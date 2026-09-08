@@ -4,6 +4,13 @@ on:
   push:
     branches: ['likivik/**', 'main']
   workflow_dispatch:
+    inputs:
+      flavor:
+        description: 'Flavor to build (hermes | iris | all)'
+        required: false
+        default: 'all'
+        type: choice
+        options: [all, hermes, iris]
 
 jobs:
   build:
@@ -21,8 +28,17 @@ jobs:
       - name: Setup Gradle (cached)
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build release APKs (both flavors)
-        run: ./gradlew assembleRelease --no-daemon -Dorg.gradle.workers.max=2
+      - name: Build release APKs
+        env:
+          FLAVOR: ${{ github.event.inputs.flavor || 'all' }}
+        # FLAVOR is a workflow-input enum (all|hermes|iris), never free text — no injection risk
+        run: |
+          case "$FLAVOR" in
+            hermes) TASKS="assembleHermesRelease" ;;
+            iris)   TASKS="assembleIrisRelease" ;;
+            *)      TASKS="assembleRelease" ;;
+          esac
+          ./gradlew $TASKS --no-daemon -Dorg.gradle.workers.max=2
 
       - name: Sign APKs
         env:
