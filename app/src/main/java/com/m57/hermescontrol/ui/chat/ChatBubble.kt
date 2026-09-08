@@ -563,17 +563,25 @@ private fun SystemBubble(
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp),
+                .padding(horizontal = 24.dp, vertical = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            text = message.content,
-            style =
-                MaterialTheme.typography.bodySmall.copy(
-                    fontStyle = FontStyle.Italic,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-        )
+        // Likivik patch: system status lines render as Telegram-style center
+        // pills (compact, single-line, muted) instead of full-width text rows.
+        Surface(
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+            tonalElevation = 0.dp,
+        ) {
+            Text(
+                text = message.content,
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 3.dp),
+            )
+        }
 
         // Approval action buttons
         if (message.approvalInfo != null) {

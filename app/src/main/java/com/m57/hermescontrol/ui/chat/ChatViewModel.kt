@@ -103,6 +103,7 @@ data class ChatUiState(
     val sessions: List<SessionUi> = emptyList(),
     val chatTitle: String = "Hermes",
     val connectionStatus: ConnectionStatus = ConnectionStatus.DISCONNECTED,
+    val statusPill: String? = null,
     val isAgentTyping: Boolean = false,
     val isThinking: Boolean = false,
     val thinkingText: String = "",
@@ -425,7 +426,7 @@ class ChatViewModel(
 
     private fun handleGatewayReady() {
         _uiState.update { it.copy(isLoading = false) }
-        addSystemMessage("Connected to Hermes")
+        addSystemMessage("Connected to Hermes", transient = true)
         loadSessions()
         fetchCommandCatalog()
         fetchModelContextLength()
@@ -873,7 +874,7 @@ class ChatViewModel(
                 }
                 // Mirror the active runtime session id app-wide (issue #532).
                 ActiveSessionHolder.set(runtimeSessionId ?: sessionId, sessionId)
-                addSystemMessage("Session resumed")
+                addSystemMessage("Session resumed", transient = true)
             }
 
             WsMethods.SESSION_INTERRUPT -> {
@@ -1472,6 +1473,26 @@ class ChatViewModel(
 
     /** Liveness timer for the newest unacknowledged `session.create`. */
     private var sessionCreateJob: Job? = null
+    private var statusPillJob: Job? = null
+
+    // ── Likivik patch: pinned sessions for the rail ──
+    private val railPrefs by lazy {
+        application.applicationContext.getSharedPreferences("hermes_rail", 0)
+    }
+    private val _pinnedSessionIds = MutableStateFlow(
+        railPrefs.getStringSet("pinned", emptySet())?.toSet() ?: emptySet(),
+    )
+    val pinnedSessionIds: StateFlow<Set<String>> = _pinnedSessionIds.asStateFlow()
+
+    fun togglePinSession(sessionId: String) {
+        val next = if (sessionId in _pinnedSessionIds.value) {
+            _pinnedSessionIds.value - sessionId
+        } else {
+            _pinnedSessionIds.value + sessionId
+        }
+        railPrefs.edit().putStringSet("pinned", next).apply()
+        _pinnedSessionIds.value = next
+    }
 
     /**
      * Ask the gateway for a fresh conversation.
@@ -1957,12 +1978,15 @@ class ChatViewModel(
         _uiState.update {
             val title = it.sessions.find { s -> s.id == sessionId }?.title ?: "Hermes"
             it.copy(
-                isLoading = true,
+                isLoading = false,
                 isSessionReady = false,
                 isLoadingOlder = false,
                 hasOlderMessages = false,
                 currentSessionId = sessionId,
-                messages = emptyList(),
+                // Likivik patch: don't wipe to emptyList — keep whatever is on
+                // screen until loadCachedMessages(sessionId) swaps in the cached
+                // transcript. Prevents the blank-flash on every switch.
+                messages = it.messages,
                 subagentIndicators = emptyList(),
                 todos = emptyList(),
                 chatTitle = title,
@@ -1981,6 +2005,10 @@ class ChatViewModel(
         // Mirror the active session id app-wide (issue #532).
         ActiveSessionHolder.set(sessionId)
         _streamingState.update { StreamingState() }
+        // Likivik patch: paint from Room cache immediately instead of staring at
+        // a blank loading screen while the network round-trip completes. The
+        // authoritative refresh below (loadSessionMessages) converges the view.
+        loadCachedMessages(sessionId)
         viewModelScope.launch {
             // Resume the selected desktop session, then load its complete transcript.
             launch(Dispatchers.IO) {
@@ -3104,7 +3132,21 @@ class ChatViewModel(
     private fun addSystemMessage(
         text: String,
         persist: Boolean = false,
+        transient: Boolean = false,
     ) {
+        // Likivik patch: connection/resume noise ("Session resumed", "Connected
+        // to Hermes") used to be appended as list items, which bumped the whole
+        // chat via tail-follow scrolling. These are surfaced as a transient
+        // status pill instead and never enter the message list.
+        if (transient) {
+            _uiState.update { it.copy(statusPill = text) }
+            statusPillJob?.cancel()
+            statusPillJob = viewModelScope.launch {
+                kotlinx.coroutines.delay(2500)
+                _uiState.update { it.copy(statusPill = null) }
+            }
+            return
+        }
         val msg = ChatMessage(role = MessageRole.SYSTEM, content = text)
         val sessionId = _uiState.value.currentSessionId
 

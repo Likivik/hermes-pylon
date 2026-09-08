@@ -53,6 +53,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -535,9 +536,20 @@ fun ChatScreen(
             }
         },
     ) { _ ->
+        // Likivik patch: Telegram-style session rail on the leading edge.
+        val pinnedIds by viewModel.pinnedSessionIds.collectAsState()
+        Row(modifier = Modifier.fillMaxSize()) {
+            SessionRail(
+                sessions = state.sessions,
+                currentSessionId = state.currentSessionId,
+                pinnedSessionIds = pinnedIds,
+                onSwitch = { viewModel.switchSession(it) },
+                onTogglePin = { viewModel.togglePinSession(it) },
+            )
         Column(
             modifier =
                 Modifier
+                    .weight(1f)
                     .fillMaxSize()
                     .background(backgroundGradient)
                     .imePadding(),
@@ -547,6 +559,28 @@ fun ChatScreen(
                 onReconnect = viewModel::reconnect,
                 onReloginClick = { showReloginDialog = true },
             )
+
+            // Likivik patch: transient status pill (replaces "Session resumed" /
+            // "Connected to Hermes" list items so the chat no longer bumps).
+            state.statusPill?.let { pill ->
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Surface(
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
+                        tonalElevation = 1.dp,
+                    ) {
+                        Text(
+                            text = pill,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        )
+                    }
+                }
+            }
 
             visibleCredentialWarning?.let { warning ->
                 CredentialWarningBanner(
@@ -743,6 +777,7 @@ fun ChatScreen(
                 onReasoningTap = { level -> viewModel.setReasoningLevel(level) },
             )
         }
+        } // Likivik patch: close the rail Row
 
         if (showReloginDialog) {
             ReloginDialog(
