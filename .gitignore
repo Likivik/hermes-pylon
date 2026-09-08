@@ -26,3 +26,4 @@ __pycache__/
 .direnv/
 hermes-chat-redesign.html
 gradle.properties.local
+result
