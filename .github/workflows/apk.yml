@@ -6,11 +6,11 @@ on:
   workflow_dispatch:
     inputs:
       flavor:
-        description: 'Flavor to build (hermes | iris | all)'
+        description: 'Flavor to build (iris = default | hermes | all)'
         required: false
-        default: 'all'
+        default: 'iris'
         type: choice
-        options: [all, hermes, iris]
+        options: [iris, hermes, all]
 
 jobs:
   build:
@@ -30,7 +30,7 @@ jobs:
 
       - name: Build release APKs
         env:
-          FLAVOR: ${{ github.event.inputs.flavor || 'all' }}
+          FLAVOR: ${{ github.event.inputs.flavor || 'iris' }}
         # FLAVOR is a workflow-input enum (all|hermes|iris), never free text — no injection risk
         run: |
           case "$FLAVOR" in
