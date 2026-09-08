@@ -11,6 +11,12 @@ on:
         default: 'iris'
         type: choice
         options: [iris, hermes, all]
+      variant:
+        description: 'Variant (release = default | debug)'
+        required: false
+        default: 'release'
+        type: choice
+        options: [release, debug]
 
 jobs:
   build:
@@ -28,19 +34,22 @@ jobs:
       - name: Setup Gradle (cached)
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build release APKs
+      - name: Build APK
         env:
           FLAVOR: ${{ github.event.inputs.flavor || 'iris' }}
-        # FLAVOR is a workflow-input enum (all|hermes|iris), never free text — no injection risk
+          VARIANT: ${{ github.event.inputs.variant || 'release' }}
+        # FLAVOR/VARIANT are workflow-input enums (all|hermes|iris / release|debug), never free text — no injection risk
         run: |
           case "$FLAVOR" in
-            hermes) TASKS="assembleHermesRelease" ;;
-            iris)   TASKS="assembleIrisRelease" ;;
-            *)      TASKS="assembleRelease" ;;
+            hermes) F="Hermes" ;;
+            iris)   F="Iris" ;;
+            *)      F="" ;;
           esac
-          ./gradlew $TASKS --no-daemon -Dorg.gradle.workers.max=2
+          V=$(echo "$VARIANT" | sed 's/^./\U&/')   # release→Release, debug→Debug
+          ./gradlew "assemble${F}${V}" --no-daemon -Dorg.gradle.workers.max=2
 
-      - name: Sign APKs
+      - name: Sign APKs (release only)
+        if: ${{ github.event.inputs.variant != 'debug' }}
         env:
           KS_BASE64: ${{ secrets.APK_KEYSTORE_BASE64 }}
           KS_PASS: ${{ secrets.APK_KEYSTORE_PASSWORD }}
@@ -56,9 +65,18 @@ jobs:
           done
           rm -f /tmp/keystore.jks
 
-      - name: Upload artifacts
+      - name: Upload artifacts (release)
+        if: ${{ github.event.inputs.variant != 'debug' }}
         uses: actions/upload-artifact@v4
         with:
           name: hermes-pylon-apks
           path: app/build/outputs/apk/*/release/*-signed.apk
           retention-days: 90
+
+      - name: Upload artifacts (debug)
+        if: ${{ github.event.inputs.variant == 'debug' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: hermes-pylon-apks-debug
+          path: app/build/outputs/apk/*/debug/*.apk
+          retention-days: 14
