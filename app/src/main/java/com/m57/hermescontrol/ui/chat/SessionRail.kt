@@ -2,6 +2,7 @@ package com.m57.hermescontrol.ui.chat
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -71,7 +72,11 @@ fun SessionRail(
     val unpinned = sessions.filter { it.id !in pinnedSessionIds }
     val fresh = unpinned.filter { !it.isStale }
     val stale = unpinned.filter { it.isStale }
-    val ordered = pinned + fresh + stale
+
+    // Likivik patch v3: stale sessions collapse into an "archive" subfolder —
+    // a single dimmed drawer chip at the bottom. Expand = lazy column of stale
+    // chips (still one tap to switch). Collapse preference persists.
+    var archiveOpen by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -85,17 +90,86 @@ fun SessionRail(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            items(ordered, key = { it.id }) { session ->
+            items(pinned, key = { it.id }) { session ->
                 RailItem(
                     session = session,
                     active = session.id == currentSessionId,
-                    pinned = session.id in pinnedSessionIds,
+                    pinned = true,
                     onSwitch = onSwitch,
                     onTogglePin = onTogglePin,
                     onDelete = onDelete,
                 )
             }
+            items(fresh, key = { it.id }) { session ->
+                RailItem(
+                    session = session,
+                    active = session.id == currentSessionId,
+                    pinned = false,
+                    onSwitch = onSwitch,
+                    onTogglePin = onTogglePin,
+                    onDelete = onDelete,
+                )
+            }
+            if (stale.isNotEmpty()) {
+                item(key = "archive-folder") {
+                    ArchiveChip(
+                        count = stale.size,
+                        activeInside = stale.any { it.id == currentSessionId },
+                        open = archiveOpen,
+                        onClick = { archiveOpen = !archiveOpen },
+                    )
+                }
+                if (archiveOpen) {
+                    items(stale, key = { it.id }) { session ->
+                        RailItem(
+                            session = session,
+                            active = session.id == currentSessionId,
+                            pinned = false,
+                            onSwitch = onSwitch,
+                            onTogglePin = onTogglePin,
+                            onDelete = onDelete,
+                        )
+                    }
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun ArchiveChip(count: Int, activeInside: Boolean, open: Boolean, onClick: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(
+                if (activeInside) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                else Color.Transparent,
+            )
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp),
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(32.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+        ) {
+            Text(
+                text = if (open) "▲" else "▾",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.height(2.dp))
+        Text(
+            text = "old·$count",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
