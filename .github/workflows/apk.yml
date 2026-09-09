@@ -3,6 +3,12 @@ name: Build signed APK
 on:
   push:
     branches: ['likivik/**', 'main']
+    paths:
+      - 'app/**'
+      - 'gradle/**'
+      - '*.gradle*'
+      - 'gradle.properties'
+      - '.github/workflows/apk.yml'
   workflow_dispatch:
     inputs:
       flavor:
