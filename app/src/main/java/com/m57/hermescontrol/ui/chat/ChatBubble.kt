@@ -373,7 +373,9 @@ private fun AssistantBubble(
             Surface(
                 modifier =
                     Modifier
-                        .bubbleMaxWidth()
+                        // Likivik patch: stretch assistant responses to full width
+                        // (readability for long/markdown answers). User bubbles stay 80%.
+                        .bubbleMaxWidth(fraction = 1f)
                         .animateContentSize()
                         .clip(
                             RoundedCornerShape(
