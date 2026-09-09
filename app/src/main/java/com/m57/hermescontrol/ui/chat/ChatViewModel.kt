@@ -2032,7 +2032,11 @@ class ChatViewModel(
                     state.copy(
                         messages = cachedMessages,
                         todos = restoredTodos(state.todos, cachedMessages),
-                        isLoading = false,
+                        // Likivik patch v2: do NOT clear isLoading here — the
+                        // network fetch (loadSessionMessages) owns the loading
+                        // state. Clearing it raced the fetch completion and
+                        // left freshly-switched sessions stuck on "empty chat".
+                        isLoading = state.isLoading,
                     )
                 } else {
                     state
