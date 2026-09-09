@@ -153,7 +153,7 @@ internal fun storeRecentIcon(context: Context, emoji: String) {
     val prefs = recentsPrefs(context)
     val cur = (prefs.getStringSet("icon_recents", emptySet()) ?: emptySet()).toMutableSet()
     cur.add(emoji)
-    // Keep only the most recent 12.
-    val recent = cur.takeLast(12)
+    // Keep only the most recent 12 (StringSet has no reliable order; cap is what matters).
+    val recent = cur.toList().takeLast(12).toMutableSet()
     prefs.edit().putStringSet("icon_recents", recent).apply()
 }
