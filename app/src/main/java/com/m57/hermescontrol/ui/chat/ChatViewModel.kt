@@ -186,7 +186,18 @@ data class SessionUi(
     val messageCount: Int = 0,
     val parentSessionId: String? = null,
     val depth: Int = 0,
-)
+    // Unix seconds of last activity (from session.list "started_at"); 0 = unknown
+    val lastActive: Long = 0,
+) {
+    /** Stale = no activity for 7+ days (0/unknown counts as stale). */
+    val isStale: Boolean
+        get() = lastActive <= 0 ||
+            lastActive * 1000 < System.currentTimeMillis() - STALE_THRESHOLD_MS
+
+    companion object {
+        private const val STALE_THRESHOLD_MS = 7L * 24 * 60 * 60 * 1000
+    }
+}
 
 data class ClarifyUi(
     val text: String,
@@ -800,6 +811,7 @@ class ChatViewModel(
                             id = s["id"] as? String ?: "",
                             title = s["title"] as? String ?: "Untitled",
                             messageCount = (s["message_count"] as? Double)?.toInt() ?: 0,
+                            lastActive = (s["started_at"] as? Double)?.toLong() ?: 0L,
                         )
                     }
                 _uiState.update { state ->
@@ -1492,6 +1504,27 @@ class ChatViewModel(
         }
         railPrefs.edit().putStringSet("pinned", next).apply()
         _pinnedSessionIds.value = next
+    }
+
+    /**
+     * Likivik patch: delete a session from the rail's long-press menu.
+     * Fire-and-forget over the WS socket, then drop it from the local list
+     * (and pins) immediately so the rail reflects reality without waiting
+     * for the next session.list round-trip.
+     */
+    fun deleteRailSession(sessionId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            wsClient.send(
+                WsMethods.SESSION_DELETE,
+                mapOf("session_id" to sessionId),
+            )
+        }
+        _pinnedSessionIds.value.let { pins ->
+            if (sessionId in pins) togglePinSession(sessionId)
+        }
+        _uiState.update { state ->
+            state.copy(sessions = state.sessions.filter { it.id != sessionId })
+        }
     }
 
     /**

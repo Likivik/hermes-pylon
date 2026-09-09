@@ -8,10 +8,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -55,14 +61,17 @@ fun SessionRail(
     pinnedSessionIds: Set<String>,
     onSwitch: (String) -> Unit,
     onTogglePin: (String) -> Unit,
+    onDelete: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     if (sessions.isEmpty()) return
     val railBg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
 
     val pinned = sessions.filter { it.id in pinnedSessionIds }
-    val rest = sessions.filter { it.id !in pinnedSessionIds }
-    val ordered = pinned + rest
+    val unpinned = sessions.filter { it.id !in pinnedSessionIds }
+    val fresh = unpinned.filter { !it.isStale }
+    val stale = unpinned.filter { it.isStale }
+    val ordered = pinned + fresh + stale
 
     Column(
         modifier = modifier
@@ -83,6 +92,7 @@ fun SessionRail(
                     pinned = session.id in pinnedSessionIds,
                     onSwitch = onSwitch,
                     onTogglePin = onTogglePin,
+                    onDelete = onDelete,
                 )
             }
         }
@@ -97,8 +107,11 @@ private fun RailItem(
     pinned: Boolean,
     onSwitch: (String) -> Unit,
     onTogglePin: (String) -> Unit,
+    onDelete: (String) -> Unit,
 ) {
     val tint = railColorFor(session.id)
+    var menuOpen by remember { mutableStateOf(false) }
+    val alpha = if (session.isStale && !active) 0.38f else 1f
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
@@ -110,23 +123,33 @@ private fun RailItem(
             )
             .combinedClickable(
                 onClick = { onSwitch(session.id) },
-                onLongClick = { onTogglePin(session.id) },
+                onLongClick = { menuOpen = true },
             )
             .padding(vertical = 4.dp),
     ) {
+        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+            DropdownMenuItem(
+                text = { Text(if (pinned) "Unpin" else "Pin") },
+                onClick = { menuOpen = false; onTogglePin(session.id) },
+            )
+            DropdownMenuItem(
+                text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
+                onClick = { menuOpen = false; onDelete(session.id) },
+            )
+        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .size(32.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(tint),
+                    .background(tint.copy(alpha = alpha)),
             ) {
                 Text(
                     text = session.title.trim().take(1).uppercase().ifEmpty { "?" },
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White,
+                    color = Color.White.copy(alpha = alpha),
                 )
             }
             if (pinned) {
@@ -146,7 +169,7 @@ private fun RailItem(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             color = if (active) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.onSurfaceVariant,
+            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
             fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
         )
     }

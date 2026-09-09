@@ -545,6 +545,10 @@ fun ChatScreen(
                 pinnedSessionIds = pinnedIds,
                 onSwitch = { viewModel.switchSession(it) },
                 onTogglePin = { viewModel.togglePinSession(it) },
+                onDelete = { id ->
+                    // Guard: never delete the session we're looking at.
+                    if (id != state.currentSessionId) viewModel.deleteRailSession(id)
+                },
             )
         Column(
             modifier =
