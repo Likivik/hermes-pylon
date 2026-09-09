@@ -60,9 +60,11 @@ fun SessionRail(
     sessions: List<SessionUi>,
     currentSessionId: String?,
     pinnedSessionIds: Set<String>,
+    railMeta: Map<String, ChatViewModel.RailMeta> = emptyMap(),
     onSwitch: (String) -> Unit,
     onTogglePin: (String) -> Unit,
     onDelete: (String) -> Unit = {},
+    onEdit: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     if (sessions.isEmpty()) return
@@ -93,21 +95,25 @@ fun SessionRail(
             items(pinned, key = { it.id }) { session ->
                 RailItem(
                     session = session,
+                    meta = railMeta[session.id],
                     active = session.id == currentSessionId,
                     pinned = true,
                     onSwitch = onSwitch,
                     onTogglePin = onTogglePin,
                     onDelete = onDelete,
+                    onEdit = onEdit,
                 )
             }
             items(fresh, key = { it.id }) { session ->
                 RailItem(
                     session = session,
+                    meta = railMeta[session.id],
                     active = session.id == currentSessionId,
                     pinned = false,
                     onSwitch = onSwitch,
                     onTogglePin = onTogglePin,
                     onDelete = onDelete,
+                    onEdit = onEdit,
                 )
             }
             if (stale.isNotEmpty()) {
@@ -123,11 +129,13 @@ fun SessionRail(
                     items(stale, key = { it.id }) { session ->
                         RailItem(
                             session = session,
+                            meta = railMeta[session.id],
                             active = session.id == currentSessionId,
                             pinned = false,
                             onSwitch = onSwitch,
                             onTogglePin = onTogglePin,
                             onDelete = onDelete,
+                            onEdit = onEdit,
                         )
                     }
                 }
@@ -177,15 +185,20 @@ private fun ArchiveChip(count: Int, activeInside: Boolean, open: Boolean, onClic
 @Composable
 private fun RailItem(
     session: SessionUi,
+    meta: ChatViewModel.RailMeta?,
     active: Boolean,
     pinned: Boolean,
     onSwitch: (String) -> Unit,
     onTogglePin: (String) -> Unit,
     onDelete: (String) -> Unit,
+    onEdit: (String) -> Unit,
 ) {
     val tint = railColorFor(session.id)
     var menuOpen by remember { mutableStateOf(false) }
     val alpha = if (session.isStale && !active) 0.38f else 1f
+    // Custom icon (emoji) overrides the auto initial; the label equals the real title.
+    val avatarText = meta?.icon ?: session.title.trim().take(1).uppercase().ifEmpty { "?" }
+    val labelText = session.title.trim().take(9)
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
@@ -202,6 +215,10 @@ private fun RailItem(
             .padding(vertical = 4.dp),
     ) {
         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+            DropdownMenuItem(
+                text = { Text("Edit icon / name") },
+                onClick = { menuOpen = false; onEdit(session.id) },
+            )
             DropdownMenuItem(
                 text = { Text(if (pinned) "Unpin" else "Pin") },
                 onClick = { menuOpen = false; onTogglePin(session.id) },
@@ -220,7 +237,7 @@ private fun RailItem(
                     .background(tint.copy(alpha = alpha)),
             ) {
                 Text(
-                    text = session.title.trim().take(1).uppercase().ifEmpty { "?" },
+                    text = avatarText,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = Color.White.copy(alpha = alpha),
@@ -238,7 +255,7 @@ private fun RailItem(
         }
         Spacer(Modifier.height(2.dp))
         Text(
-            text = session.title.trim().take(9),
+            text = labelText,
             style = MaterialTheme.typography.labelSmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

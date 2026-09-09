@@ -21,9 +21,12 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -49,6 +52,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -538,17 +542,21 @@ fun ChatScreen(
     ) { _ ->
         // Likivik patch: Telegram-style session rail on the leading edge.
         val pinnedIds by viewModel.pinnedSessionIds.collectAsState()
+        val railMeta by viewModel.railMeta.collectAsState()
+        var editingSessionId by remember { mutableStateOf<String?>(null) }
         Row(modifier = Modifier.fillMaxSize()) {
             SessionRail(
                 sessions = state.sessions,
                 currentSessionId = state.currentSessionId,
                 pinnedSessionIds = pinnedIds,
+                railMeta = railMeta,
                 onSwitch = { viewModel.switchSession(it) },
                 onTogglePin = { viewModel.togglePinSession(it) },
                 onDelete = { id ->
                     // Guard: never delete the session we're looking at.
                     if (id != state.currentSessionId) viewModel.deleteRailSession(id)
                 },
+                onEdit = { editingSessionId = it },
             )
         Column(
             modifier =
@@ -865,6 +873,19 @@ fun ChatScreen(
                 onClose = viewModel::closeMediaPlayer,
             )
         }
+
+        // Likivik patch: icon + name editor for a rail session (long-press → Edit).
+        editingSessionId?.let { sessionId ->
+            RailEditDialog(
+                currentName = state.sessions.find { it.id == sessionId }?.title ?: "",
+                currentIcon = railMeta[sessionId]?.icon,
+                onDismiss = { editingSessionId = null },
+                onSave = { icon, name ->
+                    editingSessionId = null
+                    viewModel.renameSession(sessionId, name, icon)
+                },
+            )
+        }
     }
 }
 
@@ -875,3 +896,72 @@ private fun ChatUiState.contextWindowTokens(): Long? =
             fallbackModel = modelContextLengthModel,
             fallbackLength = modelContextLength,
         )
+
+// Likivik patch: rail session icon + name editor (long-press a rail chip → Edit).
+private val RailIconChoices = listOf(
+    "💬", "🤖", "⚡", "📝", "🧠", "🛠️", "🏠", "💼",
+    "📅", "🎯", "🎨", "📚", "🔒", "🌐", "💰", "⭐",
+)
+
+@Composable
+private fun RailEditDialog(
+    currentName: String,
+    currentIcon: String?,
+    onDismiss: () -> Unit,
+    onSave: (icon: String?, name: String) -> Unit,
+) {
+    var name by remember { mutableStateOf(currentName) }
+    var icon by remember { mutableStateOf(currentIcon ?: "") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Session icon & name") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Short name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(12.dp))
+                Text("Icon", style = MaterialTheme.typography.labelMedium)
+                Spacer(Modifier.height(6.dp))
+                // Icon grid: 8 emoji per row, 2 rows.
+                RailIconChoices.chunked(8).forEach { rowIcons ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        rowIcons.forEach { emoji ->
+                            val selected = icon == emoji
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
+                                        else MaterialTheme.colorScheme.surfaceVariant,
+                                    )
+                                    .clickable { icon = if (selected) "" else emoji },
+                            ) {
+                                Text(emoji, style = MaterialTheme.typography.titleMedium)
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = if (icon.isEmpty()) "No icon — auto letter" else "Icon: $icon",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(icon, name) }) { Text(stringResource(R.string.common_save)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
+        },
+    )
+}

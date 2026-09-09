@@ -1496,6 +1496,62 @@ class ChatViewModel(
     )
     val pinnedSessionIds: StateFlow<Set<String>> = _pinnedSessionIds.asStateFlow()
 
+    // ── Likivik patch: per-session rail customization (icon emoji only; the
+    // name shown equals the real session title, renamed via session.title) ──
+    data class RailMeta(val icon: String? = null)
+
+    private val _railMeta = MutableStateFlow(
+        loadRailMeta(),
+    )
+    val railMeta: StateFlow<Map<String, RailMeta>> = _railMeta.asStateFlow()
+
+    private fun loadRailMeta(): Map<String, RailMeta> {
+        val all = railPrefs.all
+        val map = mutableMapOf<String, RailMeta>()
+        for ((key, value) in all) {
+            if (key.startsWith("icon_") && value is String) {
+                map[key.removePrefix("icon_")] = RailMeta(value.takeIf { it.isNotEmpty() })
+            }
+        }
+        return map
+    }
+
+    fun saveRailMeta(sessionId: String, icon: String?) {
+        val cleanIcon = icon?.takeIf { it.isNotEmpty() }
+        if (cleanIcon == null) {
+            railPrefs.edit().remove("icon_$sessionId").apply()
+        } else {
+            railPrefs.edit().putString("icon_$sessionId", cleanIcon).apply()
+        }
+        _railMeta.value = _railMeta.value + (sessionId to RailMeta(cleanIcon))
+    }
+
+    /**
+     * Likivik patch: rename the session's real title on the server
+     * (`session.title`). The rail name equals the actual session name — this
+     * updates the header and every surface, not just the rail. Optionally sets
+     * a rail icon (local decoration) in the same go.
+     */
+    fun renameSession(sessionId: String, newTitle: String, icon: String?) {
+        saveRailMeta(sessionId, icon)
+        val title = newTitle.trim().takeIf { it.isNotEmpty() } ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            wsClient.send(
+                WsMethods.SESSION_TITLE,
+                mapOf("session_id" to sessionId, "title" to title),
+            )
+        }
+        // Reflect immediately in the local session list.
+        _uiState.update { state ->
+            state.copy(
+                sessions = state.sessions.map {
+                    if (it.id == sessionId) it.copy(title = title) else it
+                },
+                chatTitle = if (state.currentSessionId == sessionId) title else state.chatTitle,
+            )
+        }
+    }
+
     fun togglePinSession(sessionId: String) {
         val next = if (sessionId in _pinnedSessionIds.value) {
             _pinnedSessionIds.value - sessionId
