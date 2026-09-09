@@ -898,11 +898,6 @@ private fun ChatUiState.contextWindowTokens(): Long? =
         )
 
 // Likivik patch: rail session icon + name editor (long-press a rail chip → Edit).
-private val RailIconChoices = listOf(
-    "💬", "🤖", "⚡", "📝", "🧠", "🛠️", "🏠", "💼",
-    "📅", "🎯", "🎨", "📚", "🔒", "🌐", "💰", "⭐",
-)
-
 @Composable
 private fun RailEditDialog(
     currentName: String,
@@ -910,6 +905,7 @@ private fun RailEditDialog(
     onDismiss: () -> Unit,
     onSave: (icon: String?, name: String) -> Unit,
 ) {
+    val context = LocalContext.current
     var name by remember { mutableStateOf(currentName) }
     var icon by remember { mutableStateOf(currentIcon ?: "") }
 
@@ -928,27 +924,9 @@ private fun RailEditDialog(
                 Spacer(Modifier.height(12.dp))
                 Text("Icon", style = MaterialTheme.typography.labelMedium)
                 Spacer(Modifier.height(6.dp))
-                // Icon grid: 8 emoji per row, 2 rows.
-                RailIconChoices.chunked(8).forEach { rowIcons ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        rowIcons.forEach { emoji ->
-                            val selected = icon == emoji
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
-                                        else MaterialTheme.colorScheme.surfaceVariant,
-                                    )
-                                    .clickable { icon = if (selected) "" else emoji },
-                            ) {
-                                Text(emoji, style = MaterialTheme.typography.titleMedium)
-                            }
-                        }
-                    }
-                }
+                // Likivik patch: full Telegram-style emoji picker (search, tabs,
+                // recents) backed by Org.Kodein.Emoji.
+                EmojiPickerSection(selected = icon, onSelect = { icon = it })
                 Spacer(Modifier.height(8.dp))
                 Text(
                     text = if (icon.isEmpty()) "No icon — auto letter" else "Icon: $icon",
@@ -958,7 +936,12 @@ private fun RailEditDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(icon, name) }) { Text(stringResource(R.string.common_save)) }
+            TextButton(
+                onClick = {
+                    if (icon.isNotEmpty()) storeRecentIcon(context, icon)
+                    onSave(icon, name)
+                },
+            ) { Text(stringResource(R.string.common_save)) }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
