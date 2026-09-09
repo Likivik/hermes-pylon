@@ -10,12 +10,25 @@ import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.remote.NetworkMonitor
 import com.m57.hermescontrol.data.remote.OkHttpProvider
 import com.m57.hermescontrol.ui.analytics.AnalyticsPreloader
+import io.kseongbin.crashwatcher.CrashLogger
+import io.kseongbin.crashwatcher.CrashLoggerConfig
 
 class HermesControlApp :
     Application(),
     ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
+        // Likivik patch: capture crashes + ANRs to an app-scoped dir so they can
+        // be uploaded for diagnosis (no logcat/ADB available on-device).
+        CrashLogger.initialize(
+            this,
+            CrashLoggerConfig(
+                enableCrashDetection = true,
+                enableAnrDetection = true,
+                maxLogFiles = 20,
+                logFilePrefix = "hermes_app",
+            ),
+        )
         AuthManager.init(this)
         // Issue #478: guarantee a "Default" profile is always selected so there is no
         // separate standalone/default code path anywhere in the app.

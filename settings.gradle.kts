@@ -22,6 +22,8 @@ dependencyResolutionManagement {
             }
         }
         mavenCentral()
+        // Likivik patch: CrashWatcher (crash/ANR capture) is distributed via JitPack.
+        maven { url = uri("https://jitpack.io") }
     }
 }
 

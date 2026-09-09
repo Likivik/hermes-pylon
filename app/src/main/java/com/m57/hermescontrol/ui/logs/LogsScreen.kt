@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.HistoryEdu
 import androidx.compose.material.icons.filled.KeyboardDoubleArrowDown
 import androidx.compose.material.icons.filled.Pause
@@ -141,6 +142,13 @@ fun LogsScreen(
                 Icon(
                     imageVector = Icons.Filled.Share,
                     contentDescription = stringResource(R.string.logs_action_export),
+                )
+            }
+            // Likivik patch: upload CrashWatcher app logs (crash/ANR) to Files
+            IconButton(onClick = { viewModel.uploadAppLogs() }) {
+                Icon(
+                    imageVector = Icons.Filled.FileUpload,
+                    contentDescription = stringResource(R.string.logs_action_upload),
                 )
             }
         },
