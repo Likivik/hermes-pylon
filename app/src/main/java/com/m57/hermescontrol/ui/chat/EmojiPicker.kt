@@ -35,7 +35,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import org.kodein.emoji.Emoji
+import org.kodein.emoji.*
 
 /**
  * Likivik patch: full Telegram-style emoji picker for rail session icons.

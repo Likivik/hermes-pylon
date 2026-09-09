@@ -10,8 +10,8 @@ import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.remote.NetworkMonitor
 import com.m57.hermescontrol.data.remote.OkHttpProvider
 import com.m57.hermescontrol.ui.analytics.AnalyticsPreloader
-import io.kseongbin.crashwatcher.CrashLogger
-import io.kseongbin.crashwatcher.CrashLoggerConfig
+import io.kseongbin.stacktrace.CrashLogger
+import io.kseongbin.stacktrace.CrashLoggerConfig
 
 class HermesControlApp :
     Application(),
