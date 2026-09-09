@@ -564,28 +564,6 @@ fun ChatScreen(
                 onReloginClick = { showReloginDialog = true },
             )
 
-            // Likivik patch: transient status pill (replaces "Session resumed" /
-            // "Connected to Hermes" list items so the chat no longer bumps).
-            state.statusPill?.let { pill ->
-                Box(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Surface(
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
-                        tonalElevation = 1.dp,
-                    ) {
-                        Text(
-                            text = pill,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                        )
-                    }
-                }
-            }
-
             visibleCredentialWarning?.let { warning ->
                 CredentialWarningBanner(
                     warning = warning,
@@ -638,6 +616,34 @@ fun ChatScreen(
                         .weight(1f)
                         .fillMaxWidth(),
             ) {
+                // Likivik patch: status pill as an overlay on the message list,
+                // NOT in the column flow — so it floats over the messages and
+                // never reflows/bumps the list when it appears or dismisses.
+                androidx.compose.runtime.remember(state.statusPill) {
+                    state.statusPill
+                }?.let { pill ->
+                    Box(
+                        modifier =
+                            Modifier
+                                .align(Alignment.TopCenter)
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 4.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Surface(
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
+                            tonalElevation = 1.dp,
+                        ) {
+                            Text(
+                                text = pill,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                            )
+                        }
+                    }
+                }
                 ChatMessageList(
                     messages = state.messages,
                     streamingMessage = streamingState.streamingMessage,
