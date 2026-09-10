@@ -45,8 +45,14 @@ jobs:
             iris)   F="Iris" ;;
             *)      F="" ;;
           esac
-          V=$(echo "$VARIANT" | sed 's/^./\U&/')   # release→Release, debug→Debug
-          ./gradlew "assemble${F}${V}" --no-daemon -Dorg.gradle.workers.max=2
+          V=$(echo "$VARIANT" | sed 's/^./\U&/')
+          # Version bumps every build so Android treats it as a real upgrade:
+          # versionCode = tag number (apk-7 -> 7); versionName = full tag.
+          REF="${GITHUB_REF_NAME:-}"
+          VCODE="${REF#apk-}"; VCODE="${VCODE%%-*}"
+          [ "$VCODE" = "$REF" ] && VCODE=""
+          ./gradlew "assemble${F}${V}" --no-daemon -Dorg.gradle.workers.max=2 \
+            ${VCODE:+-PversionCode=$VCODE -PversionName=$REF}
 
       - name: Sign APKs (release only)
         if: ${{ github.event.inputs.variant != 'debug' }}
