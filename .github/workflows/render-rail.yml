@@ -24,11 +24,14 @@ jobs:
       - name: Render Compose preview screenshots
         run: ./gradlew :app:updateScreenshotTest --no-daemon -Dorg.gradle.workers.max=2
 
+      - name: Locate rendered images
+        run: |
+          echo "== PNGs under app =="
+          find app -name '*.png' -print || true
+
       - name: Upload rendered rail PNGs
         uses: actions/upload-artifact@v5
         with:
           name: rail-render
-          path: |
-            app/src/screenshotTest/images/**/*.png
-            app/build/screenshotTest/**/*.png
+          path: app/**/*.png
           retention-days: 14
