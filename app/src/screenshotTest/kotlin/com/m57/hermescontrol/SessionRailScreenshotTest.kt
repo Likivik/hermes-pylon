@@ -21,7 +21,10 @@ private val FakeSessions = listOf(
 )
 
 @PreviewTest
-@Preview(name = "SessionRail C7", widthDp = 120, heightDp = 700, showBackground = true)
+@Preview(
+    name = "SessionRail C7",
+    device = "spec:width=120dp,height=700dp,dpi=640", // high dpi: 3.dp indicator ~= 19px (readable)
+)
 @Composable
 fun SessionRailC7() {
     HermesControlTheme {
