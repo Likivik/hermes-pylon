@@ -74,6 +74,7 @@ retrofit-converter-kotlinx-serialization = { module = "com.squareup.retrofit2:co
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version = "1.11.0" }
 emoji-kt = { module = "org.kodein.emoji:emoji-kt", version = "2.5.0" }
 crashwatcher = { module = "com.github.kseongbin:CrashWatcher", version = "1.0.0" }
+screenshot-validation-api = { group = "com.android.tools.screenshot", name = "screenshot-validation-api", version = "0.0.1-alpha15" }
 
 # Security
 androidx-security-crypto = { module = "androidx.security:security-crypto", version.ref = "securityCrypto" }

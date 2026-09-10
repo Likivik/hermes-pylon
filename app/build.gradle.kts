@@ -141,6 +141,9 @@ room {
 }
 
 dependencies {
+    // @PreviewTest annotation + validation for the screenshotTest source set.
+    "screenshotTestImplementation"(libs.screenshot.validation.api)
+
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
     androidTestImplementation(composeBom)
