@@ -71,6 +71,16 @@ internal fun heuristicEmoji(title: String): String {
     return ""
 }
 
+private val RailColors = listOf(
+    Color(0xFF7C4DFF), Color(0xFF29B6F6), Color(0xFF66BB6A),
+    Color(0xFFFF7043), Color(0xFFEC407A), Color(0xFF26C6DA),
+    Color(0xFFAB47BC), Color(0xFFFFCA28),
+)
+internal fun railColorFor(sessionId: String): Color {
+    val hash = sessionId.fold(0) { acc, c -> (acc * 31 + c.code) and 0x7FFFFFFF }
+    return RailColors[hash % RailColors.size]
+}
+
 @Composable
 fun SessionRail(
     sessions: List<SessionUi>,
