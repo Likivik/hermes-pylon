@@ -458,7 +458,14 @@ class ChatViewModel(
                 initialSessionId = null
                 switchSession(initial)
             } else {
-                createNewSession(setLoading = false)
+                // Likivik patch: resume the last-open session across launches
+                // instead of creating a new one every cold open.
+                val last = lastSession()
+                if (!last.isNullOrBlank()) {
+                    switchSession(last)
+                } else {
+                    createNewSession(setLoading = false)
+                }
             }
         }
     }
@@ -754,6 +761,8 @@ class ChatViewModel(
                 // drawer screens (e.g. Processes, issue #532) can issue
                 // session-scoped RPCs. See ActiveSessionHolder.
                 ActiveSessionHolder.set(runtimeId, storageId)
+                // Likivik patch: remember the freshly created session too.
+                persistLastSession(storageId)
                 _streamingState.update { StreamingState() }
                 addSystemMessage("Session created", persist = true)
                 loadSessions()
@@ -1496,6 +1505,15 @@ class ChatViewModel(
     )
     val pinnedSessionIds: StateFlow<Set<String>> = _pinnedSessionIds.asStateFlow()
 
+    // ── Likivik patch: remember the last-open session so a fresh app launch
+    // resumes it instead of blindly creating a new one each time. ──
+    private fun persistLastSession(id: String) {
+        railPrefs.edit().putString("last_session", id).apply()
+    }
+
+    private fun lastSession(): String? =
+        railPrefs.getString("last_session", null)?.takeIf { it.isNotBlank() }
+
     // ── Likivik patch: per-session rail customization (icon emoji only; the
     // name shown equals the real session title, renamed via session.title) ──
     data class RailMeta(val icon: String? = null)
@@ -2093,6 +2111,8 @@ class ChatViewModel(
         }
         // Mirror the active session id app-wide (issue #532).
         ActiveSessionHolder.set(sessionId)
+        // Likivik patch: remember this as the last-open session for next launch.
+        persistLastSession(sessionId)
         _streamingState.update { StreamingState() }
         // Likivik patch: paint from Room cache immediately instead of staring at
         // a blank loading screen while the network round-trip completes. The
