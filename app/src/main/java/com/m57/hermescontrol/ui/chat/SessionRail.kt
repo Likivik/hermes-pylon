@@ -197,7 +197,7 @@ private fun RailItem(
     val labelText = session.title.trim()
 
     // C7: active item = purple left-edge indicator + tinted label + subtle fill.
-    Row(
+    Box(
         modifier = Modifier
             .width(56.dp)
             .background(
@@ -209,14 +209,18 @@ private fun RailItem(
                 onLongClick = { menuOpen = true },
             ),
     ) {
-        // Left-edge indicator (inside the rail), only for active.
-        Box(
-            Modifier
-                .width(3.dp)
-                .fillMaxHeight()
-                .background(if (active) Color(0xFF7C5CFF) else Color.Transparent),
-        )
+        // Left-edge indicator (inside the rail), spanning the active item.
+        if (active) {
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .width(3.dp)
+                    .align(Alignment.CenterStart)
+                    .background(Color(0xFF7C5CFF)),
+            )
+        }
 
+        Row(modifier = Modifier.fillMaxWidth()) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.weight(1f).padding(vertical = 2.dp),
@@ -261,6 +265,7 @@ private fun RailItem(
                 else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
                 fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
             )
+            }
         }
     }
 }
