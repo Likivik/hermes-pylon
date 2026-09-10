@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sidebar C2 — floating narrow rail</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+         -webkit-font-smoothing: antialiased; color:#1c1c1e; /* gradient backdrop so the floating rail pops */ 
+         background: linear-gradient(160deg,#d9d9e3 0%,#c7c7d3 60%,#b9b9c9 100%); height:100vh; }
+  .app { display:flex; align-items:stretch; gap:8px; padding:8px; height:100vh; }
+  /* floating rail: narrow, rounded, translucent, shadow, detached from chat */
+  .rail { width:56px; background:rgba(255,255,255,.86); backdrop-filter:blur(14px);
+          border-radius:18px; box-shadow:0 8px 30px rgba(0,0,0,.10), 0 2px 8px rgba(0,0,0,.05);
+          border:1px solid rgba(255,255,255,.6); padding:8px 0; display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .brand { font-size:17px; opacity:.45; margin-bottom:2px; }
+  .items { display:flex; flex-direction:column; gap:6px; align-items:center; }
+  .it { position:relative; width:40px; height:40px; border-radius:12px; display:flex; align-items:center;
+        justify-content:center; font-size:20px; cursor:grab; }
+  .it.active { background:rgba(79,110,247,.16); }
+  /* selection line INSIDE the rail, hugging the tile's left edge */
+  .it.active::after { content:""; position:absolute; left:3px; top:8px; bottom:8px; width:3px;
+                      border-radius:3px; background:#4f6ef7; }
+  .it .chip { position:absolute; top:-4px; right:-4px; width:15px;height:15px;border-radius:50%;
+              background:#34c759; font-size:8px; color:#fff; display:none; align-items:center; justify-content:center; font-weight:700;}
+  .bar { flex:1; background:#ffffff; border-radius:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+         display:flex; align-items:center; justify-content:center; color:#d0d0d8; font-size:14px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="rail">
+    <div class="brand">⚡</div>
+    <div class="items">
+      <div class="it active" draggable="true">🧠</div>
+      <div class="it" draggable="true">🗺️</div>
+      <div class="it" draggable="true">🎨</div>
+      <div class="it" draggable="true">⚙️</div>
+      <div class="it" draggable="true">📋<span class="chip">3</span></div>
+      <div class="it" draggable="true">💬</div>
+    </div>
+  </nav>
+  <main class="bar">chat</main>
+</div>
+<script>
+  const its=[...document.querySelectorAll('.it[draggable]')]; let p=null;
+  its.forEach(el=>{ el.addEventListener('dragstart',e=>{p=el;e.dataTransfer.effectAllowed='move'});
+    el.addEventListener('dragover',e=>{ if(p&&p!==el){e.preventDefault();const n=el.parentNode,b=el.getBoundingClientRect();
+      n.insertBefore(p, e.clientY>b.top+b.offsetHeight/2?el.nextSibling:el);}});});
+</script>
+</body>
+</html>

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sidebar Variant C — Icon-first minimal</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+         -webkit-font-smoothing: antialiased; color: #1c1c1e; background: #f2f2f7; height: 100vh; }
+  .app { display:flex; height:100vh; }
+  .sidebar { width:88px; background:#ffffff; border-right:1px solid #e5e5ea; display:flex; flex-direction:column; }
+  .sessions { flex:1; overflow-y:auto; padding:10px 6px; display:flex; flex-direction:column; gap:14px; align-items:center; }
+  .ic { width:52px; height:52px; border-radius:16px; display:flex; align-items:center; justify-content:center;
+        font-size:27px; background:transparent; position:relative; cursor:grab; }
+  .ic.active::after { content:""; position:absolute; left:-8px; top:8px; bottom:8px; width:3px; border-radius:3px; background:#4f6ef7; }
+  .ic .lb { position:absolute; bottom:-13px; font-size:9.5px; color:#8e8e93; max-width:72px; text-align:center;
+            line-height:1.15; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .chat { flex:1; background:#f7f7fa; display:flex; align-items:center; justify-content:center; color:#ccc; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sessions">
+      <div class="ic active" draggable="true">🧠<div class="lb">ADHD support — persona</div></div>
+      <div class="ic" draggable="true">🗺️<div class="lb">SillyTavern plan</div></div>
+      <div class="ic" draggable="true">🎨<div class="lb">Design Agent UI</div></div>
+      <div class="ic" draggable="true">⚙️<div class="lb">Server planning</div></div>
+      <div class="ic" draggable="true">📋<div class="lb">Recipes</div></div>
+      <div class="ic" draggable="true">💬<div class="lb">Notes &amp; ideas</div></div>
+    </div>
+  </aside>
+  <main class="chat">Chat pane preview</main>
+</div>
+<script>
+  const ic=[...document.querySelectorAll('.ic[draggable]']); let picked=null;
+  ic.forEach(el=>{
+    el.addEventListener('dragstart',e=>{picked=el;e.dataTransfer.effectAllowed='move'});
+    el.addEventListener('dragover',e=>{if(picked&&picked!==el){e.preventDefault();const list=el.parentNode;const b=el.getBoundingClientRect();
+      list.insertBefore(picked, e.clientY>b.top+b.offsetHeight/2?el.nextSibling:el);}});
+  });
+</script>
+</body>
+</html>

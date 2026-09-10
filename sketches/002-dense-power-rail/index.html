@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sidebar Variant B — Dense power rail</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+         -webkit-font-smoothing: antialiased; color: #1c1c1e; background: #f2f2f7; height: 100vh; }
+  .app { display: flex; height: 100vh; }
+  /* narrow rail, but each cell gets 2 lines via taller tiles */
+  .sidebar { width: 118px; background: #ffffff; border-right: 1px solid #e5e5ea;
+             display: flex; flex-direction: column; }
+  .sidebar-head { padding: 12px 8px; border-bottom: 1px solid #f0f0f3; text-align:center; }
+  .sidebar-head h1 { font-size: 12px; font-weight: 700; }
+  .sessions { flex:1; overflow-y:auto; padding: 8px 6px; }
+  .tile { width:104px; margin: 6px auto; border-radius: 14px; padding: 10px 8px 8px;
+          display:flex; flex-direction:column; align-items:center; gap:6px; cursor:grab; }
+  .tile:hover { background:#f4f4f7; }
+  .tile.active { background:#e9f0ff; }
+  .icon { width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center;
+          font-size:24px; background:transparent; }
+  .noicon { background:#edunset; }
+  .icon.fi { background:linear-gradient(135deg,#7c8cf8,#4f6ef7); color:#fff; }
+  .name { font-size:11.5px; text-align:center; line-height:1.3; font-weight:500;
+          display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .drag { color:#d0d0d6; font-size:11px; }
+  .chat { flex:1; background:#f7f7fa; display:flex; align-items:center; justify-content:center; color:#ccc; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-head"><h1>Hermes</h1></div>
+    <div class="sessions">
+      <div class="tile active" draggable="true">
+        <div class="icon noicon" style="background:linear-gradient(135deg,#7c8cf8,#4f6ef7);color:#fff">🧠</div>
+        <div class="name">ADHD support<br>with persona</div><div class="drag">⠿</div>
+      </div>
+      <div class="tile" draggable="true">
+        <div class="icon noicon" style="background:transparent">🗺️</div>
+        <div class="name">Plan SillyTavern alternative</div><div class="drag">⠿</div>
+      </div>
+      <div class="tile" draggable="true">
+        <div class="icon noicon" style="background:transparent">🎨</div>
+        <div class="name">Design Agent UI</div><div class="drag">⠿</div>
+      </div>
+      <div class="tile" draggable="true">
+        <div class="icon noicon" style="background:transparent">⚙️</div>
+        <div class="name">Серверное планирование</div><div class="drag">⠿</div>
+      </div>
+      <div class="tile" draggable="true">
+        <div class="icon noicon" style="background:linear-gradient(135deg,#8e8e93,#6d6d72);color:#fff">R</div>
+        <div class="name">Recipes</div><div class="drag">⠿</div>
+      </div>
+    </div>
+  </aside>
+  <main class="chat">Chat pane preview</main>
+</div>
+<script>
+  const rows=[...document.querySelectorAll('.tile[draggable]')]; let picked=null;
+  rows.forEach(r=>{ r.addEventListener('dragstart',e=>{picked=r;e.dataTransfer.effectAllowed='move'}); r.addEventListener('dragend',()=>picked=null);
+    r.addEventListener('dragover',e=>{ if(picked&&picked!==r){e.preventDefault(); const b=r.getBoundingClientRect(); r.parentNode.insertBefore(picked, e.clientY>b.top+r.offsetHeight/2?r.nextSibling:r);} }); });
+</script>
+</body>
+</html>
