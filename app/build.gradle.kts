@@ -13,6 +13,8 @@ plugins {
 
 android {
     namespace = "com.m57.hermescontrol"
+    // Enable the screenshotTest source set (compose screenshot plugin).
+    experimentalProperties["android.experimental.enableScreenshotTest"] = true
 
     lint {
         disable += "MissingTranslation"
