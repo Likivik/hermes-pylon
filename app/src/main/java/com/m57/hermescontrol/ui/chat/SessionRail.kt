@@ -196,76 +196,68 @@ private fun RailItem(
     val avatarText = icon.ifEmpty { session.title.trim().take(1).uppercase() }
     val labelText = session.title.trim()
 
-    // C7: active item = purple left-edge indicator + tinted label + subtle fill.
-    Box(
-        modifier = Modifier
-            .width(56.dp)
-            .background(
-                if (active) MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
-                else Color.Transparent,
-            )
-            .combinedClickable(
-                onClick = { onSwitch(session.id) },
-                onLongClick = { menuOpen = true },
-            ),
-    ) {
-        // Left-edge indicator (inside the rail), spanning the active item.
-        if (active) {
-            Box(
-                Modifier
-                    .matchParentSize()
-                    .width(3.dp)
-                    .align(Alignment.CenterStart)
-                    .background(Color(0xFF7C5CFF)),
-            )
-        }
-
-        Row(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.weight(1f).padding(vertical = 2.dp),
-        ) {
-            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                DropdownMenuItem(
-                    text = { Text("Edit icon / name") },
-                    onClick = { menuOpen = false; onEdit(session.id) },
-                )
-                DropdownMenuItem(
-                    text = { Text(if (pinned) "Unpin" else "Pin") },
-                    onClick = { menuOpen = false; onTogglePin(session.id) },
-                )
-                DropdownMenuItem(
-                    text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
-                    onClick = { menuOpen = false; onDelete(session.id) },
-                )
-            }
-            // Transparent icon: just the emoji/letter, no tile background.
-            Text(
-                text = avatarText,
-                style = MaterialTheme.typography.titleLarge,
-                color = if (icon.isEmpty()) railColorFor(session.id).copy(alpha = alpha)
-                else Color.Unspecified,
-            )
-            if (pinned) {
+    // C7 rail cell: icon + label stack. Active styling is a 3dp purple bar OVERLAID
+        // on the left edge (not a background fill) so we never eat the label.
+        Box(modifier = Modifier.combinedClickable(
+            onClick = { onSwitch(session.id) },
+            onLongClick = { menuOpen = true },
+        )) {
+            // Active purple left-edge indicator — spans the cell's full height, overlaid.
+            if (active) {
                 Box(
-                    Modifier.size(4.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(MaterialTheme.colorScheme.primary),
+                    Modifier
+                        .width(3.dp)
+                        .fillMaxHeight()
+                        .background(Color(0xFF7C5CFF)),
                 )
             }
-            Spacer(Modifier.height(1.dp))
-            // 2-line wrapped label; active tints to brand purple.
-            Text(
-                text = labelText,
-                style = MaterialTheme.typography.labelSmall,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
-                color = if (active) Color(0xFF7C5CFF)
-                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
-                fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-            )
+            // Cell content (icon + label).
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .width(56.dp)
+                    .padding(vertical = 2.dp),
+            ) {
+                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Edit icon / name") },
+                        onClick = { menuOpen = false; onEdit(session.id) },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(if (pinned) "Unpin" else "Pin") },
+                        onClick = { menuOpen = false; onTogglePin(session.id) },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
+                        onClick = { menuOpen = false; onDelete(session.id) },
+                    )
+                }
+                // Transparent icon: just the emoji/letter, no tile background.
+                Text(
+                    text = avatarText,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = if (icon.isEmpty()) railColorFor(session.id).copy(alpha = alpha)
+                    else Color.Unspecified,
+                )
+                if (pinned) {
+                    Box(
+                        Modifier.size(4.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(MaterialTheme.colorScheme.primary),
+                    )
+                }
+                Spacer(Modifier.height(1.dp))
+                // 2-line wrapped label; active tints to brand purple.
+                Text(
+                    text = labelText,
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                    color = if (active) Color(0xFF7C5CFF)
+                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
+                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                )
             }
         }
     }
-}
