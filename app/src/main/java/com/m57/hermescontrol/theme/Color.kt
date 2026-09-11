@@ -15,6 +15,13 @@ import androidx.compose.ui.graphics.Color
 
 val HermesPurple = Color(0xFF7C5CFF)
 val HermesPurpleLight = Color(0xFFAC93FF)
+// Avatar fallback palette (session icons with no custom emoji). Tokenized here
+// so no raw hex leaks into composables.
+val HermesAvatarPalette = listOf(
+    Color(0xFF7C4DFF), Color(0xFF29B6F6), Color(0xFF66BB6A),
+    Color(0xFFFF7043), Color(0xFFEC407A), Color(0xFF26C6DA),
+    Color(0xFFAB47BC), Color(0xFFFFCA28),
+)
 val HermesPurpleDark = Color(0xFF5A3FE0)
 val HermesPurpleContainer = Color(0xFF2B2159)
 val HermesPurpleOnContainer = Color(0xFFD9CCFF)

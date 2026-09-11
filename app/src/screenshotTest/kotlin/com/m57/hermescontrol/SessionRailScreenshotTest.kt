@@ -17,7 +17,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.m57.hermescontrol.theme.HermesControlTheme
 import com.m57.hermescontrol.ui.chat.SessionRail
 import com.m57.hermescontrol.ui.chat.SessionUi
-import com.m57.hermescontrol.ui.chat.ChatViewModel
+import com.m57.hermescontrol.ui.chat.RailMeta
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -61,12 +61,12 @@ fun FullScreenC7() {
                 currentSessionId = "s3",
                 pinnedSessionIds = emptySet(),
                 railMeta = mapOf(
-                    "s1" to ChatViewModel.RailMeta("🧠"),
-                    "s2" to ChatViewModel.RailMeta("🦄"),
-                    "s3" to ChatViewModel.RailMeta("💎"),
-                    "s4" to ChatViewModel.RailMeta("🧠"),
-                    "s5" to ChatViewModel.RailMeta("💻"),
-                    "s6" to ChatViewModel.RailMeta("🚂"),
+                    "s1" to RailMeta("🧠"),
+                    "s2" to RailMeta("🦄"),
+                    "s3" to RailMeta("💎"),
+                    "s4" to RailMeta("🧠"),
+                    "s5" to RailMeta("💻"),
+                    "s6" to RailMeta("🚂"),
                 ),
                 onSwitch = {},
                 onTogglePin = {},

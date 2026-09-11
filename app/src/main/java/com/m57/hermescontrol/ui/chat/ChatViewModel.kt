@@ -1516,7 +1516,7 @@ class ChatViewModel(
 
     // ── Likivik patch: per-session rail customization (icon emoji only; the
     // name shown equals the real session title, renamed via session.title) ──
-    data class RailMeta(val icon: String? = null)
+    // RailMeta is a top-level model in ui/chat/RailMeta.kt.
 
     private val _railMeta = MutableStateFlow(
         loadRailMeta(),

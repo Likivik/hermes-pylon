@@ -30,6 +30,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.zIndex
+import com.m57.hermescontrol.theme.HermesAvatarPalette
+import com.m57.hermescontrol.theme.HermesPurple
 
 /**
  * Likivik patch — C7 floating rail.
@@ -71,11 +73,7 @@ internal fun heuristicEmoji(title: String): String {
     return ""
 }
 
-private val RailColors = listOf(
-    Color(0xFF7C4DFF), Color(0xFF29B6F6), Color(0xFF66BB6A),
-    Color(0xFFFF7043), Color(0xFFEC407A), Color(0xFF26C6DA),
-    Color(0xFFAB47BC), Color(0xFFFFCA28),
-)
+private val RailColors = HermesAvatarPalette
 internal fun railColorFor(sessionId: String): Color {
     val hash = sessionId.fold(0) { acc, c -> (acc * 31 + c.code) and 0x7FFFFFFF }
     return RailColors[hash % RailColors.size]
@@ -86,12 +84,12 @@ fun SessionRail(
     sessions: List<SessionUi>,
     currentSessionId: String?,
     pinnedSessionIds: Set<String>,
-    railMeta: Map<String, ChatViewModel.RailMeta> = emptyMap(),
+    railMeta: Map<String, RailMeta> = emptyMap(),
+    modifier: Modifier = Modifier,
     onSwitch: (String) -> Unit,
     onTogglePin: (String) -> Unit,
     onDelete: (String) -> Unit = {},
     onEdit: (String) -> Unit = {},
-    modifier: Modifier = Modifier,
 ) {
     if (sessions.isEmpty()) return
 
@@ -186,7 +184,7 @@ private fun ArchiveChip(count: Int, open: Boolean, onClick: () -> Unit) {
 @Composable
 private fun RailItem(
     session: SessionUi,
-    meta: ChatViewModel.RailMeta?,
+    meta: RailMeta?,
     active: Boolean,
     pinned: Boolean,
     onSwitch: (String) -> Unit,
@@ -214,7 +212,7 @@ private fun RailItem(
                     Modifier
                         .width(4.dp)
                         .fillMaxHeight()
-                        .background(Color(0xFF7C5CFF)),
+                        .background(HermesPurple),
                 )
             }
             // Cell content (icon + label).
@@ -261,7 +259,7 @@ private fun RailItem(
                     overflow = TextOverflow.Ellipsis,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.width(68.dp),
-                    color = if (active) Color(0xFF7C5CFF)
+                    color = if (active) HermesPurple
                     else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
                     fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
                 )
