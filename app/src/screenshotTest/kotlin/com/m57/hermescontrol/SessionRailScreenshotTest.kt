@@ -1,7 +1,13 @@
 package com.m57.hermescontrol
 
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.android.tools.screenshot.PreviewTest
@@ -10,6 +16,12 @@ import com.m57.hermescontrol.theme.HermesControlTheme
 import com.m57.hermescontrol.ui.chat.SessionRail
 import com.m57.hermescontrol.ui.chat.SessionUi
 import com.m57.hermescontrol.ui.chat.ChatViewModel
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 
 private val FakeSessions = listOf(
     SessionUi(id = "s1", title = "ADHD support", messageCount = 4),
