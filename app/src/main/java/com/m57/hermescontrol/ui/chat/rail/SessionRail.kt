@@ -117,7 +117,7 @@ private fun RailBody(
         items(items = visible, key = { it.id }) { session ->
             val display = state.displayFor(session)
             ReorderableItem(
-                reorderableLazyListState = dragState,
+                state = dragState,
                 key = session.id,
                 enabled = display.draggable,
             ) { isDragging ->

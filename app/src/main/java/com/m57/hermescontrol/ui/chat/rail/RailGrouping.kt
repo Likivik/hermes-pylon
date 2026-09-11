@@ -42,14 +42,13 @@ fun groupRail(sessions: List<SessionUi>, pinnedIds: Set<String>, order: List<Str
  * group ids are ignored and each group's canonical membership wins.
  */
 fun mergeArrangement(groups: RailGroups, arrangedIds: List<String>): List<String> {
-    val arranged = arrangedIds.toSet()
-    val arrangeWithin = { group: List<SessionUi>, fallback: List<SessionUi> ->
-        val inGroup = group.filter { it.id in arranged }
-        val orderedPart = arrangedIds.mapNotNull { id -> group.find { it.id == id } }
-        val rest = fallback.filter { it.id !in arranged }
-        orderedPart + rest
+    val arrangeWithin = { group: List<SessionUi> ->
+        val memberIds = group.map { it.id }.toSet()
+        val arranged = arrangedIds.filter { it in memberIds }
+        val rest = group.map { it.id }.filter { it !in arrangedIds }
+        arranged + rest
     }
-    return arrangeWithin(groups.pinned, groups.pinned) +
-        arrangeWithin(groups.fresh, groups.fresh) +
-        arrangeWithin(groups.stale, groups.stale)
+    return arrangeWithin(groups.pinned) +
+        arrangeWithin(groups.fresh) +
+        arrangeWithin(groups.stale)
 }
