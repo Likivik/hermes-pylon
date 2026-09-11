@@ -15,9 +15,10 @@ import androidx.compose.ui.Modifier
 import com.android.tools.screenshot.PreviewTest
 import androidx.compose.ui.tooling.preview.Preview
 import com.m57.hermescontrol.theme.HermesControlTheme
-import com.m57.hermescontrol.ui.chat.SessionRail
 import com.m57.hermescontrol.ui.chat.SessionUi
 import com.m57.hermescontrol.ui.chat.RailMeta
+import com.m57.hermescontrol.ui.chat.rail.RailUiModel
+import com.m57.hermescontrol.ui.chat.rail.SessionRail as RailComposable
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -44,7 +45,7 @@ private val FakeSessions = listOf(
 @PreviewTest
 @Preview(
     name = "Full Screen: Hermes chat with C7 rail",
-    device = "spec:width=440dp,height=920dp,dpi=640", // Pixel-ish phone @ high dpi
+    device = "spec:width=440dp,height=920dp,dpi=640",
     showBackground = true,
 )
 @Composable
@@ -55,32 +56,30 @@ fun FullScreenC7() {
                 .fillMaxSize()
                 .background(chatGradient()),
         ) {
-            // Rail mock on the leading edge (real SessionRail composable).
-            SessionRail(
-                sessions = FakeSessions,
-                currentSessionId = "s3",
-                pinnedSessionIds = emptySet(),
-                railMeta = mapOf(
-                    "s1" to RailMeta("🧠"),
-                    "s2" to RailMeta("🦄"),
-                    "s3" to RailMeta("💎"),
-                    "s4" to RailMeta("🧠"),
-                    "s5" to RailMeta("💻"),
-                    "s6" to RailMeta("🚂"),
+            RailComposable(
+                state = RailUiModel(
+                    sessions = FakeSessions,
+                    currentSessionId = "s3",
+                    pinnedSessionIds = emptySet(),
+                    railMeta = mapOf(
+                        "s1" to RailMeta("🧠"),
+                        "s2" to RailMeta("🦄"),
+                        "s3" to RailMeta("💎"),
+                        "s4" to RailMeta("🧠"),
+                        "s5" to RailMeta("💻"),
+                        "s6" to RailMeta("🚂"),
+                    ),
+                    order = FakeSessions.map { it.id },
+                    archiveOpen = false,
                 ),
-                onSwitch = {},
-                onTogglePin = {},
-                onDelete = {},
-                onEdit = {},
+                onEvent = {},
             )
-            // Mock chat pane background gradient (mirrors ChatScreen's backgroundGradient).
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
                     .padding(8.dp),
             ) {
-                // Mock title bar
                 Surface(
                     color = MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(12.dp),
@@ -93,32 +92,30 @@ fun FullScreenC7() {
                     )
                 }
                 Spacer(Modifier.height(8.dp))
-                // This is a real full-screen mock: compose the actual
-                // ChatMessageList + ChatInputBar (both VM-free now).
                 Box(modifier = Modifier.weight(1f)) {
-                ChatMessageList(
-                    messages = listOf(
-                        ChatMessage(role = MessageRole.ASSISTANT, content = "👋 ready when you are"),
-                        ChatMessage(role = MessageRole.USER, content = "can we make the rail floating?"),
-                        ChatMessage(role = MessageRole.ASSISTANT, content = "Yep — here's the C7 design composed with the real message list."),
-                    ),
-                    streamingMessage = null,
-                    isThinking = false,
-                    thinkingText = "",
-                    isSearchActive = false,
-                    searchQuery = "",
-                    currentSearchMatchIndex = 0,
-                    searchMatchIndices = emptyList(),
-                    typingEffectEnabled = true,
-                    typingEffectDelayMs = 20,
-                    isLoading = false,
-                    isLoadingOlder = false,
-                    isDark = false,
-                    listState = rememberLazyListState(),
-                    lastAnimatedMessageId = null,
-                    onLastAnimatedMessageIdChange = {},
-                    openingAttachmentPath = null,
-                )
+                    ChatMessageList(
+                        messages = listOf(
+                            ChatMessage(role = MessageRole.ASSISTANT, content = "👋 ready when you are"),
+                            ChatMessage(role = MessageRole.USER, content = "can we make the rail floating?"),
+                            ChatMessage(role = MessageRole.ASSISTANT, content = "Yep — here's the C7 design composed with the real message list."),
+                        ),
+                        streamingMessage = null,
+                        isThinking = false,
+                        thinkingText = "",
+                        isSearchActive = false,
+                        searchQuery = "",
+                        currentSearchMatchIndex = 0,
+                        searchMatchIndices = emptyList(),
+                        typingEffectEnabled = true,
+                        typingEffectDelayMs = 20,
+                        isLoading = false,
+                        isLoadingOlder = false,
+                        isDark = false,
+                        listState = rememberLazyListState(),
+                        lastAnimatedMessageId = null,
+                        onLastAnimatedMessageIdChange = {},
+                        openingAttachmentPath = null,
+                    )
                 }
                 ChatInputBar(
                     inputFieldValue = TextFieldValue(""),
@@ -136,7 +133,6 @@ fun FullScreenC7() {
     }
 }
 
-// Cheap decorative gradient used by the rail preview to mimic the chat gradient.
 private fun chatGradient(): androidx.compose.ui.graphics.Brush =
     androidx.compose.ui.graphics.Brush.verticalGradient(
         colors = listOf(

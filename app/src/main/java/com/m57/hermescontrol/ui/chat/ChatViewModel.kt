@@ -189,9 +189,14 @@ data class SessionUi(
     // Unix seconds of last activity (from session.list "started_at"); 0 = unknown
     val lastActive: Long = 0,
 ) {
-    /** Stale = no activity for 7+ days (0/unknown counts as stale). */
+    /**
+     * Stale = known activity and idle for 7+ days. lastActive == 0 means
+     * UNKNOWN, not old — unknown-activity sessions must render as fresh
+     * (this exact rule previously emptied the rail for all mock/pipeline
+     * sessions; real server feeds can also emit 0).
+     */
     val isStale: Boolean
-        get() = lastActive <= 0 ||
+        get() = lastActive > 0 &&
             lastActive * 1000 < System.currentTimeMillis() - STALE_THRESHOLD_MS
 
     companion object {

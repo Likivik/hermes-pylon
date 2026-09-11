@@ -98,6 +98,9 @@ import com.m57.hermescontrol.ui.chat.components.ChatScrollToBottomFab
 import com.m57.hermescontrol.ui.chat.components.ChatTimelineNoPrefetchStrategy
 import com.m57.hermescontrol.ui.chat.components.ContextUsageChip
 import com.m57.hermescontrol.ui.chat.components.ContextUsageDialog
+import com.m57.hermescontrol.ui.chat.rail.RailEvent
+import com.m57.hermescontrol.ui.chat.rail.RailUiModel
+import com.m57.hermescontrol.ui.chat.rail.SessionRail
 import com.m57.hermescontrol.ui.chat.components.ReactionHeartsOverlay
 import com.m57.hermescontrol.ui.chat.components.ReloginDialog
 import com.m57.hermescontrol.ui.chat.components.SearchBarRow
@@ -544,22 +547,32 @@ fun ChatScreen(
         val pinnedIds by viewModel.pinnedSessionIds.collectAsState()
         val railMeta by viewModel.railMeta.collectAsState()
         val homeOrder by viewModel.homeOrder.collectAsStateWithLifecycle()
+        var archiveOpen by rememberSaveable { mutableStateOf(false) }
         var editingSessionId by remember { mutableStateOf<String?>(null) }
         Row(modifier = Modifier.fillMaxSize()) {
             SessionRail(
-                sessions = state.sessions,
-                currentSessionId = state.currentSessionId,
-                pinnedSessionIds = pinnedIds,
-                railMeta = railMeta,
-                order = homeOrder,
-                onReorder = viewModel::setRailOrder,
-                onSwitch = { viewModel.switchSession(it) },
-                onTogglePin = { viewModel.togglePinSession(it) },
-                onDelete = { id ->
-                    // Guard: never delete the session we're looking at.
-                    if (id != state.currentSessionId) viewModel.deleteRailSession(id)
+                state = RailUiModel(
+                    sessions = state.sessions,
+                    currentSessionId = state.currentSessionId,
+                    pinnedSessionIds = pinnedIds,
+                    railMeta = railMeta,
+                    order = homeOrder,
+                    archiveOpen = archiveOpen,
+                ),
+                onEvent = { event ->
+                    when (event) {
+                        is RailEvent.Switch -> viewModel.switchSession(event.sessionId)
+                        is RailEvent.TogglePin -> viewModel.togglePinSession(event.sessionId)
+                        is RailEvent.Delete ->
+                            // Guard: never delete the session we're looking at.
+                            if (event.sessionId != state.currentSessionId) {
+                                viewModel.deleteRailSession(event.sessionId)
+                            }
+                        is RailEvent.Edit -> editingSessionId = event.sessionId
+                        is RailEvent.Reorder -> viewModel.setRailOrder(event.order)
+                        is RailEvent.ArchiveToggle -> archiveOpen = event.open
+                    }
                 },
-                onEdit = { editingSessionId = it },
             )
         Column(
             modifier =

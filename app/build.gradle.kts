@@ -177,6 +177,7 @@ dependencies {
     implementation(libs.retrofit.converter.kotlinx.serialization)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.emoji.kt)
+    implementation(libs.reorderable)
     implementation(libs.crashwatcher)
 
     // Native Compose LaTeX rendering
