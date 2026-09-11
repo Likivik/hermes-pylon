@@ -18,8 +18,8 @@ import androidx.compose.ui.unit.dp
 import com.m57.hermescontrol.R
 import com.m57.hermescontrol.ui.chat.ChatBubble
 import com.m57.hermescontrol.ui.chat.ChatMessage
-import com.m57.hermescontrol.ui.chat.ChatViewModel
 import com.m57.hermescontrol.ui.chat.ClarifyUi
+import com.m57.hermescontrol.ui.chat.Attachment
 import com.m57.hermescontrol.ui.chat.ImageViewerModel
 import com.m57.hermescontrol.ui.chat.MessageRole
 import com.m57.hermescontrol.ui.common.EmptyState
@@ -57,7 +57,8 @@ fun ChatMessageList(
     listState: androidx.compose.foundation.lazy.LazyListState,
     lastAnimatedMessageId: String?,
     onLastAnimatedMessageIdChange: (String?) -> Unit,
-    viewModel: ChatViewModel,
+    onRespondApproval: (String) -> Unit = {},
+    onOpenAttachment: (Attachment) -> Unit = {},
     openingAttachmentPath: String? = null,
     clarifyRequest: ClarifyUi? = null,
     onRespondClarify: ((String) -> Unit)? = null,
@@ -120,8 +121,8 @@ fun ChatMessageList(
                         isDarkTheme = isDark,
                         searchQuery = if (isSearchActive) searchQuery else "",
                         isCurrentMatch = isCurrentMatch,
-                        onRespondApproval = viewModel::respondToApproval,
-                        onOpenAttachment = viewModel::openAttachment,
+                        onRespondApproval = onRespondApproval,
+                        onOpenAttachment = onOpenAttachment,
                         openingAttachmentPath = openingAttachmentPath,
                         onImageClick = onImageClick,
                     )
@@ -143,7 +144,7 @@ fun ChatMessageList(
                             isDarkTheme = isDark,
                             searchQuery = "",
                             isCurrentMatch = false,
-                            onOpenAttachment = viewModel::openAttachment,
+                            onOpenAttachment = onOpenAttachment,
                             openingAttachmentPath = openingAttachmentPath,
                             onImageClick = onImageClick,
                         )
