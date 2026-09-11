@@ -111,7 +111,7 @@ fun SessionRail(
         color = railColor,
         tonalElevation = 6.dp,
         shadowElevation = 10.dp,
-        modifier = modifier.width(56.dp).fillMaxHeight(),
+        modifier = modifier.width(72.dp).fillMaxHeight(),
     ) {
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
@@ -158,7 +158,7 @@ private fun ArchiveChip(count: Int, open: Boolean, onClick: () -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .width(56.dp)
+            .width(72.dp)
             .clickable(onClick = onClick)
             .padding(vertical = 2.dp),
     ) {
@@ -206,7 +206,7 @@ private fun RailItem(
             if (active) {
                 Box(
                     Modifier
-                        .width(3.dp)
+                        .width(4.dp)
                         .fillMaxHeight()
                         .background(Color(0xFF7C5CFF)),
                 )
@@ -215,7 +215,7 @@ private fun RailItem(
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
-                    .width(56.dp)
+                    .width(72.dp)
                     .padding(vertical = 2.dp),
             ) {
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
@@ -235,7 +235,7 @@ private fun RailItem(
                 // Transparent icon: just the emoji/letter, no tile background.
                 Text(
                     text = avatarText,
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.headlineSmall,
                     color = if (icon.isEmpty()) railColorFor(session.id).copy(alpha = alpha)
                     else Color.Unspecified,
                 )
@@ -250,10 +250,11 @@ private fun RailItem(
                 // 2-line wrapped label; active tints to brand purple.
                 Text(
                     text = labelText,
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelMedium,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     textAlign = TextAlign.Center,
+                    modifier = Modifier.width(68.dp),
                     color = if (active) Color(0xFF7C5CFF)
                     else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
                     fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
