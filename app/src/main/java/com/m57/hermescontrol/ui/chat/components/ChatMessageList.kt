@@ -18,8 +18,8 @@ import androidx.compose.ui.unit.dp
 import com.m57.hermescontrol.R
 import com.m57.hermescontrol.ui.chat.ChatBubble
 import com.m57.hermescontrol.ui.chat.ChatMessage
+import com.m57.hermescontrol.data.model.Attachment
 import com.m57.hermescontrol.ui.chat.ClarifyUi
-import com.m57.hermescontrol.ui.chat.Attachment
 import com.m57.hermescontrol.ui.chat.ImageViewerModel
 import com.m57.hermescontrol.ui.chat.MessageRole
 import com.m57.hermescontrol.ui.common.EmptyState
