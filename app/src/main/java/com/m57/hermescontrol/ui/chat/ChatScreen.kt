@@ -543,6 +543,7 @@ fun ChatScreen(
         // Likivik patch: Telegram-style session rail on the leading edge.
         val pinnedIds by viewModel.pinnedSessionIds.collectAsState()
         val railMeta by viewModel.railMeta.collectAsState()
+        val homeOrder by viewModel.homeOrder.collectAsStateWithLifecycle()
         var editingSessionId by remember { mutableStateOf<String?>(null) }
         Row(modifier = Modifier.fillMaxSize()) {
             SessionRail(
@@ -550,6 +551,8 @@ fun ChatScreen(
                 currentSessionId = state.currentSessionId,
                 pinnedSessionIds = pinnedIds,
                 railMeta = railMeta,
+                order = homeOrder,
+                onReorder = viewModel::setRailOrder,
                 onSwitch = { viewModel.switchSession(it) },
                 onTogglePin = { viewModel.togglePinSession(it) },
                 onDelete = { id ->

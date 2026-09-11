@@ -1505,6 +1505,25 @@ class ChatViewModel(
     )
     val pinnedSessionIds: StateFlow<Set<String>> = _pinnedSessionIds.asStateFlow()
 
+    // ── Likivik patch: persisted rail order (drag-to-reorder). Stored as a
+    // comma-joined id string because SharedPreferences StringSet ordering is
+    // not guaranteed. homeOrder holds the full displayed order (pinned +
+    // fresh + stale, as last set by the rail). ──
+    private val _homeOrder = MutableStateFlow(loadHomeOrder())
+    val homeOrder: StateFlow<List<String>> = _homeOrder.asStateFlow()
+
+    private fun loadHomeOrder(): List<String> =
+        (railPrefs.getString("home_order", null)?.takeIf { it.isNotBlank() }
+            ?.split(',')?.filter { it.isNotEmpty() }) ?: emptyList()
+
+    /** Persist the rail's full displayed order (pinned + fresh + stale). */
+    fun setRailOrder(order: List<String>) {
+        val clean = order.filter { it.isNotBlank() }
+        railPrefs.edit().putString("home_order", clean.joinToString(",")).apply()
+        _homeOrder.value = clean
+    }
+
+
     // ── Likivik patch: remember the last-open session so a fresh app launch
     // resumes it instead of blindly creating a new one each time. ──
     private fun persistLastSession(id: String) {
