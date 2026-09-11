@@ -2,6 +2,7 @@ package com.m57.hermescontrol
 
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,6 +24,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.text.input.TextFieldValue
+import com.m57.hermescontrol.data.ws.CommandCatalog
+import com.m57.hermescontrol.ui.chat.ChatMessage
+import com.m57.hermescontrol.ui.chat.ChatMessageList
+import com.m57.hermescontrol.ui.chat.MessageRole
+import com.m57.hermescontrol.ui.chat.components.ChatInputBar
 
 private val FakeSessions = listOf(
     SessionUi(id = "s1", title = "ADHD support", messageCount = 4),
@@ -85,26 +93,44 @@ fun FullScreenC7() {
                     )
                 }
                 Spacer(Modifier.height(8.dp))
-                // Mock chat bubble cards
-                listOf(
-                    "👋 ready when you are",
-                    "(the rest of the chat pane is mocked for the screenshot test)",
-                ).forEach { msg ->
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                    ) {
-                        Text(
-                            text = msg,
-                            modifier = Modifier.padding(12.dp),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                // This is a real full-screen mock: compose the actual
+                // ChatMessageList + ChatInputBar (both VM-free now).
+                Box(modifier = Modifier.weight(1f)) {
+                ChatMessageList(
+                    messages = listOf(
+                        ChatMessage(role = MessageRole.ASSISTANT, content = "👋 ready when you are"),
+                        ChatMessage(role = MessageRole.USER, content = "can we make the rail floating?"),
+                        ChatMessage(role = MessageRole.ASSISTANT, content = "Yep — here's the C7 design composed with the real message list."),
+                    ),
+                    streamingMessage = null,
+                    isThinking = false,
+                    thinkingText = "",
+                    isSearchActive = false,
+                    searchQuery = "",
+                    currentSearchMatchIndex = 0,
+                    searchMatchIndices = emptyList(),
+                    typingEffectEnabled = true,
+                    typingEffectDelayMs = 20,
+                    isLoading = false,
+                    isLoadingOlder = false,
+                    isDark = false,
+                    listState = rememberLazyListState(),
+                    lastAnimatedMessageId = null,
+                    onLastAnimatedMessageIdChange = {},
+                    openingAttachmentPath = null,
+                )
                 }
+                ChatInputBar(
+                    inputFieldValue = TextFieldValue(""),
+                    onInputChange = {},
+                    onSend = {},
+                    onMicTap = {},
+                    isListening = false,
+                    isAgentTyping = false,
+                    isConnected = true,
+                    isSessionReady = true,
+                    commandCatalog = CommandCatalog(),
+                )
             }
         }
     }
