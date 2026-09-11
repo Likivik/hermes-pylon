@@ -22,29 +22,86 @@ private val FakeSessions = listOf(
 
 @PreviewTest
 @Preview(
-    name = "SessionRail C7",
-    device = "spec:width=120dp,height=700dp,dpi=640", // high dpi: 3.dp indicator ~= 19px (readable)
+    name = "Full Screen: Hermes chat with C7 rail",
+    device = "spec:width=440dp,height=920dp,dpi=640", // Pixel-ish phone @ high dpi
+    showBackground = true,
 )
 @Composable
-fun SessionRailC7() {
+fun FullScreenC7() {
     HermesControlTheme {
-        SessionRail(
-            sessions = FakeSessions,
-            currentSessionId = "s3",
-            pinnedSessionIds = emptySet(),
-            railMeta = mapOf(
-                "s1" to ChatViewModel.RailMeta("🧠"),
-                "s2" to ChatViewModel.RailMeta("🦄"),
-                "s3" to ChatViewModel.RailMeta("💎"),
-                "s4" to ChatViewModel.RailMeta("🧠"),
-                "s5" to ChatViewModel.RailMeta("💻"),
-                "s6" to ChatViewModel.RailMeta("🚂"),
-            ),
-            onSwitch = {},
-            onTogglePin = {},
-            onDelete = {},
-            onEdit = {},
-            modifier = Modifier.padding(8.dp),
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(chatGradient()),
+        ) {
+            // Rail mock on the leading edge (real SessionRail composable).
+            SessionRail(
+                sessions = FakeSessions,
+                currentSessionId = "s3",
+                pinnedSessionIds = emptySet(),
+                railMeta = mapOf(
+                    "s1" to ChatViewModel.RailMeta("🧠"),
+                    "s2" to ChatViewModel.RailMeta("🦄"),
+                    "s3" to ChatViewModel.RailMeta("💎"),
+                    "s4" to ChatViewModel.RailMeta("🧠"),
+                    "s5" to ChatViewModel.RailMeta("💻"),
+                    "s6" to ChatViewModel.RailMeta("🚂"),
+                ),
+                onSwitch = {},
+                onTogglePin = {},
+                onDelete = {},
+                onEdit = {},
+            )
+            // Mock chat pane background gradient (mirrors ChatScreen's backgroundGradient).
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .padding(8.dp),
+            ) {
+                // Mock title bar
+                Surface(
+                    color = MaterialTheme.colorScheme.surface,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        text = "Hermes",
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                // Mock chat bubble cards
+                listOf(
+                    "👋 ready when you are",
+                    "(the rest of the chat pane is mocked for the screenshot test)",
+                ).forEach { msg ->
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                    ) {
+                        Text(
+                            text = msg,
+                            modifier = Modifier.padding(12.dp),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
     }
 }
+
+// Cheap decorative gradient used by the rail preview to mimic the chat gradient.
+private fun chatGradient(): androidx.compose.ui.graphics.Brush =
+    androidx.compose.ui.graphics.Brush.verticalGradient(
+        colors = listOf(
+            androidx.compose.ui.graphics.Color(0xFFF6F1FF),
+            androidx.compose.ui.graphics.Color(0xFFFFFFFF),
+        ),
+    )
