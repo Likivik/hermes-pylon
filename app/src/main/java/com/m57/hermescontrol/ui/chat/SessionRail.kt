@@ -111,7 +111,10 @@ fun SessionRail(
         color = railColor,
         tonalElevation = 6.dp,
         shadowElevation = 10.dp,
-        modifier = modifier.width(72.dp).fillMaxHeight(),
+        modifier = modifier
+            .width(72.dp)
+            .fillMaxHeight()
+            .clip(RoundedCornerShape(22.dp)),
     ) {
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
