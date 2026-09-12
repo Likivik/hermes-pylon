@@ -108,7 +108,6 @@ private fun RailBody(
 
     LazyColumn(
         state = listState,
-        containerColor = Color.Transparent,
         modifier = Modifier
             .fillMaxSize()
             // Inset layer: all items physically narrower than the pill.
