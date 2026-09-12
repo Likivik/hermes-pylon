@@ -124,6 +124,7 @@ private fun RailBody(
                 state = dragState,
                 key = session.id,
                 enabled = display.draggable,
+                modifier = Modifier.background(Color(0x550000FF)),
             ) { isDragging ->
                 RailItem(
                     display = display,
