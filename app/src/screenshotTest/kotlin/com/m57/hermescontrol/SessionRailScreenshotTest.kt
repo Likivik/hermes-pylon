@@ -45,7 +45,7 @@ private val FakeSessions = listOf(
 @PreviewTest
 @Preview(
     name = "Full Screen: Hermes chat with C7 rail",
-    device = "spec:width=440dp,height=920dp,dpi=640",
+    device = "spec:width=460dp,height=920dp,dpi=420",
     showBackground = true,
 )
 @Composable
