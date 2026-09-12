@@ -71,16 +71,15 @@ fun SessionRail(
     }
     val railColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.60f)
 
-    // ── DEBUG LAYERS (render-29): every structural layer gets a bright border
-    // + tinted fill so we can identify who paints the on-device band.
-    // RED border/fill = pill Surface · GREEN = LazyColumn body ·
-    // YELLOW = RailItem content box · CYAN = purple indicator · MAGENTA = label.
-    val DebugPill = Color(0x33FF0000)
+    // ── DEBUG + OPAQUE TEST: pill forced OPAQUE (kills translucency → any
+    // band seen through it is proven to come from behind), layers color-coded
+    // (RED=pill border, GREEN=list body, YELLOW=item boxes).
+    val DebugPill = Color(0xFFFF0000)
     val DebugBody = Color(0x3300FF00)
     val DebugItem = Color(0x33FFFF00)
     Surface(
         shape = RailShape,
-        color = railColor.copy(alpha = 0.60f).compositeOver(DebugPill),
+        color = railColor.copy(alpha = 1f).compositeOver(DebugPill),
         border = BorderStroke(2.dp, Color.Red),
         tonalElevation = 0.dp,
         shadowElevation = 10.dp,
