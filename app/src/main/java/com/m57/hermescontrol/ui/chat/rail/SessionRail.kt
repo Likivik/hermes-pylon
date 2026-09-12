@@ -1,8 +1,6 @@
 package com.m57.hermescontrol.ui.chat.rail
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.draggable2D
 import androidx.compose.foundation.layout.Arrangement
@@ -35,7 +33,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -71,16 +68,9 @@ fun SessionRail(
     }
     val railColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.60f)
 
-    // ── DEBUG + OPAQUE TEST: pill forced OPAQUE (kills translucency → any
-    // band seen through it is proven to come from behind), layers color-coded
-    // (RED=pill border, GREEN=list body, YELLOW=item boxes).
-    val DebugPill = Color(0xFFFF0000)
-    val DebugBody = Color(0x3300FF00)
-    val DebugItem = Color(0x33FFFF00)
     Surface(
         shape = RailShape,
-        color = railColor.copy(alpha = 1f).compositeOver(DebugPill),
-        border = BorderStroke(2.dp, Color.Red),
+        color = railColor,
         tonalElevation = 0.dp,
         shadowElevation = 10.dp,
         modifier = modifier
@@ -89,13 +79,7 @@ fun SessionRail(
             // Single rounded clip = the ONLY containment boundary.
             .clip(RailShape),
     ) {
-        RailBody(
-            groups = groups,
-            state = state,
-            onEvent = onEvent,
-            debugBody = DebugBody,
-            debugItem = DebugItem,
-        )
+        RailBody(groups = groups, state = state, onEvent = onEvent)
     }
 }
 
@@ -104,8 +88,6 @@ private fun RailBody(
     groups: RailGroups,
     state: RailUiModel,
     onEvent: (RailEvent) -> Unit,
-    debugBody: Color,
-    debugItem: Color,
 ) {
     // LazyColumn over the FULL visible list (pinned + fresh), archive appends
     // its items after the chip when open. Drag via reorderable lib; items carry
@@ -128,9 +110,6 @@ private fun RailBody(
         state = listState,
         modifier = Modifier
             .fillMaxSize()
-            // DEBUG: green border around the list body itself.
-            .border(2.dp, Color.Green, RailShape)
-            .background(debugBody)
             // Inset layer: all items physically narrower than the pill.
             .padding(horizontal = 4.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -145,14 +124,12 @@ private fun RailBody(
                 state = dragState,
                 key = session.id,
                 enabled = display.draggable,
-                modifier = Modifier.background(Color(0x550000FF)),
             ) { isDragging ->
                 RailItem(
                     display = display,
                     dragging = isDragging,
                     onEvent = onEvent,
                     dragModifier = Modifier.longPressDraggableHandle(),
-                    debugItem = debugItem,
                 )
             }
         }
@@ -174,7 +151,6 @@ private fun ReorderableCollectionItemScope.RailItem(
     dragging: Boolean,
     onEvent: (RailEvent) -> Unit,
     dragModifier: Modifier,
-    debugItem: Color,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     val alpha = if (display.stale && !display.active) 0.38f else 1f
@@ -183,9 +159,8 @@ private fun ReorderableCollectionItemScope.RailItem(
     Box(
         modifier = Modifier
             .width(ItemWidth)
-            // DEBUG: yellow border/fill around each item box.
-            .border(2.dp, Color.Yellow)
-            .background(debugItem)
+            // Transparent item background — the frosted pill is the only fill.
+            .background(Color.Transparent)
             .zIndex(if (dragging) 1f else 0f)
             .then(dragModifier)
             .combinedClickable(
