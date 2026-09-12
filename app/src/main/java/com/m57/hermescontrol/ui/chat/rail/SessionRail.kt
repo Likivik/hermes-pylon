@@ -32,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -156,6 +157,9 @@ private fun ReorderableCollectionItemScope.RailItem(
         modifier = Modifier
             .width(RailWidth)
             .zIndex(if (dragging) 1f else 0f)
+            // Hard containment: nothing painted by an item — emoji, label,
+            // indicator — can ever leave the rail's rounded pill.
+            .clipToBounds()
             .then(dragModifier)
             .combinedClickable(
                 onClick = { onEvent(RailEvent.Switch(id)) },
@@ -193,6 +197,9 @@ private fun ReorderableCollectionItemScope.RailItem(
             Text(
                 text = display.icon.ifEmpty { display.label.take(1).uppercase() },
                 style = MaterialTheme.typography.headlineSmall,
+                maxLines = 1,
+                modifier = Modifier.width(RailWidth),
+                textAlign = TextAlign.Center,
                 color = if (display.avatarIsFallbackColor) railColorFor(id).copy(alpha = alpha)
                 else Color.Unspecified,
             )
@@ -211,7 +218,9 @@ private fun ReorderableCollectionItemScope.RailItem(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.width(68.dp),
+                modifier = Modifier
+                    .width(RailWidth)
+                    .padding(horizontal = 3.dp),
                 color = if (display.active) com.m57.hermescontrol.theme.HermesPurple
                 else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
                 fontWeight = if (display.active) FontWeight.SemiBold else FontWeight.Normal,
