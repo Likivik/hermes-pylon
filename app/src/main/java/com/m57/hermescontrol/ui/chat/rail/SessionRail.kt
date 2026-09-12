@@ -71,7 +71,7 @@ fun SessionRail(
     Surface(
         shape = RailShape,
         color = railColor,
-        tonalElevation = 6.dp,
+        tonalElevation = 0.dp,
         shadowElevation = 10.dp,
         modifier = modifier
             .width(RailWidth)
@@ -108,6 +108,7 @@ private fun RailBody(
 
     LazyColumn(
         state = listState,
+        containerColor = Color.Transparent,
         modifier = Modifier
             .fillMaxSize()
             // Inset layer: all items physically narrower than the pill.
