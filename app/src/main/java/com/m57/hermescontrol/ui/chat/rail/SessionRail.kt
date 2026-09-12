@@ -32,7 +32,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -77,10 +76,8 @@ fun SessionRail(
         modifier = modifier
             .width(RailWidth)
             .fillMaxHeight()
-            // THE containment: one hard rounded clip on the pill itself.
-            // Children (items, labels, indicator) can only paint inside it.
-            .clip(RailShape)
-            .clipToBounds(),
+            // Single rounded clip = the ONLY containment boundary.
+            .clip(RailShape),
     ) {
         RailBody(groups = groups, state = state, onEvent = onEvent)
     }
@@ -162,6 +159,8 @@ private fun ReorderableCollectionItemScope.RailItem(
     Box(
         modifier = Modifier
             .width(ItemWidth)
+            // Transparent item background — the frosted pill is the only fill.
+            .background(Color.Transparent)
             .zIndex(if (dragging) 1f else 0f)
             .then(dragModifier)
             .combinedClickable(
