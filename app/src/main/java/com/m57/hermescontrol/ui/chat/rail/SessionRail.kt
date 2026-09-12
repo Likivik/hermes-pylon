@@ -45,6 +45,8 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 
 /** Rail pill width — single source of truth for cells + chip + surface. */
 internal val RailWidth = 72.dp
+/** Item content width = pill minus the horizontal inset (4dp each side). */
+internal val ItemWidth = RailWidth - 8.dp
 internal val RailShape = RoundedCornerShape(22.dp)
 
 /**
@@ -75,7 +77,10 @@ fun SessionRail(
         modifier = modifier
             .width(RailWidth)
             .fillMaxHeight()
-            .clip(RailShape),
+            // THE containment: one hard rounded clip on the pill itself.
+            // Children (items, labels, indicator) can only paint inside it.
+            .clip(RailShape)
+            .clipToBounds(),
     ) {
         RailBody(groups = groups, state = state, onEvent = onEvent)
     }
@@ -108,7 +113,8 @@ private fun RailBody(
         state = listState,
         modifier = Modifier
             .fillMaxSize()
-            .padding(vertical = 6.dp),
+            // Inset layer: all items physically narrower than the pill.
+            .padding(horizontal = 4.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top,
         userScrollEnabled = true,
@@ -155,11 +161,8 @@ private fun ReorderableCollectionItemScope.RailItem(
 
     Box(
         modifier = Modifier
-            .width(RailWidth)
+            .width(ItemWidth)
             .zIndex(if (dragging) 1f else 0f)
-            // Hard containment: nothing painted by an item — emoji, label,
-            // indicator — can ever leave the rail's rounded pill.
-            .clipToBounds()
             .then(dragModifier)
             .combinedClickable(
                 onClick = { onEvent(RailEvent.Switch(id)) },
@@ -177,7 +180,7 @@ private fun ReorderableCollectionItemScope.RailItem(
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
-                .width(RailWidth)
+                .width(ItemWidth)
                 .padding(vertical = 2.dp),
         ) {
             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
@@ -198,7 +201,7 @@ private fun ReorderableCollectionItemScope.RailItem(
                 text = display.icon.ifEmpty { display.label.take(1).uppercase() },
                 style = MaterialTheme.typography.headlineSmall,
                 maxLines = 1,
-                modifier = Modifier.width(RailWidth),
+                modifier = Modifier.width(ItemWidth),
                 textAlign = TextAlign.Center,
                 color = if (display.avatarIsFallbackColor) railColorFor(id).copy(alpha = alpha)
                 else Color.Unspecified,
@@ -219,7 +222,7 @@ private fun ReorderableCollectionItemScope.RailItem(
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
-                    .width(RailWidth)
+                    .width(ItemWidth)
                     .padding(horizontal = 3.dp),
                 color = if (display.active) com.m57.hermescontrol.theme.HermesPurple
                 else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
@@ -234,7 +237,7 @@ private fun ArchiveChip(count: Int, open: Boolean, onClick: () -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .width(RailWidth)
+            .width(ItemWidth)
             .combinedClickable(onClick = onClick)
             .padding(vertical = 2.dp),
     ) {
