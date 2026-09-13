@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.system.components
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -44,13 +46,13 @@ internal fun HookCard(
             ),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(spacing.md),
+            modifier = Modifier.fillMaxWidth().padding(Spacing.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
                 ) {
                     Icon(
                         Icons.Filled.Terminal,
@@ -64,8 +66,8 @@ internal fun HookCard(
                         fontWeight = FontWeight.Medium,
                     )
                 }
-                Spacer(modifier = Modifier.height(spacing.xs))
-                Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                Spacer(modifier = Modifier.height(Spacing.xs))
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                     Text(
                         text = hook.event ?: "",
                         style = MaterialTheme.typography.labelSmall,
@@ -79,8 +81,8 @@ internal fun HookCard(
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(spacing.xs))
-                Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                Spacer(modifier = Modifier.height(Spacing.xs))
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                     StatusBadge(
                         text =
                             if (hook.executable != false) {
