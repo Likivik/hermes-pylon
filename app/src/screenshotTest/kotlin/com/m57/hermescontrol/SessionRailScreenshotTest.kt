@@ -15,6 +15,8 @@ import androidx.compose.ui.Modifier
 import com.android.tools.screenshot.PreviewTest
 import androidx.compose.ui.tooling.preview.Preview
 import com.m57.hermescontrol.theme.HermesControlTheme
+import com.m57.hermescontrol.theme.ThemePreset
+import com.m57.hermescontrol.theme.ThemePreference
 import com.m57.hermescontrol.ui.chat.SessionUi
 import com.m57.hermescontrol.ui.chat.RailMeta
 import com.m57.hermescontrol.ui.chat.rail.RailUiModel
@@ -51,110 +53,165 @@ private val FakeSessions = listOf(
     SessionUi(id = "s15", title = "Casual friday thread", messageCount = 2),
 )
 
+private val FakeRailMeta = mapOf(
+    "s1" to RailMeta("🧠"),
+    "s2" to RailMeta("🦄"),
+    "s3" to RailMeta("💎"),
+    "s4" to RailMeta("🧠"),
+    "s5" to RailMeta("💻"),
+    "s6" to RailMeta("🚂"),
+    "s7" to RailMeta("🎨"),
+    "s8" to RailMeta("📦"),
+    "s9" to RailMeta("🔑"),
+    "s10" to RailMeta("🧪"),
+    "s11" to RailMeta("📚"),
+    "s12" to RailMeta("🏠"),
+    "s13" to RailMeta("🔍"),
+    "s14" to RailMeta("❄️"),
+    "s15" to RailMeta("🎉"),
+)
+
 @PreviewTest
 @Preview(
-    name = "Full Screen: Hermes chat with C7 rail",
+    name = "Full Screen light (Default preset)",
     device = "spec:width=460dp,height=920dp,dpi=420",
     showBackground = true,
 )
 @Composable
 fun FullScreenC7() {
-    HermesControlTheme {
-        Row(
+    HermesControlTheme(
+        themePreference = ThemePreference.LIGHT,
+        useDynamicColors = false,
+        themePreset = ThemePreset.DEFAULT,
+    ) {
+        FullScreenRailBody(dark = false)
+    }
+}
+
+@PreviewTest
+@Preview(
+    name = "Full Screen dark (Default preset)",
+    device = "spec:width=460dp,height=920dp,dpi=420",
+    showBackground = true,
+)
+@Composable
+fun FullScreenC7Dark() {
+    HermesControlTheme(
+        themePreference = ThemePreference.DARK,
+        useDynamicColors = false,
+        themePreset = ThemePreset.DEFAULT,
+    ) {
+        FullScreenRailBody(dark = true)
+    }
+}
+
+@PreviewTest
+@Preview(
+    name = "Full Screen dark (AMOLED preset)",
+    device = "spec:width=460dp,height=920dp,dpi=420",
+    showBackground = true,
+)
+@Composable
+fun FullScreenC7Amoled() {
+    HermesControlTheme(
+        themePreference = ThemePreference.DARK,
+        useDynamicColors = false,
+        themePreset = ThemePreset.AMOLED,
+    ) {
+        FullScreenRailBody(dark = true)
+    }
+}
+
+@Composable
+private fun FullScreenRailBody(dark: Boolean) {
+    Row(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(chatGradient(dark)),
+    ) {
+        RailComposable(
+            state = RailUiModel(
+                sessions = FakeSessions,
+                currentSessionId = "s3",
+                pinnedSessionIds = emptySet(),
+                railMeta = FakeRailMeta,
+                order = FakeSessions.map { it.id },
+                archiveOpen = false,
+            ),
+            onEvent = {},
+        )
+        Column(
             modifier = Modifier
-                .fillMaxSize()
-                .background(chatGradient()),
+                .weight(1f)
+                .fillMaxHeight()
+                .padding(8.dp),
         ) {
-            RailComposable(
-                state = RailUiModel(
-                    sessions = FakeSessions,
-                    currentSessionId = "s3",
-                    pinnedSessionIds = emptySet(),
-                    railMeta = mapOf(
-                        "s1" to RailMeta("🧠"),
-                        "s2" to RailMeta("🦄"),
-                        "s3" to RailMeta("💎"),
-                        "s4" to RailMeta("🧠"),
-                        "s5" to RailMeta("💻"),
-                        "s6" to RailMeta("🚂"),
-                        "s7" to RailMeta("🎨"),
-                        "s8" to RailMeta("📦"),
-                        "s9" to RailMeta("🔑"),
-                        "s10" to RailMeta("🧪"),
-                        "s11" to RailMeta("📚"),
-                        "s12" to RailMeta("🏠"),
-                        "s13" to RailMeta("🔍"),
-                        "s14" to RailMeta("❄️"),
-                        "s15" to RailMeta("🎉"),
-                    ),
-                    order = FakeSessions.map { it.id },
-                    archiveOpen = false,
-                ),
-                onEvent = {},
-            )
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .padding(8.dp),
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                Surface(
-                    color = MaterialTheme.colorScheme.surface,
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(
-                        text = "Hermes",
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                }
-                Spacer(Modifier.height(8.dp))
-                Box(modifier = Modifier.weight(1f)) {
-                    ChatMessageList(
-                        messages = listOf(
-                            ChatMessage(role = MessageRole.ASSISTANT, content = "👋 ready when you are"),
-                            ChatMessage(role = MessageRole.USER, content = "can we make the rail floating?"),
-                            ChatMessage(role = MessageRole.ASSISTANT, content = "Yep — here's the C7 design composed with the real message list."),
-                        ),
-                        streamingMessage = null,
-                        isThinking = false,
-                        thinkingText = "",
-                        isSearchActive = false,
-                        searchQuery = "",
-                        currentSearchMatchIndex = 0,
-                        searchMatchIndices = emptyList(),
-                        typingEffectEnabled = true,
-                        typingEffectDelayMs = 20,
-                        isLoading = false,
-                        isLoadingOlder = false,
-                        isDark = false,
-                        listState = rememberLazyListState(),
-                        lastAnimatedMessageId = null,
-                        onLastAnimatedMessageIdChange = {},
-                        openingAttachmentPath = null,
-                    )
-                }
-                ChatInputBar(
-                    inputFieldValue = TextFieldValue(""),
-                    onInputChange = {},
-                    onSend = {},
-                    onMicTap = {},
-                    isListening = false,
-                    isAgentTyping = false,
-                    isConnected = true,
-                    isSessionReady = true,
-                    commandCatalog = CommandCatalog(),
+                Text(
+                    text = "Hermes",
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    style = MaterialTheme.typography.titleMedium,
                 )
             }
+            Spacer(Modifier.height(8.dp))
+            Box(modifier = Modifier.weight(1f)) {
+                ChatMessageList(
+                    messages = listOf(
+                        ChatMessage(role = MessageRole.ASSISTANT, content = "👋 ready when you are"),
+                        ChatMessage(role = MessageRole.USER, content = "can we make the rail floating?"),
+                        ChatMessage(role = MessageRole.ASSISTANT, content = "Yep — here's the C7 design composed with the real message list."),
+                    ),
+                    streamingMessage = null,
+                    isThinking = false,
+                    thinkingText = "",
+                    isSearchActive = false,
+                    searchQuery = "",
+                    currentSearchMatchIndex = 0,
+                    searchMatchIndices = emptyList(),
+                    typingEffectEnabled = true,
+                    typingEffectDelayMs = 20,
+                    isLoading = false,
+                    isLoadingOlder = false,
+                    isDark = dark,
+                    listState = rememberLazyListState(),
+                    lastAnimatedMessageId = null,
+                    onLastAnimatedMessageIdChange = {},
+                  openingAttachmentPath = null,
+                )
+            }
+            ChatInputBar(
+                inputFieldValue = TextFieldValue(""),
+                onInputChange = {},
+                onSend = {},
+                onMicTap = {},
+                isListening = false,
+                isAgentTyping = false,
+                isConnected = true,
+                isSessionReady = true,
+                commandCatalog = CommandCatalog(),
+            )
         }
     }
 }
 
-private fun chatGradient(): androidx.compose.ui.graphics.Brush =
-    androidx.compose.ui.graphics.Brush.verticalGradient(
-        colors = listOf(
-            androidx.compose.ui.graphics.Color(0xFFF6F1FF),
-            androidx.compose.ui.graphics.Color(0xFFFFFFFF),
-        ),
-    )
+// Cheap decorative gradient used by the rail preview to mimic the chat
+// gradient. Light: the original lavender→white. Dark: theme-aware surface
+// blend (no hardcoded near-black so presets still read through).
+@Composable
+private fun chatGradient(dark: Boolean): androidx.compose.ui.graphics.Brush {
+    if (!dark) {
+        return androidx.compose.ui.graphics.Brush.verticalGradient(
+            colors = listOf(
+                androidx.compose.ui.graphics.Color(0xFFF6F1FF),
+                androidx.compose.ui.graphics.Color(0xFFFFFFFF),
+            ),
+        )
+    }
+    val top = MaterialTheme.colorScheme.background
+    val bottom = MaterialTheme.colorScheme.surfaceVariant
+    return androidx.compose.ui.graphics.Brush.verticalGradient(colors = listOf(top, bottom))
+}
