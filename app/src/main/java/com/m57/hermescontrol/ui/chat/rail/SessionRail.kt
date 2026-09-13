@@ -5,6 +5,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.draggable2D
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -210,7 +211,7 @@ private fun ReorderableCollectionItemScope.RailItem(
             .combinedClickable(
                 onClick = { onEvent(RailEvent.Switch(id)) },
                 onLongClick = { menuOpen = true },
-                indication = androidx.compose.material.ripple.rememberRipple(
+                indication = androidx.compose.material3.ripple(
                     color = com.m57.hermescontrol.theme.HermesPurple,
                 ),
             ),
