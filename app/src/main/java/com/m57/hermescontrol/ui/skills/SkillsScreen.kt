@@ -1,5 +1,6 @@
 package com.m57.hermescontrol.ui.skills
 
+import com.m57.hermescontrol.theme.Spacing
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -126,7 +127,7 @@ fun SkillsScreen(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                        .padding(horizontal = Spacing.sm, vertical = 6.dp),
             ) {
                 SegmentedButton(
                     selected = state.viewMode == SkillsViewMode.INSTALLED,
@@ -302,7 +303,7 @@ private fun InstalledSkillsView(
             query = query,
             onQueryChange = onQueryChange,
             placeholder = stringResource(R.string.skills_search_placeholder),
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs),
         )
 
         FilterChipRow(
@@ -425,7 +426,7 @@ private fun SkillCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(
-                modifier = Modifier.weight(1f).padding(horizontal = 8.dp, vertical = 8.dp),
+                modifier = Modifier.weight(1f).padding(horizontal = Spacing.sm, vertical = Spacing.sm),
             ) {
                 // ── Top row: name + source badge + toggle ──
                 Row(
@@ -575,7 +576,7 @@ private fun HubBrowseView(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                    .padding(horizontal = Spacing.sm, vertical = 6.dp),
             placeholder = { Text(stringResource(R.string.skills_hub_search_placeholder)) },
             trailingIcon = {
                 Row(
@@ -687,7 +688,7 @@ private fun HubBrowseView(
                 ),
             actions =
                 if (previewReady && state.isHubPreviewing) {
-                    { CircularProgressIndicator(modifier = Modifier.padding(top = 8.dp)) }
+                    { CircularProgressIndicator(modifier = Modifier.padding(top = Spacing.sm)) }
                 } else {
                     null
                 },
@@ -714,7 +715,7 @@ private fun HubSkillCard(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.sm, vertical = Spacing.sm),
         ) {
             // ── Top row: name ──
             Text(
@@ -803,7 +804,7 @@ fun SkillPreviewDialog(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .padding(16.dp),
+                    .padding(Spacing.md),
             colors =
                 CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface,
@@ -828,7 +829,7 @@ fun SkillPreviewDialog(
                                 modifier =
                                     Modifier
                                         .fillMaxSize()
-                                        .padding(16.dp)
+                                        .padding(Spacing.md)
                                         .verticalScroll(rememberScrollState()),
                             ) {
                                 Text(
@@ -897,7 +898,7 @@ fun SkillEditorDialog(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .padding(16.dp),
+                    .padding(Spacing.md),
             colors =
                 CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface,
@@ -954,7 +955,7 @@ fun SkillEditorDialog(
                                 modifier =
                                     Modifier
                                         .fillMaxSize()
-                                        .padding(16.dp),
+                                        .padding(Spacing.md),
                                 textStyle =
                                     TextStyle(
                                         fontFamily = FontFamily.Monospace,

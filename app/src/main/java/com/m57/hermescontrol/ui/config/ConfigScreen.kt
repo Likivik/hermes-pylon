@@ -1,5 +1,6 @@
 package com.m57.hermescontrol.ui.config
 
+import com.m57.hermescontrol.theme.Spacing
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -166,8 +167,8 @@ private fun ConfigContent(
         Column(
             modifier =
                 Modifier
-                    .padding(horizontal = 16.dp)
-                    .padding(top = 8.dp),
+                    .padding(horizontal = Spacing.md)
+                    .padding(top = Spacing.sm),
         ) {
             // Path display
             state.path?.let { path ->
@@ -175,7 +176,7 @@ private fun ConfigContent(
                     text = stringResource(R.string.config_path, path),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 8.dp),
+                    modifier = Modifier.padding(bottom = Spacing.sm),
                 )
             }
 
@@ -192,7 +193,7 @@ private fun ConfigContent(
                     Icon(
                         imageVector = if (state.yamlMode) Icons.Filled.Tune else Icons.Filled.Code,
                         contentDescription = null,
-                        modifier = Modifier.padding(end = 4.dp),
+                        modifier = Modifier.padding(end = Spacing.xs),
                     )
                     Text(
                         stringResource(if (state.yamlMode) R.string.config_mode_form else R.string.config_mode_yaml),
@@ -224,7 +225,7 @@ private fun ConfigContent(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                                .padding(horizontal = 12.dp, vertical = Spacing.sm),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -325,7 +326,7 @@ private fun YAMLEditor(
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = Spacing.md),
     ) {
         OutlinedTextField(
             value = loadedYaml,
@@ -355,7 +356,7 @@ private fun YAMLEditor(
                 Icon(
                     imageVector = Icons.Filled.Save,
                     contentDescription = null,
-                    modifier = Modifier.padding(end = 4.dp),
+                    modifier = Modifier.padding(end = Spacing.xs),
                 )
                 Text(
                     stringResource(R.string.config_action_save_yaml),
@@ -459,7 +460,7 @@ private fun FormEditor(
                     text = stringResource(R.string.config_search_results, count),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 4.dp),
+                    modifier = Modifier.padding(vertical = Spacing.xs),
                 )
             }
         }
@@ -471,7 +472,7 @@ private fun FormEditor(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp),
+                            .padding(vertical = Spacing.xs),
                     colors =
                         CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -519,7 +520,7 @@ private fun FormEditor(
                             },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(vertical = 24.dp),
+                        modifier = Modifier.padding(vertical = Spacing.lg),
                     )
                 }
             }
@@ -546,7 +547,7 @@ private fun FormEditor(
                         Icon(
                             imageVector = Icons.Filled.Save,
                             contentDescription = null,
-                            modifier = Modifier.padding(end = 4.dp),
+                            modifier = Modifier.padding(end = Spacing.xs),
                         )
                         Text(stringResource(R.string.config_action_save))
                     }
@@ -561,7 +562,7 @@ private fun FormEditor(
                         Icon(
                             imageVector = Icons.Filled.Refresh,
                             contentDescription = null,
-                            modifier = Modifier.padding(end = 4.dp),
+                            modifier = Modifier.padding(end = Spacing.xs),
                         )
                         Text(stringResource(R.string.config_action_reset))
                     }
@@ -633,7 +634,7 @@ private fun ConfigFieldCard(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(vertical = 4.dp),
+                .padding(vertical = Spacing.xs),
         colors =
             CardDefaults.cardColors(
                 containerColor =
@@ -717,7 +718,7 @@ private fun ConfigFieldCard(
                     text = row.valueText,
                     style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp),
+                    modifier = Modifier.padding(top = Spacing.xs),
                 )
                 return@Column
             }
@@ -774,7 +775,7 @@ private fun ConfigFieldCard(
                             text = description,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 4.dp),
+                            modifier = Modifier.padding(top = Spacing.xs),
                         )
                     }
                 }

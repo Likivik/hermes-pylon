@@ -1,5 +1,6 @@
 package com.m57.hermescontrol.ui.model
 
+import com.m57.hermescontrol.theme.Spacing
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
@@ -319,7 +320,7 @@ private fun ModelSettingsSection(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
             ),
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(Spacing.md)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -479,7 +480,7 @@ private fun AuxTasksDialog(
                     val isAuto = cur == null || cur.provider.isBlank() || cur.provider == "auto"
 
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.xs),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
@@ -563,14 +564,14 @@ private fun PinnedSectionCard(
     onUnpin: (String, String) -> Unit,
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth().animateContentSize().padding(bottom = 8.dp),
+        modifier = Modifier.fillMaxWidth().animateContentSize().padding(bottom = Spacing.sm),
         colors =
             CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
             ),
         onClick = onToggleExpanded,
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(Spacing.md)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -601,7 +602,7 @@ private fun PinnedSectionCard(
             }
 
             AnimatedVisibility(visible = isExpanded) {
-                Column(modifier = Modifier.padding(top = 8.dp)) {
+                Column(modifier = Modifier.padding(top = Spacing.sm)) {
                     pinnedModels.forEach { pinned ->
                         val isActive =
                             activeProfile?.provider == pinned.providerSlug &&
@@ -609,7 +610,7 @@ private fun PinnedSectionCard(
 
                         Card(
                             onClick = { onModelClick(pinned.providerSlug, pinned.modelName) },
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.xs),
                             colors =
                                 CardDefaults.cardColors(
                                     containerColor =
@@ -715,7 +716,7 @@ private fun ProviderCard(
                     },
             ),
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(Spacing.md)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -756,12 +757,12 @@ private fun ProviderCard(
             }
 
             AnimatedVisibility(visible = isExpanded) {
-                Column(modifier = Modifier.padding(top = 16.dp)) {
+                Column(modifier = Modifier.padding(top = Spacing.md)) {
                     Text(
                         text = stringResource(R.string.model_label_available),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(bottom = 8.dp),
+                        modifier = Modifier.padding(bottom = Spacing.sm),
                     )
 
                     val models = provider.models.orEmpty()
@@ -785,7 +786,7 @@ private fun ProviderCard(
                                     activeProfile.model == model
                             Card(
                                 onClick = { onModelClick(provider.slug, model) },
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.xs),
                                 colors =
                                     CardDefaults.cardColors(
                                         containerColor =

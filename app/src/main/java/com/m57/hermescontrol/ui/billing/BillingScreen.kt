@@ -1,5 +1,6 @@
 package com.m57.hermescontrol.ui.billing
 
+import com.m57.hermescontrol.theme.Spacing
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -179,7 +180,7 @@ private fun PlanCard(subscription: SubscriptionCurrent) {
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         shape = RoundedCornerShape(16.dp),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(Spacing.md)) {
             Text(
                 text = subscription.tier_name ?: stringResource(R.string.billing_free_plan),
                 style = MaterialTheme.typography.headlineSmall,
@@ -194,7 +195,7 @@ private fun PlanCard(subscription: SubscriptionCurrent) {
                         ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp),
+                    modifier = Modifier.padding(top = Spacing.xs),
                 )
             }
             if (subscription.cycle_ends_at != null) {
@@ -202,7 +203,7 @@ private fun PlanCard(subscription: SubscriptionCurrent) {
                     text = stringResource(R.string.billing_renews, subscription.cycle_ends_at),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp),
+                    modifier = Modifier.padding(top = Spacing.xs),
                 )
             }
             if (subscription.pending_downgrade_display != null) {
@@ -210,7 +211,7 @@ private fun PlanCard(subscription: SubscriptionCurrent) {
                     text = subscription.pending_downgrade_display ?: "",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp),
+                    modifier = Modifier.padding(top = Spacing.xs),
                 )
             }
         }
@@ -224,7 +225,7 @@ private fun NoActivePlanCard(subscription: SubscriptionStateResponse) {
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         shape = RoundedCornerShape(16.dp),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(Spacing.md)) {
             Text(
                 text = stringResource(R.string.billing_free_plan),
                 style = MaterialTheme.typography.headlineSmall,
@@ -239,7 +240,7 @@ private fun NoActivePlanCard(subscription: SubscriptionStateResponse) {
                     },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp),
+                modifier = Modifier.padding(top = Spacing.xs),
             )
         }
     }
@@ -274,7 +275,7 @@ private fun UsageBarRow(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .padding(top = 8.dp)
+                        .padding(top = Spacing.sm)
                         .height(8.dp)
                         .clip(RoundedCornerShape(4.dp)),
             )
@@ -289,7 +290,7 @@ private fun SectionTitle(text: String) {
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+        modifier = Modifier.padding(top = Spacing.sm, bottom = Spacing.xs),
     )
 }
 
@@ -304,7 +305,7 @@ private fun FeatureUnavailableState(onRetry: () -> Unit) {
             imageVector = androidx.compose.material.icons.Icons.Filled.AccountBalanceWallet,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-            modifier = Modifier.padding(bottom = 16.dp).size(48.dp),
+            modifier = Modifier.padding(bottom = Spacing.md).size(48.dp),
         )
         ErrorState(
             message = stringResource(R.string.billing_feature_unavailable),

@@ -1,5 +1,6 @@
 package com.m57.hermescontrol.ui.analytics
 
+import com.m57.hermescontrol.theme.Spacing
 import android.app.Application
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -168,7 +169,7 @@ private fun AnalyticsContent(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                        .padding(horizontal = Spacing.md, vertical = Spacing.sm),
             ) {
                 Text(
                     text = "Most Used Components",
@@ -222,7 +223,7 @@ private fun AnalyticsContent(
                 item {
                     Text(
                         text = "No model data available",
-                        modifier = Modifier.padding(16.dp),
+                        modifier = Modifier.padding(Spacing.md),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -244,7 +245,7 @@ private fun AnalyticsContent(
                 item {
                     Text(
                         text = "No skill data available",
-                        modifier = Modifier.padding(16.dp),
+                        modifier = Modifier.padding(Spacing.md),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -261,7 +262,7 @@ private fun AnalyticsContent(
                 item {
                     Text(
                         text = "No tool data available",
-                        modifier = Modifier.padding(16.dp),
+                        modifier = Modifier.padding(Spacing.md),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -298,7 +299,7 @@ private fun SectionTitle(text: String) {
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+        modifier = Modifier.padding(top = Spacing.sm, bottom = Spacing.xs),
     )
 }
 
@@ -310,7 +311,7 @@ private fun TotalsCard(totals: com.m57.hermescontrol.data.model.AnalyticsTotals)
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         shape = RoundedCornerShape(16.dp),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(Spacing.md)) {
             Text(
                 text = formatCost(totals.total_estimated_cost),
                 style = MaterialTheme.typography.headlineSmall,

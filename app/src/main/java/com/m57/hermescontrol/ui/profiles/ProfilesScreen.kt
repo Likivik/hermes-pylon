@@ -1,5 +1,6 @@
 package com.m57.hermescontrol.ui.profiles
 
+import com.m57.hermescontrol.theme.Spacing
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -161,7 +162,7 @@ fun ProfilesScreen(
                             CircularProgressIndicator()
                         } else if (state.errorMessage != null && state.profiles.isEmpty()) {
                             Column(
-                                modifier = Modifier.padding(16.dp),
+                                modifier = Modifier.padding(Spacing.md),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
                                 Text(text = state.errorMessage ?: "", color = MaterialTheme.colorScheme.error)
@@ -199,7 +200,7 @@ fun ProfilesScreen(
                                             modifier =
                                                 Modifier
                                                     .fillMaxWidth()
-                                                    .padding(16.dp),
+                                                    .padding(Spacing.md),
                                         ) {
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),
@@ -268,7 +269,7 @@ fun ProfilesScreen(
                                                                 R.string.profiles_content_desc_active,
                                                             ),
                                                         tint = MaterialTheme.colorScheme.primary,
-                                                        modifier = Modifier.padding(start = 8.dp),
+                                                        modifier = Modifier.padding(start = Spacing.sm),
                                                     )
                                                 }
                                             }
@@ -328,7 +329,7 @@ fun ProfilesScreen(
                                                     modifier =
                                                         Modifier
                                                             .fillMaxWidth()
-                                                            .padding(bottom = 8.dp),
+                                                            .padding(bottom = Spacing.sm),
                                                 ) {
                                                     Text(stringResource(R.string.profiles_action_activate))
                                                 }
@@ -344,7 +345,7 @@ fun ProfilesScreen(
                                                         soulEditProfileName = profile.name
                                                         viewModel.loadSoul(profile.name)
                                                     },
-                                                    modifier = Modifier.padding(end = 8.dp),
+                                                    modifier = Modifier.padding(end = Spacing.sm),
                                                 ) {
                                                     Icon(
                                                         imageVector = Icons.Filled.Edit,
@@ -361,7 +362,7 @@ fun ProfilesScreen(
                                                         tempModelProvider = profile.provider ?: ""
                                                         tempModelName = profile.model ?: ""
                                                     },
-                                                    modifier = Modifier.padding(end = 8.dp),
+                                                    modifier = Modifier.padding(end = Spacing.sm),
                                                 ) {
                                                     Text(stringResource(R.string.profiles_action_set_model))
                                                 }
