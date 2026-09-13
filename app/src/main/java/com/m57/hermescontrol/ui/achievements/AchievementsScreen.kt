@@ -730,7 +730,7 @@ private fun AchievementCard(
 @Composable
 private fun Surface(
     modifier: Modifier = Modifier,
-    shape: RoundedCornerShape,
+    shape: androidx.compose.foundation.shape.CornerBasedShape,
     color: Color = MaterialTheme.colorScheme.surface,
     content: @Composable () -> Unit,
 ) {
