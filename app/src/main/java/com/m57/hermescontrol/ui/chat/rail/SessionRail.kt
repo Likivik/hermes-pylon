@@ -110,9 +110,9 @@ private fun RailBody(
     LazyColumn(
         state = listState,
         modifier = Modifier
-            .fillMaxSize()
-            // Inset layer: all items physically narrower than the pill.
-            .padding(horizontal = 4.dp, vertical = 6.dp),
+            .fillMaxSize(),
+            // BAND KILL TEST 1: horizontal inset REMOVED — if the shade
+            // boundary tracks this padding, the band was the list viewport.
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top,
         userScrollEnabled = true,
