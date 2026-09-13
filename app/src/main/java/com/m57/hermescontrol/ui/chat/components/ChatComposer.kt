@@ -220,7 +220,7 @@ fun ChatInputBar(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = Spacing.sm, vertical = 2.dp),
+                            .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     val placeholderText =
@@ -279,7 +279,7 @@ fun ChatInputBar(
                                 Row(
                                     modifier =
                                         Modifier
-                                            .padding(start = 12.dp, end = Spacing.xs, top = 9.dp, bottom = 9.dp)
+                                            .padding(start = 12.dp, end = Spacing.xs, top = Spacing.sm, bottom = Spacing.sm)
                                             .fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {

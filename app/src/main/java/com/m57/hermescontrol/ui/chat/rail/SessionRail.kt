@@ -118,7 +118,7 @@ private fun RailBody(
         modifier = Modifier
             .fillMaxSize()
             // Even side gutters; a touch more breathing room up top.
-            .padding(start = Spacing.xs, end = Spacing.xs, top = 10.dp, bottom = 6.dp),
+            .padding(start = Spacing.xs, end = Spacing.xs, top = Spacing.sm, bottom = Spacing.xs),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp),
         userScrollEnabled = true,
@@ -244,7 +244,7 @@ private fun ReorderableCollectionItemScope.RailItem(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .width(ItemWidth)
-                .padding(vertical = 2.dp),
+                .padding(vertical = Spacing.xs),
         ) {
             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                 DropdownMenuItem(
@@ -313,7 +313,7 @@ private fun ReorderableCollectionItemScope.RailItem(
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .width(ItemWidth)
-                    .padding(horizontal = 3.dp),
+                    .padding(horizontal = Spacing.xs),
                 color = if (display.active) com.m57.hermescontrol.theme.HermesPurple
                 else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
                 fontWeight = if (display.active) FontWeight.SemiBold else FontWeight.Normal,
@@ -329,7 +329,7 @@ private fun ArchiveChip(count: Int, open: Boolean, onClick: () -> Unit) {
         modifier = Modifier
             .width(ItemWidth)
             .combinedClickable(onClick = onClick)
-            .padding(vertical = 2.dp),
+            .padding(vertical = Spacing.xs),
     ) {
         Text(
             text = if (open) "▲" else "▾",

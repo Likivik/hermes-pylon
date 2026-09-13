@@ -212,7 +212,7 @@ private fun UserBubble(
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(horizontal = Spacing.sm, vertical = 2.dp),
+                .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
         contentAlignment = Alignment.CenterEnd,
     ) {
         // Likivik patch: user bubble follows the theme's *own* container color
@@ -266,7 +266,7 @@ private fun UserBubble(
                 color = Color.Transparent,
                 tonalElevation = 0.dp,
             ) {
-                Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+                Column(modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs)) {
                     ChatFontScale {
                         SelectionContainer {
                             Text(
@@ -370,7 +370,7 @@ private fun AssistantBubble(
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(horizontal = Spacing.sm, vertical = 2.dp),
+                .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
         contentAlignment = Alignment.CenterStart,
     ) {
         Box {
@@ -403,7 +403,7 @@ private fun AssistantBubble(
                     ),
                 tonalElevation = 1.dp,
             ) {
-                Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+                Column(modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs)) {
                     if (message.reasoningText.isNotBlank()) {
                         ReasoningCard(
                             reasoningText = message.reasoningText,
@@ -529,7 +529,7 @@ private fun SelfImprovementReviewCard(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             ),
     ) {
-        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = Spacing.sm)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = icon,
@@ -569,7 +569,7 @@ private fun SystemBubble(
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(horizontal = Spacing.lg, vertical = 2.dp),
+                .padding(horizontal = Spacing.lg, vertical = Spacing.xs),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // Likivik patch: system status lines render as Telegram-style center
@@ -585,7 +585,7 @@ private fun SystemBubble(
                 maxLines = 1,
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 3.dp),
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = Spacing.xs),
             )
         }
 
@@ -2187,7 +2187,7 @@ private fun ToolBubble(
                 modifier =
                     Modifier
                         .animateContentSize()
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                        .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
             ) {
                 // ── Header row: icon + tool name ──
                 HeaderRow(message, config, contentColor, statusColors)
@@ -2204,7 +2204,7 @@ private fun ToolBubble(
                             ),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = Spacing.xs, start = 22.dp),
+                        modifier = Modifier.padding(top = Spacing.xs, start = Spacing.lg),
                     )
                 }
 
@@ -2218,7 +2218,7 @@ private fun ToolBubble(
                 if (!expanded && parsed?.summaryText != null) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(top = Spacing.xs, start = 22.dp),
+                        modifier = Modifier.padding(top = Spacing.xs, start = Spacing.lg),
                     ) {
                         Icon(
                             imageVector = config.icon,
@@ -2425,7 +2425,7 @@ private fun SecurityRiskChip(
     Row(
         modifier =
             modifier
-                .padding(top = Spacing.xs, start = 22.dp),
+                .padding(top = Spacing.xs, start = Spacing.lg),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {

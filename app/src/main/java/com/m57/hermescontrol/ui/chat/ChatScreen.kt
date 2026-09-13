@@ -498,7 +498,7 @@ fun ChatScreen(
                             text = terminalBackend,
                             modifier =
                                 Modifier
-                                    .padding(horizontal = 6.dp, vertical = 1.dp)
+                                    .padding(horizontal = Spacing.xs, vertical = 1.dp)
                                     .semantics {
                                         contentDescription = terminalBackendDescription
                                     },

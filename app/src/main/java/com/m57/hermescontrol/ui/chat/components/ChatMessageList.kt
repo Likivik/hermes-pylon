@@ -1,5 +1,6 @@
 package com.m57.hermescontrol.ui.chat.components
 
+import com.m57.hermescontrol.theme.Spacing
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
