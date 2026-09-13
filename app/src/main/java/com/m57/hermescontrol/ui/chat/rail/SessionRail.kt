@@ -212,6 +212,17 @@ private fun ReorderableCollectionItemScope.RailItem(
                     emoji = kodeinEmoji,
                     iterations = 1,
                     speed = 1f,
+                    // Static emoji Text placeholder: shows instantly on device
+                    // and remains in screenshot renders / offline (where the
+                    // animated APNG fetch fails) — no blank gaps.
+                    placeholder = {
+                        Text(
+                            text = iconText,
+                            style = MaterialTheme.typography.headlineSmall,
+                            maxLines = 1,
+                            textAlign = TextAlign.Center,
+                        )
+                    },
                     modifier = Modifier.height(28.dp),
                 )
             } else {
