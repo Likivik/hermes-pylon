@@ -582,6 +582,21 @@ fun ChatScreen(
                     .background(backgroundGradient)
                     .imePadding(),
         ) {
+            // Brand accent: thin Hermes-purple gradient hairline under the TopBar.
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(2.dp)
+                    .background(
+                        androidx.compose.ui.graphics.Brush.horizontalGradient(
+                            listOf(
+                                com.m57.hermescontrol.theme.HermesPurple,
+                                com.m57.hermescontrol.theme.HermesPurpleLight,
+                                com.m57.hermescontrol.theme.HermesPurple,
+                            ),
+                        ),
+                    ),
+            )
             ChatConnectionBanner(
                 connectionStatus = state.connectionStatus,
                 onReconnect = viewModel::reconnect,

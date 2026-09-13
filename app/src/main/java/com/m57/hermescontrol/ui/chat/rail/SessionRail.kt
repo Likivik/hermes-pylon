@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import kotlin.math.roundToInt
 import org.kodein.emoji.*
 import org.kodein.emoji.compose.NotoAnimatedEmoji
 import sh.calvin.reorderable.ReorderableItem
@@ -49,7 +50,7 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 internal val RailWidth = 72.dp
 /** Item content width = pill minus the horizontal inset (4dp each side). */
 internal val ItemWidth = RailWidth - 8.dp
-internal val RailShape = RoundedCornerShape(22.dp)
+internal val RailShape = RoundedCornerShape(26.dp)
 
 /**
  * C7 floating rail — best-practices rewrite.
@@ -92,6 +93,7 @@ private fun RailBody(
     state: RailUiModel,
     onEvent: (RailEvent) -> Unit,
 ) {
+    Box(modifier = Modifier.fillMaxSize()) {
     // LazyColumn over the FULL visible list (pinned + fresh), archive appends
     // its items after the chip when open. Drag via reorderable lib; items carry
     // stable keys so WS refreshes can't desync anything.
@@ -147,6 +149,40 @@ private fun RailBody(
             }
         }
     }
+
+    // Styled scrollbar: thin rounded brand-colored thumb, only while scrolling.
+    val showBar = listState.isScrollInProgress
+    val canScroll = listState.layoutInfo.totalItemsCount > 0 &&
+        listState.layoutInfo.visibleItemsInfo.size < listState.layoutInfo.totalItemsCount
+    if (showBar && canScroll) {
+        val layout = listState.layoutInfo
+        val viewport = layout.viewportSize.height.toFloat().coerceAtLeast(1f)
+        val total = layout.totalItemsCount
+        val visibleCount = layout.visibleItemsInfo.size.coerceAtLeast(1)
+        val first = layout.visibleItemsInfo.firstOrNull()
+        val progress = if (first != null && total > visibleCount) {
+            ((first.index + first.offset.toFloat() / first.size.coerceAtLeast(1)) /
+                (total - visibleCount)).coerceIn(0f, 1f)
+        } else 0f
+        val thumbFraction = (visibleCount.toFloat() / total).coerceIn(0.08f, 1f)
+        Box(
+            Modifier
+                .fillMaxHeight()
+                .width(3.dp)
+                .align(Alignment.CenterEnd)
+                .offset(x = (-2).dp),
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(thumbFraction)
+                    .offset { androidx.compose.ui.unit.IntOffset(0, ((viewport - viewport * thumbFraction) * progress).roundToInt()) }
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(com.m57.hermescontrol.theme.HermesPurple.copy(alpha = 0.45f)),
+            )
+        }
+    }
+    }
 }
 
 @Composable
@@ -163,13 +199,20 @@ private fun ReorderableCollectionItemScope.RailItem(
     Box(
         modifier = Modifier
             .width(ItemWidth)
-            // Transparent item background — the frosted pill is the only fill.
-            .background(Color.Transparent)
+            // Solid active pill + purple-tinted press ripple (Telegram-like).
+            .clip(RailShape)
+            .background(
+                if (display.active) MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+                else Color.Transparent,
+            )
             .zIndex(if (dragging) 1f else 0f)
             .then(dragModifier)
             .combinedClickable(
                 onClick = { onEvent(RailEvent.Switch(id)) },
                 onLongClick = { menuOpen = true },
+                indication = androidx.compose.material.ripple.rememberRipple(
+                    color = com.m57.hermescontrol.theme.HermesPurple,
+                ),
             ),
     ) {
         if (display.active) {
@@ -178,6 +221,20 @@ private fun ReorderableCollectionItemScope.RailItem(
                     .width(4.dp)
                     .fillMaxHeight()
                     .background(com.m57.hermescontrol.theme.HermesPurple),
+            )
+            // Soft outer glow ring around the active item's icon.
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .background(
+                        androidx.compose.ui.graphics.Brush.horizontalGradient(
+                            listOf(
+                                com.m57.hermescontrol.theme.HermesPurple.copy(alpha = 0.14f),
+                                com.m57.hermescontrol.theme.HermesPurple.copy(alpha = 0.04f),
+                                Color.Transparent,
+                            ),
+                        ),
+                    ),
             )
         }
         Column(
