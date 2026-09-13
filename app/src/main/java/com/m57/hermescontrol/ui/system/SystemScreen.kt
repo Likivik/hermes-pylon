@@ -786,7 +786,7 @@ private fun LazyListScope.selfImprovementSection(
                                 Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = spacing.xs),
-                            shape = androidx.compose.foundation.shape.MaterialTheme.shapes.small,
+                            shape = MaterialTheme.shapes.small,
                             color = MaterialTheme.colorScheme.surfaceContainerHigh,
                         ) {
                             Row(

@@ -711,7 +711,7 @@ private fun AchievementCard(
                 ) {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = MaterialTheme.shapes.small,
+                        shape = MaterialTheme.shapes.small as androidx.compose.foundation.shape.CornerBasedShape,
                         color = MaterialTheme.colorScheme.surfaceContainerHigh,
                     ) {
                         Text(
