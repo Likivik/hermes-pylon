@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.chat.components
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -92,7 +94,7 @@ fun StickySubagentBar(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = spacing.sm, vertical = 2.dp)
+                    .padding(horizontal = Spacing.sm, vertical = 2.dp)
                     .clip(RoundedCornerShape(10.dp))
                     .clickable(onClick = onClick)
                     .testTag("sticky_subagent_bar"),

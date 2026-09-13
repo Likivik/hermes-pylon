@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.model.components
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -175,7 +177,7 @@ fun ModelPickerDialog(
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    modifier = Modifier.padding(top = spacing.xs, bottom = 6.dp),
+                                    modifier = Modifier.padding(top = Spacing.xs, bottom = 6.dp),
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.PushPin,
@@ -289,7 +291,7 @@ private fun ModelItemCard(
             ),
     ) {
         Row(
-            modifier = Modifier.padding(start = 12.dp, end = spacing.xs, top = spacing.xs, bottom = spacing.xs),
+            modifier = Modifier.padding(start = 12.dp, end = Spacing.xs, top = Spacing.xs, bottom = Spacing.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(

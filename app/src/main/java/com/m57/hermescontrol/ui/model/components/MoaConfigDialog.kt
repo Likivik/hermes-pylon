@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.model.components
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -316,7 +318,7 @@ private fun MoaConfigEditor(
             }
         }
 
-        HorizontalDivider(modifier = Modifier.padding(vertical = spacing.sm))
+        HorizontalDivider(modifier = Modifier.padding(vertical = Spacing.sm))
 
         // Reference models
         Text(
@@ -436,7 +438,7 @@ private fun MoaSlotPicker(
                         text = provider.name,
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(vertical = spacing.xs),
+                        modifier = Modifier.padding(vertical = Spacing.xs),
                     )
 
                     models.forEach { model ->

@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.chat.components
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -47,7 +49,7 @@ fun BoxScope.ChatScrollToBottomFab(
         modifier =
             Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = spacing.md, bottom = spacing.md),
+                .padding(end = Spacing.md, bottom = Spacing.md),
     ) {
         BadgedBox(
             badge = {

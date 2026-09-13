@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.chat.components
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -67,8 +69,8 @@ fun SubagentInspectionSheet(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = spacing.md)
-                    .padding(bottom = spacing.lg),
+                    .padding(horizontal = Spacing.md)
+                    .padding(bottom = Spacing.lg),
         ) {
             // Header
             Row(
@@ -106,7 +108,7 @@ fun SubagentInspectionSheet(
                     text = "No active tasks or plan items.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = spacing.md),
+                    modifier = Modifier.padding(vertical = Spacing.md),
                 )
             } else {
                 LazyColumn(
@@ -117,7 +119,7 @@ fun SubagentInspectionSheet(
                         item(key = "todos_header") {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(vertical = spacing.xs),
+                                modifier = Modifier.padding(vertical = Spacing.xs),
                             ) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.FormatListBulleted,
@@ -147,7 +149,7 @@ fun SubagentInspectionSheet(
                             item(key = "subagents_header") {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(top = spacing.sm, bottom = spacing.xs),
+                                    modifier = Modifier.padding(top = Spacing.sm, bottom = Spacing.xs),
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Groups,
@@ -312,7 +314,7 @@ internal fun InspectionItemCard(indicator: SubagentIndicator) {
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
                             .background(MaterialTheme.colorScheme.surfaceContainerLowest)
-                            .padding(spacing.sm),
+                            .padding(Spacing.sm),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     Text(

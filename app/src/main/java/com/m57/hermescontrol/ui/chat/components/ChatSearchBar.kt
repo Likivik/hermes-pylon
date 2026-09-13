@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.chat.components
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -139,7 +141,7 @@ fun SearchBarRow(
                                 MaterialTheme.colorScheme.onSurfaceVariant
                             },
                     ),
-                modifier = Modifier.padding(horizontal = spacing.xs),
+                modifier = Modifier.padding(horizontal = Spacing.xs),
             )
         }
         IconButton(

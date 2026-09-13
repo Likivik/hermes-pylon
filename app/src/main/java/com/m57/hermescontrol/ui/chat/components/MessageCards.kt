@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.chat.components
 
+import com.m57.hermescontrol.theme.Spacing
+
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -112,7 +114,7 @@ fun ReasoningCard(
         shape = RoundedCornerShape(12.dp),
         onClick = { expanded = !expanded },
     ) {
-        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = spacing.sm)) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = Spacing.sm)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "🧠",
@@ -138,7 +140,7 @@ fun ReasoningCard(
                         text = reasoningText,
                         style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = spacing.xs),
+                        modifier = Modifier.padding(top = Spacing.xs),
                     )
                     if (isStreaming) {
                         ReasoningPulsingDot(modifier = Modifier.padding(top = 6.dp))
@@ -211,7 +213,7 @@ fun CodeBlockCard(
         Column {
             // Header row: language badge (left) + copy button (right)
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.sm, vertical = spacing.xs),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.sm, vertical = Spacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (!language.isNullOrBlank()) {
@@ -381,7 +383,7 @@ fun ClarifyBubble(
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(horizontal = spacing.lg, vertical = spacing.xs)
+                .padding(horizontal = Spacing.lg, vertical = Spacing.xs)
                 .testTag("clarify_bubble"),
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -472,7 +474,7 @@ fun SubagentCard(
         color = MaterialTheme.colorScheme.tertiaryContainer,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = spacing.sm),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = Spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (isComplete) {
@@ -513,7 +515,7 @@ fun SubagentCard(
 @Composable
 fun TypingIndicator(modifier: Modifier = Modifier) {
     Row(
-        modifier = modifier.padding(horizontal = spacing.md, vertical = spacing.sm).testTag("typing_indicator"),
+        modifier = modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm).testTag("typing_indicator"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {

@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.chat.components
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -75,7 +77,7 @@ fun ChatConnectionBanner(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = spacing.md, vertical = spacing.sm),
+                        .padding(horizontal = Spacing.md, vertical = Spacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
@@ -85,7 +87,7 @@ fun ChatConnectionBanner(
                 ) {
                     if (connectionStatus == ConnectionStatus.RECONNECTING) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp).padding(end = spacing.sm),
+                            modifier = Modifier.size(16.dp).padding(end = Spacing.sm),
                             strokeWidth = 2.dp,
                             color = LocalHermesStatusColors.current.error,
                         )

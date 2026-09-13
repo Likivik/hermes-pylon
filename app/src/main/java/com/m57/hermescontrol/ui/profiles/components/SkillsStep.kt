@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.profiles.components
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -113,7 +115,7 @@ fun SkillsStep(
                                     } else {
                                         onSelectedSkillsChange(selectedSkills + skill.name)
                                     }
-                                }.padding(vertical = spacing.xs),
+                                }.padding(vertical = Spacing.xs),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Checkbox(
@@ -197,7 +199,7 @@ fun SkillsStep(
                                     .background(
                                         MaterialTheme.colorScheme.surfaceVariant,
                                         RoundedCornerShape(4.dp),
-                                    ).padding(horizontal = spacing.sm, vertical = spacing.xs),
+                                    ).padding(horizontal = Spacing.sm, vertical = Spacing.xs),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
@@ -238,7 +240,7 @@ fun SkillsStep(
                             modifier =
                                 Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = spacing.xs),
+                                    .padding(vertical = Spacing.xs),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {

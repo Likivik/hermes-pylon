@@ -2,6 +2,8 @@
 
 package com.m57.hermescontrol.ui.chat.components
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -89,7 +91,7 @@ fun ContextUsageChip(
                     } else {
                         Modifier
                     },
-                ).padding(horizontal = 12.dp, vertical = spacing.xs),
+                ).padding(horizontal = 12.dp, vertical = Spacing.xs),
         verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         Row(

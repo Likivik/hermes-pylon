@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.chat.components
 
+import com.m57.hermescontrol.theme.Spacing
+
 import android.graphics.drawable.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -130,13 +132,13 @@ fun GifImageThumbnail(
                 modifier =
                     Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(spacing.sm)
+                        .padding(Spacing.sm)
                         .minimumInteractiveComponentSize()
                         .background(
                             color = MaterialTheme.colorScheme.scrim.copy(alpha = 0.6f),
                             shape = RoundedCornerShape(16.dp),
                         ).clickable { togglePlayPause() }
-                        .padding(horizontal = spacing.sm, vertical = spacing.xs),
+                        .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,

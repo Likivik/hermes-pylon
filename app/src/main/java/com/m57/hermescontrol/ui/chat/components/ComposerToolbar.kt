@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.chat.components
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -61,7 +63,7 @@ fun ComposerToolbar(
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(horizontal = spacing.sm, vertical = spacing.xs)
+                .padding(horizontal = Spacing.sm, vertical = Spacing.xs)
                 .testTag("composer_toolbar"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),

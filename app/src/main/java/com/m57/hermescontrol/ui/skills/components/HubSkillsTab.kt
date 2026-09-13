@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.skills.components
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -75,7 +77,7 @@ internal fun HubBrowseView(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = spacing.sm, vertical = 6.dp),
+                    .padding(horizontal = Spacing.sm, vertical = 6.dp),
             placeholder = { Text(stringResource(R.string.skills_hub_search_placeholder)) },
             trailingIcon = {
                 Row(
@@ -189,7 +191,7 @@ internal fun HubBrowseView(
                 ),
             actions =
                 if (previewReady && state.isHubPreviewing) {
-                    { CircularProgressIndicator(modifier = Modifier.padding(top = spacing.sm)) }
+                    { CircularProgressIndicator(modifier = Modifier.padding(top = Spacing.sm)) }
                 } else {
                     null
                 },
@@ -214,7 +216,7 @@ private fun HubSkillCard(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.sm, vertical = spacing.sm),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.sm, vertical = Spacing.sm),
         ) {
             // ── Top row: name + source badge ──
             Row(

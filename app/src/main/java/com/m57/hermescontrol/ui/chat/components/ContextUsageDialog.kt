@@ -2,6 +2,8 @@
 
 package com.m57.hermescontrol.ui.chat.components
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -117,7 +119,7 @@ fun ContextUsageDialog(
                         text = stringResource(R.string.chat_context_detail_footnote),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = spacing.xs),
+                        modifier = Modifier.padding(top = Spacing.xs),
                     )
                 }
             }

@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.skills.components
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -74,7 +76,7 @@ internal fun SkillEditorDialog(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .padding(spacing.md),
+                    .padding(Spacing.md),
             colors =
                 CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface,
@@ -131,7 +133,7 @@ internal fun SkillEditorDialog(
                                 modifier =
                                     Modifier
                                         .fillMaxSize()
-                                        .padding(spacing.md),
+                                        .padding(Spacing.md),
                                 textStyle =
                                     TextStyle(
                                         fontFamily = FontFamily.Monospace,

@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.chat.components
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -46,7 +48,7 @@ fun ChatLoadingOverlay(isLoading: Boolean) {
                 elevation = CardDefaults.cardElevation(4.dp),
             ) {
                 Column(
-                    modifier = Modifier.padding(spacing.xl),
+                    modifier = Modifier.padding(Spacing.xl),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     CircularProgressIndicator(

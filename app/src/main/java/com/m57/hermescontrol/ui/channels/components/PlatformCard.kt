@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.channels.components
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -91,7 +93,7 @@ private fun StateBadge(state: String) {
             text = style.label,
             color = style.color,
             style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.padding(horizontal = spacing.sm, vertical = 2.dp),
+            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = 2.dp),
         )
     }
 }
@@ -113,7 +115,7 @@ internal fun PlatformCard(
     val style = platformStateStyle(platform.state)
 
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(spacing.md)) {
+        Column(modifier = Modifier.padding(Spacing.md)) {
             // ── Top row: icon + name + badge + switch ──
             Row(
                 modifier = Modifier.fillMaxWidth(),

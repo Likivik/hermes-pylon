@@ -2,6 +2,8 @@
 
 package com.m57.hermescontrol.ui.settings.components
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -86,7 +88,7 @@ internal fun ConnectionSection(
                     elevation = CardDefaults.cardElevation(0.dp),
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = spacing.sm),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = Spacing.sm),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
@@ -212,7 +214,7 @@ internal fun TestResultCard(testResult: String?) {
             ) {
                 Text(
                     text = result,
-                    modifier = Modifier.padding(spacing.md),
+                    modifier = Modifier.padding(Spacing.md),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
