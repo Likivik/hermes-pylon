@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.achievements
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -278,7 +280,7 @@ fun AchievementsScreen(
                                 ),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = spacing.xs),
+                            modifier = Modifier.padding(top = Spacing.xs),
                         )
                     }
 
@@ -565,7 +567,7 @@ private fun AchievementCard(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(spacing.md),
+                    .padding(Spacing.md),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             // Header row: icon + name + tier badge

@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.chat
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
@@ -143,7 +145,7 @@ fun MarkdownText(
 
                 is MdBlock.Hr -> {
                     HorizontalDivider(
-                        modifier = Modifier.padding(vertical = spacing.sm),
+                        modifier = Modifier.padding(vertical = Spacing.sm),
                         color = textColor.copy(alpha = 0.25f),
                     )
                 }
@@ -320,7 +322,7 @@ fun MarkdownText(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = spacing.xs),
+                                .padding(vertical = Spacing.xs),
                     ) {
                         com.m57.hermescontrol.ui.chat.components.GifImageThumbnail(
                             model = source.model,
@@ -354,7 +356,7 @@ fun MarkdownText(
                                     text = def,
                                     color = textColor,
                                     style = MaterialTheme.typography.bodyMedium,
-                                    modifier = Modifier.padding(start = spacing.md, bottom = 2.dp),
+                                    modifier = Modifier.padding(start = Spacing.md, bottom = 2.dp),
                                 )
                             }
                             Spacer(modifier = Modifier.height(2.dp))
@@ -530,7 +532,7 @@ private fun MarkdownTable(
             Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState())
-                .padding(vertical = spacing.xs),
+                .padding(vertical = Spacing.xs),
     ) {
         // Header row
         Row(modifier = Modifier.background(headerBg)) {

@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.common
 
+import com.m57.hermescontrol.theme.Spacing
+
 import android.media.MediaPlayer
 import android.view.SurfaceHolder
 import android.view.SurfaceView
@@ -136,9 +138,9 @@ private fun MediaInitializationDialog(
     error: Boolean,
 ) {
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Card(modifier = Modifier.fillMaxWidth().padding(spacing.md)) {
+        Card(modifier = Modifier.fillMaxWidth().padding(Spacing.md)) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(spacing.md),
+                modifier = Modifier.fillMaxWidth().padding(Spacing.md),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -241,9 +243,9 @@ private fun ReadySecureGatewayMediaPlayer(
         onDismissRequest = onClose,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        Card(modifier = Modifier.fillMaxWidth().padding(spacing.md)) {
+        Card(modifier = Modifier.fillMaxWidth().padding(Spacing.md)) {
             Column(
-                modifier = Modifier.fillMaxWidth().padding(spacing.md),
+                modifier = Modifier.fillMaxWidth().padding(Spacing.md),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {

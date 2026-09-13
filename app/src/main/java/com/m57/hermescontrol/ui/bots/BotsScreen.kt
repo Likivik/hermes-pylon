@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.bots
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -99,7 +101,7 @@ fun BotsScreen(
                         leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                         placeholder = { Text(stringResource(R.string.bots_search_placeholder)) },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.md, vertical = spacing.sm),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.md, vertical = Spacing.sm),
                     )
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),

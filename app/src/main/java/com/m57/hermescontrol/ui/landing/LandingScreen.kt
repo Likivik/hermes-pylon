@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.landing
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -43,7 +45,7 @@ fun LandingScreen(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = spacing.xl),
+                    .padding(horizontal = Spacing.xl),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {

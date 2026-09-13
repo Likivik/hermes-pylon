@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.gateway
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -86,7 +88,7 @@ fun GatewayScreen(
                         CircularProgressIndicator()
                     } else if (state.errorMessage != null && state.status == null) {
                         Column(
-                            modifier = Modifier.padding(spacing.md),
+                            modifier = Modifier.padding(Spacing.md),
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
                             Text(
@@ -106,7 +108,7 @@ fun GatewayScreen(
                                 Modifier
                                     .fillMaxSize()
                                     .verticalScroll(rememberScrollState())
-                                    .padding(spacing.md),
+                                    .padding(Spacing.md),
                             verticalArrangement = Arrangement.spacedBy(16.dp),
                         ) {
                             val isRunning = status?.gateway_running == true
@@ -130,7 +132,7 @@ fun GatewayScreen(
                                     modifier =
                                         Modifier
                                             .fillMaxWidth()
-                                            .padding(spacing.md),
+                                            .padding(Spacing.md),
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                 ) {
                                     Text(
@@ -175,7 +177,7 @@ fun GatewayScreen(
                                     modifier =
                                         Modifier
                                             .fillMaxWidth()
-                                            .padding(spacing.md),
+                                            .padding(Spacing.md),
                                     verticalArrangement = Arrangement.spacedBy(12.dp),
                                 ) {
                                     Text(
@@ -250,7 +252,7 @@ fun GatewayScreen(
                                             modifier =
                                                 Modifier
                                                     .fillMaxWidth()
-                                                    .padding(spacing.md),
+                                                    .padding(Spacing.md),
                                             verticalArrangement = Arrangement.spacedBy(8.dp),
                                         ) {
                                             Text(
@@ -264,7 +266,7 @@ fun GatewayScreen(
                                                     modifier =
                                                         Modifier
                                                             .fillMaxWidth()
-                                                            .padding(vertical = spacing.xs),
+                                                            .padding(vertical = Spacing.xs),
                                                     horizontalArrangement = Arrangement.SpaceBetween,
                                                     verticalAlignment = Alignment.CenterVertically,
                                                 ) {

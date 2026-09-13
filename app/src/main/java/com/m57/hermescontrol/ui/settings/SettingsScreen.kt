@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.settings
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -65,7 +67,7 @@ fun SettingsScreen(
                 modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = spacing.md, vertical = spacing.sm),
+                    .padding(horizontal = Spacing.md, vertical = Spacing.sm),
         ) {
             SettingsCategoryCard(
                 items =
@@ -192,7 +194,7 @@ private fun SettingsCategoryCard(items: List<SettingsRow>) {
                 )
                 if (index < items.lastIndex) {
                     HorizontalDivider(
-                        modifier = Modifier.padding(start = 56.dp, end = spacing.md),
+                        modifier = Modifier.padding(start = 56.dp, end = Spacing.md),
                         color = MaterialTheme.colorScheme.outlineVariant,
                     )
                 }
@@ -229,7 +231,7 @@ internal fun SectionCard(content: @Composable () -> Unit) {
             ),
         elevation = CardDefaults.cardElevation(1.dp),
     ) {
-        Column(modifier = Modifier.padding(spacing.md)) {
+        Column(modifier = Modifier.padding(Spacing.md)) {
             content()
         }
     }

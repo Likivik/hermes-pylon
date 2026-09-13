@@ -138,7 +138,7 @@ fun CronJobsScreen(
                                     containerColor = MaterialTheme.colorScheme.surfaceContainer,
                                 ),
                         ) {
-                            Column(modifier = Modifier.padding(spacing.md)) {
+                            Column(modifier = Modifier.padding(Spacing.md)) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -166,10 +166,10 @@ fun CronJobsScreen(
                                     )
                                 }
                                 if (job.hasSecondaryBadges()) {
-                                    Spacer(modifier = Modifier.height(spacing.xs))
+                                    Spacer(modifier = Modifier.height(Spacing.xs))
                                     FlowRow(
-                                        horizontalArrangement = Arrangement.spacedBy(spacing.xs),
-                                        verticalArrangement = Arrangement.spacedBy(spacing.xs),
+                                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                                        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
                                     ) {
                                         when (job.lastRunStatus) {
                                             "blocked_config" ->
@@ -197,19 +197,19 @@ fun CronJobsScreen(
                                         }
                                     }
                                 }
-                                Spacer(modifier = Modifier.height(spacing.xs))
+                                Spacer(modifier = Modifier.height(Spacing.xs))
                                 Text(
                                     text = CronExpressionFormatter.cronToHumanReadable(job.scheduleText),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
-                                Spacer(modifier = Modifier.height(spacing.xs))
+                                Spacer(modifier = Modifier.height(Spacing.xs))
                                 Text(
                                     text = job.scheduleText,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                                 )
-                                Spacer(modifier = Modifier.height(spacing.sm))
+                                Spacer(modifier = Modifier.height(Spacing.sm))
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.End,
@@ -291,7 +291,7 @@ fun CronJobsScreen(
             onDismissRequest = { selectedJob = null },
             title = { Text(job.name, style = MaterialTheme.typography.titleLarge) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                     RunDetailRow(
                         "Status",
                         when (job.lastRunStatus) {
@@ -377,7 +377,7 @@ fun CronJobEditorDialog(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .padding(spacing.md),
+                    .padding(Spacing.md),
             colors =
                 CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface,
@@ -433,7 +433,7 @@ fun CronJobEditorDialog(
                         modifier =
                             Modifier
                                 .fillMaxSize()
-                                .padding(horizontal = spacing.md, vertical = spacing.md)
+                                .padding(horizontal = Spacing.md, vertical = Spacing.md)
                                 .verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
@@ -644,7 +644,7 @@ private fun MonitorModeSection(
     val off = stringResource(R.string.cron_edit_monitor_off)
     val script = stringResource(R.string.cron_edit_monitor_script)
     val url = stringResource(R.string.cron_edit_monitor_url)
-    Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         ExposedDropdownField(
             label = stringResource(R.string.cron_edit_monitor_mode),
             options = listOf(off, script, url),

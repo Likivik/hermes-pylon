@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.toolsets
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -114,7 +116,7 @@ fun ToolsetsScreen(
                         CircularProgressIndicator()
                     } else if (state.errorMessage != null && state.toolsets.isEmpty()) {
                         Column(
-                            modifier = Modifier.padding(spacing.md),
+                            modifier = Modifier.padding(Spacing.md),
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
                             Text(text = state.errorMessage ?: "", color = MaterialTheme.colorScheme.error)
@@ -156,7 +158,7 @@ fun ToolsetsScreen(
                                         modifier =
                                             Modifier
                                                 .fillMaxWidth()
-                                                .padding(spacing.md),
+                                                .padding(Spacing.md),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
@@ -203,7 +205,7 @@ fun ToolsetsScreen(
                                         Switch(
                                             checked = toolset.enabled,
                                             onCheckedChange = { viewModel.toggleToolset(toolset) },
-                                            modifier = Modifier.padding(start = spacing.md),
+                                            modifier = Modifier.padding(start = Spacing.md),
                                         )
                                     }
                                 }

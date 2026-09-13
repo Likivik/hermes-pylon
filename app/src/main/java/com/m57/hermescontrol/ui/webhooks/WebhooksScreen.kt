@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.webhooks
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -279,7 +281,7 @@ fun WebhooksScreen(
                                 modifier =
                                     Modifier
                                         .fillMaxWidth()
-                                        .padding(spacing.md),
+                                        .padding(Spacing.md),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
@@ -416,7 +418,7 @@ private fun SubscriptionCard(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(spacing.md),
+                    .padding(Spacing.md),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             // Header row: Name + Toggle + Delete

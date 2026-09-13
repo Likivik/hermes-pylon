@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.common
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -81,7 +83,7 @@ fun DetailDialog(
                             .padding(padding)
                             .fillMaxWidth()
                             .verticalScroll(rememberScrollState())
-                            .padding(spacing.md),
+                            .padding(Spacing.md),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     visibleRows.forEachIndexed { index, (label, value, tone) ->

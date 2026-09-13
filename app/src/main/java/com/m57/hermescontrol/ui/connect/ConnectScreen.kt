@@ -2,6 +2,8 @@
 
 package com.m57.hermescontrol.ui.connect
 
+import com.m57.hermescontrol.theme.Spacing
+
 import android.app.Application
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -98,7 +100,7 @@ fun ConnectScreen(
                 Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = spacing.lg, vertical = spacing.xl),
+                    .padding(horizontal = Spacing.lg, vertical = Spacing.xl),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {

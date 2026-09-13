@@ -5,6 +5,8 @@
 
 package com.m57.hermescontrol.ui.keys
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
@@ -600,7 +602,7 @@ private fun EnvVarCard(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
             ),
     ) {
-        Column(modifier = Modifier.padding(spacing.md)) {
+        Column(modifier = Modifier.padding(Spacing.md)) {
             // Header: Key name (breaks cleanly at underscores _) + Delete Button
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -739,7 +741,7 @@ private fun EnvVarCard(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = spacing.sm),
+                                .padding(horizontal = 12.dp, vertical = Spacing.sm),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {

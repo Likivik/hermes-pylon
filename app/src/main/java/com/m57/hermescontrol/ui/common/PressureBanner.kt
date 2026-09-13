@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.common
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -154,7 +156,7 @@ fun PressureBanner(
         color = bgColor,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = spacing.sm),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = Spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {

@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.chat
 
+import com.m57.hermescontrol.theme.Spacing
+
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -199,7 +201,7 @@ fun ImageViewerDialog(
                         Text(
                             text = String.format(loadFailedFmt, resolved.message),
                             color = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.align(Alignment.Center).padding(spacing.lg),
+                            modifier = Modifier.align(Alignment.Center).padding(Spacing.lg),
                         )
 
                     is ImageBytesResolver.Result.Bytes ->
@@ -238,7 +240,7 @@ fun ImageViewerDialog(
                         Modifier
                             .fillMaxWidth()
                             .statusBarsPadding()
-                            .padding(spacing.sm),
+                            .padding(Spacing.sm),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -252,7 +254,7 @@ fun ImageViewerDialog(
                     Row {
                         if (isBusy) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp).padding(horizontal = spacing.sm),
+                                modifier = Modifier.size(24.dp).padding(horizontal = Spacing.sm),
                                 strokeWidth = 2.dp,
                                 color = MaterialTheme.colorScheme.onSurface,
                             )

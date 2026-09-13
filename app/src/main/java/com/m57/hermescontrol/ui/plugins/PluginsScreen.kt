@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.plugins
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -189,7 +191,7 @@ fun PluginsScreen(
                                 text = stringResource(R.string.plugins_orphan_heading),
                                 style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(vertical = spacing.sm),
+                                modifier = Modifier.padding(vertical = Spacing.sm),
                             )
                         }
                         items(state.orphanPlugins, key = { "orphan-${it.name}" }) { plugin ->
@@ -235,7 +237,7 @@ private fun ProviderSelectionSection(
     val providerDefaultsLabel = stringResource(R.string.plugins_provider_defaults)
 
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(spacing.md)) {
+        Column(modifier = Modifier.padding(Spacing.md)) {
             Text(
                 text = stringResource(R.string.plugins_providers_heading),
                 style = MaterialTheme.typography.titleMedium,
@@ -316,7 +318,7 @@ private fun InstallSection(
     viewModel: PluginsViewModel,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(spacing.md)) {
+        Column(modifier = Modifier.padding(Spacing.md)) {
             Text(
                 text = stringResource(R.string.plugins_install_heading),
                 style = MaterialTheme.typography.titleMedium,
@@ -408,7 +410,7 @@ private fun PluginCard(
     val statusColors = LocalHermesStatusColors.current
 
     Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
-        Column(modifier = Modifier.padding(spacing.md)) {
+        Column(modifier = Modifier.padding(Spacing.md)) {
             // Header row: name + toggle
             Row(
                 modifier = Modifier.fillMaxWidth(),

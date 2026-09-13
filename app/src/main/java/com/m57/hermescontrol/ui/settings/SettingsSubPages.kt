@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.settings
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -66,7 +68,7 @@ internal fun SettingsConnectionPage(
                 Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = spacing.md, vertical = spacing.sm),
+                    .padding(horizontal = Spacing.md, vertical = Spacing.sm),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             ConnectionSection(
@@ -118,7 +120,7 @@ internal fun SettingsAppearancePage(
                 Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = spacing.md, vertical = spacing.sm),
+                    .padding(horizontal = Spacing.md, vertical = Spacing.sm),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             AppearanceSection(
@@ -150,7 +152,7 @@ internal fun SettingsLanguagePage(
                 Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = spacing.md, vertical = spacing.sm),
+                    .padding(horizontal = Spacing.md, vertical = Spacing.sm),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             LanguageSection(
@@ -178,7 +180,7 @@ internal fun SettingsChatPage(
                 Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = spacing.md, vertical = spacing.sm),
+                    .padding(horizontal = Spacing.md, vertical = Spacing.sm),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             ChatSection(
@@ -210,7 +212,7 @@ internal fun SettingsBehaviorPage(
                 Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = spacing.md, vertical = spacing.sm),
+                    .padding(horizontal = Spacing.md, vertical = Spacing.sm),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             BehaviorSection(
@@ -236,7 +238,7 @@ internal fun SettingsAboutPage(
                 Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = spacing.md, vertical = spacing.sm),
+                    .padding(horizontal = Spacing.md, vertical = Spacing.sm),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             AboutSection()

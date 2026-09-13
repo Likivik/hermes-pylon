@@ -2,6 +2,8 @@
 
 package com.m57.hermescontrol.ui.authlogin
 
+import com.m57.hermescontrol.theme.Spacing
+
 import android.app.Application
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -99,7 +101,7 @@ fun AuthLoginScreen(
                 Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = spacing.lg, vertical = spacing.xl),
+                    .padding(horizontal = Spacing.lg, vertical = Spacing.xl),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -138,7 +140,7 @@ fun AuthLoginScreen(
                 Text(
                     text = stringResource(R.string.auth_login_existing_profiles_title),
                     style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.padding(top = spacing.sm),
+                    modifier = Modifier.padding(top = Spacing.sm),
                 )
                 state.loggedInProfiles.forEach { profile ->
                     androidx.compose.material3.OutlinedButton(

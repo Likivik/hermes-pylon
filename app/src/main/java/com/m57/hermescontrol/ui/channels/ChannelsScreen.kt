@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.channels
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -422,7 +424,7 @@ private fun AdminSection(envPath: String) {
         shape = RoundedCornerShape(8.dp),
     ) {
         Column(
-            modifier = Modifier.padding(spacing.md),
+            modifier = Modifier.padding(Spacing.md),
         ) {
             Text(
                 text = "Admin",

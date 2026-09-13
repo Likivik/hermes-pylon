@@ -2,6 +2,8 @@
 
 package com.m57.hermescontrol.ui.files
 
+import com.m57.hermescontrol.theme.Spacing
+
 import android.content.Intent
 import android.text.format.DateFormat
 import android.text.format.Formatter
@@ -308,7 +310,7 @@ fun FilesScreen(
                 modifier =
                     Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(spacing.md),
+                        .padding(Spacing.md),
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             ) {
@@ -337,7 +339,7 @@ private fun BreadcrumbBar(
             text = stringResource(R.string.files_root_label),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = spacing.xs),
+            modifier = Modifier.padding(bottom = Spacing.xs),
         )
         return
     }
@@ -345,7 +347,7 @@ private fun BreadcrumbBar(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(bottom = spacing.xs),
+                .padding(bottom = Spacing.xs),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

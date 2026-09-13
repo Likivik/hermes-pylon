@@ -368,7 +368,7 @@ fun SessionsScreen(
             text = {
                 Column {
                     Text(stringResource(R.string.sessions_prune_desc))
-                    Spacer(modifier = Modifier.height(spacing.md))
+                    Spacer(modifier = Modifier.height(Spacing.md))
                     OutlinedTextField(
                         value = pruneDays,
                         onValueChange = { pruneDays = it.filter { c -> c.isDigit() } },
@@ -495,7 +495,7 @@ fun SessionsScreen(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = spacing.md, vertical = spacing.sm),
+                        .padding(horizontal = Spacing.md, vertical = Spacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 SearchBar(
@@ -504,7 +504,7 @@ fun SessionsScreen(
                     placeholder = stringResource(R.string.sessions_search_placeholder),
                     modifier = Modifier.weight(1f),
                 )
-                Spacer(modifier = Modifier.width(spacing.sm))
+                Spacer(modifier = Modifier.width(Spacing.sm))
                 IconButton(onClick = { screenViewModel.toggleSelecting() }) {
                     Icon(
                         imageVector = if (state.isSelecting) Icons.Filled.Close else Icons.Filled.SelectAll,
@@ -564,8 +564,8 @@ fun SessionsScreen(
                                                 Modifier
                                                     .fillMaxWidth()
                                                     .padding(
-                                                        horizontal = spacing.md,
-                                                        vertical = spacing.sm,
+                                                        horizontal = Spacing.md,
+                                                        vertical = Spacing.sm,
                                                     ),
                                         )
                                         LazyColumn(
@@ -650,8 +650,8 @@ fun SessionsScreen(
                                     Modifier
                                         .fillMaxWidth()
                                         .height(IntrinsicSize.Max)
-                                        .padding(horizontal = spacing.md, vertical = spacing.sm),
-                                horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                                        .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+                                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                             ) {
                                 StatCard(
                                     label = stringResource(R.string.sessions_stat_total),
@@ -676,7 +676,7 @@ fun SessionsScreen(
                                     onClick = { screenViewModel.showPruneDialog() },
                                 ) {
                                     Box(
-                                        modifier = Modifier.fillMaxSize().padding(spacing.md),
+                                        modifier = Modifier.fillMaxSize().padding(Spacing.md),
                                         contentAlignment = Alignment.Center,
                                     ) {
                                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -686,7 +686,7 @@ fun SessionsScreen(
                                                 tint = statusColors.warning,
                                                 modifier = Modifier.size(20.dp),
                                             )
-                                            Spacer(modifier = Modifier.height(spacing.xs))
+                                            Spacer(modifier = Modifier.height(Spacing.xs))
                                             Text(
                                                 text = stringResource(R.string.sessions_action_prune),
                                                 style = MaterialTheme.typography.labelMedium,
@@ -704,7 +704,7 @@ fun SessionsScreen(
                                     text = statsError,
                                     style = MaterialTheme.typography.labelSmall,
                                     color = statusColors.error,
-                                    modifier = Modifier.padding(horizontal = spacing.md),
+                                    modifier = Modifier.padding(horizontal = Spacing.md),
                                 )
                             }
 
@@ -814,7 +814,7 @@ fun SessionsScreen(
                                             modifier =
                                                 Modifier
                                                     .fillMaxWidth()
-                                                    .padding(vertical = spacing.sm),
+                                                    .padding(vertical = Spacing.sm),
                                             contentAlignment = Alignment.Center,
                                         ) {
                                             if (state.isLoadingMore) {
@@ -866,7 +866,7 @@ fun SessionsScreen(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = spacing.md, vertical = spacing.sm),
+                                .padding(horizontal = Spacing.md, vertical = Spacing.sm),
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -890,7 +890,7 @@ fun SessionsScreen(
                                 contentDescription = null,
                                 modifier = Modifier.size(18.dp),
                             )
-                            Spacer(modifier = Modifier.width(spacing.xs))
+                            Spacer(modifier = Modifier.width(Spacing.xs))
                             Text(
                                 if (allVisibleSessionsSelected) {
                                     stringResource(R.string.sessions_action_deselect_all)
@@ -922,7 +922,7 @@ fun SessionsScreen(
                                     modifier = Modifier.size(18.dp),
                                 )
                             }
-                            Spacer(modifier = Modifier.width(spacing.xs))
+                            Spacer(modifier = Modifier.width(Spacing.xs))
                             Text(
                                 stringResource(
                                     R.string.sessions_action_delete_n,
@@ -946,7 +946,7 @@ private fun SessionSectionHeader(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = spacing.xs, vertical = 6.dp),
+                .padding(horizontal = Spacing.xs, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -1051,7 +1051,7 @@ private fun SessionCard(
             },
     ) {
         Row(
-            modifier = Modifier.padding(spacing.md),
+            modifier = Modifier.padding(Spacing.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // Checkbox in select mode
@@ -1061,7 +1061,7 @@ private fun SessionCard(
                     onCheckedChange = { onToggleSelection() },
                     modifier = Modifier.testTag("session_checkbox_${session.id}"),
                 )
-                Spacer(modifier = Modifier.width(spacing.sm))
+                Spacer(modifier = Modifier.width(Spacing.sm))
             }
 
             if (isFork && forkDepth > 0 && !isSelecting) {
@@ -1075,14 +1075,14 @@ private fun SessionCard(
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(16.dp),
                 )
-                Spacer(modifier = Modifier.width(spacing.xs))
+                Spacer(modifier = Modifier.width(Spacing.xs))
                 Text(
                     text = forkDepth.toString(),
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
                 )
-                Spacer(modifier = Modifier.width(spacing.sm))
+                Spacer(modifier = Modifier.width(Spacing.sm))
             }
 
             // Source icon
@@ -1093,7 +1093,7 @@ private fun SessionCard(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp),
                 )
-                Spacer(modifier = Modifier.width(spacing.sm))
+                Spacer(modifier = Modifier.width(Spacing.sm))
             }
 
             // Main content
@@ -1111,7 +1111,7 @@ private fun SessionCard(
                     overflow = TextOverflow.Ellipsis,
                 )
 
-                Spacer(modifier = Modifier.height(spacing.xs))
+                Spacer(modifier = Modifier.height(Spacing.xs))
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -1122,7 +1122,7 @@ private fun SessionCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     if (!session.status.isNullOrBlank()) {
-                        Spacer(modifier = Modifier.width(spacing.sm))
+                        Spacer(modifier = Modifier.width(Spacing.sm))
                         StatusBadge(
                             text = session.status,
                             status = if (isActive) StatusBadgeType.SUCCESS else StatusBadgeType.NEUTRAL,
@@ -1133,7 +1133,7 @@ private fun SessionCard(
 
             // Action buttons (not in select mode)
             if (!isSelecting) {
-                Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                     SessionPinButton(
                         sessionId = session.id,
                         isPinned = isPinned,
@@ -1213,7 +1213,7 @@ private fun SearchResultCard(
             },
     ) {
         Row(
-            modifier = Modifier.padding(spacing.sm),
+            modifier = Modifier.padding(Spacing.sm),
             verticalAlignment = Alignment.Top,
         ) {
             // Checkbox in select mode
@@ -1223,14 +1223,14 @@ private fun SearchResultCard(
                     onCheckedChange = { onToggleSelection() },
                     modifier = Modifier.testTag("session_checkbox_${session.id}"),
                 )
-                Spacer(modifier = Modifier.width(spacing.sm))
+                Spacer(modifier = Modifier.width(Spacing.sm))
             }
 
             Column(modifier = Modifier.weight(1f)) {
                 // Header row: "Match" label + source icon
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
                 ) {
                     val srcIcon = sourceIcon(session.source)
                     if (srcIcon != null && !isSelecting) {
@@ -1257,7 +1257,7 @@ private fun SearchResultCard(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(spacing.xs))
+                Spacer(modifier = Modifier.height(Spacing.xs))
 
                 // The matched snippet, highlighted — shown as the body, NOT as a title.
                 Text(
@@ -1268,12 +1268,12 @@ private fun SearchResultCard(
                     overflow = TextOverflow.Ellipsis,
                 )
 
-                Spacer(modifier = Modifier.height(spacing.xs))
+                Spacer(modifier = Modifier.height(Spacing.xs))
 
                 // Metadata chips row
                 FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(spacing.xs),
-                    verticalArrangement = Arrangement.spacedBy(spacing.xs),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xs),
                 ) {
                     session.source?.let { src ->
                         StatusBadge(
@@ -1298,7 +1298,7 @@ private fun SearchResultCard(
 
             // Action buttons (not in select mode)
             if (!isSelecting) {
-                Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                     SessionPinButton(
                         sessionId = session.id,
                         isPinned = isPinned,

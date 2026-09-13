@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.kanban
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -123,7 +125,7 @@ fun KanbanScreen(
                                 query = query,
                                 onQueryChange = { query = it },
                                 placeholder = "Filter tasks by title, status, or assignee...",
-                                modifier = Modifier.padding(horizontal = spacing.md, vertical = spacing.sm),
+                                modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
                             )
                             // Board selector tab row
                             if (state.boards.isNotEmpty()) {
@@ -176,7 +178,7 @@ fun KanbanScreen(
                                                 })",
                                                 style = MaterialTheme.typography.titleMedium,
                                                 fontWeight = FontWeight.Bold,
-                                                modifier = Modifier.padding(bottom = spacing.sm),
+                                                modifier = Modifier.padding(bottom = Spacing.sm),
                                             )
 
                                             LazyColumn(
