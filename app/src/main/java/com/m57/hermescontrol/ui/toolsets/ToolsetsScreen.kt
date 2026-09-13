@@ -114,7 +114,7 @@ fun ToolsetsScreen(
                         CircularProgressIndicator()
                     } else if (state.errorMessage != null && state.toolsets.isEmpty()) {
                         Column(
-                            modifier = Modifier.padding(16.dp),
+                            modifier = Modifier.padding(spacing.md),
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
                             Text(text = state.errorMessage ?: "", color = MaterialTheme.colorScheme.error)
@@ -156,7 +156,7 @@ fun ToolsetsScreen(
                                         modifier =
                                             Modifier
                                                 .fillMaxWidth()
-                                                .padding(16.dp),
+                                                .padding(spacing.md),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
@@ -203,7 +203,7 @@ fun ToolsetsScreen(
                                         Switch(
                                             checked = toolset.enabled,
                                             onCheckedChange = { viewModel.toggleToolset(toolset) },
-                                            modifier = Modifier.padding(start = 16.dp),
+                                            modifier = Modifier.padding(start = spacing.md),
                                         )
                                     }
                                 }

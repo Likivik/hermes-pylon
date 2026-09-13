@@ -91,7 +91,7 @@ private fun StateBadge(state: String) {
             text = style.label,
             color = style.color,
             style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+            modifier = Modifier.padding(horizontal = spacing.sm, vertical = 2.dp),
         )
     }
 }
@@ -113,7 +113,7 @@ internal fun PlatformCard(
     val style = platformStateStyle(platform.state)
 
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(spacing.md)) {
             // ── Top row: icon + name + badge + switch ──
             Row(
                 modifier = Modifier.fillMaxWidth(),

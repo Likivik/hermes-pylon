@@ -113,7 +113,7 @@ fun SkillsStep(
                                     } else {
                                         onSelectedSkillsChange(selectedSkills + skill.name)
                                     }
-                                }.padding(vertical = 4.dp),
+                                }.padding(vertical = spacing.xs),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Checkbox(
@@ -197,7 +197,7 @@ fun SkillsStep(
                                     .background(
                                         MaterialTheme.colorScheme.surfaceVariant,
                                         RoundedCornerShape(4.dp),
-                                    ).padding(horizontal = 8.dp, vertical = 4.dp),
+                                    ).padding(horizontal = spacing.sm, vertical = spacing.xs),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
@@ -238,7 +238,7 @@ fun SkillsStep(
                             modifier =
                                 Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
+                                    .padding(vertical = spacing.xs),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {

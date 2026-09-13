@@ -81,7 +81,7 @@ fun DetailDialog(
                             .padding(padding)
                             .fillMaxWidth()
                             .verticalScroll(rememberScrollState())
-                            .padding(16.dp),
+                            .padding(spacing.md),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     visibleRows.forEachIndexed { index, (label, value, tone) ->

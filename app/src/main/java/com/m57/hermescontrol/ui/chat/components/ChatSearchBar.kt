@@ -139,7 +139,7 @@ fun SearchBarRow(
                                 MaterialTheme.colorScheme.onSurfaceVariant
                             },
                     ),
-                modifier = Modifier.padding(horizontal = 4.dp),
+                modifier = Modifier.padding(horizontal = spacing.xs),
             )
         }
         IconButton(

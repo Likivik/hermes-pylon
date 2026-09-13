@@ -112,7 +112,7 @@ fun ReasoningCard(
         shape = RoundedCornerShape(12.dp),
         onClick = { expanded = !expanded },
     ) {
-        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = spacing.sm)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "🧠",
@@ -138,7 +138,7 @@ fun ReasoningCard(
                         text = reasoningText,
                         style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp),
+                        modifier = Modifier.padding(top = spacing.xs),
                     )
                     if (isStreaming) {
                         ReasoningPulsingDot(modifier = Modifier.padding(top = 6.dp))
@@ -211,7 +211,7 @@ fun CodeBlockCard(
         Column {
             // Header row: language badge (left) + copy button (right)
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.sm, vertical = spacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (!language.isNullOrBlank()) {
@@ -381,7 +381,7 @@ fun ClarifyBubble(
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 4.dp)
+                .padding(horizontal = spacing.lg, vertical = spacing.xs)
                 .testTag("clarify_bubble"),
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -472,7 +472,7 @@ fun SubagentCard(
         color = MaterialTheme.colorScheme.tertiaryContainer,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (isComplete) {
@@ -513,7 +513,7 @@ fun SubagentCard(
 @Composable
 fun TypingIndicator(modifier: Modifier = Modifier) {
     Row(
-        modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp).testTag("typing_indicator"),
+        modifier = modifier.padding(horizontal = spacing.md, vertical = spacing.sm).testTag("typing_indicator"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {

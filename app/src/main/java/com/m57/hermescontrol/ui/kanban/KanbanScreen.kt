@@ -123,7 +123,7 @@ fun KanbanScreen(
                                 query = query,
                                 onQueryChange = { query = it },
                                 placeholder = "Filter tasks by title, status, or assignee...",
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                modifier = Modifier.padding(horizontal = spacing.md, vertical = spacing.sm),
                             )
                             // Board selector tab row
                             if (state.boards.isNotEmpty()) {
@@ -176,7 +176,7 @@ fun KanbanScreen(
                                                 })",
                                                 style = MaterialTheme.typography.titleMedium,
                                                 fontWeight = FontWeight.Bold,
-                                                modifier = Modifier.padding(bottom = 8.dp),
+                                                modifier = Modifier.padding(bottom = spacing.sm),
                                             )
 
                                             LazyColumn(

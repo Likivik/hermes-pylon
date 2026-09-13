@@ -47,7 +47,7 @@ fun BoxScope.ChatScrollToBottomFab(
         modifier =
             Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 16.dp, bottom = 16.dp),
+                .padding(end = spacing.md, bottom = spacing.md),
     ) {
         BadgedBox(
             badge = {

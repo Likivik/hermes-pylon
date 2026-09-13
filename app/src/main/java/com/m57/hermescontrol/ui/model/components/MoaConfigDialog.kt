@@ -316,7 +316,7 @@ private fun MoaConfigEditor(
             }
         }
 
-        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+        HorizontalDivider(modifier = Modifier.padding(vertical = spacing.sm))
 
         // Reference models
         Text(
@@ -436,7 +436,7 @@ private fun MoaSlotPicker(
                         text = provider.name,
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(vertical = 4.dp),
+                        modifier = Modifier.padding(vertical = spacing.xs),
                     )
 
                     models.forEach { model ->

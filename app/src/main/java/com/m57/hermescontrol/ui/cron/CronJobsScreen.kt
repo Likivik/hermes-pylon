@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.cron
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -375,7 +377,7 @@ fun CronJobEditorDialog(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .padding(16.dp),
+                    .padding(spacing.md),
             colors =
                 CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface,
@@ -431,7 +433,7 @@ fun CronJobEditorDialog(
                         modifier =
                             Modifier
                                 .fillMaxSize()
-                                .padding(horizontal = 16.dp, vertical = 16.dp)
+                                .padding(horizontal = spacing.md, vertical = spacing.md)
                                 .verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {

@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.common
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement

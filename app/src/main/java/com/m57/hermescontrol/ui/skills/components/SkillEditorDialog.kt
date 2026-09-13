@@ -74,7 +74,7 @@ internal fun SkillEditorDialog(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .padding(16.dp),
+                    .padding(spacing.md),
             colors =
                 CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface,
@@ -131,7 +131,7 @@ internal fun SkillEditorDialog(
                                 modifier =
                                     Modifier
                                         .fillMaxSize()
-                                        .padding(16.dp),
+                                        .padding(spacing.md),
                                 textStyle =
                                     TextStyle(
                                         fontFamily = FontFamily.Monospace,

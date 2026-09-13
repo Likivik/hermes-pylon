@@ -99,7 +99,7 @@ fun AuthLoginScreen(
                 Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 24.dp, vertical = 32.dp),
+                    .padding(horizontal = spacing.lg, vertical = spacing.xl),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -138,7 +138,7 @@ fun AuthLoginScreen(
                 Text(
                     text = stringResource(R.string.auth_login_existing_profiles_title),
                     style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.padding(top = 8.dp),
+                    modifier = Modifier.padding(top = spacing.sm),
                 )
                 state.loggedInProfiles.forEach { profile ->
                     androidx.compose.material3.OutlinedButton(

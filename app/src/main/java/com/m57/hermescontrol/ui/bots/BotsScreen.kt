@@ -99,7 +99,7 @@ fun BotsScreen(
                         leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                         placeholder = { Text(stringResource(R.string.bots_search_placeholder)) },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.md, vertical = spacing.sm),
                     )
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),

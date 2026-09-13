@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.system
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -783,12 +785,12 @@ private fun LazyListScope.selfImprovementSection(
                             modifier =
                                 Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
+                                    .padding(vertical = spacing.xs),
                             shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
                             color = MaterialTheme.colorScheme.surfaceContainerHigh,
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = spacing.sm),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 val icon = if (node.kind == "skill") "⚡" else "🧠"

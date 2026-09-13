@@ -279,7 +279,7 @@ fun WebhooksScreen(
                                 modifier =
                                     Modifier
                                         .fillMaxWidth()
-                                        .padding(16.dp),
+                                        .padding(spacing.md),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
@@ -416,7 +416,7 @@ private fun SubscriptionCard(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(spacing.md),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             // Header row: Name + Toggle + Delete

@@ -89,7 +89,7 @@ fun ContextUsageChip(
                     } else {
                         Modifier
                     },
-                ).padding(horizontal = 12.dp, vertical = 4.dp),
+                ).padding(horizontal = 12.dp, vertical = spacing.xs),
         verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         Row(

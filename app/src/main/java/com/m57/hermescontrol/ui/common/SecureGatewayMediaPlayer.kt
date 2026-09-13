@@ -136,9 +136,9 @@ private fun MediaInitializationDialog(
     error: Boolean,
 ) {
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Card(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+        Card(modifier = Modifier.fillMaxWidth().padding(spacing.md)) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                modifier = Modifier.fillMaxWidth().padding(spacing.md),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -241,9 +241,9 @@ private fun ReadySecureGatewayMediaPlayer(
         onDismissRequest = onClose,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        Card(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+        Card(modifier = Modifier.fillMaxWidth().padding(spacing.md)) {
             Column(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                modifier = Modifier.fillMaxWidth().padding(spacing.md),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {

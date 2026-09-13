@@ -278,7 +278,7 @@ fun AchievementsScreen(
                                 ),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 4.dp),
+                            modifier = Modifier.padding(top = spacing.xs),
                         )
                     }
 
@@ -565,7 +565,7 @@ private fun AchievementCard(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(spacing.md),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             // Header row: icon + name + tier badge

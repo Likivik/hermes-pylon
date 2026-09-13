@@ -86,7 +86,7 @@ internal fun ConnectionSection(
                     elevation = CardDefaults.cardElevation(0.dp),
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = spacing.sm),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
@@ -212,7 +212,7 @@ internal fun TestResultCard(testResult: String?) {
             ) {
                 Text(
                     text = result,
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier.padding(spacing.md),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }

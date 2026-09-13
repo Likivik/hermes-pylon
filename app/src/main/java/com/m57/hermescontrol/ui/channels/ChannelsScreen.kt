@@ -422,7 +422,7 @@ private fun AdminSection(envPath: String) {
         shape = RoundedCornerShape(8.dp),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(spacing.md),
         ) {
             Text(
                 text = "Admin",

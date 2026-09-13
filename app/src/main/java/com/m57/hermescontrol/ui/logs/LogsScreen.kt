@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.logs
 
+import com.m57.hermescontrol.theme.Spacing
+
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -254,7 +256,7 @@ fun LogsScreen(
                             modifier =
                                 Modifier
                                     .align(Alignment.BottomEnd)
-                                    .padding(16.dp),
+                                    .padding(spacing.md),
                             containerColor = MaterialTheme.colorScheme.secondaryContainer,
                         ) {
                             Icon(

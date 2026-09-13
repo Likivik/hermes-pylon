@@ -61,7 +61,7 @@ fun ComposerToolbar(
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 4.dp)
+                .padding(horizontal = spacing.sm, vertical = spacing.xs)
                 .testTag("composer_toolbar"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),

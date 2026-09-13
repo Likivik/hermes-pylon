@@ -308,7 +308,7 @@ fun FilesScreen(
                 modifier =
                     Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(16.dp),
+                        .padding(spacing.md),
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             ) {
@@ -337,7 +337,7 @@ private fun BreadcrumbBar(
             text = stringResource(R.string.files_root_label),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 4.dp),
+            modifier = Modifier.padding(bottom = spacing.xs),
         )
         return
     }
@@ -345,7 +345,7 @@ private fun BreadcrumbBar(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(bottom = 4.dp),
+                .padding(bottom = spacing.xs),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

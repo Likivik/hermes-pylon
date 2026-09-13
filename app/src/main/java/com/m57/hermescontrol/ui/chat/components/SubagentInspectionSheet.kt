@@ -67,8 +67,8 @@ fun SubagentInspectionSheet(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .padding(bottom = 24.dp),
+                    .padding(horizontal = spacing.md)
+                    .padding(bottom = spacing.lg),
         ) {
             // Header
             Row(
@@ -106,7 +106,7 @@ fun SubagentInspectionSheet(
                     text = "No active tasks or plan items.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 16.dp),
+                    modifier = Modifier.padding(vertical = spacing.md),
                 )
             } else {
                 LazyColumn(
@@ -117,7 +117,7 @@ fun SubagentInspectionSheet(
                         item(key = "todos_header") {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(vertical = 4.dp),
+                                modifier = Modifier.padding(vertical = spacing.xs),
                             ) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.FormatListBulleted,
@@ -147,7 +147,7 @@ fun SubagentInspectionSheet(
                             item(key = "subagents_header") {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+                                    modifier = Modifier.padding(top = spacing.sm, bottom = spacing.xs),
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Groups,
@@ -312,7 +312,7 @@ internal fun InspectionItemCard(indicator: SubagentIndicator) {
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
                             .background(MaterialTheme.colorScheme.surfaceContainerLowest)
-                            .padding(8.dp),
+                            .padding(spacing.sm),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     Text(

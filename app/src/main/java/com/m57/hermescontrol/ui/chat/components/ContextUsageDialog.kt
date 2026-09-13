@@ -117,7 +117,7 @@ fun ContextUsageDialog(
                         text = stringResource(R.string.chat_context_detail_footnote),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp),
+                        modifier = Modifier.padding(top = spacing.xs),
                     )
                 }
             }

@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.ui.common
 
+import com.m57.hermescontrol.theme.Spacing
+
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat

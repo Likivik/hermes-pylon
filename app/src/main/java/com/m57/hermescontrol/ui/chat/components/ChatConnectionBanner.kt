@@ -75,7 +75,7 @@ fun ChatConnectionBanner(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                        .padding(horizontal = spacing.md, vertical = spacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
@@ -85,7 +85,7 @@ fun ChatConnectionBanner(
                 ) {
                     if (connectionStatus == ConnectionStatus.RECONNECTING) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp).padding(end = 8.dp),
+                            modifier = Modifier.size(16.dp).padding(end = spacing.sm),
                             strokeWidth = 2.dp,
                             color = LocalHermesStatusColors.current.error,
                         )

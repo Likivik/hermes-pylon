@@ -175,7 +175,7 @@ fun ModelPickerDialog(
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    modifier = Modifier.padding(top = 4.dp, bottom = 6.dp),
+                                    modifier = Modifier.padding(top = spacing.xs, bottom = 6.dp),
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.PushPin,
@@ -289,7 +289,7 @@ private fun ModelItemCard(
             ),
     ) {
         Row(
-            modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+            modifier = Modifier.padding(start = 12.dp, end = spacing.xs, top = spacing.xs, bottom = spacing.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(

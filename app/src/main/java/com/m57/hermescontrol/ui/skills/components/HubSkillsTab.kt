@@ -75,7 +75,7 @@ internal fun HubBrowseView(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                    .padding(horizontal = spacing.sm, vertical = 6.dp),
             placeholder = { Text(stringResource(R.string.skills_hub_search_placeholder)) },
             trailingIcon = {
                 Row(
@@ -189,7 +189,7 @@ internal fun HubBrowseView(
                 ),
             actions =
                 if (previewReady && state.isHubPreviewing) {
-                    { CircularProgressIndicator(modifier = Modifier.padding(top = 8.dp)) }
+                    { CircularProgressIndicator(modifier = Modifier.padding(top = spacing.sm)) }
                 } else {
                     null
                 },
@@ -214,7 +214,7 @@ private fun HubSkillCard(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.sm, vertical = spacing.sm),
         ) {
             // ── Top row: name + source badge ──
             Row(

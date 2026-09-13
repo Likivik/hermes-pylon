@@ -130,13 +130,13 @@ fun GifImageThumbnail(
                 modifier =
                     Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(8.dp)
+                        .padding(spacing.sm)
                         .minimumInteractiveComponentSize()
                         .background(
                             color = MaterialTheme.colorScheme.scrim.copy(alpha = 0.6f),
                             shape = RoundedCornerShape(16.dp),
                         ).clickable { togglePlayPause() }
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                        .padding(horizontal = spacing.sm, vertical = spacing.xs),
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,

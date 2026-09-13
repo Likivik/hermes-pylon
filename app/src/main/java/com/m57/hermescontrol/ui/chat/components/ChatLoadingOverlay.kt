@@ -46,7 +46,7 @@ fun ChatLoadingOverlay(isLoading: Boolean) {
                 elevation = CardDefaults.cardElevation(4.dp),
             ) {
                 Column(
-                    modifier = Modifier.padding(32.dp),
+                    modifier = Modifier.padding(spacing.xl),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     CircularProgressIndicator(

@@ -92,7 +92,7 @@ fun StickySubagentBar(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                    .padding(horizontal = spacing.sm, vertical = 2.dp)
                     .clip(RoundedCornerShape(10.dp))
                     .clickable(onClick = onClick)
                     .testTag("sticky_subagent_bar"),

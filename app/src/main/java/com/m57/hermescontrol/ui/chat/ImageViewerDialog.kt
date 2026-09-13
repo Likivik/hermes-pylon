@@ -199,7 +199,7 @@ fun ImageViewerDialog(
                         Text(
                             text = String.format(loadFailedFmt, resolved.message),
                             color = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                            modifier = Modifier.align(Alignment.Center).padding(spacing.lg),
                         )
 
                     is ImageBytesResolver.Result.Bytes ->
@@ -238,7 +238,7 @@ fun ImageViewerDialog(
                         Modifier
                             .fillMaxWidth()
                             .statusBarsPadding()
-                            .padding(8.dp),
+                            .padding(spacing.sm),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -252,7 +252,7 @@ fun ImageViewerDialog(
                     Row {
                         if (isBusy) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp).padding(horizontal = 8.dp),
+                                modifier = Modifier.size(24.dp).padding(horizontal = spacing.sm),
                                 strokeWidth = 2.dp,
                                 color = MaterialTheme.colorScheme.onSurface,
                             )

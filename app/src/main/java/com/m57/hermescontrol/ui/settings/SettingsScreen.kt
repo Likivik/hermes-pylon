@@ -65,7 +65,7 @@ fun SettingsScreen(
                 modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = spacing.md, vertical = spacing.sm),
         ) {
             SettingsCategoryCard(
                 items =
@@ -192,7 +192,7 @@ private fun SettingsCategoryCard(items: List<SettingsRow>) {
                 )
                 if (index < items.lastIndex) {
                     HorizontalDivider(
-                        modifier = Modifier.padding(start = 56.dp, end = 16.dp),
+                        modifier = Modifier.padding(start = 56.dp, end = spacing.md),
                         color = MaterialTheme.colorScheme.outlineVariant,
                     )
                 }
@@ -229,7 +229,7 @@ internal fun SectionCard(content: @Composable () -> Unit) {
             ),
         elevation = CardDefaults.cardElevation(1.dp),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(spacing.md)) {
             content()
         }
     }
