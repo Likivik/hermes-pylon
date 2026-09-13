@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import org.kodein.emoji.compose.material3.NotoAnimatedEmoji
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.ReorderableCollectionItemScope
 import sh.calvin.reorderable.rememberReorderableLazyListState
@@ -198,15 +199,31 @@ private fun ReorderableCollectionItemScope.RailItem(
                     onClick = { menuOpen = false; onEvent(RailEvent.Delete(id)) },
                 )
             }
-            Text(
-                text = display.icon.ifEmpty { display.label.take(1).uppercase() },
-                style = MaterialTheme.typography.headlineSmall,
-                maxLines = 1,
-                modifier = Modifier.width(ItemWidth),
-                textAlign = TextAlign.Center,
-                color = if (display.avatarIsFallbackColor) railColorFor(id).copy(alpha = alpha)
-                else Color.Unspecified,
-            )
+            val iconText = display.icon.ifEmpty { display.label.take(1).uppercase() }
+            // Telegram-like: animated (Noto) emoji when the icon is an emoji
+            // AND Noto has an animation for it; letter fallbacks stay Text.
+            // Animate once on appear (iterations=1) — no looping noise.
+            val kodeinEmoji = remember(iconText) {
+                runCatching { emojiFromChar(iconText) }.getOrNull()
+            }
+            if (kodeinEmoji != null) {
+                NotoAnimatedEmoji(
+                    emoji = kodeinEmoji,
+                    iterations = 1,
+                    speed = 1f,
+                    modifier = Modifier.height(28.dp),
+                )
+            } else {
+                Text(
+                    text = iconText,
+                    style = MaterialTheme.typography.headlineSmall,
+                    maxLines = 1,
+                    modifier = Modifier.width(ItemWidth),
+                    textAlign = TextAlign.Center,
+                    color = if (display.avatarIsFallbackColor) railColorFor(id).copy(alpha = alpha)
+                    else Color.Unspecified,
+                )
+            }
             if (display.pinned) {
                 Box(
                     Modifier
@@ -218,8 +235,8 @@ private fun ReorderableCollectionItemScope.RailItem(
             Spacer(Modifier.height(1.dp))
             Text(
                 text = display.label,
-                style = MaterialTheme.typography.labelMedium,
-                maxLines = 2,
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
