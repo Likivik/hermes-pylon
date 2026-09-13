@@ -595,7 +595,7 @@ private fun EnvVarCard(
             Modifier
                 .fillMaxWidth()
                 .animateContentSize(),
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.large,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
         colors =
             CardDefaults.cardColors(
@@ -821,7 +821,7 @@ private fun RestartBanner(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.large,
         border = BorderStroke(1.dp, statusColors.warning.copy(alpha = 0.4f)),
         colors =
             CardDefaults.cardColors(

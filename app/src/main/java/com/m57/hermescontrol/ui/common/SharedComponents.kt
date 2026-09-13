@@ -107,7 +107,7 @@ fun StatusBadge(
         }
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(8.dp),
+        shape = MaterialTheme.shapes.small,
         color = bgColor,
     ) {
         Row(
@@ -217,11 +217,11 @@ fun SearchBar(
                 .height(40.dp)
                 .background(
                     color = MaterialTheme.colorScheme.surfaceContainer,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = MaterialTheme.shapes.medium,
                 ).border(
                     width = 1.dp,
                     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = MaterialTheme.shapes.medium,
                 ).padding(horizontal = 12.dp),
         singleLine = true,
         textStyle = MaterialTheme.typography.bodyMedium.copy(color = textColor),

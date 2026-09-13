@@ -86,7 +86,7 @@ private fun platformStateStyle(state: String): StateStyle {
 private fun StateBadge(state: String) {
     val style = platformStateStyle(state)
     Surface(
-        shape = RoundedCornerShape(4.dp),
+        shape = MaterialTheme.shapes.extraSmall,
         color = style.color.copy(alpha = 0.15f),
     ) {
         Text(

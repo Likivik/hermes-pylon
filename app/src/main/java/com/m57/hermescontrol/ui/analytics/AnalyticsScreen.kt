@@ -145,7 +145,7 @@ private fun AnalyticsContent(
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = MaterialTheme.shapes.large,
                 ) {
                     Box(
                         modifier =
@@ -309,7 +309,7 @@ private fun TotalsCard(totals: com.m57.hermescontrol.data.model.AnalyticsTotals)
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.large,
     ) {
         Column(modifier = Modifier.padding(Spacing.md)) {
             Text(
@@ -378,7 +378,7 @@ private fun DailyCostChart(entries: List<AnalyticsDailyEntry>) {
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.large,
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             if (maxCost <= 0.0) {
@@ -441,7 +441,7 @@ private fun ModelRow(model: ModelsAnalyticsModelEntry) {
     val status = LocalHermesStatusColors.current
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
@@ -492,7 +492,7 @@ private fun ModelEntryRow(entry: com.m57.hermescontrol.data.model.AnalyticsModel
     val status = LocalHermesStatusColors.current
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
     ) {
         Row(
             modifier =
@@ -537,7 +537,7 @@ private fun ModelEntryRow(entry: com.m57.hermescontrol.data.model.AnalyticsModel
 private fun SkillRow(skill: com.m57.hermescontrol.data.model.AnalyticsSkillEntry) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
     ) {
         Row(
             modifier =
@@ -574,7 +574,7 @@ private fun SkillRow(skill: com.m57.hermescontrol.data.model.AnalyticsSkillEntry
 private fun ToolRow(tool: com.m57.hermescontrol.data.model.AnalyticsToolUsage) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
     ) {
         Row(
             modifier =

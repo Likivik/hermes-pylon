@@ -244,7 +244,7 @@ fun ProfilesScreen(
                                                         Box(
                                                             modifier =
                                                                 Modifier
-                                                                    .clip(RoundedCornerShape(4.dp))
+                                                                    .clip(MaterialTheme.shapes.extraSmall)
                                                                     .background(
                                                                         MaterialTheme.colorScheme.errorContainer,
                                                                     ).padding(horizontal = 6.dp, vertical = 2.dp),

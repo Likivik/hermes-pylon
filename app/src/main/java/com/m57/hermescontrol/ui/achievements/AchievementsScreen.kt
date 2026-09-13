@@ -346,7 +346,7 @@ private fun StatPill(
 ) {
     androidx.compose.material3.Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
         color = color.copy(alpha = 0.12f),
     ) {
         Column(
@@ -543,7 +543,7 @@ private fun AchievementCard(
         modifier =
             modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp)),
+                .clip(MaterialTheme.shapes.large),
         colors =
             CardDefaults.cardColors(
                 containerColor =
@@ -711,7 +711,7 @@ private fun AchievementCard(
                 ) {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp),
+                        shape = MaterialTheme.shapes.small,
                         color = MaterialTheme.colorScheme.surfaceContainerHigh,
                     ) {
                         Text(

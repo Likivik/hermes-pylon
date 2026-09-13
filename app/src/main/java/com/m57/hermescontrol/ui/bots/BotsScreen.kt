@@ -144,7 +144,7 @@ private fun BotCard(
 ) {
     Card(
         Modifier.fillMaxWidth().clickable(enabled = onClick != null) { onClick?.invoke() },
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             BotAvatar(

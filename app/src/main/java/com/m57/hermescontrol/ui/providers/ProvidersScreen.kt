@@ -361,7 +361,7 @@ private fun ExternalFlowContent(provider: OAuthProvider) {
         provider.cliCommand.takeIf { it.isNotBlank() }?.let { cmd ->
             Surface(
                 color = LocalHermesStatusColors.current.infoContainer,
-                shape = RoundedCornerShape(4.dp),
+                shape = MaterialTheme.shapes.extraSmall,
             ) {
                 Text(
                     text = "  $cmd",
@@ -436,7 +436,7 @@ private fun DeviceCodeFlowContent(
         start?.userCode?.let { code ->
             Surface(
                 color = LocalHermesStatusColors.current.infoContainer,
-                shape = RoundedCornerShape(4.dp),
+                shape = MaterialTheme.shapes.extraSmall,
             ) {
                 Text(
                     text = "  $code",

@@ -192,7 +192,7 @@ fun DiffViewCard(
             modifier
                 .fillMaxWidth()
                 .testTag("diff_view_card"),
-        shape = RoundedCornerShape(8.dp),
+        shape = MaterialTheme.shapes.small,
         color = CodeTerminalBg,
         border = BorderStroke(1.dp, CodeTerminalBorder),
     ) {

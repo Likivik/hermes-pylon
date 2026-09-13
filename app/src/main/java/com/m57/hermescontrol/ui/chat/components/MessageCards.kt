@@ -111,7 +111,7 @@ fun ReasoningCard(
             CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
             ),
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
         onClick = { expanded = !expanded },
     ) {
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = Spacing.sm)) {
@@ -206,7 +206,7 @@ fun CodeBlockCard(
             modifier
                 .fillMaxWidth()
                 .testTag("code_block"),
-        shape = RoundedCornerShape(8.dp),
+        shape = MaterialTheme.shapes.small,
         color = CodeTerminalBg,
         border = BorderStroke(1.dp, CodeTerminalBorder),
     ) {
@@ -385,7 +385,7 @@ fun ClarifyBubble(
                 .fillMaxWidth()
                 .padding(horizontal = Spacing.lg, vertical = Spacing.xs)
                 .testTag("clarify_bubble"),
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         border =
             BorderStroke(
@@ -470,7 +470,7 @@ fun SubagentCard(
     val isComplete = indicator.type == "subagent.complete"
     Surface(
         modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp).testTag("subagent_card"),
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.tertiaryContainer,
     ) {
         Row(

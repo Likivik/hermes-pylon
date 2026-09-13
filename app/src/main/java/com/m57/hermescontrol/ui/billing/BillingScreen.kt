@@ -133,7 +133,7 @@ private fun BillingContent(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = MaterialTheme.shapes.medium,
                 ) {
                     Text(
                         text = state.errorMessage ?: "",
@@ -150,7 +150,7 @@ private fun BillingContent(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = MaterialTheme.shapes.medium,
                 ) {
                     Text(
                         text = state.actionMessage ?: "",
@@ -178,7 +178,7 @@ private fun PlanCard(subscription: SubscriptionCurrent) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.large,
     ) {
         Column(modifier = Modifier.padding(Spacing.md)) {
             Text(
@@ -223,7 +223,7 @@ private fun NoActivePlanCard(subscription: SubscriptionStateResponse) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.large,
     ) {
         Column(modifier = Modifier.padding(Spacing.md)) {
             Text(
@@ -253,7 +253,7 @@ private fun UsageBarRow(
 ) {
     val fraction = (bar.fill_fraction ?: 0.0).toFloat().coerceIn(0f, 1f)
     val summary = bar.remaining_display ?: bar.total_display ?: ""
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -277,7 +277,7 @@ private fun UsageBarRow(
                         .fillMaxWidth()
                         .padding(top = Spacing.sm)
                         .height(8.dp)
-                        .clip(RoundedCornerShape(4.dp)),
+                        .clip(MaterialTheme.shapes.extraSmall),
             )
         }
     }

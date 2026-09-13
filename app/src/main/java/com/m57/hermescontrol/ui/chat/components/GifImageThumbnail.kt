@@ -92,7 +92,7 @@ fun GifImageThumbnail(
         modifier =
             modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(MaterialTheme.shapes.medium)
                 .clickable { onClick() },
     ) {
         AsyncImage(
@@ -112,7 +112,7 @@ fun GifImageThumbnail(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp)),
+                    .clip(MaterialTheme.shapes.medium),
             contentScale = ContentScale.FillWidth,
         )
 
@@ -136,7 +136,7 @@ fun GifImageThumbnail(
                         .minimumInteractiveComponentSize()
                         .background(
                             color = MaterialTheme.colorScheme.scrim.copy(alpha = 0.6f),
-                            shape = RoundedCornerShape(16.dp),
+                            shape = MaterialTheme.shapes.large,
                         ).clickable { togglePlayPause() }
                         .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
             ) {

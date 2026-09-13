@@ -198,7 +198,7 @@ fun SkillsStep(
                                     .fillMaxWidth()
                                     .background(
                                         MaterialTheme.colorScheme.surfaceVariant,
-                                        RoundedCornerShape(4.dp),
+                                        MaterialTheme.shapes.extraSmall,
                                     ).padding(horizontal = Spacing.sm, vertical = Spacing.xs),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,

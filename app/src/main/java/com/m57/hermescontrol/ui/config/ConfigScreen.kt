@@ -689,7 +689,7 @@ private fun ConfigFieldCard(
                     ) {
                         Surface(
                             modifier = Modifier.fillMaxSize(),
-                            shape = RoundedCornerShape(4.dp),
+                            shape = MaterialTheme.shapes.extraSmall,
                             color = MaterialTheme.colorScheme.primary,
                         ) {}
                     }
@@ -811,7 +811,7 @@ private fun ConfigFieldCard(
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text(description) },
                         singleLine = true,
-                        shape = RoundedCornerShape(8.dp),
+                        shape = MaterialTheme.shapes.small,
                     )
                 }
             }
@@ -900,7 +900,7 @@ private fun SearchableSelectField(
             label = { Text(label) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             singleLine = true,
-            shape = RoundedCornerShape(8.dp),
+            shape = MaterialTheme.shapes.small,
         )
 
         ExposedDropdownMenu(
@@ -963,7 +963,7 @@ private fun NumberField(
         label = { Text(label) },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         singleLine = true,
-        shape = RoundedCornerShape(8.dp),
+        shape = MaterialTheme.shapes.small,
     )
 }
 

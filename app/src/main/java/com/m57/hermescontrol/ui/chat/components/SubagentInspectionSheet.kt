@@ -186,7 +186,7 @@ fun SubagentInspectionSheet(
 internal fun TodoInspectionCard(todo: TodoItem) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Row(
@@ -253,7 +253,7 @@ internal fun TodoInspectionCard(todo: TodoItem) {
 internal fun InspectionItemCard(indicator: SubagentIndicator) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
@@ -312,7 +312,7 @@ internal fun InspectionItemCard(indicator: SubagentIndicator) {
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
+                            .clip(MaterialTheme.shapes.small)
                             .background(MaterialTheme.colorScheme.surfaceContainerLowest)
                             .padding(Spacing.sm),
                     verticalArrangement = Arrangement.spacedBy(2.dp),

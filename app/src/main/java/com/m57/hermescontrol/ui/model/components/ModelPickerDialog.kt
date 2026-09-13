@@ -280,9 +280,9 @@ private fun ModelItemCard(
             modifier
                 .fillMaxWidth()
                 .padding(vertical = 2.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(MaterialTheme.shapes.medium)
                 .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         border =
             BorderStroke(

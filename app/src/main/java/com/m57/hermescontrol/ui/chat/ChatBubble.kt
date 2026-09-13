@@ -2181,7 +2181,7 @@ private fun ToolBubble(
         Card(
             onClick = { expanded = !expanded },
             colors = CardDefaults.cardColors(containerColor = chipColor),
-            shape = RoundedCornerShape(8.dp),
+            shape = MaterialTheme.shapes.small,
         ) {
             Column(
                 modifier =
@@ -2577,7 +2577,7 @@ private fun InlineAttachment(
         // Non-image file — show a card with file icon and name. Tapping fetches
         // the bytes (gateway-sourced) or opens the local URI.
         Surface(
-            shape = RoundedCornerShape(8.dp),
+            shape = MaterialTheme.shapes.small,
             color = textColor.copy(alpha = 0.1f),
             border = BorderStroke(1.dp, textColor.copy(alpha = 0.2f)),
             modifier = clickable,

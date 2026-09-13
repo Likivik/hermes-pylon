@@ -123,7 +123,7 @@ fun ChatInputBar(
                 Modifier
                     .fillMaxWidth()
                     .padding(horizontal = Spacing.xs, vertical = Spacing.xs),
-            shape = RoundedCornerShape(16.dp),
+            shape = MaterialTheme.shapes.large,
             color = MaterialTheme.colorScheme.surface,
             border =
                 BorderStroke(
@@ -160,7 +160,7 @@ fun ChatInputBar(
                                 Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 12.dp, vertical = Spacing.xs),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = MaterialTheme.shapes.medium,
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                             border =
                                 BorderStroke(
@@ -406,7 +406,7 @@ fun AttachmentChip(
     val thumbnail = attachment.uri
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(8.dp),
+        shape = MaterialTheme.shapes.small,
         tonalElevation = 2.dp,
     ) {
         Row(
@@ -420,7 +420,7 @@ fun AttachmentChip(
                     modifier =
                         Modifier
                             .size(24.dp)
-                            .clip(RoundedCornerShape(4.dp))
+                            .clip(MaterialTheme.shapes.extraSmall)
                             .clickable(onClick = onPreview),
                     contentScale = ContentScale.Crop,
                 )

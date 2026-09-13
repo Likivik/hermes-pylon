@@ -247,7 +247,7 @@ private fun ShimmerBox(
 @Composable
 private fun SkeletonRow(height: Dp) {
     val spacing = LocalSpacing.current
-    val shape = RoundedCornerShape(12.dp)
+    val shape = MaterialTheme.shapes.medium
     Row(
         modifier =
             Modifier
