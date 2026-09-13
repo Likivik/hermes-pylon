@@ -945,11 +945,22 @@ private fun RailEditDialog(
                 // recents) backed by Org.Kodein.Emoji.
                 EmojiPickerSection(selected = icon, onSelect = { icon = it })
                 Spacer(Modifier.height(8.dp))
-                Text(
-                    text = if (icon.isEmpty()) "No icon — auto letter" else "Icon: $icon",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Row(
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        text = if (icon.isEmpty()) "No icon — auto letter" else "Icon: $icon",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (currentIcon != null || icon.isNotEmpty()) {
+                        TextButton(onClick = { icon = "" }) {
+                            Text("No icon")
+                        }
+                    }
+                }
             }
         },
         confirmButton = {

@@ -94,6 +94,13 @@ private data class PendingRpcRequest(
     val redirectText: String? = null,
     /** Attempt generation for a session.create, used to fence retried answers. */
     val createGeneration: Long? = null,
+    /**
+     * Rename waiting on this resume: once the ack installs a live runtime
+     * session, `session.title` succeeds (the gateway resolves titles through
+     * the LIVE session map — storage ids 404 with 4001).
+     */
+    val pendingRenameTitle: String? = null,
+    val pendingRenameIcon: String? = null,
 )
 
 data class ChatUiState(
@@ -843,7 +850,13 @@ class ChatViewModel(
                 val selectedSessionId = _uiState.value.currentSessionId
                 if (
                     requestedSessionId != null &&
-                    selectedSessionId != requestedSessionId
+                    selectedSessionId != requestedSessionId &&
+                    // Likivik patch: a rename-resume targets a rail item the
+                    // user ISN'T currently viewing. Never replace the active
+                    // chat for it, but do NOT drop it — the ack handler below
+                    // fires the queued session.title via the runtime id this
+                    // response carries (storage ids 4001 on session.title).
+                    request.pendingRenameTitle == null
                 ) {
                     return
                 }
@@ -866,30 +879,39 @@ class ChatViewModel(
                 // the WS round-trip. Calling loadCachedMessages() here would
                 // overwrite any message the user sent between switchSession() and
                 // the server ack, making the chat appear to go blank.
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        currentSessionId = sessionId,
-                        isSessionReady = runtimeSessionId != null,
-                        currentSessionModel =
-                            if (model != null && provider != null) {
-                                "$provider/$model"
-                            } else {
-                                model ?: it.currentSessionModel
-                            },
-                        reasoningLevel =
-                            if (reasoningEffort.isNullOrEmpty()) {
-                                null
-                            } else {
-                                reasoningEffort
-                            },
-                        terminalBackend = terminalBackend?.trim()?.takeIf { it.isNotEmpty() },
-                        // `switchSession()` cleared the previous session's
-                        // reading. Hydrate only from this resume response.
-                        contextUsage = parseContextUsage(usage, previous = null),
-                    )
+                //
+                // Likivik patch: a rename-resume (pendingRenameTitle != null)
+                // MUST NOT hijack the UI onto the renamed background session —
+                // it only exists to obtain a runtime id. Keep the current view.
+                val renameOnly = request.pendingRenameTitle != null &&
+                    requestedSessionId != null &&
+                    selectedSessionId != requestedSessionId
+                if (!renameOnly) {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            currentSessionId = sessionId,
+                            isSessionReady = runtimeSessionId != null,
+                            currentSessionModel =
+                                if (model != null && provider != null) {
+                                    "$provider/$model"
+                                } else {
+                                    model ?: it.currentSessionModel
+                                },
+                            reasoningLevel =
+                                if (reasoningEffort.isNullOrEmpty()) {
+                                    null
+                                } else {
+                                    reasoningEffort
+                                },
+                            terminalBackend = terminalBackend?.trim()?.takeIf { it.isNotEmpty() },
+                            // `switchSession()` cleared the previous session's
+                            // reading. Hydrate only from this resume response.
+                            contextUsage = parseContextUsage(usage, previous = null),
+                        )
+                    }
                 }
-                if (sessionId != null) {
+                if (sessionId != null && !renameOnly) {
                     hydrateResumeMessages(
                         sessionId = sessionId,
                         payload = resultMap?.get("messages"),
@@ -898,9 +920,18 @@ class ChatViewModel(
                                 requestedSessionId != sessionId,
                     )
                 }
-                // Mirror the active runtime session id app-wide (issue #532).
-                ActiveSessionHolder.set(runtimeSessionId ?: sessionId, sessionId)
-                addSystemMessage("Session resumed", transient = true)
+                if (!renameOnly) {
+                    // Mirror the active runtime session id app-wide (issue #532).
+                    ActiveSessionHolder.set(runtimeSessionId ?: sessionId, sessionId)
+                    addSystemMessage("Session resumed", transient = true)
+                }
+                // Likivik patch: a rename queued on this resume fires now that
+                // the runtime session is live (gateway session.title resolves
+                // through the LIVE map only; storage ids 4001).
+                val liveRuntimeId = runtimeSessionId
+                if (liveRuntimeId != null && request.pendingRenameTitle != null) {
+                    sendSessionTitle(liveRuntimeId, request.pendingRenameTitle)
+                }
             }
 
             WsMethods.SESSION_INTERRUPT -> {
@@ -1576,11 +1607,37 @@ class ChatViewModel(
      */
     fun renameSession(sessionId: String, newTitle: String, icon: String?) {
         saveRailMeta(sessionId, icon)
-        val title = newTitle.trim().takeIf { it.isNotEmpty() } ?: return
-        viewModelScope.launch(Dispatchers.IO) {
+        // Icon-only edit (empty title = keep current): no server round-trip.
+        val title = newTitle.trim().takeIf { it.isNotEmpty() }
+        if (title == null) return
+        val runtimeId = ActiveSessionHolder.activeSessionId.value
+        val isLiveSession = runtimeId != null && (
+            sessionId == runtimeId ||
+                sessionId == _uiState.value.currentSessionId
+            )
+        if (isLiveSession) {
+            // This session is live (or about to be): runtime id resolves.
+            // The gateway's session.title attaches via _sess_nowait on the
+            // LIVE session map, so address it by the runtime id.
+            val target = ActiveSessionHolder.resolveStoredSessionId(
+                _uiState.value.currentSessionId ?: sessionId,
+            )
+            sendSessionTitle(target, title)
+        } else {
+            // Background rail item: no live runtime session exists — a bare
+            // session.title would 4001. Resume it first (omit_messages keeps
+            // it cheap), then send the title from the resume ack handler.
             wsClient.send(
-                WsMethods.SESSION_TITLE,
-                mapOf("session_id" to sessionId, "title" to title),
+                WsMethods.SESSION_RESUME,
+                mapOf("session_id" to sessionId, "omit_messages" to true),
+                onSent = { id ->
+                    pendingRequests[id] = PendingRpcRequest(
+                        method = WsMethods.SESSION_RESUME,
+                        resumeSessionId = sessionId,
+                        pendingRenameTitle = title,
+                        pendingRenameIcon = icon,
+                    )
+                },
             )
         }
         // Reflect immediately in the local session list.
@@ -1590,6 +1647,15 @@ class ChatViewModel(
                     if (it.id == sessionId) it.copy(title = title) else it
                 },
                 chatTitle = if (state.currentSessionId == sessionId) title else state.chatTitle,
+            )
+        }
+    }
+
+    private fun sendSessionTitle(runtimeSessionId: String, title: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            wsClient.send(
+                WsMethods.SESSION_TITLE,
+                mapOf("session_id" to runtimeSessionId, "title" to title),
             )
         }
     }
