@@ -214,16 +214,19 @@ private fun UserBubble(
                 .padding(horizontal = 8.dp, vertical = 2.dp),
         contentAlignment = Alignment.CenterEnd,
     ) {
+        // Likivik patch: user bubble follows the theme's *own* container color
+        // (primaryContainer) instead of a primary→secondary gradient, so it
+        // adapts to every preset (incl. AMOLED) instead of fighting it.
         val gradientBrush =
             Brush.linearGradient(
                 colors =
                     listOf(
-                        MaterialTheme.colorScheme.primary,
-                        MaterialTheme.colorScheme.secondary,
+                        MaterialTheme.colorScheme.primaryContainer,
+                        MaterialTheme.colorScheme.primaryContainer,
                     ),
             )
-        val primary = MaterialTheme.colorScheme.primary
-        val secondary = MaterialTheme.colorScheme.secondary
+        val primary = MaterialTheme.colorScheme.onPrimaryContainer
+        val secondary = MaterialTheme.colorScheme.onPrimaryContainer
         val avgLuminance = (primary.luminance() + secondary.luminance()) / 2f
         val userBubbleTextColor =
             if (avgLuminance > 0.5f) {
