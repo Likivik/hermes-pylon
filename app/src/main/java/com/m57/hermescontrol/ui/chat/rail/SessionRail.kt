@@ -200,8 +200,8 @@ private fun ReorderableCollectionItemScope.RailItem(
     Box(
         modifier = Modifier
             .width(ItemWidth)
-            // Solid active pill + purple-tinted press ripple (Telegram-like).
-            .clip(RailShape)
+            // Active tint clipped to M3-medium rounded shape (matches cards).
+            .clip(MaterialTheme.shapes.medium)
             .background(
                 if (display.active) MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
                 else Color.Transparent,
