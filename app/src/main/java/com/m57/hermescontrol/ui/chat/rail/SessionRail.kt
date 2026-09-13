@@ -67,13 +67,13 @@ fun SessionRail(
     val groups = remember(state.sessions, state.pinnedSessionIds, state.order) {
         groupRail(state.sessions, state.pinnedSessionIds, state.order)
     }
-    val railColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.60f)
+    val railColor = MaterialTheme.colorScheme.surfaceContainerHigh
 
     Surface(
         shape = RailShape,
         color = railColor,
-        tonalElevation = 0.dp,
-        shadowElevation = 10.dp,
+        tonalElevation = 1.dp,
+        shadowElevation = 1.dp,
         modifier = modifier
             .width(RailWidth)
             .fillMaxHeight()
