@@ -209,11 +209,12 @@ private fun ReorderableCollectionItemScope.RailItem(
             .zIndex(if (dragging) 1f else 0f)
             .then(dragModifier)
             .combinedClickable(
-                onClick = { onEvent(RailEvent.Switch(id)) },
-                onLongClick = { menuOpen = true },
+                interactionSource = remember(id) { androidx.compose.foundation.interaction.MutableInteractionSource() },
                 indication = androidx.compose.material3.ripple(
                     color = com.m57.hermescontrol.theme.HermesPurple,
                 ),
+                onClick = { onEvent(RailEvent.Switch(id)) },
+                onLongClick = { menuOpen = true },
             ),
     ) {
         if (display.active) {
