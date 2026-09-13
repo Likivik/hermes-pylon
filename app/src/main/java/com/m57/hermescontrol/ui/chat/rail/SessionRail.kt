@@ -110,11 +110,11 @@ private fun RailBody(
     LazyColumn(
         state = listState,
         modifier = Modifier
-            .fillMaxSize(),
-            // BAND KILL TEST 1: horizontal inset REMOVED — if the shade
-            // boundary tracks this padding, the band was the list viewport.
+            .fillMaxSize()
+            // Even side gutters; a touch more breathing room up top.
+            .padding(start = 4.dp, end = 4.dp, top = 10.dp, bottom = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Top,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
         userScrollEnabled = true,
     ) {
         val visible = groups.pinned + groups.fresh +
