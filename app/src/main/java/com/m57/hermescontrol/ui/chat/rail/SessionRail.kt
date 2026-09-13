@@ -40,7 +40,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import org.kodein.emoji.*
-import org.kodein.emoji.compose.m3.NotoAnimatedEmoji
+import org.kodein.emoji.compose.NotoAnimatedEmoji
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.ReorderableCollectionItemScope
 import sh.calvin.reorderable.rememberReorderableLazyListState
