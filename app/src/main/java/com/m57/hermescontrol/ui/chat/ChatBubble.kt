@@ -1,5 +1,6 @@
 package com.m57.hermescontrol.ui.chat
 
+import com.m57.hermescontrol.theme.Spacing
 import android.content.ClipData
 import android.text.format.DateFormat
 import androidx.compose.animation.AnimatedVisibility
@@ -211,7 +212,7 @@ private fun UserBubble(
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 2.dp),
+                .padding(horizontal = Spacing.sm, vertical = 2.dp),
         contentAlignment = Alignment.CenterEnd,
     ) {
         // Likivik patch: user bubble follows the theme's *own* container color
@@ -297,7 +298,7 @@ private fun UserBubble(
                             modifier =
                                 Modifier
                                     .align(Alignment.End)
-                                    .padding(top = 4.dp),
+                                    .padding(top = Spacing.xs),
                         )
                     }
                 }
@@ -369,7 +370,7 @@ private fun AssistantBubble(
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 2.dp),
+                .padding(horizontal = Spacing.sm, vertical = 2.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
         Box {
@@ -447,7 +448,7 @@ private fun AssistantBubble(
                             modifier =
                                 Modifier
                                     .align(Alignment.End)
-                                    .padding(top = 4.dp),
+                                    .padding(top = Spacing.xs),
                         )
                     }
                 }
@@ -520,7 +521,7 @@ private fun SelfImprovementReviewCard(
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 4.dp)
+                .padding(horizontal = 12.dp, vertical = Spacing.xs)
                 .testTag("self_improvement_review_card"),
         shape = RoundedCornerShape(10.dp),
         colors =
@@ -568,7 +569,7 @@ private fun SystemBubble(
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 2.dp),
+                .padding(horizontal = Spacing.lg, vertical = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // Likivik patch: system status lines render as Telegram-style center
@@ -2174,7 +2175,7 @@ private fun ToolBubble(
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 1.dp),
+                .padding(horizontal = Spacing.sm, vertical = 1.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
         Card(
@@ -2203,7 +2204,7 @@ private fun ToolBubble(
                             ),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 4.dp, start = 22.dp),
+                        modifier = Modifier.padding(top = Spacing.xs, start = 22.dp),
                     )
                 }
 
@@ -2217,7 +2218,7 @@ private fun ToolBubble(
                 if (!expanded && parsed?.summaryText != null) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(top = 4.dp, start = 22.dp),
+                        modifier = Modifier.padding(top = Spacing.xs, start = 22.dp),
                     ) {
                         Icon(
                             imageVector = config.icon,
@@ -2344,7 +2345,7 @@ private fun ToolBubble(
                     text = formatTimestamp(message.timestamp, DateFormat.is24HourFormat(LocalContext.current)),
                     color = contentColor.copy(alpha = 0.5f),
                     style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.align(Alignment.End).padding(top = 4.dp),
+                    modifier = Modifier.align(Alignment.End).padding(top = Spacing.xs),
                 )
             }
         }
@@ -2424,7 +2425,7 @@ private fun SecurityRiskChip(
     Row(
         modifier =
             modifier
-                .padding(top = 4.dp, start = 22.dp),
+                .padding(top = Spacing.xs, start = 22.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
@@ -2582,7 +2583,7 @@ private fun InlineAttachment(
             modifier = clickable,
         ) {
             Row(
-                modifier = Modifier.padding(8.dp),
+                modifier = Modifier.padding(Spacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (isOpening) {

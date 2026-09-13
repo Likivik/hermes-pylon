@@ -1,5 +1,6 @@
 package com.m57.hermescontrol.ui.chat.rail
 
+import com.m57.hermescontrol.theme.Spacing
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.draggable2D
@@ -117,7 +118,7 @@ private fun RailBody(
         modifier = Modifier
             .fillMaxSize()
             // Even side gutters; a touch more breathing room up top.
-            .padding(start = 4.dp, end = 4.dp, top = 10.dp, bottom = 6.dp),
+            .padding(start = Spacing.xs, end = Spacing.xs, top = 10.dp, bottom = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp),
         userScrollEnabled = true,

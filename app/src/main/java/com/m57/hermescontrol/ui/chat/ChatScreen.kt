@@ -2,6 +2,7 @@
 
 package com.m57.hermescontrol.ui.chat
 
+import com.m57.hermescontrol.theme.Spacing
 import android.Manifest
 import android.app.Activity
 import android.content.Intent
@@ -626,7 +627,7 @@ fun ChatScreen(
                             color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
                         ),
                 ) {
-                    Box(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                    Box(modifier = Modifier.padding(horizontal = 12.dp, vertical = Spacing.sm)) {
                         SearchBarRow(
                             searchQuery = state.searchQuery,
                             onQueryChange = { viewModel.setSearchQuery(it) },
@@ -666,7 +667,7 @@ fun ChatScreen(
                             Modifier
                                 .align(Alignment.TopCenter)
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 4.dp),
+                                .padding(horizontal = Spacing.md, vertical = Spacing.xs),
                         contentAlignment = Alignment.Center,
                     ) {
                         Surface(
@@ -678,7 +679,7 @@ fun ChatScreen(
                                 text = pill,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = Spacing.xs),
                             )
                         }
                     }
