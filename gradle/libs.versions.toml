@@ -15,6 +15,7 @@ junit5 = "6.1.3"
 junitPlatform = "6.1.3"
 kotlin = "2.4.10"
 screenshot = "0.0.1-alpha15"
+roborazzi-plugin = "1.43.0"
 # standalone per KSP 2.0+ guidance — NOT kotlinVersion-kspVersion; easy
 # to miss during Kotlin upgrades since it no longer tracks the Kotlin version.
 ksp = "2.3.11"
@@ -112,3 +113,4 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", versi
 room = { id = "androidx.room", version.ref = "room" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 screenshot = { id = "com.android.compose.screenshot", version.ref = "screenshot" }
+roborazzi = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi-plugin" }
