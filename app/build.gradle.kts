@@ -156,7 +156,6 @@ dependencies {
     // Roborazzi: JVM (Robolectric) screenshot capture/verify for Compose UI.
     "testImplementation"(libs.roborazzi.core)
     "testImplementation"(libs.roborazzi.rule)
-    "testImplementation"(libs.roborazzi.preview.scanner)
     "testImplementation"(libs.robolectric)
     "testImplementation"(libs.androidx.compose.ui.test.junit4)
 
