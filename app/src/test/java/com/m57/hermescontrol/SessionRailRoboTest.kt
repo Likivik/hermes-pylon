@@ -12,7 +12,6 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import androidx.compose.ui.test.onRoot
 import com.github.takahirom.roborazzi.captureRoboImage
-import org.robolectric.annotation.GraphicsMode
 
 /**
  * Roborazzi captures of the C7 rail + chat screen, replacing the layoutlib
