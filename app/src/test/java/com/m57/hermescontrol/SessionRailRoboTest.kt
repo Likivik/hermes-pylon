@@ -34,6 +34,7 @@ import com.m57.hermescontrol.theme.HermesControlTheme
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import androidx.compose.runtime.Composable
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import androidx.compose.ui.test.onRoot
