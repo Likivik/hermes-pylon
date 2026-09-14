@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import com.m57.hermescontrol.theme.ThemePreset
 import com.m57.hermescontrol.theme.ThemePreference
 import com.m57.hermescontrol.theme.HermesControlTheme
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -56,6 +57,11 @@ class SessionRailRoboTest {
 
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Before
+    fun setUp() {
+        FakeAndroidKeyStore.setup
+    }
 
     private fun capture(name: String, dark: Boolean, preset: ThemePreset) {
         composeRule.setContent {
