@@ -116,12 +116,6 @@ private val FakeRailMeta = mapOf(
     "s15" to RailMeta("🎉"),
 )
 
-@PreviewTest
-@Preview(
-    name = "Full Screen light (Default preset)",
-    device = "spec:width=460dp,height=920dp,dpi=420",
-    showBackground = true,
-)
 @Composable
 fun FullScreenC7() {
     HermesControlTheme(
@@ -133,12 +127,6 @@ fun FullScreenC7() {
     }
 }
 
-@PreviewTest
-@Preview(
-    name = "Full Screen dark (Default preset)",
-    device = "spec:width=460dp,height=920dp,dpi=420",
-    showBackground = true,
-)
 @Composable
 fun FullScreenC7Dark() {
     HermesControlTheme(
@@ -150,12 +138,6 @@ fun FullScreenC7Dark() {
     }
 }
 
-@PreviewTest
-@Preview(
-    name = "Full Screen dark (AMOLED preset)",
-    device = "spec:width=460dp,height=920dp,dpi=420",
-    showBackground = true,
-)
 @Composable
 fun FullScreenC7Amoled() {
     HermesControlTheme(
