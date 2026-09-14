@@ -550,7 +550,7 @@ fun ChatScreen(
         val homeOrder by viewModel.homeOrder.collectAsStateWithLifecycle()
         var archiveOpen by rememberSaveable { mutableStateOf(false) }
         var editingSessionId by remember { mutableStateOf<String?>(null) }
-        Row(modifier = Modifier.fillMaxSize()) {
+        Row(modifier = Modifier.fillMaxSize().padding(start = 6.dp)) {
             SessionRail(
                 state = RailUiModel(
                     sessions = state.sessions,
