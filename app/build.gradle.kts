@@ -16,6 +16,14 @@ android {
     // Enable the screenshotTest source set (compose screenshot plugin).
     experimentalProperties["android.experimental.enableScreenshotTest"] = true
 
+    testOptions {
+        unitTests {
+            // Roborazzi needs includeAndroidResources to resolve themed resources.
+            isIncludeAndroidResources = true
+            all { it.jvmArgs("-Xmx2g") }
+        }
+    }
+
     lint {
         disable += "MissingTranslation"
     }
@@ -143,6 +151,13 @@ room {
 dependencies {
     // @PreviewTest annotation + validation for the screenshotTest source set.
     "screenshotTestImplementation"(libs.screenshot.validation.api)
+
+    // Roborazzi: JVM (Robolectric) screenshot capture/verify for Compose UI.
+    "testImplementation"(libs.roborazzi.core)
+    "testImplementation"(libs.roborazzi.rule)
+    "testImplementation"(libs.roborazzi.preview.scanner)
+    "testImplementation"(libs.robolectric)
+    "testImplementation"(libs.androidx.compose.ui.test.junit4)
 
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
