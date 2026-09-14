@@ -12,7 +12,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import androidx.compose.ui.test.onRoot
 import com.github.takahirom.roborazzi.captureRoboImage
-import org.robolectric.annotation.ConsistentAndroidOs
+import org.robolectric.annotation.GraphicsMode
 
 /**
  * Roborazzi captures of the C7 rail + chat screen, replacing the layoutlib
@@ -25,7 +25,6 @@ import org.robolectric.annotation.ConsistentAndroidOs
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [34], qualifiers = "w460dp-h920dp-420dpi")
-@ConsistentAndroidOs
 class SessionRailRoboTest {
 
     @get:Rule
