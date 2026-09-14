@@ -20,13 +20,18 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      # Record fresh goldens and print them; verify-gate comes after baselines settle.
-      - name: Record Roborazzi captures
-        run: ./gradlew recordRoborazziDebug --stacktrace
+      # Record fresh goldens for both flavors; verify-gate comes after baselines settle.
+      - name: Record Roborazzi captures (hermes + iris)
+        run: |
+          ./gradlew recordRoborazziHermesDebug --stacktrace
+          ./gradlew recordRoborazziIrisDebug --stacktrace
 
       - name: Upload renders
         uses: actions/upload-artifact@v4
         with:
           name: roborazzi-renders
-          path: app/src/test/assets/roborazzi/*.png
+          path: |
+            app/src/test/assets/roborazzi/**/*.png
+            app/build/outputs/roborazzi/**/*.png
+          if-no-files-found: warn
           retention-days: 30
