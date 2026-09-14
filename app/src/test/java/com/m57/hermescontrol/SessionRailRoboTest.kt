@@ -2,6 +2,32 @@ package com.m57.hermescontrol
 
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.m57.hermescontrol.ui.chat.SessionUi
+import com.m57.hermescontrol.ui.chat.RailMeta
+import com.m57.hermescontrol.ui.chat.rail.RailUiModel
+import com.m57.hermescontrol.ui.chat.rail.SessionRail as RailComposable
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.text.input.TextFieldValue
+import com.m57.hermescontrol.data.ws.CommandCatalog
+import com.m57.hermescontrol.ui.chat.ChatMessage
+import com.m57.hermescontrol.ui.chat.MessageRole
+import com.m57.hermescontrol.ui.chat.components.ChatMessageList
+import com.m57.hermescontrol.ui.chat.components.ChatInputBar
+import androidx.compose.foundation.layout.fillMaxWidth
 import com.m57.hermescontrol.theme.ThemePreset
 import com.m57.hermescontrol.theme.ThemePreference
 import com.m57.hermescontrol.theme.HermesControlTheme
