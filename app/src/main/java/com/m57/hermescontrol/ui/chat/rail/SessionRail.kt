@@ -80,6 +80,10 @@ fun SessionRail(
         tonalElevation = 1.dp,
         shadowElevation = 1.dp,
         modifier = modifier
+            // Left-edge gap lives HERE (component-owned placement margin) so
+            // every caller — ChatScreen, previews, tests — gets the identical
+            // floating-detached look with one source of truth.
+            .padding(start = 6.dp)
             .width(RailWidth)
             .fillMaxHeight()
             // Single rounded clip = the ONLY containment boundary.

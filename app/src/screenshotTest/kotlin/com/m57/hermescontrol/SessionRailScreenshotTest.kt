@@ -127,7 +127,6 @@ private fun FullScreenRailBody(dark: Boolean) {
     Row(
         modifier = Modifier
             .fillMaxSize()
-            .padding(start = 6.dp)
             .background(chatGradient(dark)),
     ) {
         RailComposable(
