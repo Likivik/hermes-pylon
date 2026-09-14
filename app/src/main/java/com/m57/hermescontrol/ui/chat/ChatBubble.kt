@@ -83,9 +83,7 @@ import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.Attachment
 import com.m57.hermescontrol.data.remote.OkHttpProvider
 import com.m57.hermescontrol.theme.ChatFontScale
-import com.m57.hermescontrol.theme.DarkOnSurface
 import com.m57.hermescontrol.theme.HermesStatusColors
-import com.m57.hermescontrol.theme.LightOnSurface
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.theme.onColorFor
 import com.m57.hermescontrol.ui.chat.components.DiffViewCard
@@ -226,23 +224,9 @@ private fun UserBubble(
                         MaterialTheme.colorScheme.primaryContainer,
                     ),
             )
-        val primary = MaterialTheme.colorScheme.onPrimaryContainer
-        val secondary = MaterialTheme.colorScheme.onPrimaryContainer
-        val avgLuminance = (primary.luminance() + secondary.luminance()) / 2f
-        val userBubbleTextColor =
-            if (avgLuminance > 0.5f) {
-                if (MaterialTheme.colorScheme.onPrimary.luminance() < 0.5f) {
-                    MaterialTheme.colorScheme.onPrimary
-                } else {
-                    LightOnSurface
-                }
-            } else {
-                if (MaterialTheme.colorScheme.onPrimary.luminance() > 0.5f) {
-                    MaterialTheme.colorScheme.onPrimary
-                } else {
-                    DarkOnSurface
-                }
-            }
+        // On-color: the scheme's own onPrimaryContainer — no guessing. Verified
+        // pairs: Default dark 9.58:1, light 6.36:1; follows presets/dynamic.
+        val userBubbleTextColor = MaterialTheme.colorScheme.onPrimaryContainer
         Box {
             Surface(
                 modifier =
