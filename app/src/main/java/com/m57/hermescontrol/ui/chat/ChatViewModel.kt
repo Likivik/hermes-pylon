@@ -926,11 +926,17 @@ class ChatViewModel(
                     addSystemMessage("Session resumed", transient = true)
                 }
                 // Likivik patch: a rename queued on this resume fires now that
-                // the runtime session is live (gateway session.title resolves
-                // through the LIVE map only; storage ids 4001).
+                // the runtime session is live. Addressing: session.title
+                // resolves via _session_lookup_key = agent.session_id OR
+                // session["session_key"]. The resume payload's "session_key"
+                // field IS the storage id we asked for, so send the title with
+                // THAT (stable across the runtime-id rotation the ack's
+                // "session_id" introduces). Falls back to the runtime id.
                 val liveRuntimeId = runtimeSessionId
+                val renameTarget = resultMap?.get("session_key") as? String
+                    ?: liveRuntimeId
                 if (liveRuntimeId != null && request.pendingRenameTitle != null) {
-                    sendSessionTitle(liveRuntimeId, request.pendingRenameTitle)
+                    sendSessionTitle(renameTarget, request.pendingRenameTitle)
                 }
             }
 
