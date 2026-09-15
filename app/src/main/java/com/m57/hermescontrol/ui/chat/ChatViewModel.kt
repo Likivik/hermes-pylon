@@ -933,10 +933,13 @@ class ChatViewModel(
                 // THAT (stable across the runtime-id rotation the ack's
                 // "session_id" introduces). Falls back to the runtime id.
                 val liveRuntimeId = runtimeSessionId
-                val renameTarget = resultMap?.get("session_key") as? String
+                val renameTarget = (resultMap?.get("session_key") as? String)
                     ?: liveRuntimeId
                 if (liveRuntimeId != null && request.pendingRenameTitle != null) {
-                    sendSessionTitle(renameTarget, request.pendingRenameTitle)
+                    sendSessionTitle(
+                        renameTarget ?: liveRuntimeId,
+                        request.pendingRenameTitle,
+                    )
                 }
             }
 
