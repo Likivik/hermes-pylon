@@ -1057,6 +1057,13 @@ class ChatViewModel(
             }
         }
 
+        // Likivik patch: a failed rename-resume means the rename is LOST —
+        // surface it (the optimistic rail title reverts on the next
+        // session.list refresh, so the user must know why).
+        if (request.pendingRenameTitle != null && method == WsMethods.SESSION_RESUME) {
+            Log.e(TAG, "rename-resume failed ($errorCode): $errorMsg")
+        }
+
         // Surface error in UI (these are server-pushed RpcError for
         // fire-and-forget RPCs — awaited RPCs handle their own failure
         // via the HermesWsClient.request() deferred).
@@ -1625,12 +1632,13 @@ class ChatViewModel(
                 sessionId == _uiState.value.currentSessionId
             )
         if (isLiveSession) {
-            // This session is live (or about to be): runtime id resolves.
-            // The gateway's session.title attaches via _sess_nowait on the
-            // LIVE session map, so address it by the runtime id.
-            val target = ActiveSessionHolder.resolveStoredSessionId(
-                _uiState.value.currentSessionId ?: sessionId,
-            )
+            // This session is live. The gateway resolves session.title via
+            // _session_lookup_key = agent.session_id (RUNTIME id) first — and
+            // after a compression rotation the agent's session_id is NO LONGER
+            // the stored id, so addressing by the stored id 4001s even for the
+            // live session (the exact failure on 'Verify Standard Compute').
+            // Always address the live session by its runtime id.
+            val target = runtimeId
             sendSessionTitle(target, title)
         } else {
             // Background rail item: no live runtime session exists — a bare
