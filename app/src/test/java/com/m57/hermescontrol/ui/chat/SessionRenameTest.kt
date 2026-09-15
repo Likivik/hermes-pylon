@@ -4,7 +4,6 @@ import android.util.Log
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import com.m57.hermescontrol.ConnectionStatus
 import com.m57.hermescontrol.R
-import com.m57.hermescontrol.data.session.ActiveSessionHolder
 import com.m57.hermescontrol.data.ws.HermesWsClient
 import com.m57.hermescontrol.data.ws.WsEvent
 import com.m57.hermescontrol.data.ws.WsMethods
@@ -262,27 +261,44 @@ class SessionRenameTest {
         }
 
     @Test
-    fun liveSessionRename_addressesByRuntimeId_notStoredId() =
+    fun currentSessionRename_alsoResumesFirst_thenTitlesBySessionKey() =
         runTest {
             val viewModel = bootConnected()
-            // Current session is live: runtime id 8-hex, storage id session-123.
-            ActiveSessionHolder.set("runtime-live-8hex", "session-123")
+            // Current session (storage id session-123). Even the current
+            // session goes through resume: the gateway may have reaped its
+            // detached runtime, so a bare session.title 4001s.
 
             viewModel.renameSession("session-123", "Live Rename", null)
             advanceUntilIdle()
 
-            // Addressed by the RUNTIME id (post-compression the stored id no
-            // longer matches the live lookup key).
+            // Resume first.
+            io.mockk.verify {
+                HermesWsClient.send(
+                    WsMethods.SESSION_RESUME,
+                    mapOf("session_id" to "session-123", "omit_messages" to true),
+                    any(),
+                )
+            }
+            // Ack (live fast-path payload: session_key = session-123).
+            mockEventsFlow.emit(
+                WsEvent.RpcResult(
+                    "req-resume-2",
+                    mapOf(
+                        "session_id" to "runtime-live-8hex",
+                        "resumed" to "session-123",
+                        "message_count" to 0.0,
+                        "messages" to emptyList<Map<String, Any?>>(),
+                        "session_key" to "session-123",
+                    ),
+                ),
+            )
+            advanceUntilIdle()
+
+            // Title addressed by session_key (storage id).
             io.mockk.verify {
                 HermesWsClient.send(
                     WsMethods.SESSION_TITLE,
-                    mapOf("session_id" to "runtime-live-8hex", "title" to "Live Rename"),
-                )
-            }
-            io.mockk.verify(exactly = 0) {
-                HermesWsClient.send(
-                    WsMethods.SESSION_TITLE,
-                    mapOf("session_id" to "session-123", any()),
+                    mapOf("session_id" to "session-123", "title" to "Live Rename"),
                 )
             }
         }

@@ -1626,37 +1626,27 @@ class ChatViewModel(
         // Icon-only edit (empty title = keep current): no server round-trip.
         val title = newTitle.trim().takeIf { it.isNotEmpty() }
         if (title == null) return
-        val runtimeId = ActiveSessionHolder.activeSessionId.value
-        val isLiveSession = runtimeId != null && (
-            sessionId == runtimeId ||
-                sessionId == _uiState.value.currentSessionId
-            )
-        if (isLiveSession) {
-            // This session is live. The gateway resolves session.title via
-            // _session_lookup_key = agent.session_id (RUNTIME id) first — and
-            // after a compression rotation the agent's session_id is NO LONGER
-            // the stored id, so addressing by the stored id 4001s even for the
-            // live session (the exact failure on 'Verify Standard Compute').
-            // Always address the live session by its runtime id.
-            val target = runtimeId
-            sendSessionTitle(target, title)
-        } else {
-            // Background rail item: no live runtime session exists — a bare
-            // session.title would 4001. Resume it first (omit_messages keeps
-            // it cheap), then send the title from the resume ack handler.
-            wsClient.send(
-                WsMethods.SESSION_RESUME,
-                mapOf("session_id" to sessionId, "omit_messages" to true),
-                onSent = { id ->
-                    pendingRequests[id] = PendingRpcRequest(
-                        method = WsMethods.SESSION_RESUME,
-                        resumeSessionId = sessionId,
-                        pendingRenameTitle = title,
-                        pendingRenameIcon = icon,
-                    )
-                },
-            )
-        }
+        // ALWAYS resume first — single deterministic path. The gateway reaps
+        // detached runtimes (WS grace reaper), so a session the app still
+        // considers "live" (cached runtime id) can already be reaped
+        // server-side: even CURRENT-session renames 4001 with a bare
+        // session.title ("detached/reaped runtime; client should resume the
+        // stored session" — the gateway's own guidance). Resume is idempotent:
+        // live sessions return the fast-path payload, detached ones are
+        // re-registered; the ack then fires the title by the stable
+        // session_key (storage id).
+        wsClient.send(
+            WsMethods.SESSION_RESUME,
+            mapOf("session_id" to sessionId, "omit_messages" to true),
+            onSent = { id ->
+                pendingRequests[id] = PendingRpcRequest(
+                    method = WsMethods.SESSION_RESUME,
+                    resumeSessionId = sessionId,
+                    pendingRenameTitle = title,
+                    pendingRenameIcon = icon,
+                )
+            },
+        )
         // Reflect immediately in the local session list.
         _uiState.update { state ->
             state.copy(
