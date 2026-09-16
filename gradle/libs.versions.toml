@@ -18,7 +18,7 @@ screenshot = "0.0.1-alpha15"
 roborazzi-plugin = "1.72.0"
 # standalone per KSP 2.0+ guidance — NOT kotlinVersion-kspVersion; easy
 # to miss during Kotlin upgrades since it no longer tracks the Kotlin version.
-ksp = "2.3.11"
+ksp = "2.3.12"
 nav3Core = "1.0.1"
 lifecycleViewmodelNav3 = "2.10.0"
 leakcanary = "2.14"
