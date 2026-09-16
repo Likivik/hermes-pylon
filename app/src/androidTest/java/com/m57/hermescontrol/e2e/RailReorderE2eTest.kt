@@ -3,6 +3,7 @@ package com.m57.hermescontrol.e2e
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -76,11 +77,12 @@ class RailReorderE2eTest {
         // the stationary long-press menu).
         low.performTouchInput {
             down(center)
-            // Long-press hold: successive tiny moves advance injected event
-            // time (~16ms/event) past the 500ms long-press threshold, then
-            // the real drag to the slot above item-top.
-            repeat(40) { moveTo(centerX, centerY) }
-            repeat(8) { i -> moveTo(centerX, centerY - (i + 1) * 28f) }
+            // Long-press hold: delayMillis on the first move advances event
+            // time past the 500ms long-press threshold; then drag up one slot.
+            moveTo(Offset(centerX, centerY + 1f), delayMillis = 600)
+            moveTo(Offset(centerX, centerY - 60f), delayMillis = 50)
+            moveTo(Offset(centerX, centerY - 130f), delayMillis = 50)
+            moveTo(Offset(centerX, centerY - 220f), delayMillis = 50)
             up()
         }
         composeRule.waitForIdle()
