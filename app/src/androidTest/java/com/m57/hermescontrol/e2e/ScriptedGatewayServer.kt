@@ -19,7 +19,7 @@ import okhttp3.mockwebserver.MockWebServer
  * (127.0.0.1) is correct — no 10.0.2.2 bridge needed.
  */
 class ScriptedGatewayServer(
-    private val gateway: ScriptedGateway,
+    val gateway: ScriptedGateway,
 ) {
     val server = MockWebServer()
     private val client = OkHttpClient()
@@ -56,7 +56,7 @@ class ScriptedGatewayServer(
 
     fun start(): String {
         server.start(java.net.InetAddress.getByName("127.0.0.1"), 0)
-        server.enqueue(MockResponse.Builder().webSocketUpgrade(serverListener).build())
+        server.enqueue(MockResponse().withWebSocketUpgrade(serverListener))
         return "ws://127.0.0.1:${server.port}/ws"
     }
 
