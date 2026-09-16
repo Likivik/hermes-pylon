@@ -15,7 +15,11 @@ object E2eHarness {
             id = AuthManager.DEFAULT_PROFILE_ID,
             name = "E2E",
             baseUrl = baseUrl,
-            wsAuthParam = "ticket",
+            // "token", NOT "ticket": a ticket profile puts openSocket into gated mode,
+            // which POSTs api/auth/ws-ticket to a server that does not exist in the
+            // test env, yielding TRANSIENT_FAILURE and a deferred socket — the WS
+            // override is never reached. "token" takes the non-gated path where
+            // the offline refresh is best-effort, so the override URL wins.
         )
         AuthManager.saveConnectionProfilesAndToken(
             profiles = listOf(profile),
