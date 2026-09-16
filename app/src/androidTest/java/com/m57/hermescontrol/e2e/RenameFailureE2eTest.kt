@@ -46,6 +46,8 @@ class RenameFailureE2eTest {
     fun reapedResume_4001_surfacesError_neverTitles() {
         val gw = gatewayServer.gateway
         val wsUrl = gatewayServer.start()
+        // Land on ChatScreen (rail), not LandingScreen: seed profile+token.
+        E2eHarness.seedServerProfile()
         HermesWsClient.e2eWsOverride = wsUrl
 
         gw.enqueue(

@@ -23,6 +23,20 @@ android {
             isIncludeAndroidResources = true
             all { it.jvmArgs("-Xmx2g") }
         }
+        // Gradle Managed Devices: AGP provisions + drives the emulator itself,
+        // so the CI workflow is one gradle task and test failures set the
+        // Gradle exit code (no am-instrument exit-0-on-failure trap).
+        managedDevices {
+            localDevices {
+                create("e2eApi34") {
+                    device = "Pixel 5"
+                    apiLevel = 34
+                    // "google" = Play Services image; ATD images top out at API 30,
+                    // too old for this app's compose stack.
+                    systemImageSource = "google"
+                }
+            }
+        }
     }
 
     lint {

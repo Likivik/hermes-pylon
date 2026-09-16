@@ -1,4 +1,4 @@
-name: E2E (Espresso + emulator)
+name: E2E (Espresso + Gradle Managed Device)
 
 on:
   push:
@@ -27,30 +27,14 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      # Build once, outside the emulator step, for better failure locality.
-      - name: Assemble test APKs (iris flavor)
-        run: |
-          ./gradlew assembleIrisDebug assembleIrisDebugAndroidTest \
-            --no-daemon -Dorg.gradle.workers.max=2
-
-      - name: Run rename E2E on emulator (API 34, google_apis)
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 34
-          target: google_apis
-          arch: x86_64
-          disk-size: 6000M
-          heap-size: 600M
-          ram-size: 2048M
-          cores: 2
-          disable-animations: true
-          disable-spellchecker: true
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
-          emulator-boot-timeout: 800
-          script: |
-            adb install -r app/build/outputs/apk/iris/debug/app-iris-debug.apk
-            adb install -r app/build/outputs/apk/androidTest/iris/debug/app-iris-debug-androidTest.apk
-            adb shell am instrument -w -e class com.m57.hermescontrol.e2e.RenameE2eTest,com.m57.hermescontrol.e2e.RenameFailureE2eTest,com.m57.hermescontrol.e2e.RailReorderE2eTest sh.slb.irismobile.test/androidx.test.runner.AndroidJUnitRunner
+      # GMD: AGP provisions, boots, installs, runs, tears down the emulator.
+      # Gradle's exit code fails when tests fail (no am-instrument trap).
+      # swiftshader_indirect: GitHub runners have no hardware GPU.
+      - name: Run E2E on Gradle Managed Device (Pixel 5, API 34)
+        run: >
+          ./gradlew e2eApi34IrisDebugAndroidTest --no-daemon
+          -Dorg.gradle.workers.max=2
+          -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
 
       - name: Upload instrumented results on failure
         if: failure()

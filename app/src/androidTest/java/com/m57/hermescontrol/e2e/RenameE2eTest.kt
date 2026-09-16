@@ -52,6 +52,8 @@ class RenameE2eTest {
         val gw = gatewayServer.gateway
         val wsUrl = gatewayServer.start()
         // Route the app's real WS client at the scripted gateway.
+        // Land on ChatScreen (rail), not LandingScreen: seed profile+token.
+        E2eHarness.seedServerProfile()
         HermesWsClient.e2eWsOverride = wsUrl
 
         gw.enqueue(

@@ -43,6 +43,8 @@ class RailReorderE2eTest {
     fun dragBelow_persistsHomeOrder() {
         val gw = gatewayServer.gateway
         val wsUrl = gatewayServer.start()
+        // Land on ChatScreen (rail), not LandingScreen: seed profile+token.
+        E2eHarness.seedServerProfile()
         HermesWsClient.e2eWsOverride = wsUrl
 
         gw.enqueue(
