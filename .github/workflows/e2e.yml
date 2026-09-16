@@ -50,9 +50,7 @@ jobs:
           script: |
             adb install -r app/build/outputs/apk/iris/debug/app-iris-debug.apk
             adb install -r app/build/outputs/apk/androidTest/iris/debug/app-iris-debug-androidTest.apk
-            adb shell am instrument -w \
-              -e class com.m57.hermescontrol.e2e.RenameE2eTest \
-              sh.slb.irismobile.test/androidx.test.runner.AndroidJUnitRunner
+            adb shell am instrument -w -e class com.m57.hermescontrol.e2e.RenameE2eTest sh.slb.irismobile.test/androidx.test.runner.AndroidJUnitRunner
 
       - name: Upload instrumented results on failure
         if: failure()
