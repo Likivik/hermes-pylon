@@ -73,7 +73,10 @@ class ScriptedGatewayServer(
             object : WebSocketListener() {},
         )
 
-    fun awaitOpen(timeoutMs: Long = 5000) {
+    fun awaitOpen(timeoutMs: Long = 30_000) {
+        // 30s: the app's WS client retries with backoff (1s..30s); the override
+        // set in the test body is picked up by the NEXT scheduled retry, so the
+        // mock must wait out the worst-case backoff window.
         check(opened.await(timeoutMs, TimeUnit.MILLISECONDS)) { "gateway WS never opened" }
     }
 
