@@ -9,6 +9,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.m57.hermescontrol.MainActivity
 import com.m57.hermescontrol.data.ws.HermesWsClient
 import org.junit.After
+import org.junit.Rule
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -75,8 +76,11 @@ class RailReorderE2eTest {
         // the stationary long-press menu).
         low.performTouchInput {
             down(center)
-            advanceEventTimes(viewConfiguration.longPressTimeoutMillis + 100)
-            moveTo(centerX, centerY - 220f)
+            // Long-press hold: successive tiny moves advance injected event
+            // time (~16ms/event) past the 500ms long-press threshold, then
+            // the real drag to the slot above item-top.
+            repeat(40) { moveTo(centerX, centerY) }
+            repeat(8) { i -> moveTo(centerX, centerY - (i + 1) * 28f) }
             up()
         }
         composeRule.waitForIdle()
