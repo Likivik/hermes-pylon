@@ -1,0 +1,63 @@
+name: E2E (Espresso + emulator)
+
+on:
+  push:
+    tags:
+      - 'e2e-*'
+  workflow_dispatch:
+
+jobs:
+  rename-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable KVM group perms
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Build once, outside the emulator step, for better failure locality.
+      - name: Assemble test APKs (iris flavor)
+        run: |
+          ./gradlew assembleIrisDebug assembleIrisDebugAndroidTest \
+            --no-daemon -Dorg.gradle.workers.max=2
+
+      - name: Run rename E2E on emulator (API 34, google_apis)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          disk-size: 6000M
+          heap-size: 600M
+          ram-size: 2048M
+          cores: 2
+          disable-animations: true
+          disable-spellchecker: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          emulator-boot-timeout: 800
+          script: |
+            adb install -r app/build/outputs/apk/iris/debug/app-iris-debug.apk
+            adb install -r app/build/outputs/apk/androidTest/iris/debug/app-iris-debug-androidTest.apk
+            adb shell am instrument -w \
+              -e class com.m57.hermescontrol.e2e.RenameE2eTest \
+              sh.slb.irismobile.test/androidx.test.runner.AndroidJUnitRunner
+
+      - name: Upload instrumented results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: app/build/outputs/androidTest-results/**/*.xml
+          retention-days: 14
