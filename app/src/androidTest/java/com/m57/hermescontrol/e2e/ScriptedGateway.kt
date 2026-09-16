@@ -130,7 +130,7 @@ class ScriptedGateway {
 
     companion object {
         fun errorEnvelope(id: String, code: Int, message: String) =
-            """{"jsonrpc":"2.0","id":"${id}","error":{"code":${code},"message":"${message}","data":null}}"""
+            """{"jsonrpc":"2.0","id":"${id}","error":{"code":${code},"message":"${message}"}}"""
 
         fun resultEnvelope(id: String, resultJson: String) =
             """{"jsonrpc":"2.0","id":"${id}","result":${resultJson}}"""
@@ -138,12 +138,17 @@ class ScriptedGateway {
         // ── Choreography builders (the field-bug sequences) ─────────────────
 
         /** Resume fast-path ack for a live session. */
+        /** Resume fast-path ack — keys match the real gateway's _live_session_payload
+         * (info/message_count/messages/running/session_id/session_key/started_at/status).
+         * The real gateway has NO "resumed" key; the app falls back to the
+         * requested id, so fidelity wins over the convenience key. */
         fun resumeAck(id: String, storageId: String, runtimeId: String) = Step.Reply(
             resultEnvelope(
                 id,
-                """{"session_id":"${runtimeId}","resumed":"${storageId}",""" +
-                    """"message_count":0,"messages":[],"session_key":"${storageId}",""" +
-                    """"status":"idle","running":false}""",
+                """{"info":{"cwd":"/tmp","lazy":true,"skills":{},"tools":{}},""" +
+                    """"message_count":0,"messages":[],"running":false,""" +
+                    """"session_id":"$runtimeId","session_key":"$storageId",""" +
+                    """"started_at":0.0,"status":"idle"}""",
             ),
         )
 

@@ -32,6 +32,12 @@ class ScriptedGatewayServer(
         override fun onOpen(webSocket: WebSocket, response: Response) {
             appSocket = webSocket
             opened.countDown()
+            // Real gateway always emits gateway.ready immediately after accept
+            // (tui_gateway/ws.py:311). Keep the mock contract-identical.
+            webSocket.send(
+                """{"jsonrpc":"2.0","method":"event","params":{""" +
+                    """"type":"gateway.ready","payload":{"skin":"default","change_events":true}}}""",
+            )
             // Anything the gateway script pushes asynchronously gets delivered
             // from a background thread — the scripted push channel drives it.
             Thread {

@@ -190,7 +190,6 @@ class SessionRenameTest {
                     "req-resume-2",
                     mapOf(
                         "session_id" to "runtime-8hex",
-                        "resumed" to "stored-bg",
                         "message_count" to 0.0,
                         "messages" to emptyList<Map<String, Any?>>(),
                         "session_key" to "stored-bg",
@@ -285,7 +284,6 @@ class SessionRenameTest {
                     "req-resume-2",
                     mapOf(
                         "session_id" to "runtime-live-8hex",
-                        "resumed" to "session-123",
                         "message_count" to 0.0,
                         "messages" to emptyList<Map<String, Any?>>(),
                         "session_key" to "session-123",
@@ -316,7 +314,6 @@ class SessionRenameTest {
                     "req-resume-2",
                     mapOf(
                         "session_id" to "runtime-8hex",
-                        "resumed" to "stored-bg",
                         "session_key" to "stored-bg",
                         "messages" to emptyList<Map<String, Any?>>(),
                     ),
