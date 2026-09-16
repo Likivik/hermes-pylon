@@ -40,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.zIndex
 import kotlin.math.roundToInt
 import org.kodein.emoji.*
@@ -205,6 +206,8 @@ private fun ReorderableCollectionItemScope.RailItem(
     Box(
         modifier = Modifier
             .width(ItemWidth)
+            // E2E hook: stable node selection regardless of label text.
+            .testTag("rail_item_$id")
             // Active tint clipped to M3-medium rounded shape (matches cards).
             .clip(MaterialTheme.shapes.medium)
             .background(

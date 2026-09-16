@@ -67,6 +67,10 @@ internal data class SourcedWsEvent(
  * as well as direct callbacks.
  */
 object HermesWsClient {
+
+    /** E2E: when non-blank, WS connects here instead of AuthManager.wsUrl(). */
+    @Volatile
+    var e2eWsOverride: String? = null
     private const val TAG = "HermesWsClient"
 
     // ── Backoff settings ─────────────────────────────────────────────────
@@ -846,8 +850,12 @@ object HermesWsClient {
         }
         val url =
             try {
-                ticketResult.ticket?.let(AuthManager::wsUrlWithCredential)
-                    ?: AuthManager.wsUrl()
+                // E2E override: androidTest sets e2eWsOverride to the
+                // MockWebServer loopback URL; the scripted gateway replaces
+                // the real dashboard/gateway for the whole test process.
+                e2eWsOverride?.takeIf { it.isNotBlank() }
+                    ?: (ticketResult.ticket?.let(AuthManager::wsUrlWithCredential)
+                        ?: AuthManager.wsUrl())
             } catch (e: IllegalArgumentException) {
                 Log.w(TAG, "WebSocket blocked by transport policy")
                 synchronized(connectionLock) {
