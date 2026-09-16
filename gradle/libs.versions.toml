@@ -33,7 +33,7 @@ sqlcipher = "4.17.0"
 datastore = "1.1.2"
 latex = "1.5.4"
 reorderable = "3.1.0"
-roborazzi = "1.72.0"
+roborazzi = "1.74.0"
 robolectric = "4.14.1"
 
 [libraries]
