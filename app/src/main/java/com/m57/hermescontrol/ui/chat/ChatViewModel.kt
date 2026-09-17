@@ -391,7 +391,13 @@ class ChatViewModel(
             }
         }
         if (wsClient.connectionStatus.value == ConnectionStatus.CONNECTED) {
-            handleGatewayReady()
+            // Deferred: when the WS is already CONNECTED mid-construction (fast
+            // e2e mock retry), handleGatewayReady would run before later-declared
+            // property initializers (railPrefs lazy delegate at ~1552) execute —
+            // the lazy delegate is still null → NPE. Posting to viewModelScope
+            // runs it after construction completes, matching the async
+            // gateway.ready arrival in production.
+            viewModelScope.launch { handleGatewayReady() }
         }
     }
 
