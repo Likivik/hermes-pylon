@@ -7,7 +7,6 @@ object DeviceLog {
     fun recent(): String = try {
         val ui = InstrumentationRegistry.getInstrumentation().uiAutomation
         val pfd = ui.executeShellCommand("logcat -d -t 1500 AndroidRuntime:E System.err:W ActivityTaskManager:W *:F")
-        pfd.autoCloseStream(false)
         val text = pfd.fileDescriptor.let { fd ->
             java.io.FileDescriptor().let { _ ->
                 java.io.FileInputStream(fd).bufferedReader().readText()
