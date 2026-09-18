@@ -74,8 +74,10 @@ class RailReorderE2eTest {
 
         val low = composeRule.onNodeWithTag("rail_item_item-low")
         val top = composeRule.onNodeWithTag("rail_item_item-top")
-        low.assertIsDisplayed()
-        top.assertIsDisplayed()
+        DeviceLog.withEvidence("rail-reorder-e2e") {
+            low.assertIsDisplayed()
+            top.assertIsDisplayed()
+        }
 
         // Long-press (merged gesture: hold then move) and drag the lower item
         // one item-height up. No context menu should open (movement wins over

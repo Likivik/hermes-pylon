@@ -87,8 +87,10 @@ class RenameE2eTest {
         composeRule.waitForIdle()
 
         // 2. Long-press the background rail item → context menu.
-        composeRule.onNodeWithTag("rail_item_stored-bg")
-            .assertIsDisplayed()
+        DeviceLog.withEvidence("rename-e2e") {
+            composeRule.onNodeWithTag("rail_item_stored-bg")
+                .assertIsDisplayed()
+        }
         composeRule.onNodeWithTag("rail_item_stored-bg")
             .performTouchInput { longClick() }
         composeRule.waitForIdle()

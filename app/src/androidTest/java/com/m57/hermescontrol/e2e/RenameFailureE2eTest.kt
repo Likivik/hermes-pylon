@@ -80,7 +80,9 @@ class RenameFailureE2eTest {
         gatewayServer.awaitOpen()
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithTag("rail_item_stored-gone").assertIsDisplayed()
+        DeviceLog.withEvidence("rename-failure-e2e") {
+            composeRule.onNodeWithTag("rail_item_stored-gone").assertIsDisplayed()
+        }
         composeRule.onNodeWithTag("rail_item_stored-gone")
             .performTouchInput { longClick() }
         composeRule.waitForIdle()
