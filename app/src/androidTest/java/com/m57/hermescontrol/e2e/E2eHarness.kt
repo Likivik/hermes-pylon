@@ -21,10 +21,12 @@ object E2eHarness {
             // override is never reached. "token" takes the non-gated path where
             // the offline refresh is best-effort, so the override URL wins.
         )
-        AuthManager.saveConnectionProfilesAndToken(
+        AuthManager.saveConnectionProfilesAndSelect(
             profiles = listOf(profile),
             profileId = AuthManager.DEFAULT_PROFILE_ID,
             token = "e2e-token",
         )
+        // Force re-publish even if selected id was already the default:
+        AuthManager.setSelectedProfileId(AuthManager.DEFAULT_PROFILE_ID)
     }
 }

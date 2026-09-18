@@ -32,7 +32,10 @@ class RenameE2eTest {
 
     private lateinit var gatewayServer: ScriptedGatewayServer
 
-    @get:Rule
+    @get:Rule(order = 0)
+    val logcatRule = LogcatOnFailureRule()
+
+    @get:Rule(order = 1)
     val composeRule = createAndroidComposeRule<MainActivity>()
 
     @Before
