@@ -1,14 +1,20 @@
 package com.m57.hermescontrol.e2e
 
-import java.io.BufferedReader
+import androidx.test.platform.app.InstrumentationRegistry
 
-/** Reads recent device logcat from the instrumentation process. */
+/** Reads recent device logcat via UiAutomation (works under instrumentation). */
 object DeviceLog {
     fun recent(): String = try {
-        val p = ProcessBuilder("logcat", "-d", "-t", "1500",
-            "AndroidRuntime:E", "System.err:W", "ActivityTaskManager:W", "DataStore:E", "*:F")
-            .redirectErrorStream(true).start()
-        p.inputStream.bufferedReader().readText().takeLast(6000)
+        val ui = InstrumentationRegistry.getInstrumentation().uiAutomation
+        val pfd = ui.executeShellCommand("logcat -d -t 1500 AndroidRuntime:E System.err:W ActivityTaskManager:W *:F")
+        pfd.autoCloseStream(false)
+        val text = pfd.fileDescriptor.let { fd ->
+            java.io.FileDescriptor().let { _ ->
+                java.io.FileInputStream(fd).bufferedReader().readText()
+            }
+        }
+        pfd.close()
+        text.takeLast(6000)
     } catch (t: Throwable) {
         "logcat unavailable: $t"
     }
