@@ -1,5 +1,6 @@
 package com.m57.hermescontrol.e2e
 
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -88,6 +89,10 @@ class RenameE2eTest {
 
         // 2. Long-press the background rail item → context menu.
         DeviceLog.withEvidence("rename-e2e") {
+            composeRule.waitUntilAtLeastOneExists(
+                hasTestTag("rail_item_stored-bg"),
+                timeoutMillis = 30_000,
+            )
             composeRule.onNodeWithTag("rail_item_stored-bg")
                 .assertIsDisplayed()
         }

@@ -1,5 +1,6 @@
 package com.m57.hermescontrol.e2e
 
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -81,6 +82,10 @@ class RenameFailureE2eTest {
         composeRule.waitForIdle()
 
         DeviceLog.withEvidence("rename-failure-e2e") {
+            composeRule.waitUntilAtLeastOneExists(
+                hasTestTag("rail_item_stored-gone"),
+                timeoutMillis = 30_000,
+            )
             composeRule.onNodeWithTag("rail_item_stored-gone").assertIsDisplayed()
         }
         composeRule.onNodeWithTag("rail_item_stored-gone")

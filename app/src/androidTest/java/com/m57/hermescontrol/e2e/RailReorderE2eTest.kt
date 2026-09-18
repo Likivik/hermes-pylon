@@ -1,5 +1,6 @@
 package com.m57.hermescontrol.e2e
 
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -75,6 +76,10 @@ class RailReorderE2eTest {
         val low = composeRule.onNodeWithTag("rail_item_item-low")
         val top = composeRule.onNodeWithTag("rail_item_item-top")
         DeviceLog.withEvidence("rail-reorder-e2e") {
+            composeRule.waitUntilAtLeastOneExists(
+                hasTestTag("rail_item_item-low"),
+                timeoutMillis = 30_000,
+            )
             low.assertIsDisplayed()
             top.assertIsDisplayed()
         }
