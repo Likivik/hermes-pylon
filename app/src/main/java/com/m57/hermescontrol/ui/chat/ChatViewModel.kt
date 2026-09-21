@@ -397,7 +397,12 @@ class ChatViewModel(
             // the lazy delegate is still null → NPE. Posting to viewModelScope
             // runs it after construction completes, matching the async
             // gateway.ready arrival in production.
-            viewModelScope.launch { handleGatewayReady() }
+            // `launch` may run immediately on the main dispatcher while the
+            // constructor is still initializing later properties. Post one
+            // message-loop turn so all property initializers have completed.
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                handleGatewayReady()
+            }
         }
     }
 
@@ -1555,9 +1560,9 @@ class ChatViewModel(
     private var statusPillJob: Job? = null
 
     // ── Likivik patch: pinned sessions for the rail ──
-    private val railPrefs by lazy {
-        application.applicationContext.getSharedPreferences("hermes_rail", 0)
-    }
+    // Eagerly initialize this before init{} can receive a fast gateway.ready.
+    // A lazy delegate here can be observed as unassigned during construction.
+    private val railPrefs = application.applicationContext.getSharedPreferences("hermes_rail", 0)
     private val _pinnedSessionIds = MutableStateFlow(
         railPrefs.getStringSet("pinned", emptySet())?.toSet() ?: emptySet(),
     )
