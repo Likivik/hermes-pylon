@@ -29,6 +29,7 @@ import org.junit.runner.RunWith
  *  4. persists in the rail list
  */
 @RunWith(AndroidJUnit4::class)
+@OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
 class RenameE2eTest {
 
     private lateinit var gatewayServer: ScriptedGatewayServer

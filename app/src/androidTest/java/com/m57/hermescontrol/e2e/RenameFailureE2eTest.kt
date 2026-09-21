@@ -26,6 +26,7 @@ import org.junit.runner.RunWith
  * that silently dropped renames before the surfaced-failure fix).
  */
 @RunWith(AndroidJUnit4::class)
+@OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
 class RenameFailureE2eTest {
 
     private lateinit var gatewayServer: ScriptedGatewayServer

@@ -23,6 +23,7 @@ import org.junit.runner.RunWith
  * choreography pin is the persisted order string, not pixels.
  */
 @RunWith(AndroidJUnit4::class)
+@OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
 class RailReorderE2eTest {
 
     private lateinit var gatewayServer: ScriptedGatewayServer
