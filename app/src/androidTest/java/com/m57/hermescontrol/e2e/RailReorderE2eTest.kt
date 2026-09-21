@@ -2,7 +2,8 @@ package com.m57.hermescontrol.e2e
 
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.test.core.app.ActivityScenario
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.performTouchInput
@@ -32,7 +33,9 @@ class RailReorderE2eTest {
     val logcatRule = LogcatOnFailureRule()
 
     @get:Rule(order = 1)
-    val composeRule = createAndroidComposeRule<MainActivity>()
+    val composeRule = createEmptyComposeRule()
+
+    private lateinit var activityScenario: ActivityScenario<MainActivity>
 
     @Before
     fun setUp() {
@@ -41,7 +44,9 @@ class RailReorderE2eTest {
 
     @After
     fun tearDown() {
+        if (::activityScenario.isInitialized) activityScenario.close()
         gatewayServer.shutdown()
+        HermesWsClient.e2eWsOverride = null
     }
 
     @Test
@@ -71,6 +76,8 @@ class RailReorderE2eTest {
             ),
         )
 
+        E2eHarness.seedServerProfile()
+        activityScenario = ActivityScenario.launch(MainActivity::class.java)
         gatewayServer.awaitOpen()
         composeRule.waitForIdle()
 

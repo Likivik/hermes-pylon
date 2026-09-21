@@ -1,20 +1,18 @@
 package com.m57.hermescontrol.e2e
 
 import androidx.compose.ui.test.hasTestTag
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.test.core.app.ActivityScenario
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.longClick
-import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.m57.hermescontrol.MainActivity
-import com.m57.hermescontrol.data.ws.HermesWsClient
-import org.junit.After
 import org.junit.Rule
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.m57.hermescontrol.data.ws.HermesWsClient
+import com.m57.hermescontrol.MainActivity
+import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -35,7 +33,9 @@ class RenameFailureE2eTest {
     val logcatRule = LogcatOnFailureRule()
 
     @get:Rule(order = 1)
-    val composeRule = createAndroidComposeRule<MainActivity>()
+    val composeRule = createEmptyComposeRule()
+
+    private lateinit var activityScenario: ActivityScenario<MainActivity>
 
     @Before
     fun setUp() {
@@ -44,52 +44,54 @@ class RenameFailureE2eTest {
 
     @After
     fun tearDown() {
+        if (::activityScenario.isInitialized) activityScenario.close()
         gatewayServer.shutdown()
+        HermesWsClient.e2eWsOverride = null
     }
 
     @Test
     fun reapedResume_4001_surfacesError_neverTitles() {
         val gw = gatewayServer.gateway
         val wsUrl = gatewayServer.start()
-        // Land on ChatScreen (rail), not LandingScreen: seed profile+token.
-        E2eHarness.seedServerProfile()
         HermesWsClient.e2eWsOverride = wsUrl
 
         gw.enqueue(
-            // session.list: two sessions, stored-gone is background.
             ScriptedGateway.Step.Reply(
-                ScriptedGateway.resultEnvelope(
+                ScriptedGateway.Companion.resultEnvelope(
                     "1",
                     """{"sessions":[
-                       {"id":"stored-live","title":"Current chat","message_count":5,
-                        "started_at":100,"source":"telegram"},
-                       {"id":"stored-gone","title":"Doomed chat","message_count":3,
-                        "started_at":50,"source":"telegram"}]}""",
+                       {"id":"reaped-bg","title":"Stale chat","message_count":1,
+                        "started_at":10,"source":"telegram"}]}""",
                 ),
             ),
             ScriptedGateway.Step.Reply(
-                ScriptedGateway.resultEnvelope("2", "{}"),
+                ScriptedGateway.Companion.resultEnvelope("2", "{}"),
             ),
             ScriptedGateway.Step.Reply(
-                ScriptedGateway.resultEnvelope("3", "{}"),
+                ScriptedGateway.Companion.resultEnvelope("3", "{}"),
             ),
-            // The rename resume: gateway has REAPED the runtime → 4001.
-            ScriptedGateway.Step.Fail(4001, "session not found"),
-            // NO further steps: any session.title would be caught by
-            // assertNeverSent below + assertAllConsumed.
+            // session.resume ack — 4001 means "session not found / reaped".
+            ScriptedGateway.Companion.errorEnvelope(
+                id = "4",
+                code = 4001,
+                message = "session not found",
+            ),
         )
 
+        E2eHarness.seedServerProfile()
+        activityScenario = ActivityScenario.launch(MainActivity::class.java)
         gatewayServer.awaitOpen()
         composeRule.waitForIdle()
 
         DeviceLog.withEvidence("rename-failure-e2e") {
             composeRule.waitUntilAtLeastOneExists(
-                hasTestTag("rail_item_stored-gone"),
+                hasTestTag("rail_item_reaped-bg"),
                 timeoutMillis = 30_000,
             )
-            composeRule.onNodeWithTag("rail_item_stored-gone").assertIsDisplayed()
+            composeRule.onNodeWithTag("rail_item_reaped-bg").assertIsDisplayed()
         }
-        composeRule.onNodeWithTag("rail_item_stored-gone")
+
+        composeRule.onNodeWithTag("rail_item_reaped-bg")
             .performTouchInput { longClick() }
         composeRule.waitForIdle()
 
@@ -97,16 +99,19 @@ class RenameFailureE2eTest {
         composeRule.waitForIdle()
 
         composeRule.onNodeWithTag("rename_field")
-            .performTextReplacement("Won't land")
+            .performTextReplacement("Renamed E2E")
         composeRule.onNodeWithText("Save").performClick()
 
-        // Error must surface (the silent-drop regression made this invisible).
-        composeRule.waitUntil(10_000) {
-            composeRule.onAllNodesWithText("Error", substring = true)
-                .fetchSemanticsNodes().isNotEmpty()
+        // session.title must NEVER have been sent — the surfaced-error path
+        // short-circuits before the title RPC.
+        composeRule.waitUntil(5_000) {
+            // We expect to have sent session.resume but never session.title.
+            gw.assertNeverSent("session.title", mapOf("session_id" to "reaped-bg"))
+            true
         }
-        // And the title must never be sent — the choreography pin.
-        gw.assertNeverSent("session.title")
         gw.assertAllConsumed()
+
+        // Error surfaced — "Error" toast/banner visible.
+        composeRule.onNodeWithText("Error", substring = true).assertIsDisplayed()
     }
 }

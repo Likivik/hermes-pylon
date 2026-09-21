@@ -1,12 +1,12 @@
 package com.m57.hermescontrol.e2e
 
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.test.core.app.ActivityScenario
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
@@ -14,7 +14,6 @@ import androidx.compose.ui.test.longClick
 import org.junit.Rule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.m57.hermescontrol.data.ws.HermesWsClient
-import com.m57.hermescontrol.MainActivity
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -38,7 +37,9 @@ class RenameE2eTest {
     val logcatRule = LogcatOnFailureRule()
 
     @get:Rule(order = 1)
-    val composeRule = createAndroidComposeRule<MainActivity>()
+    val composeRule = createEmptyComposeRule()
+
+    private lateinit var activityScenario: ActivityScenario<MainActivity>
 
     @Before
     fun setUp() {
@@ -47,7 +48,9 @@ class RenameE2eTest {
 
     @After
     fun tearDown() {
+        if (::activityScenario.isInitialized) activityScenario.close()
         gatewayServer.shutdown()
+        HermesWsClient.e2eWsOverride = null
     }
 
     @Test
@@ -55,10 +58,12 @@ class RenameE2eTest {
         // 1. Script the choreography: rail loads (session.list), then the
         //    rename path: resume → ack(session_key) → title accepted.
         val gw = gatewayServer.gateway
+        // Mock first (port allocation), then route the app's WS client at it.
+        // HermesWsClient is in RECONNECTING (from MainActivity.onStart's failed
+        // attempt against the seeded wsUrl); the backoff retry (1s..30s) picks
+        // up e2eWsOverride on its next tick — gatewayServer.awaitOpen() below
+        // waits up to 30s for that.
         val wsUrl = gatewayServer.start()
-        // Route the app's real WS client at the scripted gateway.
-        // Land on ChatScreen (rail), not LandingScreen: seed profile+token.
-        E2eHarness.seedServerProfile()
         HermesWsClient.e2eWsOverride = wsUrl
 
         gw.enqueue(
@@ -85,6 +90,8 @@ class RenameE2eTest {
             ScriptedGateway.Companion.titleAccept("5", "Renamed E2E"),
         )
 
+        E2eHarness.seedServerProfile()
+        activityScenario = ActivityScenario.launch(MainActivity::class.java)
         gatewayServer.awaitOpen()
         composeRule.waitForIdle()
 
