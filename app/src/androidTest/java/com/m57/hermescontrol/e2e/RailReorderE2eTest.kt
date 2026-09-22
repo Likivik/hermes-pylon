@@ -65,11 +65,16 @@ class RailReorderE2eTest {
     @Test
     fun dragBelow_persistsHomeOrder() {
         val gw = gatewayServer.gateway
+        // 1) Reset HermesWsClient.requestId (Kotlin object — survives across
+        //    androidTest classes in the same instrumentation JVM) and wipe
+        //    hermes_rail prefs (last_session/pinned/home_order would otherwise
+        //    leak across tests and reroute handleGatewayReady into
+        //    switchSession(staleId) → unscripted session.resume).
+        E2eHarness.resetStateForTest()
         val wsUrl = gatewayServer.start()
-        // Land on ChatScreen (rail), not LandingScreen: seed profile+token.
-        E2eHarness.seedServerProfile()
-        HermesWsClient.e2eWsOverride = wsUrl
-
+        // 2) Pre-script every session.list / commands.catalog / etc envelope
+        //    BEFORE the activity launches, so onClientFrame dispatches them
+        //    in order as the WS comes up.
         gw.enqueue(
             ScriptedGateway.Step.Reply(
                 ScriptedGateway.resultEnvelope(
@@ -88,7 +93,17 @@ class RailReorderE2eTest {
                 ScriptedGateway.resultEnvelope("3", "{}"),
             ),
         )
+        // 3) Seed the profile+token AFTER scripting the replies so the seed
+        //    publish doesn't preempt the scripted gateway.ready flow.
+        E2eHarness.seedServerProfile()
+        // 4) e2eWsOverride after seed: the WS connect that happens during
+        //    MainActivity.onStart consumes the override URL on its next
+        //    scheduled retry (gatewayServer.awaitOpen below waits for it).
+        HermesWsClient.e2eWsOverride = wsUrl
 
+        // 5) Launch last. ActivityScenario.launch returns once the activity is
+        //    CREATED; awaitOpen() blocks until the WS handshake completes
+        //    (the override URL is what gets dialed, not the seeded :9119).
         activityScenario = ActivityScenario.launch(MainActivity::class.java)
         gatewayServer.awaitOpen()
         composeRule.waitForIdle()

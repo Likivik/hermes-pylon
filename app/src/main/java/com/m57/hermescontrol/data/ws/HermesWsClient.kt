@@ -353,6 +353,28 @@ object HermesWsClient {
             !backgroundIdleClosed.get() &&
             autoReconnect
 
+    /**
+     * E2E: reset process-wide request state before each androidTest runs.
+     *
+     * `HermesWsClient` is a Kotlin `object`, so `requestId` (process-scope
+     * `AtomicInteger`) survives across the three E2E classes in the same
+     * instrumentation JVM — without this hook, the 2nd and 3rd tests see
+     * ids > 1 for what used to be the first send, and their hardcoded
+     * scripted `"1"`/`"2"`/`"3"` reply ids never match the outgoing
+     * JSON-RPC frames. ChatViewModel.handleRpcResult (line 750) does
+     * `pendingRequests.remove(id) ?: return`, so an unmatched id silently
+     * drops the `session.list` reply and the rail renders empty —
+     * `waitUntilAtLeastOneExists(rail_item_*)` then times out at 30s.
+     *
+     * @param rejectInflight fail any not-yet-replied pending requests so
+     *   their callers don't hang across the test boundary.
+     */
+    @VisibleForTesting
+    internal fun resetRequestCounterForTest(rejectInflight: Boolean = true) {
+        if (rejectInflight) rejectAllPending()
+        requestId.set(0)
+    }
+
     /** Open a WebSocket connection using settings from [AuthManager]. */
     fun connect() {
         val generation =

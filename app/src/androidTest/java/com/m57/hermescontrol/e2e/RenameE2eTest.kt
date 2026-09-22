@@ -72,7 +72,12 @@ class RenameE2eTest {
 
     @Test
     fun renameBackgroundSession_resumeFirst_thenTitleBySessionKey() {
-        // 1. Script the choreography: rail loads (session.list), then the
+        // 1. Reset HermesWsClient.requestId (Kotlin object — survives across
+        //    androidTest classes in the same instrumentation JVM) and wipe
+        //    hermes_rail prefs so last_session from the prior test doesn't
+        //    reroute handleGatewayReady into switchSession(staleId).
+        E2eHarness.resetStateForTest()
+        // 2. Script the choreography: rail loads (session.list), then the
         //    rename path: resume → ack(session_key) → title accepted.
         val gw = gatewayServer.gateway
         // Mock first (port allocation), then route the app's WS client at it.
@@ -81,7 +86,6 @@ class RenameE2eTest {
         // up e2eWsOverride on its next tick — gatewayServer.awaitOpen() below
         // waits up to 30s for that.
         val wsUrl = gatewayServer.start()
-        HermesWsClient.e2eWsOverride = wsUrl
 
         gw.enqueue(
             // session.list ack: two sessions; stored-bg is NOT current.
@@ -107,12 +111,20 @@ class RenameE2eTest {
             ScriptedGateway.Companion.titleAccept("5", "Renamed E2E"),
         )
 
+        // 3. Seed the profile+token AFTER scripting — the seed publish must
+        //    not preempt the scripted gateway.ready flow.
         E2eHarness.seedServerProfile()
+        // 4. e2eWsOverride after seed: the WS connect that runs in
+        //    MainActivity.onStart consumes the override URL on its next retry.
+        HermesWsClient.e2eWsOverride = wsUrl
+
+        // 5. Launch last. ActivityScenario.launch returns once CREATED;
+        //    awaitOpen() blocks until the WS handshake completes.
         activityScenario = ActivityScenario.launch(MainActivity::class.java)
         gatewayServer.awaitOpen()
         composeRule.waitForIdle()
 
-        // 2. Long-press the background rail item → context menu.
+        // 6. Long-press the background rail item → context menu.
         DeviceLog.withEvidence("rename-e2e") {
             composeRule.waitUntilAtLeastOneExists(
                 hasTestTag("rail_item_stored-bg"),
@@ -125,16 +137,16 @@ class RenameE2eTest {
             .performTouchInput { longClick() }
         composeRule.waitForIdle()
 
-        // 3. Tap Edit.
+        // 7. Tap Edit.
         composeRule.onNodeWithText("Edit icon / name").performClick()
         composeRule.waitForIdle()
 
-        // 4. Clear + type the new name, Save.
+        // 8. Clear + type the new name, Save.
         composeRule.onNodeWithTag("rename_field")
             .performTextReplacement("Renamed E2E")
         composeRule.onNodeWithText("Save").performClick()
 
-        // 5. The choreography assertions — the heart of the field bug.
+        // 9. The choreography assertions — the heart of the field bug.
         composeRule.waitUntil(10_000) {
             // session.title sent, addressed by STORAGE id, and accepted.
             gw.assertSent("session.title", mapOf("session_id" to "stored-bg"))
@@ -146,7 +158,7 @@ class RenameE2eTest {
         )
         gw.assertAllConsumed()
 
-        // 6. Rail shows the new name; no error toast.
+        // 10. Rail shows the new name; no error toast.
         composeRule.waitUntil(5_000) {
             composeRule.onAllNodesWithText("Renamed E2E")
                 .fetchSemanticsNodes().isNotEmpty()

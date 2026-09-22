@@ -66,9 +66,13 @@ class RenameFailureE2eTest {
 
     @Test
     fun reapedResume_4001_surfacesError_neverTitles() {
+        // 1. Reset HermesWsClient.requestId (Kotlin object — survives across
+        //    androidTest classes in the same instrumentation JVM) and wipe
+        //    hermes_rail prefs so last_session from the prior test doesn't
+        //    reroute handleGatewayReady into switchSession(staleId).
+        E2eHarness.resetStateForTest()
         val gw = gatewayServer.gateway
         val wsUrl = gatewayServer.start()
-        HermesWsClient.e2eWsOverride = wsUrl
 
         gw.enqueue(
             ScriptedGateway.Step.Reply(
@@ -95,7 +99,12 @@ class RenameFailureE2eTest {
             ),
         )
 
+        // 2. Seed the profile+token AFTER scripting the replies.
         E2eHarness.seedServerProfile()
+        // 3. e2eWsOverride after seed.
+        HermesWsClient.e2eWsOverride = wsUrl
+
+        // 4. Launch last.
         activityScenario = ActivityScenario.launch(MainActivity::class.java)
         gatewayServer.awaitOpen()
         composeRule.waitForIdle()
