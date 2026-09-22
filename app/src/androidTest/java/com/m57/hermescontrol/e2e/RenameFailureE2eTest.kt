@@ -75,28 +75,26 @@ class RenameFailureE2eTest {
         val wsUrl = gatewayServer.start()
 
         gw.enqueue(
-            ScriptedGateway.Step.Reply(
-                ScriptedGateway.Companion.resultEnvelope(
-                    "1",
-                    """{"sessions":[
-                       {"id":"reaped-bg","title":"Stale chat","message_count":1,
-                        "started_at":10,"source":"telegram"}]}""",
-                ),
+            // session.list ack: stale/reaped session, surfaced for a long-press
+            // tap that the rail still references.
+            ScriptedGateway.Companion.sessionList(
+                """[
+                   {"id":"reaped-bg","title":"Stale chat","message_count":1,
+                    "started_at":10,"source":"telegram"}]""",
             ),
-            ScriptedGateway.Step.Reply(
-                ScriptedGateway.Companion.resultEnvelope("2", "{}"),
-            ),
-            ScriptedGateway.Step.Reply(
-                ScriptedGateway.Companion.resultEnvelope("3", "{}"),
-            ),
+            // commands.catalog ack — empty catalog is fine.
+            ScriptedGateway.Companion.commandsCatalogEmpty(),
             // session.resume ack — 4001 means "session not found / reaped".
-            ScriptedGateway.Step.Reply(
-                ScriptedGateway.Companion.errorEnvelope(
-                    id = "4",
-                    code = 4001,
-                    message = "session not found",
-                ),
-            ),
+            ScriptedGateway.Companion.titleRejectStorageId().let {
+                // Re-target the FailFor to session.resume (the unit test the
+                // rename-failure flow exercises is the session.resume 4001
+                // on the rail tap — same code, same semantics).
+                ScriptedGateway.Step.FailFor(
+                    method = "session.resume",
+                    code = it.code,
+                    message = it.message,
+                )
+            },
         )
 
         // 2. Seed the profile+token AFTER scripting the replies.

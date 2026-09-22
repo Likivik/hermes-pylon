@@ -89,26 +89,19 @@ class RenameE2eTest {
 
         gw.enqueue(
             // session.list ack: two sessions; stored-bg is NOT current.
-            ScriptedGateway.Step.Reply(
-                ScriptedGateway.Companion.resultEnvelope(
-                    "1",
-                    """{"sessions":[
-                       {"id":"stored-current","title":"Current chat","message_count":5,
-                        "started_at":100,"source":"telegram"},
-                       {"id":"stored-bg","title":"Background chat","message_count":3,
-                        "started_at":50,"source":"telegram"}]}""",
-                ),
+            ScriptedGateway.Companion.sessionList(
+                """[
+                   {"id":"stored-current","title":"Current chat","message_count":5,
+                    "started_at":100,"source":"telegram"},
+                   {"id":"stored-bg","title":"Background chat","message_count":3,
+                    "started_at":50,"source":"telegram"}]""",
             ),
-            ScriptedGateway.Step.Reply(
-                ScriptedGateway.Companion.resultEnvelope("2", "{}"),
-            ),
-            ScriptedGateway.Step.Reply(
-                ScriptedGateway.Companion.resultEnvelope("3", "{}"),
-            ),
+            // commands.catalog ack — empty catalog is fine.
+            ScriptedGateway.Companion.commandsCatalogEmpty(),
             // The rename resume: ack carries session_key = storage id.
-            ScriptedGateway.Companion.resumeAck("4", "stored-bg", "runtime-9hex"),
+            ScriptedGateway.Companion.resumeAck("stored-bg", "runtime-9hex"),
             // The title (addressed by storage id) is accepted.
-            ScriptedGateway.Companion.titleAccept("5", "Renamed E2E"),
+            ScriptedGateway.Companion.titleAccept("Renamed E2E"),
         )
 
         // 3. Seed the profile+token AFTER scripting — the seed publish must

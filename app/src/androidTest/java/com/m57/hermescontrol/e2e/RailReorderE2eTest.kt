@@ -76,22 +76,18 @@ class RailReorderE2eTest {
         //    BEFORE the activity launches, so onClientFrame dispatches them
         //    in order as the WS comes up.
         gw.enqueue(
-            ScriptedGateway.Step.Reply(
-                ScriptedGateway.resultEnvelope(
-                    "1",
-                    """{"sessions":[
-                       {"id":"item-top","title":"Top chat","message_count":5,
-                        "started_at":100,"source":"telegram"},
-                       {"id":"item-low","title":"Low chat","message_count":3,
-                        "started_at":50,"source":"telegram"}]}""",
-                ),
+            // session.list ack: method-aware so it lands on session.list
+            // regardless of which request id the concurrent
+            // handleGatewayReady coroutines assign.
+            ScriptedGateway.Companion.sessionList(
+                """[
+                   {"id":"item-top","title":"Top chat","message_count":5,
+                    "started_at":100,"source":"telegram"},
+                   {"id":"item-low","title":"Low chat","message_count":3,
+                    "started_at":50,"source":"telegram"}]""",
             ),
-            ScriptedGateway.Step.Reply(
-                ScriptedGateway.resultEnvelope("2", "{}"),
-            ),
-            ScriptedGateway.Step.Reply(
-                ScriptedGateway.resultEnvelope("3", "{}"),
-            ),
+            // commands.catalog ack — empty catalog is fine.
+            ScriptedGateway.Companion.commandsCatalogEmpty(),
         )
         // 3) Seed the profile+token AFTER scripting the replies so the seed
         //    publish doesn't preempt the scripted gateway.ready flow.
