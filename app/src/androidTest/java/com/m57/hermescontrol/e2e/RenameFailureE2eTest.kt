@@ -4,8 +4,10 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.longClick
 import org.junit.Rule
@@ -71,10 +73,12 @@ class RenameFailureE2eTest {
                 ScriptedGateway.Companion.resultEnvelope("3", "{}"),
             ),
             // session.resume ack — 4001 means "session not found / reaped".
-            ScriptedGateway.Companion.errorEnvelope(
-                id = "4",
-                code = 4001,
-                message = "session not found",
+            ScriptedGateway.Step.Reply(
+                ScriptedGateway.Companion.errorEnvelope(
+                    id = "4",
+                    code = 4001,
+                    message = "session not found",
+                ),
             ),
         )
 

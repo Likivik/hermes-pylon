@@ -13,6 +13,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.longClick
 import org.junit.Rule
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.m57.hermescontrol.MainActivity
 import com.m57.hermescontrol.data.ws.HermesWsClient
 import org.junit.After
 import org.junit.Before

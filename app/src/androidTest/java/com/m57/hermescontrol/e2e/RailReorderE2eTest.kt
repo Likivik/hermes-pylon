@@ -76,7 +76,6 @@ class RailReorderE2eTest {
             ),
         )
 
-        E2eHarness.seedServerProfile()
         activityScenario = ActivityScenario.launch(MainActivity::class.java)
         gatewayServer.awaitOpen()
         composeRule.waitForIdle()
