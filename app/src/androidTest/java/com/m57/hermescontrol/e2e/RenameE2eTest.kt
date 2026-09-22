@@ -13,6 +13,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.longClick
 import org.junit.Rule
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.rule.GrantPermissionRule
 import com.m57.hermescontrol.MainActivity
 import com.m57.hermescontrol.data.ws.HermesWsClient
 import org.junit.After
@@ -34,10 +35,25 @@ class RenameE2eTest {
 
     private lateinit var gatewayServer: ScriptedGatewayServer
 
+    /**
+     * Pre-grant runtime permissions the app requests on first launch. Without
+     * this, the system permission dialog covers MainActivity on Android 13+
+     * (GMD `e2eApi34`), the activity stays in PAUSED state, and
+     * `ActivityScenario.launch()` returns before the Compose hierarchy is
+     * built — `waitUntilAtLeastOneExists` then polls an empty semantics tree
+     * and times out with "No compose hierarchies found".
+     *
+     * On API < 33 [GrantPermissionRule] no-ops (POST_NOTIFICATIONS isn't
+     * runtime on older versions), so this rule is safe across GMD images.
+     */
     @get:Rule(order = 0)
-    val logcatRule = LogcatOnFailureRule()
+    val permissionRule: GrantPermissionRule =
+        GrantPermissionRule.grant(android.Manifest.permission.POST_NOTIFICATIONS)
 
     @get:Rule(order = 1)
+    val logcatRule = LogcatOnFailureRule()
+
+    @get:Rule(order = 2)
     val composeRule = createEmptyComposeRule()
 
     private lateinit var activityScenario: ActivityScenario<MainActivity>
