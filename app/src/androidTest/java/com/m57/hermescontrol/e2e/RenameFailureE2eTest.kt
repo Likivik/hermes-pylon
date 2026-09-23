@@ -80,7 +80,7 @@ class RenameFailureE2eTest {
             ScriptedGateway.Companion.sessionList(
                 """[
                    {"id":"reaped-bg","title":"Stale chat","message_count":1,
-                    "started_at":10,"source":"telegram"}]""",
+                    "started_at":0,"source":"telegram"}]""",
             ),
             // commands.catalog ack — empty catalog is fine.
             ScriptedGateway.Companion.commandsCatalogEmpty(),

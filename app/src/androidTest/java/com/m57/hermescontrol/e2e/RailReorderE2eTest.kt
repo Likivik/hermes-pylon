@@ -82,9 +82,9 @@ class RailReorderE2eTest {
             ScriptedGateway.Companion.sessionList(
                 """[
                    {"id":"item-top","title":"Top chat","message_count":5,
-                    "started_at":100,"source":"telegram"},
+                    "started_at":0,"source":"telegram"},
                    {"id":"item-low","title":"Low chat","message_count":3,
-                    "started_at":50,"source":"telegram"}]""",
+                    "started_at":0,"source":"telegram"}]""",
             ),
             // commands.catalog ack — empty catalog is fine.
             ScriptedGateway.Companion.commandsCatalogEmpty(),

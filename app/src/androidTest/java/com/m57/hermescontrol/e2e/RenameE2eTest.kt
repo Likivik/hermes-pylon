@@ -92,9 +92,9 @@ class RenameE2eTest {
             ScriptedGateway.Companion.sessionList(
                 """[
                    {"id":"stored-current","title":"Current chat","message_count":5,
-                    "started_at":100,"source":"telegram"},
+                    "started_at":0,"source":"telegram"},
                    {"id":"stored-bg","title":"Background chat","message_count":3,
-                    "started_at":50,"source":"telegram"}]""",
+                    "started_at":0,"source":"telegram"}]""",
             ),
             // commands.catalog ack — empty catalog is fine.
             ScriptedGateway.Companion.commandsCatalogEmpty(),
