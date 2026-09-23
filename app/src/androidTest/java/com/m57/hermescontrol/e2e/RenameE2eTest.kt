@@ -118,7 +118,7 @@ class RenameE2eTest {
         composeRule.waitForIdle()
 
         // 6. Long-press the background rail item → context menu.
-        DeviceLog.withEvidence("rename-e2e") {
+        DeviceLog.withEvidence("rename-e2e", extra = { gw.dumpState() }) {
             composeRule.waitUntilAtLeastOneExists(
                 hasTestTag("rail_item_stored-bg"),
                 timeoutMillis = 30_000,

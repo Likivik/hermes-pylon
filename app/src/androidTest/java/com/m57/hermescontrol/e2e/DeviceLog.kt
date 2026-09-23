@@ -18,12 +18,27 @@ object DeviceLog {
         "logcat unavailable: $t"
     }
 
-    /** Run [block]; on failure rethrow with the recent device log embedded. */
-    inline fun withEvidence(tag: String, block: () -> Unit) {
+    /** Run [block]; on failure rethrow with device log + optional state dump. */
+    inline fun withEvidence(
+        tag: String,
+        extra: (() -> String)? = null,
+        block: () -> Unit,
+    ) {
         try {
             block()
         } catch (t: Throwable) {
-            throw IllegalStateException("[$tag] FAILED — device log:\n${recent()}", t)
+            val detail = try {
+                extraDetail(extra)
+            } catch (_: Throwable) {
+                "extra unavailable"
+            }
+            throw IllegalStateException(
+                "[$tag] FAILED — device log:\n${recent()}\nBROADCAST/STATE:\n$detail",
+                t,
+            )
         }
     }
+
+    private fun extraDetail(extra: (() -> String)?): String =
+        extra?.invoke() ?: ""
 }
