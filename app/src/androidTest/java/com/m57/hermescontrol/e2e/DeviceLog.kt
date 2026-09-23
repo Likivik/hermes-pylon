@@ -19,9 +19,9 @@ object DeviceLog {
     }
 
     /** Run [block]; on failure rethrow with device log + optional state dump. */
-    inline fun withEvidence(
+    fun withEvidence(
         tag: String,
-        noinline extra: (() -> String)? = null,
+        extra: (() -> String)? = null,
         block: () -> Unit,
     ) {
         try {
