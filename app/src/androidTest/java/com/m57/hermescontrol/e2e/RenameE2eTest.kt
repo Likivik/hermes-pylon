@@ -116,6 +116,9 @@ class RenameE2eTest {
         activityScenario = ActivityScenario.launch(MainActivity::class.java)
         gatewayServer.awaitOpen()
         composeRule.waitForIdle()
+        // DIAGNOSTIC: print what the app actually sent before asserting, so a
+        // red run shows the RPC order without needing the 30s timeout.
+        android.util.Log.i("PylonE2E", "RPCs received so far: ${gw.dumpState()}")
 
         // 6. Long-press the background rail item → context menu.
         DeviceLog.withEvidence("rename-e2e", extra = { gw.dumpState() }) {
