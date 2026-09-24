@@ -75,6 +75,9 @@ class RenameFailureE2eTest {
         val wsUrl = gatewayServer.start()
 
         gw.enqueue(
+            // session.create ack — fresh boot (no last session) creates first,
+            // then loadSessions() fires (ChatViewModel.kt:791).
+            ScriptedGateway.Companion.sessionCreateAck("reaped-current", "runtime-reaped"),
             // session.list ack: stale/reaped session, surfaced for a long-press
             // tap that the rail still references.
             ScriptedGateway.Companion.sessionList(

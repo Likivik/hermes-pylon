@@ -76,6 +76,8 @@ class RailReorderE2eTest {
         //    BEFORE the activity launches, so onClientFrame dispatches them
         //    in order as the WS comes up.
         gw.enqueue(
+            // session.create ack — fresh boot creates first, then loadSessions().
+            ScriptedGateway.Companion.sessionCreateAck("item-current", "runtime-item"),
             // session.list ack: method-aware so it lands on session.list
             // regardless of which request id the concurrent
             // handleGatewayReady coroutines assign.

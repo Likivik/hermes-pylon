@@ -88,6 +88,9 @@ class RenameE2eTest {
         val wsUrl = gatewayServer.start()
 
         gw.enqueue(
+            // session.create ack first — app booted with no last session, so it
+            // creates before listing (ChatViewModel.handleGatewayReady → createNewSession).
+            ScriptedGateway.Companion.sessionCreateAck("stored-current", "runtime-current"),
             // session.list ack: two sessions; stored-bg is NOT current.
             ScriptedGateway.Companion.sessionList(
                 """[

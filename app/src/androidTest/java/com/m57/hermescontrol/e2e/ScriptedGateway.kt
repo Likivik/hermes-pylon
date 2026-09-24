@@ -329,6 +329,12 @@ class ScriptedGateway {
 
         // ── Convenience builders for gateway.ready-time RPCs ──────────────
 
+        /** session.create ack — app then calls loadSessions() (ChatViewModel.kt:791). */
+        fun sessionCreateAck(storageId: String, runtimeId: String) = Step.ReplyFor(
+            method = "session.create",
+            resultJson = """{"session_id":"$runtimeId","stored_session_id":"$storageId"}""",
+        )
+
         /** session.list response with the given sessions JSON array body. */
         fun sessionList(sessionsJson: String) = Step.ReplyFor(
             method = "session.list",
