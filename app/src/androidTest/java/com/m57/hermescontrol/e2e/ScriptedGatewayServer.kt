@@ -23,14 +23,15 @@ class ScriptedGatewayServer(
 ) {
     val server = MockWebServer()
     private val client = OkHttpClient()
-    private var appSocket: WebSocket? = null
+    /** All accepted app sockets; latest one is used for shutdown. */
+    private val sockets = java.util.concurrent.ConcurrentLinkedQueue<WebSocket>()
 
     /** Signals the app's WS is open and the upgrade handshake completed. */
     private val opened = CountDownLatch(1)
 
     private val serverListener = object : WebSocketListener() {
         override fun onOpen(webSocket: WebSocket, response: Response) {
-            appSocket = webSocket
+            sockets.add(webSocket)
             opened.countDown()
             // Real gateway always emits gateway.ready immediately after accept
             // (tui_gateway/ws.py:311). Keep the mock contract-identical.
@@ -62,7 +63,14 @@ class ScriptedGatewayServer(
 
     fun start(): String {
         server.start(java.net.InetAddress.getByName("127.0.0.1"), 0)
-        server.enqueue(MockResponse().withWebSocketUpgrade(serverListener))
+        // Upgrade EVERY connection, not just the first enqueued one: the app's
+        // WS client may reconnect (token republish / retry backoff), and a
+        // one-shot enqueue would 404 the second socket. Dispatcher is the
+        // documented pattern for upgrade-on-every-request.
+        server.dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
+            override fun dispatch(request: okhttp3.mockwebserver.RecordedRequest): MockResponse =
+                MockResponse().withWebSocketUpgrade(serverListener)
+        }
         return "ws://127.0.0.1:${server.port}/ws"
     }
 
@@ -81,7 +89,7 @@ class ScriptedGatewayServer(
     }
 
     fun shutdown() {
-        appSocket?.close(1000, "test done")
+        sockets.forEach { it.close(1000, "test done") }
         server.shutdown()
     }
 }
