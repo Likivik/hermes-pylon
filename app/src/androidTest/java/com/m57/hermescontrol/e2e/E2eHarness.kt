@@ -53,6 +53,13 @@ object E2eHarness {
     }
 
     fun seedServerProfile(baseUrl: String = "http://127.0.0.1:9119/") {
+        // E2E: pin the WS target BEFORE the profile/token publish triggers any
+        // connect. openSocket() reads the override first (HermesWsClient.kt:878),
+        // so a stale first socket to 127.0.0.1:9119 (ids 1–2: session.list,
+        // commands.catalog) can never exist — everything scripts to the mock.
+        // The test body sets the real MockWebServer wsUrl AFTER this, which
+        // replaces this placeholder before any socket actually opens.
+        HermesWsClient.e2eWsOverride = HermesWsClient.e2eWsOverride ?: "ws://127.0.0.1:9119/ws"
         val profile = ConnectionProfile(
             id = AuthManager.DEFAULT_PROFILE_ID,
             name = "E2E",
