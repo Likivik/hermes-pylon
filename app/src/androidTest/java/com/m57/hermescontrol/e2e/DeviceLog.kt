@@ -6,14 +6,9 @@ import androidx.test.platform.app.InstrumentationRegistry
 object DeviceLog {
     fun recent(): String = try {
         val ui = InstrumentationRegistry.getInstrumentation().uiAutomation
-        val pfd = ui.executeShellCommand("logcat -d -t 1500 AndroidRuntime:E System.err:W ActivityTaskManager:W *:F")
-        val text = pfd.fileDescriptor.let { fd ->
-            java.io.FileDescriptor().let { _ ->
-                java.io.FileInputStream(fd).bufferedReader().readText()
-            }
-        }
-        pfd.close()
-        text.takeLast(6000)
+        val pfd = ui.executeShellCommand("logcat -d -t 1500 HermesWsClient:D PylonE2E:D ChatViewModel:D AndroidRuntime:E System.err:W ActivityTaskManager:W *:F")
+        java.io.FileInputStream(pfd.fileDescriptor).bufferedReader().use { it.readText() }.takeLast(8000)
+            .also { pfd.close() }
     } catch (t: Throwable) {
         "logcat unavailable: $t"
     }
