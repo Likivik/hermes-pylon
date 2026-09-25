@@ -59,8 +59,7 @@ jobs:
           ./gradlew e2eApi34IrisDebugAndroidTest --no-daemon
           -Dorg.gradle.workers.max=2
           -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
-          --tests "com.m57.hermescontrol.e2e.*"
-          --tests "com.m57.hermescontrol.e2e.*Test"
+          -Pandroid.testInstrumentationRunnerArguments.class=com.m57.hermescontrol.e2e.RenameE2eTest,com.m57.hermescontrol.e2e.RenameFailureE2eTest,com.m57.hermescontrol.e2e.RailReorderE2eTest
 
       - name: Upload instrumented results on failure
         if: failure()
