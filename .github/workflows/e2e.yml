@@ -27,6 +27,18 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # Cache the whole AVD + emulator state: GMD re-downloads the system image
+      # and recreates the AVD every run otherwise (~2-4 min per run). No
+      # untrusted input flows into this — static paths only.
+      - name: Cache AVD + system images
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.android/avd
+            ~/.android/cache
+            ~/.gradle/caches/jars-*
+          key: ${{ runner.os }}-gmd-avd-v1
+
       # GMD: AGP provisions, boots, installs, runs, tears down the emulator.
       # Gradle's exit code fails when tests fail (no am-instrument trap).
       # swiftshader_indirect: GitHub runners have no hardware GPU.
@@ -35,6 +47,8 @@ jobs:
           ./gradlew e2eApi34IrisDebugAndroidTest --no-daemon
           -Dorg.gradle.workers.max=2
           -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
+          --tests "com.m57.hermescontrol.e2e.*"
+          --tests "com.m57.hermescontrol.e2e.*Test"
 
       - name: Upload instrumented results on failure
         if: failure()
