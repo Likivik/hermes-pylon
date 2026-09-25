@@ -31,9 +31,10 @@ android {
                 create("e2eApi34") {
                     device = "Pixel 5"
                     apiLevel = 34
-                    // "google" = Play Services image; ATD images top out at API 30,
-                    // too old for this app's compose stack.
-                    systemImageSource = "google"
+                    // ATD (test-only, headless, no GMS) boots much faster than
+                    // "google" and is what the GMD docs recommend for tests.
+                    // aosp-atd 34 exists on modern SDK images.
+                    systemImageSource = "aosp-atd"
                 }
             }
         }

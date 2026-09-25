@@ -39,6 +39,18 @@ jobs:
             ~/.gradle/caches/jars-*
           key: ${{ runner.os }}-gmd-avd-v1
 
+      # Persist the Gradle build cache between runs: org.gradle.caching=true is
+      # set, but without persisting build-cache-1 every run recompiles all
+      # unchanged Kotlin + re-assembles APKs (~3-4 min). Keyed by the workflow
+      # file so CI-only changes don't poison the cache.
+      - name: Cache Gradle build outputs
+        uses: actions/cache@v4
+        with:
+          path: ~/.gradle/caches/build-cache-1
+          key: ${{ runner.os }}-gradle-build-v1-${{ hashFiles('.github/workflows/e2e.yml', '**/*.gradle*', 'gradle/libs.versions.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-build-v1-
+
       # GMD: AGP provisions, boots, installs, runs, tears down the emulator.
       # Gradle's exit code fails when tests fail (no am-instrument trap).
       # swiftshader_indirect: GitHub runners have no hardware GPU.
