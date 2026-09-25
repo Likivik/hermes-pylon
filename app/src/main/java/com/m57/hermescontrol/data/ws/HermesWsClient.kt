@@ -1026,8 +1026,13 @@ object HermesWsClient {
                 _connectionStatus.value = ConnectionStatus.CONNECTED
                 currentBackoff = INITIAL_BACKOFF_MS
                 startHealthTracking()
-                drainQueue(webSocket)
             }
+            // Drain the queue OUTSIDE connectionLock: the ViewModel's
+            // loadSessions()/fetchCommandCatalog() take connectionLock inside
+            // send(), so draining inside the lock would deadlock the enqueue of
+            // the RPCs issued right after gateway.ready — they'd allocate an id
+            // but never reach the wire (the e2e-37 "ids 1-2 vanish" symptom).
+            drainQueue(webSocket)
         }
 
         override fun onMessage(

@@ -91,13 +91,12 @@ class RailReorderE2eTest {
             // commands.catalog ack — empty catalog is fine.
             ScriptedGateway.Companion.commandsCatalogEmpty(),
         )
-        // 3) Seed the profile+token AFTER scripting the replies so the seed
-        //    publish doesn't preempt the scripted gateway.ready flow.
-        E2eHarness.seedServerProfile()
-        // 4) e2eWsOverride after seed: the WS connect that happens during
-        //    MainActivity.onStart consumes the override URL on its next
-        //    scheduled retry (gatewayServer.awaitOpen below waits for it).
+        // 3) Route the app's WS client at the mock BEFORE seeding (seed publish
+        //    triggers connect(); override must already be set to avoid the
+        //    dead-socket first connect to 127.0.0.1:9119).
         HermesWsClient.e2eWsOverride = wsUrl
+        // 4) Seed the profile+token AFTER scripting and override.
+        E2eHarness.seedServerProfile()
 
         // 5) Launch last. ActivityScenario.launch returns once the activity is
         //    CREATED; awaitOpen() blocks until the WS handshake completes

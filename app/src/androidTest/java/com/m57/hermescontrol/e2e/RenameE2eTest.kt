@@ -107,12 +107,14 @@ class RenameE2eTest {
             ScriptedGateway.Companion.titleAccept("Renamed E2E"),
         )
 
-        // 3. Seed the profile+token AFTER scripting — the seed publish must
-        //    not preempt the scripted gateway.ready flow.
-        E2eHarness.seedServerProfile()
-        // 4. e2eWsOverride after seed: the WS connect that runs in
-        //    MainActivity.onStart consumes the override URL on its next retry.
+        // 3. Route the app's WS client at the mock BEFORE seeding: the seed's
+        //    token publish reactively triggers HermesWsClient.connect(), so the
+        //    override must already be set or that connect targets wsUrl()
+        //    (127.0.0.1:9119) — the dead-socket first connect seen in e2e-37.
         HermesWsClient.e2eWsOverride = wsUrl
+        // 4. Seed the profile+token AFTER scripting and override — the seed
+        //    publish triggers connect(), which now lands on the mock.
+        E2eHarness.seedServerProfile()
 
         // 5. Launch last. ActivityScenario.launch returns once CREATED;
         //    awaitOpen() blocks until the WS handshake completes.

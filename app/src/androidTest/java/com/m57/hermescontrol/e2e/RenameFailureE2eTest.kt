@@ -100,10 +100,12 @@ class RenameFailureE2eTest {
             },
         )
 
-        // 2. Seed the profile+token AFTER scripting the replies.
-        E2eHarness.seedServerProfile()
-        // 3. e2eWsOverride after seed.
+        // 2. Route the app's WS client at the mock BEFORE seeding (seed publish
+        //    triggers connect(); override must already be set to avoid the
+        //    dead-socket first connect to 127.0.0.1:9119).
         HermesWsClient.e2eWsOverride = wsUrl
+        // 3. Seed the profile+token AFTER scripting the replies.
+        E2eHarness.seedServerProfile()
 
         // 4. Launch last.
         activityScenario = ActivityScenario.launch(MainActivity::class.java)
