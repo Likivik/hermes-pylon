@@ -20,6 +20,7 @@ class LogcatOnFailureRule : TestRule {
                 } catch (t: Throwable) {
                     runCatching {
                         val out = ProcessBuilder("logcat", "-d", "-t", "2000",
+                            "HermesWsClient:D", "PylonE2E:D", "ChatViewModel:D",
                             "AndroidRuntime:E", "CRASH:E", "System.err:W",
                             "ActivityTaskManager:W", "DataStore:E", "*:F")
                             .redirectErrorStream(true)

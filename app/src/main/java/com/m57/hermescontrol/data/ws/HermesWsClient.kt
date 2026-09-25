@@ -886,7 +886,7 @@ object HermesWsClient {
                 }
                 return
             }
-        if (BuildConfig.DEBUG) Log.d(TAG, "Connecting to WebSocket endpoint")
+        if (BuildConfig.DEBUG) Log.d(TAG, "Connecting to WebSocket endpoint: $url override=${!e2eWsOverride.isNullOrBlank()}")
 
         val request = Request.Builder().url(url).build()
         var restartForProfileChange = false
