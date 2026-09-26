@@ -286,9 +286,9 @@ class ScriptedGateway {
         val o = org.json.JSONObject(frame)
         ClientCall(
             method = o.getString("method"),
-            params = o.getJSONObject("params").let { jo ->
+            params = if (o.has("params")) o.getJSONObject("params").let { jo ->
                 buildMap { for (k in jo.keys()) put(k, jo.opt(k)) }
-            },
+            } else emptyMap(),
             id = o.optString("id", ""),
         )
     }.getOrNull()
