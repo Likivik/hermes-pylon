@@ -34,6 +34,13 @@ object E2eHarness {
      *     consumed for the wrong RPC.
      */
     fun resetStateForTest() {
+        // Full teardown, not just a counter reset: the singleton HermesWsClient
+        // survives across tests in the same instrumentation JVM. Clearing only
+        // requestId left a live socket + messageQueue + pendingCalls from the
+        // prior test, which rerouted/consumed scripted replies out of order.
+        // disconnect(clearPendingMessages=true) resets socket, queue, pending
+        // calls, generation, status in one call.
+        HermesWsClient.disconnect(clearPendingMessages = true)
         HermesWsClient.resetRequestCounterForTest(rejectInflight = true)
         HermesWsClient.e2eWsOverride = null
         // Wipe the per-test rail prefs (pinned, home_order, last_session,

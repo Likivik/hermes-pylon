@@ -164,8 +164,17 @@ class ScriptedGateway {
             }
         }
 
-        // Pass 2: legacy FIFO.
-        return legacyDispatch(call)
+        // Pass 1b: no scripted reply for THIS method — don't hang the client.
+        // Reply with a sane default or a benign error so the app's
+        // pending-request waiter resolves instead of timing out (e2e-38/39:
+        // ids 1-2 were allocated but never answered → rail stayed empty).
+        return when (call.method) {
+            "session.list" -> resultEnvelope(call.id, """{"sessions":[]}""")
+            "commands.catalog" -> resultEnvelope(call.id, "{}")
+            "session.resume" -> resultEnvelope(call.id, """{"info":{"cwd":"/tmp","lazy":true,"skills":{},"tools":{}},"message_count":0,"messages":[],"running":false,"session_id":"default","session_key":"default","started_at":0,"status":"idle"}""")
+            "session.title" -> resultEnvelope(call.id, """{"pending":false,"title":"untitled"}""")
+            else -> errorEnvelope(call.id, -32601, "method not found")
+        }
     }
 
     /**
@@ -243,6 +252,13 @@ class ScriptedGateway {
     fun assertAllConsumed() {
         val remaining = steps.toList()
         check(remaining.isEmpty()) { "Unconsumed scripted steps: ${remaining}" }
+    }
+
+    /** All these methods were actually sent by the app at least once. */
+    fun assertSentAll(vararg methods: String) {
+        val sent = received.map { it.method }.toSet()
+        val missing = methods.filterNot { it in sent }
+        check(missing.isEmpty()) { "Never sent: $missing (received: ${received.toList()})" }
     }
 
     fun assertSent(method: String, paramsSubset: Map<String, Any?>) {
