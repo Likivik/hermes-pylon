@@ -777,23 +777,24 @@ object HermesWsClient {
      * never succeed, so it is discarded to avoid livelocking the loop.
      */
     private fun drainQueue(ws: WebSocket) {
-        synchronized(connectionLock) {
-            while (true) {
-                val msg = messageQueue.peek() ?: break
-                if (!isRetryableMessage(msg)) {
-                    Log.w(TAG, "Dropping oversized queued message")
-                    messageQueue.poll()
-                    continue
-                }
-                if (!ws.send(msg)) {
-                    Log.w(TAG, "WS rejected queued message — retaining for next connection")
-                    recoverRejectedSocket(ws)
-                    return
-                }
+        // e2e-38: drain OUTSIDE connectionLock so handleGatewayReady's
+        // send()s (which also take the lock) can enqueue while we drain
+        // instead of deadlocking on the lock and dropping the RPCs.
+        while (true) {
+            val msg = messageQueue.peek() ?: break
+            if (!isRetryableMessage(msg)) {
+                Log.w(TAG, "Dropping oversized queued message")
                 messageQueue.poll()
+                continue
             }
-            disconnectIfIdleInBackground()
+            if (!ws.send(msg)) {
+                Log.w(TAG, "WS rejected queued message — retaining for next connection")
+                recoverRejectedSocket(ws)
+                return
+            }
+            messageQueue.poll()
         }
+        disconnectIfIdleInBackground()
     }
 
     /** Convenience: submit a user prompt to an existing session. */
