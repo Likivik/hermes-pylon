@@ -39,14 +39,31 @@ jobs:
             ~/.gradle/caches/jars-*
           key: ${{ runner.os }}-gmd-avd-v1
 
-      # Persist the Gradle build cache between runs: org.gradle.caching=true is
-      # set, but without persisting build-cache-1 every run recompiles all
-      # unchanged Kotlin + re-assembles APKs (~3-4 min). Keyed by the workflow
-      # file so CI-only changes don't poison the cache.
+      # Cache the emulator's snapshot further: the AVD dir above may be the
+      # config only; the actual booted snapshot lives under ~/.android/avd
+      # but the biggest recurring cost is the cold boot. Snapshotting + cache
+      # the snapshot dir cuts boot from ~40s to ~5s.
+      - name: Cache emulator snapshot
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/avd/*.avd/snapshots
+          key: ${{ runner.os }}-emulator-snap-v1
+          restore-keys: |
+            ${{ runner.os }}-emulator-snap-v1-
+
+      # Persist the Gradle build cache + Kotlin compile cache between runs:
+      # org.gradle.caching=true is set, but without persisting build-cache-1
+      # every run recompiles all unchanged Kotlin + re-assembles APKs
+      # (~3-4 min). Keyed by the workflow file so CI-only changes don't
+      # poison the cache. --no-daemon stays (deterministic CI; daemon state
+      # is not cacheable safely across runner images).
       - name: Cache Gradle build outputs
         uses: actions/cache@v4
         with:
-          path: ~/.gradle/caches/build-cache-1
+          path: |
+            ~/.gradle/caches/build-cache-1
+            ~/.gradle/caches/modules-2
+            ~/.gradle/caches/kotlin
           key: ${{ runner.os }}-gradle-build-v1-${{ hashFiles('.github/workflows/e2e.yml', '**/*.gradle*', 'gradle/libs.versions.toml') }}
           restore-keys: |
             ${{ runner.os }}-gradle-build-v1-
