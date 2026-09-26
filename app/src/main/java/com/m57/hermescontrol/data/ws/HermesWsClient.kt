@@ -658,6 +658,7 @@ object HermesWsClient {
         onSent?.invoke(id)
         val request = JsonRpcRequest(id = id, method = method, params = params.mapValues { it.value.toJsonElement() })
         val json = OkHttpProvider.json.encodeToString(request)
+        Log.d(TAG, "send method=$method id=$id (${json.length}B) connected=${connected.get()} ws=${webSocket != null}")
         var accepted = false
         synchronized(connectionLock) {
             cancelBackgroundIdleCloseLocked()
@@ -672,13 +673,15 @@ object HermesWsClient {
                 // previous code ignored that and silently dropped the message.
                 if (ws.send(json)) {
                     accepted = true
+                    Log.d(TAG, "send direct ok id=$id method=$method")
                 } else {
                     if (webSocket !== ws || !acceptQueuedMessages.get()) {
-                        Log.w(TAG, "WS identity changed while sending — dropping message")
+                        Log.w(TAG, "send identity-change drop id=$id method=$method wsMatches=${webSocket === ws} accept=${acceptQueuedMessages.get()}")
                     } else if (isRetryableMessage(json)) {
                         Log.w(TAG, "WS rejected outgoing message — queuing for reconnect")
                         messageQueue.add(json)
                         accepted = true
+                        Log.d(TAG, "send queued id=$id method=$method queueSize=${messageQueue.size}")
                         recoverRejectedSocket(ws)
                     } else {
                         Log.w(TAG, "WS rejected oversized outgoing message — not retrying")
@@ -689,6 +692,7 @@ object HermesWsClient {
                     Log.d(TAG, "WS disconnected — queuing message")
                     messageQueue.add(json)
                     accepted = true
+                    Log.d(TAG, "send queued (no ws) id=$id method=$method queueSize=${messageQueue.size}")
                 } else {
                     Log.w(TAG, "WS disconnected with oversized outgoing message — not queueing")
                 }
