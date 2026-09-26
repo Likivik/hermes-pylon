@@ -110,8 +110,13 @@ class ScriptedGateway {
 
     /** Transport adapter calls this on every client frame. Returns the reply frame, if scripted. */
     fun onClientFrame(frame: String): String? {
-        val call = parseCall(frame) ?: return null
+        val call = parseCall(frame)
+        if (call == null) {
+            android.util.Log.w("PylonE2E", "onClientFrame UNPARSEABLE (${frame.length}B): $frame")
+            return null
+        }
         received.add(call)
+        android.util.Log.i("PylonE2E", "onClientFrame ${call.method} id=${call.id}")
         return dispatchFor(call)
     }
 
