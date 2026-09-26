@@ -135,6 +135,10 @@ class ScriptedGateway {
      *     Expect steps (asserting the call matches), and drain Pushes.
      */
     private fun dispatchFor(call: ClientCall): String? {
+        // Remember the last session.list result we served, so a duplicate
+        // (post-create) list gets the SAME sessions, never an empty wipe.
+        var lastSessionListResult: String? = null
+
         // Pass 1: method-aware match.
         val matchingReply = steps.firstOrNull { step ->
             when (step) {
@@ -159,7 +163,12 @@ class ScriptedGateway {
                 }
             }
             return when (matchingReply) {
-                is Step.ReplyFor -> resultEnvelope(call.id, matchingReply.resultJson)
+                is Step.ReplyFor -> {
+                    if (call.method == "session.list") {
+                        lastSessionListResult = matchingReply.resultJson
+                    }
+                    resultEnvelope(call.id, matchingReply.resultJson)
+                }
                 is Step.FailFor -> errorEnvelope(
                     call.id,
                     matchingReply.code,
@@ -174,7 +183,11 @@ class ScriptedGateway {
         // pending-request waiter resolves instead of timing out (e2e-38/39:
         // ids 1-2 were allocated but never answered → rail stayed empty).
         return when (call.method) {
-            "session.list" -> resultEnvelope(call.id, """{"sessions":[]}""")
+            // A post-create duplicate session.list (loadSessions after
+            // session.create ack) must return the SAME sessions as the first,
+            // NOT empty — an empty reply wipes the rail. Reuse the most recent
+            // scripted/consumed session.list result.
+            "session.list" -> resultEnvelope(call.id, lastSessionListResult ?: """{"sessions":[]}""")
             "commands.catalog" -> resultEnvelope(call.id, "{}")
             "session.resume" -> resultEnvelope(call.id, """{"info":{"cwd":"/tmp","lazy":true,"skills":{},"tools":{}},"message_count":0,"messages":[],"running":false,"session_id":"default","session_key":"default","started_at":0,"status":"idle"}""")
             "session.title" -> resultEnvelope(call.id, """{"pending":false,"title":"untitled"}""")
