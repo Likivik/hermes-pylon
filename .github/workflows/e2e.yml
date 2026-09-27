@@ -193,6 +193,9 @@ jobs:
       # GMD: AGP provisions, boots, installs, runs, tears down the emulator.
       # The app under test talks to the REAL gateway at 127.0.0.1:8642.
       # Tests run with the ephemeral password via a system property.
+      - name: Compile androidTest (fail-fast gate before the slow emulator boot)
+        run: ./gradlew compileIrisDebugAndroidTestKotlin --no-daemon -Dorg.gradle.workers.max=2
+
       - name: Run E2E on Gradle Managed Device (Pixel 5, API 34)
         run: >
           ./gradlew e2eApi34IrisDebugAndroidTest --no-daemon
