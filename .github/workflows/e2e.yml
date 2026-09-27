@@ -95,6 +95,7 @@ jobs:
           cd hermes-agent
           uv pip install --system -e ".[all]"
           export HERMES_HOME=/tmp/e2e-home
+          mkdir -p "$HERMES_HOME"   # config.yaml lives here; gateway not up yet
           python - <<'PY'
           import os, secrets
           from pathlib import Path
