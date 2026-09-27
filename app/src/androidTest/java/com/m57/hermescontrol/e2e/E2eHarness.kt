@@ -82,4 +82,45 @@ object E2eHarness {
         // Force re-publish even if selected id was already the default:
         AuthManager.setSelectedProfileId(AuthManager.DEFAULT_PROFILE_ID)
     }
+
+    /**
+     * Seed the profile against the REAL gateway (the workflow-started
+     * `hermes dashboard` on 127.0.0.1:8642) using the ephemeral CI password.
+     * The profile is "ticket" mode: openSocket mints a ws-ticket via
+     * api/auth/ws-ticket (the real password-login path), then connects to the
+     * real gateway's /api/ws. This tests the actual auth + session flow.
+     */
+    fun seedRealGatewayProfile(
+        baseUrl: String = "http://127.0.0.1:8642/",
+        password: String,
+    ) {
+        // Log in to get the dashboard session cookie (password-login).
+        val login = java.net.HttpURLConnection::class.java.let { _ ->
+            val conn = (java.net.URL(baseUrl + "auth/password-login").openConnection() as java.net.HttpURLConnection)
+            conn.requestMethod = "POST"
+            conn.doOutput = true
+            conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+            conn.outputStream.use { os ->
+                os.write("username=admin&password=${java.net.URLEncoder.encode(password, "UTF-8")}".toByteArray())
+            }
+            conn.inputStream.bufferedReader().use { it.readText() }
+        }
+        // Cookie set by the 302/session response is stored in AuthManager's
+        // cookie store via the login; the ticket mint follows.
+        val profile = ConnectionProfile(
+            id = AuthManager.DEFAULT_PROFILE_ID,
+            name = "E2E-REAL",
+            baseUrl = baseUrl,
+            // ticket mode: real ws-ticket flow against the real gateway.
+        )
+        AuthManager.saveConnectionProfilesAndSelect(
+            profiles = listOf(profile),
+            profileId = AuthManager.DEFAULT_PROFILE_ID,
+            token = "e2e-token", // placeholder; real auth via ticket
+        )
+        AuthManager.setSelectedProfileId(AuthManager.DEFAULT_PROFILE_ID)
+        // Point the WS client at the real /api/ws endpoint of the gateway.
+        HermesWsClient.e2eWsOverride =
+            baseUrl.trimEnd('/') + "/api/ws"
+    }
 }
