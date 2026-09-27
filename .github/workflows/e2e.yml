@@ -78,7 +78,8 @@ jobs:
           # so install the EXACT web-deps from its uv.lock (fastapi 0.133.1,
           # uvicorn 0.41.0, python-multipart 0.0.32, starlette 1.3.1,
           # websockets 15.0.1, pydantic 2.13.4) — all wheels, one line.
-          python -m pip install --user --quiet \
+          PY=$(command -v python3)
+          "$PY" -m pip install --user --quiet \
             'fastapi==0.133.1' 'uvicorn[standard]==0.41.0' \
             'python-multipart==0.0.32' 'starlette==1.3.1' \
             'websockets==15.0.1' 'pydantic==2.13.4'
@@ -89,7 +90,7 @@ jobs:
           HERMES_DASHBOARD_BASIC_AUTH_USERNAME=admin \
           HERMES_DASHBOARD_BASIC_AUTH_PASSWORD="$E2E_PASS" \
           HERMES_HOME=/tmp/e2e-home \
-          nohup python -m hermes_cli.web_server --host 0.0.0.0 --port 8642 \
+          nohup "$PY" -m hermes_cli.web_server --host 0.0.0.0 --port 8642 \
             > /tmp/gateway.log 2>&1 &
           echo $! > /tmp/gateway.pid
           for i in $(seq 1 60); do
