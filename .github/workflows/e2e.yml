@@ -68,9 +68,9 @@ jobs:
       - name: Checkout hermes-agent (gateway source)
         uses: actions/checkout@v5
         with:
+          # Public repo — clones without a token.
           repository: Likivik/hermes-agent
           path: hermes-agent
-          token: ${{ secrets.GITHUBCLASSIC }}
 
       - name: Start real Hermes gateway with ephemeral auth
         run: |
