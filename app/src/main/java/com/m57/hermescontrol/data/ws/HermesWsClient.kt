@@ -880,9 +880,20 @@ object HermesWsClient {
                 // E2E override: androidTest sets e2eWsOverride to the
                 // MockWebServer loopback URL; the scripted gateway replaces
                 // the real dashboard/gateway for the whole test process.
-                e2eWsOverride?.takeIf { it.isNotBlank() }
-                    ?: (ticketResult.ticket?.let(AuthManager::wsUrlWithCredential)
-                        ?: AuthManager.wsUrl())
+                // For the REAL-gateway E2E (workflow starts `hermes dashboard`
+                // with basic-auth gated), the override points at the real
+                // `/api/ws`, but `/api/ws` rejects unauthenticated handshakes —
+                // append the just-minted ticket so the gateway accepts us.
+                e2eWsOverride?.takeIf { it.isNotBlank() }?.let { base ->
+                    val minted = ticketResult.ticket
+                    if (minted != null && AuthManager.isGatedMode()) {
+                        val sep = if ('?' in base) "&" else "?"
+                        "$base${sep}ticket=$minted"
+                    } else {
+                        base
+                    }
+                } ?: (ticketResult.ticket?.let(AuthManager::wsUrlWithCredential)
+                    ?: AuthManager.wsUrl())
             } catch (e: IllegalArgumentException) {
                 Log.w(TAG, "WebSocket blocked by transport policy")
                 synchronized(connectionLock) {

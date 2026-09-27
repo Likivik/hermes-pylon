@@ -82,36 +82,61 @@ jobs:
           done
           echo "gateway failed to start; log:"; cat /tmp/gateway.log; exit 1
 
-      - name: Seed gateway profile sessions (2 normal + 1 reaped)
+      - name: "Seed gateway profile sessions (5 rows: 2 normal + 1 reaped + 2 rail-reorder)"
         run: |
           python3 - <<'PY'
-          import os, sqlite3
+          import os, sqlite3, time
           home = "/tmp/e2e-home"
           # profile dir is created by the gateway on first boot
           os.makedirs(home, exist_ok=True)
           # locate state.db (created lazily; create if missing)
           db = os.path.join(home, "state.db")
           con = sqlite3.connect(db)
+          # Match the real sessions schema (hermes_state_common.SCHEMA_SQL,
+          # CREATE TABLE sessions). The gateway creates its own schema on first
+          # boot — we just INSERT the rows the e2e tests long-press against.
+          # Required NOT NULL: id, source, started_at.
+          now = time.time()
           con.executescript("""
           CREATE TABLE IF NOT EXISTS sessions(
-            session_key TEXT PRIMARY KEY,
-            runtime_session_id TEXT,
+            id TEXT PRIMARY KEY,
+            source TEXT NOT NULL,
+            created_source TEXT,
+            session_key TEXT,
+            model TEXT,
+            started_at REAL NOT NULL,
+            ended_at REAL,
+            end_reason TEXT,
+            message_count INTEGER DEFAULT 0,
             title TEXT,
-            messages TEXT DEFAULT '[]',
-            status TEXT DEFAULT 'idle',
-            reaped INTEGER DEFAULT 0
+            archived INTEGER NOT NULL DEFAULT 0,
+            pinned INTEGER NOT NULL DEFAULT 0,
+            hidden INTEGER NOT NULL DEFAULT 0
           );
           """)
+          rows = [
+            # RenameE2eTest: the active background session the user renames.
+            ("stored-current", "Current chat", 5, now - 7200),
+            ("stored-bg",      "Background chat", 3, now - 3600),
+            # RenameFailureE2eTest: a session whose resume is refused.
+            # message_count above the gateway's max_resume_messages (default
+            # 20_000) trips SessionResumeTooLargeError in _resume_guard,
+            # returning 4130 — the rename flow surfaces the error and never
+            # sends session.title.
+            ("reaped-bg",      "Reaped chat", 99999, now - 86400),
+            # RailReorderE2eTest: two sessions the user drags. item-top is the
+            # NEWEST so it sits above item-low in the rail (newest-first sort
+            # by started_at); the test drags item-low up past item-top.
+            ("item-top",       "Top chat", 5, now - 1800),
+            ("item-low",       "Low chat", 3, now - 5400),
+          ]
           con.executemany(
-            "INSERT OR REPLACE INTO sessions(session_key, title, status, reaped) VALUES (?,?,?,?)",
-            [
-              ("stored-current", "Current chat", "idle", 0),
-              ("stored-bg", "Background chat", "idle", 0),
-              ("reaped-bg", "Reaped chat", "reaped", 1),
-            ],
+            "INSERT OR REPLACE INTO sessions(id, source, title, message_count, started_at, ended_at, end_reason) "
+            "VALUES (?, 'telegram', ?, ?, ?, NULL, NULL)",
+            rows,
           )
           con.commit(); con.close()
-          print("seeded 3 sessions")
+          print(f"seeded {len(rows)} sessions")
           PY
 
       # GMD: AGP provisions, boots, installs, runs, tears down the emulator.

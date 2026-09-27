@@ -2,7 +2,12 @@ package com.m57.hermescontrol.e2e
 
 import com.m57.hermescontrol.data.config.ConnectionProfile
 import com.m57.hermescontrol.data.local.AuthManager
+import com.m57.hermescontrol.data.remote.AuthPayloads
+import com.m57.hermescontrol.data.remote.OkHttpProvider
 import com.m57.hermescontrol.data.ws.HermesWsClient
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 
 /**
  * Seeds the app's real auth store so MainActivity lands on ChatScreen
@@ -84,42 +89,114 @@ object E2eHarness {
     }
 
     /**
+     * Read the ephemeral dashboard password from the test-runner args.
+     * CI passes it via `-Pandroid.testInstrumentationRunnerArguments.e2ePassword=...`.
+     * Returns `null` if the arg is absent or blank — callers should fail with a
+     * clear message rather than silently using an empty password.
+     */
+    fun realGatewayPasswordFromArgs(): String? {
+        val args = androidx.test.platform.app.InstrumentationRegistry.getArguments()
+        val pw = args.getString("e2ePassword")?.takeIf { it.isNotBlank() }
+        return pw
+    }
+
+    /**
      * Seed the profile against the REAL gateway (the workflow-started
      * `hermes dashboard` on 127.0.0.1:8642) using the ephemeral CI password.
-     * The profile is "ticket" mode: openSocket mints a ws-ticket via
-     * api/auth/ws-ticket (the real password-login path), then connects to the
-     * real gateway's /api/ws. This tests the actual auth + session flow.
+     *
+     * Auth flow (mirrors what AuthLoginViewModel.connectBasicAuth does):
+     *  1. POST `/auth/password-login` with `{provider:"basic", username, password, next:""}`
+     *     via the shared `OkHttpProvider.probe` client. The probe carries the
+     *     `PersistentCookieJar`, so the Set-Cookie response lands in the
+     *     active serverId scope (set by `saveConnectionProfilesAndSelect`).
+     *  2. Save the profile with `baseUrl="http://127.0.0.1:8642/"` and set
+     *     `wsAuthParam="ticket"` on the SELECTED profile, putting
+     *     `AuthManager.isGatedMode()` into true. Subsequent
+     *     `HermesWsClient.openSocket()` mints a ws-ticket via
+     *     `POST /api/auth/ws-ticket` (carrying the session cookie from step 1).
+     *  3. Set `HermesWsClient.e2eWsOverride = baseUrl + "/api/ws"`. The override
+     *     is a BASE url only — `openSocket()` appends `?ticket=<minted>` when a
+     *     ticket was just minted in gated mode, so the real `/api/ws` rejects
+     *     unauthenticated handshakes. (Mock-gateway tests set the override to
+     *     a non-auth URL, leave `wsAuthParam=null`, and the override is used
+     *     as-is — backward-compatible with the ScriptedGatewayServer tests.)
      */
     fun seedRealGatewayProfile(
         baseUrl: String = "http://127.0.0.1:8642/",
         password: String,
     ) {
-        // Log in to get the dashboard session cookie (password-login).
-        val login = java.net.HttpURLConnection::class.java.let { _ ->
-            val conn = (java.net.URL(baseUrl + "auth/password-login").openConnection() as java.net.HttpURLConnection)
-            conn.requestMethod = "POST"
-            conn.doOutput = true
-            conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
-            conn.outputStream.use { os ->
-                os.write("username=admin&password=${java.net.URLEncoder.encode(password, "UTF-8")}".toByteArray())
-            }
-            conn.inputStream.bufferedReader().use { it.readText() }
+        require(password.isNotBlank()) {
+            "seedRealGatewayProfile requires a non-blank password (the CI ephemeral password)"
         }
-        // Cookie set by the 302/session response is stored in AuthManager's
-        // cookie store via the login; the ticket mint follows.
-        val profile = ConnectionProfile(
-            id = AuthManager.DEFAULT_PROFILE_ID,
-            name = "E2E-REAL",
-            baseUrl = baseUrl,
-            // ticket mode: real ws-ticket flow against the real gateway.
-        )
+        // Pin the cookie scope to the default profile id BEFORE the login so
+        // the Set-Cookie response lands in the same scope the selected profile
+        // will own after saveConnectionProfilesAndSelect(). Without this, a
+        // previous real-gateway test that switched the scope elsewhere would
+        // leave the cookies stranded in that other scope and the ticket mint
+        // would miss them.
+        com.m57.hermescontrol.data.remote.CookieManager.useStore(AuthManager.DEFAULT_PROFILE_ID)
+        com.m57.hermescontrol.data.remote.CookieManager.beginAuthentication()
+
+        val passwordJson = AuthPayloads.passwordLogin(username = "admin", password = password)
+        val loginMediaType = "application/json; charset=utf-8".toMediaType()
+        val loginBody = passwordJson.toRequestBody(loginMediaType)
+
+        // Build the request against the probe so CookieJar captures Set-Cookie.
+        // We pinned the cookie scope to DEFAULT_PROFILE_ID and called
+        // beginAuthentication() above, mirroring AuthLoginViewModel — the
+        // pinned scope means the cookies land in the same scope the selected
+        // profile will own after saveConnectionProfilesAndSelect().
+        val loginRequest =
+            Request
+                .Builder()
+                .url(baseUrl.trimEnd('/') + "/auth/password-login")
+                .header("Content-Type", "application/json")
+                .post(loginBody)
+                .build()
+
+        val loginResponse =
+            try {
+                OkHttpProvider.probe.newCall(loginRequest).execute()
+            } catch (t: Throwable) {
+                throw IllegalStateException(
+                    "seedRealGatewayProfile: password-login HTTP call failed against $baseUrl — " +
+                        "is the real gateway up and basic-auth wired? ${t.message}",
+                    t,
+                )
+            }
+        loginResponse.use { resp ->
+            if (!resp.isSuccessful) {
+                throw IllegalStateException(
+                    "seedRealGatewayProfile: password-login returned HTTP ${resp.code} for " +
+                        "admin@$baseUrl. Wrong username/password? Wrong provider? " +
+                        "Expected {provider:\"basic\", username:\"admin\", password, next:\"\"}.",
+                )
+            }
+            // The session cookies (hermes_session_at / hermes_session_rt) are
+            // persisted by PersistentCookieJar.saveAll() — OkHttp calls it on
+            // every response, including ours. They live in the active serverId
+            // scope (the "default" profile, set in saveConnectionProfilesAndSelect).
+        }
+
+        val profile =
+            ConnectionProfile(
+                id = AuthManager.DEFAULT_PROFILE_ID,
+                name = "E2E-REAL",
+                baseUrl = baseUrl,
+                // ticket mode: real ws-ticket flow against the real gateway.
+                wsAuthParam = "ticket",
+            )
         AuthManager.saveConnectionProfilesAndSelect(
             profiles = listOf(profile),
             profileId = AuthManager.DEFAULT_PROFILE_ID,
             token = "e2e-token", // placeholder; real auth via ticket
         )
+        // Belt-and-suspenders: in case the profile persisted a previous
+        // wsAuthParam, force it to "ticket" on the selected one.
+        AuthManager.setWsAuthParam("ticket")
         AuthManager.setSelectedProfileId(AuthManager.DEFAULT_PROFILE_ID)
         // Point the WS client at the real /api/ws endpoint of the gateway.
+        // openSocket() appends ?ticket=<minted> in gated mode.
         HermesWsClient.e2eWsOverride =
             baseUrl.trimEnd('/') + "/api/ws"
     }

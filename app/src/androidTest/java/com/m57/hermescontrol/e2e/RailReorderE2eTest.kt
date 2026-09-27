@@ -1,42 +1,48 @@
 package com.m57.hermescontrol.e2e
 
-import androidx.compose.ui.test.hasTestTag
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createEmptyComposeRule
-import androidx.test.core.app.ActivityScenario
-import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performTouchInput
+import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
 import com.m57.hermescontrol.MainActivity
 import com.m57.hermescontrol.data.ws.HermesWsClient
 import org.junit.After
 import org.junit.Rule
-import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * E2E #3: drag-reorder persists the rail order.
- * Long-press + drag item B below item A → setRailOrder fires → the
- * home_order pref records A,B. Reorderable lib handles the gesture; the
- * choreography pin is the persisted order string, not pixels.
+ * E2E: drag-reorder persists the rail order against the REAL Hermes gateway.
+ *
+ * The workflow seeds `/tmp/e2e-home/state.db` with item-top (NEWEST) +
+ * item-low (OLDER). The rail sorts newest-first by `started_at`, so item-top
+ * is initially above item-low. The user long-presses item-low and drags it up
+ * past item-top; the `sh.calvin.reorderable` library fires
+ * `RailEvent.Reorder` on drag-end → `ChatViewModel.setRailOrder(...)`
+ * persists the new order to `hermes_rail/home_order` SharedPreferences.
+ *
+ * Without a scripted gateway, the choreography pin is the persisted order:
+ * after the drag, read `hermes_rail` prefs and assert
+ * `home_order.indexOf("item-low") < home_order.indexOf("item-top")`.
  */
 @RunWith(AndroidJUnit4::class)
-@OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
+@OptIn(ExperimentalTestApi::class)
 class RailReorderE2eTest {
-
-    private lateinit var gatewayServer: ScriptedGatewayServer
 
     /**
      * Pre-grant runtime permissions the app requests on first launch. Without
      * this, the system permission dialog covers MainActivity on Android 13+
      * (GMD `e2eApi34`), the activity stays in PAUSED state, and
      * `ActivityScenario.launch()` returns before the Compose hierarchy is
-     * built — `waitUntilAtLeastOneExists` then polls an empty semantics tree
-     * and times out with "No compose hierarchies found".
+     * built.
      */
     @get:Rule(order = 0)
     val permissionRule: GrantPermissionRule =
@@ -48,62 +54,27 @@ class RailReorderE2eTest {
     @get:Rule(order = 2)
     val composeRule = createEmptyComposeRule()
 
-    private lateinit var activityScenario: ActivityScenario<MainActivity>
-
-    @Before
-    fun setUp() {
-        gatewayServer = ScriptedGatewayServer(ScriptedGateway())
-    }
+    private var activityScenario: ActivityScenario<MainActivity>? = null
 
     @After
     fun tearDown() {
-        if (::activityScenario.isInitialized) activityScenario.close()
-        gatewayServer.shutdown()
+        activityScenario?.close()
         HermesWsClient.e2eWsOverride = null
     }
 
     @Test
     fun dragBelow_persistsHomeOrder() {
-        val gw = gatewayServer.gateway
-        // 1) Reset HermesWsClient.requestId (Kotlin object — survives across
-        //    androidTest classes in the same instrumentation JVM) and wipe
-        //    hermes_rail prefs (last_session/pinned/home_order would otherwise
-        //    leak across tests and reroute handleGatewayReady into
-        //    switchSession(staleId) → unscripted session.resume).
-        E2eHarness.resetStateForTest()
-        val wsUrl = gatewayServer.start()
-        // 2) Pre-script every session.list / commands.catalog / etc envelope
-        //    BEFORE the activity launches, so onClientFrame dispatches them
-        //    in order as the WS comes up.
-        gw.enqueue(
-            // session.create ack — fresh boot creates first, then loadSessions().
-            ScriptedGateway.Companion.sessionCreateAck("item-current", "runtime-item"),
-            // session.list ack: method-aware so it lands on session.list
-            // regardless of which request id the concurrent
-            // handleGatewayReady coroutines assign.
-            ScriptedGateway.Companion.sessionList(
-                """[
-                   {"id":"item-top","title":"Top chat","message_count":5,
-                    "started_at":0,"source":"telegram"},
-                   {"id":"item-low","title":"Low chat","message_count":3,
-                    "started_at":0,"source":"telegram"}]""",
-            ),
-            // commands.catalog ack — empty catalog is fine.
-            ScriptedGateway.Companion.commandsCatalogEmpty(),
-        )
-        // 3) Route the app's WS client at the mock BEFORE seeding (seed publish
-        //    triggers connect(); override must already be set to avoid the
-        //    dead-socket first connect to 127.0.0.1:9119).
-        HermesWsClient.e2eWsOverride = wsUrl
-        // 4) Seed the profile+token AFTER scripting and override.
-        E2eHarness.seedServerProfile()
+        val password = E2eHarness.realGatewayPasswordFromArgs()
+            ?: error("e2ePassword not set — CI must pass -Pandroid.testInstrumentationRunnerArguments.e2ePassword=\$E2E_PASS")
 
-        // 5) Launch last. ActivityScenario.launch returns once the activity is
-        //    CREATED; awaitOpen() blocks until the WS handshake completes
-        //    (the override URL is what gets dialed, not the seeded :9119).
-        activityScenario = ActivityScenario.launch(MainActivity::class.java)
-        gatewayServer.awaitOpen()
-        composeRule.waitForIdle()
+        // 1. Reset state and seed the real-gateway profile (ticket mode).
+        E2eHarness.resetStateForTest()
+        E2eHarness.seedRealGatewayProfile(password = password)
+
+        // 2. Launch. The rail renders once session.list returns the seeded
+        //    item-top + item-low rows.
+        val scenario = ActivityScenario.launch(MainActivity::class.java)
+        activityScenario = scenario
 
         val low = composeRule.onNodeWithTag("rail_item_item-low")
         val top = composeRule.onNodeWithTag("rail_item_item-top")
@@ -116,28 +87,60 @@ class RailReorderE2eTest {
             top.assertIsDisplayed()
         }
 
-        // Long-press (merged gesture: hold then move) and drag the lower item
-        // one item-height up. No context menu should open (movement wins over
-        // the stationary long-press menu).
+        // 3. Long-press (merged gesture: hold then move) and drag the lower
+        //    item up. With 5 seeded sessions + 1 auto-created = 6 rail items,
+        //    item-low sits roughly in the middle; we drag it past item-top
+        //    (and the items between them) until it settles above item-top.
+        //    The library swaps items as the dragged item's center crosses
+        //    each neighbor's center — so the final relative order is what we
+        //    assert, not the pixel-perfect drag distance.
         low.performTouchInput {
             down(center)
             // Long-press hold: delayMillis on the first move advances event
-            // time past the 500ms long-press threshold; then drag up one slot.
+            // time past the 500ms long-press threshold; then drag up several
+            // slots. The 1px move right after the hold engages the drag.
             moveTo(Offset(centerX, centerY + 1f), delayMillis = 600)
             moveTo(Offset(centerX, centerY - 60f), delayMillis = 50)
-            moveTo(Offset(centerX, centerY - 130f), delayMillis = 50)
-            moveTo(Offset(centerX, centerY - 220f), delayMillis = 50)
+            moveTo(Offset(centerX, centerY - 150f), delayMillis = 50)
+            moveTo(Offset(centerX, centerY - 250f), delayMillis = 50)
+            moveTo(Offset(centerX, centerY - 380f), delayMillis = 50)
             up()
         }
         composeRule.waitForIdle()
 
-        // Choreography pin: the persisted order now leads with item-low.
-        // (Verification via the rail itself: after re-render, item-low's tag
-        // node remains displayed and a subsequent session.list would keep it.)
+        // 4. Choreography pin: the persisted order now leads with item-low.
+        //    Verification: read hermes_rail/home_order SharedPreferences. After
+        //    the drag end, RailEvent.Reorder fires setRailOrder(...) which
+        //    writes the full displayed order to that pref. We poll briefly
+        //    because the persist is async (apply(), not commit()).
+        val prefs =
+            InstrumentationRegistry.getInstrumentation().targetContext
+                .getSharedPreferences("hermes_rail", 0)
+        val homeOrder =
+            run {
+                var persisted: String? = null
+                composeRule.waitUntil(5_000) {
+                    persisted =
+                        prefs.getString("home_order", null)?.takeIf { it.isNotBlank() }
+                    persisted != null
+                }
+                persisted ?: ""
+            }
+
+        // item-low must appear before item-top — the drag moved it up.
+        check(homeOrder.split(',').let { ids ->
+            ids.contains("item-low") &&
+                ids.contains("item-top") &&
+                ids.indexOf("item-low") < ids.indexOf("item-top")
+        }) {
+            "rail home_order did not reflect the drag: $homeOrder"
+        }
+
+        // 5. After the drag, both items remain rendered (drag didn't crash
+        //    the rail, no collection shape violation).
         composeRule.waitUntil(5_000) {
             composeRule.onAllNodesWithTag("rail_item_item-low")
                 .fetchSemanticsNodes().isNotEmpty()
         }
-        gw.assertAllConsumed()
     }
 }
