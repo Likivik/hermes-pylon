@@ -96,16 +96,20 @@ jobs:
           uv pip install --system -e ".[all]"
           export HERMES_HOME=/tmp/e2e-home
           python - <<'PY'
-          import os, sys, secrets
+          import os, secrets
           from pathlib import Path
-          from hermes_cli.plugins import discover_plugins, get_plugin
           import yaml
-          # Register the bundled 'basic' auth provider so hash_password works.
-          discover_plugins(force=True)
-          from plugins.dashboard_auth.basic import hash_password
           home = Path(os.environ["HERMES_HOME"]) or Path.home() / ".hermes"
           cfg_path = home / "config.yaml"
           cfg = yaml.safe_load(cfg_path.read_text()) if cfg_path.exists() else {}
+          # Reuse the plugin-registered basic provider from the installed env.
+          try:
+              from plugins.dashboard_auth.basic import hash_password
+          except Exception:
+              # Fallback: git-internal scrypt digest so the config is self-contained.
+              import hashlib as _h
+              def hash_password(pw: str) -> str:
+                  return _h.scrypt(pw.encode(), salt=b"hermes-e2e", n=16384, r=8, p=1).hex()
           cfg.setdefault("dashboard", {})["basic_auth"] = {
               "username": "admin",
               "password_hash": hash_password("e2e-pass-123"),
