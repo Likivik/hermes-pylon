@@ -100,10 +100,13 @@ class RailReorderE2eTest {
             // time past the 500ms long-press threshold; then drag up several
             // slots. The 1px move right after the hold engages the drag.
             moveTo(Offset(centerX, centerY + 1f), delayMillis = 600)
-            moveTo(Offset(centerX, centerY - 60f), delayMillis = 50)
-            moveTo(Offset(centerX, centerY - 150f), delayMillis = 50)
-            moveTo(Offset(centerX, centerY - 250f), delayMillis = 50)
-            moveTo(Offset(centerX, centerY - 380f), delayMillis = 50)
+            // A bigger, slower sweep so reorderable's neighbor-crossing
+            // detection reliably engages on the headless ATD emulator.
+            moveTo(Offset(centerX, centerY - 40f), delayMillis = 120)
+            moveTo(Offset(centerX, centerY - 120f), delayMillis = 120)
+            moveTo(Offset(centerX, centerY - 240f), delayMillis = 120)
+            moveTo(Offset(centerX, centerY - 400f), delayMillis = 120)
+            moveTo(Offset(centerX, centerY - 560f), delayMillis = 120)
             up()
         }
         composeRule.waitForIdle()
