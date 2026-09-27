@@ -74,8 +74,10 @@ jobs:
 
       - name: Start real Hermes gateway with ephemeral auth
         run: |
-          # The runner's base python lacks the web deps the gateway needs.
-          python -m pip install --user --quiet 'fastapi' 'uvicorn[standard]' 'python-multipart'
+          # Install the gateway's OWN pinned dependency set (pyproject.toml)
+          # so we never chase imports one-by-one. The runner has python 3.12
+          # (<3.14, matching requires-python), and all pinned wheels exist.
+          python -m pip install --user --quiet ./hermes-agent
           E2E_PASS="e2e-$(openssl rand -hex 12)"
           echo "E2E_PASS=$E2E_PASS" >> "$GITHUB_ENV"
           mkdir -p /tmp/e2e-home
