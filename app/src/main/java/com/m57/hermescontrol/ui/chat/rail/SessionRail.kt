@@ -117,6 +117,9 @@ private fun RailBody(
         arranged.add(to.index, fromId)
         onEvent(RailEvent.Reorder(mergeArrangement(groups, arranged)))
     }
+    // In reorder mode every item is grabbable (long-press-drag), not just the
+    // default-draggable subset.
+    val reordering = state.reordering
 
     LazyColumn(
         state = listState,
@@ -130,18 +133,30 @@ private fun RailBody(
     ) {
         val visible = groups.pinned + groups.fresh +
             if (state.archiveOpen) groups.stale else emptyList()
+        // Reorder-mode header: an explicit "Done" exit so the mode can't trap
+        // the user (archive chip is not always present).
+        if (reordering) {
+            item(key = "reorder_done") {
+                DoneChip(onClick = { onEvent(RailEvent.ToggleReorder) })
+            }
+        }
         items(items = visible, key = { it.id }) { session ->
             val display = state.displayFor(session)
             ReorderableItem(
                 state = dragState,
                 key = session.id,
-                enabled = display.draggable,
+                // Reorder mode: EVERY item grabbable; otherwise only the
+                // default-draggable subset.
+                enabled = reordering || display.draggable,
                 modifier = Modifier.fillMaxWidth(),
             ) { isDragging ->
                 RailItem(
                     display = display,
                     dragging = isDragging,
                     onEvent = onEvent,
+                    // Long-press drag handle regardless of mode; in reorder
+                    // mode the long-press opens the drag, not the popup.
+                    reordering = reordering,
                     dragModifier = Modifier.longPressDraggableHandle(),
                 )
             }
@@ -197,6 +212,7 @@ private fun ReorderableCollectionItemScope.RailItem(
     display: RailItemDisplay,
     dragging: Boolean,
     onEvent: (RailEvent) -> Unit,
+    reordering: Boolean,
     dragModifier: Modifier,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
@@ -222,7 +238,7 @@ private fun ReorderableCollectionItemScope.RailItem(
                     color = com.m57.hermescontrol.theme.HermesPurple,
                 ),
                 onClick = { onEvent(RailEvent.Switch(id)) },
-                onLongClick = { menuOpen = true },
+                onLongClick = { if (!reordering) menuOpen = true },
             ),
     ) {
         if (display.active) {
@@ -254,6 +270,12 @@ private fun ReorderableCollectionItemScope.RailItem(
                 .padding(vertical = Spacing.xs),
         ) {
             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                if (!reordering) {
+                    DropdownMenuItem(
+                        text = { Text("Reorder") },
+                        onClick = { menuOpen = false; onEvent(RailEvent.ToggleReorder) },
+                    )
+                }
                 DropdownMenuItem(
                     text = { Text("Edit icon / name") },
                     onClick = { menuOpen = false; onEvent(RailEvent.Edit(id)) },
@@ -326,6 +348,23 @@ private fun ReorderableCollectionItemScope.RailItem(
                 fontWeight = if (display.active) FontWeight.SemiBold else FontWeight.Normal,
             )
         }
+    }
+}
+
+@Composable
+private fun DoneChip(onClick: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .width(ItemWidth)
+            .combinedClickable(onClick = onClick)
+            .padding(vertical = Spacing.xs),
+    ) {
+        Text(
+            text = "✓ Done",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+        )
     }
 }
 

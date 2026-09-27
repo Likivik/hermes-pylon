@@ -87,13 +87,22 @@ class RailReorderE2eTest {
             top.assertIsDisplayed()
         }
 
-        // 3. Long-press (merged gesture: hold then move) and drag the lower
-        //    item up. With 5 seeded sessions + 1 auto-created = 6 rail items,
-        //    item-low sits roughly in the middle; we drag it past item-top
-        //    (and the items between them) until it settles above item-top.
-        //    The library swaps items as the dragged item's center crosses
-        //    each neighbor's center — so the final relative order is what we
-        //    assert, not the pixel-perfect drag distance.
+        // 2. Enter reorder mode from the long-press menu on the lower item.
+        low.performTouchInput { longClick() }
+        composeRule
+            .onNodeWithText("Reorder")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitForIdle()
+        // Reorder-mode banner (Done chip) visible.
+        composeRule
+            .onNodeWithText("✓ Done")
+            .assertIsDisplayed()
+
+        // 3. In reorder mode, long-press-drag the lower item up. With 5 seeded
+        //    sessions + 1 auto-created = 6 rail items, item-low sits roughly
+        //    in the middle; drag it well past item-top. The library swaps
+        //    items as the dragged item's center crosses each neighbor.
         low.performTouchInput {
             down(center)
             // Long-press hold: delayMillis on the first move advances event

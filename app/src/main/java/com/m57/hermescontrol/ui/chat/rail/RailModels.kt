@@ -16,6 +16,8 @@ data class RailUiModel(
     val order: List<String> = emptyList(),
     /** Whether the archive (stale drawer) is open — owned by the VM so it survives process death. */
     val archiveOpen: Boolean = false,
+    /** Reorder mode: long-press grabs & drags instead of opening the menu. */
+    val reordering: Boolean = false,
 )
 
 /** Sealed rail events — one callback, scales without signature churn. */
@@ -26,5 +28,7 @@ sealed interface RailEvent {
     data class Edit(val sessionId: String) : RailEvent
     /** Emitted on drop with the full desired order (pinned + fresh + stale). */
     data class Reorder(val order: List<String>) : RailEvent
+    /** Enter/exit reorder mode (long-press-drag grab instead of the menu). */
+    data object ToggleReorder : RailEvent
     data class ArchiveToggle(val open: Boolean) : RailEvent
 }

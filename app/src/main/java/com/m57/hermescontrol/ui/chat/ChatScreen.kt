@@ -551,6 +551,7 @@ fun ChatScreen(
         val homeOrder by viewModel.homeOrder.collectAsStateWithLifecycle()
         var archiveOpen by rememberSaveable { mutableStateOf(false) }
         var editingSessionId by remember { mutableStateOf<String?>(null) }
+        var reordering by rememberSaveable { mutableStateOf(false) }
         Row(modifier = Modifier.fillMaxSize()) {
             SessionRail(
                 state = RailUiModel(
@@ -560,6 +561,7 @@ fun ChatScreen(
                     railMeta = railMeta,
                     order = homeOrder,
                     archiveOpen = archiveOpen,
+                    reordering = reordering,
                 ),
                 onEvent = { event ->
                     when (event) {
@@ -572,6 +574,7 @@ fun ChatScreen(
                             }
                         is RailEvent.Edit -> editingSessionId = event.sessionId
                         is RailEvent.Reorder -> viewModel.setRailOrder(event.order)
+                        is RailEvent.ToggleReorder -> reordering = !reordering
                         is RailEvent.ArchiveToggle -> archiveOpen = event.open
                     }
                 },
