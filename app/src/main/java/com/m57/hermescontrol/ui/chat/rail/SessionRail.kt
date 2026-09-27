@@ -231,15 +231,20 @@ private fun ReorderableCollectionItemScope.RailItem(
                 else Color.Transparent,
             )
             .zIndex(if (dragging) 1f else 0f)
-            .then(dragModifier)
+            // combinedClickable first, then the drag handle OUTERMOST so it
+            // gets first shot at the long-press in reorder mode.
             .combinedClickable(
                 interactionSource = remember(id) { androidx.compose.foundation.interaction.MutableInteractionSource() },
                 indication = androidx.compose.material3.ripple(
                     color = com.m57.hermescontrol.theme.HermesPurple,
                 ),
                 onClick = { onEvent(RailEvent.Switch(id)) },
-                onLongClick = { if (!reordering) menuOpen = true },
-            ),
+                // In reorder mode the long-press belongs to the drag handle
+                // (dragModifier below); the popup is suppressed so combinedClickable
+                // never consumes the long-press.
+                onLongClick = if (reordering) null else { menuOpen = true },
+            )
+            .then(dragModifier),
     ) {
         if (display.active) {
             Box(

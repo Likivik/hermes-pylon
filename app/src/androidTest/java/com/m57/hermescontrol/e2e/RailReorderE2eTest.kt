@@ -107,18 +107,15 @@ class RailReorderE2eTest {
         //    in the middle; drag it well past item-top. The library swaps
         //    items as the dragged item's center crosses each neighbor.
         low.performTouchInput {
+            // Canonical reorderable long-press-drag: down + hold past the
+            // long-press timeout, then drag. This engages the library's
+            // after-long-press drag properly (fast 1px-move was flaky).
             down(center)
-            // Long-press hold: delayMillis on the first move advances event
-            // time past the 500ms long-press threshold; then drag up several
-            // slots. The 1px move right after the hold engages the drag.
-            moveTo(Offset(centerX, centerY + 1f), delayMillis = 600)
-            // A bigger, slower sweep so reorderable's neighbor-crossing
-            // detection reliably engages on the headless ATD emulator.
-            moveTo(Offset(centerX, centerY - 40f), delayMillis = 120)
-            moveTo(Offset(centerX, centerY - 120f), delayMillis = 120)
-            moveTo(Offset(centerX, centerY - 240f), delayMillis = 120)
-            moveTo(Offset(centerX, centerY - 400f), delayMillis = 120)
-            moveTo(Offset(centerX, centerY - 560f), delayMillis = 120)
+            advanceEventTime(700)  // hold past long-press timeout
+            moveBy(Offset(0f, -60f), delayMillis = 120)
+            moveBy(Offset(0f, -200f), delayMillis = 120)
+            moveBy(Offset(0f, -400f), delayMillis = 120)
+            moveBy(Offset(0f, -560f), delayMillis = 120)
             up()
         }
         composeRule.waitForIdle()
