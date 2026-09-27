@@ -846,6 +846,7 @@ class ChatViewModel(
                             lastActive = (s["started_at"] as? Double)?.toLong() ?: 0L,
                         )
                     }
+                android.util.Log.i("ChatVM", "session.list result processed: ${sessions.size} sessions: ${sessions.map { it.id }}")
                 _uiState.update { state ->
                     val newTitle = sessions.find { s -> s.id == state.currentSessionId }?.title
                     state.copy(
