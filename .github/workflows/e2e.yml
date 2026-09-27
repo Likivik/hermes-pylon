@@ -74,6 +74,8 @@ jobs:
 
       - name: Start real Hermes gateway with ephemeral auth
         run: |
+          # The runner's base python lacks the web deps the gateway needs.
+          python -m pip install --user --quiet 'fastapi' 'uvicorn[standard]'
           E2E_PASS="e2e-$(openssl rand -hex 12)"
           echo "E2E_PASS=$E2E_PASS" >> "$GITHUB_ENV"
           mkdir -p /tmp/e2e-home
