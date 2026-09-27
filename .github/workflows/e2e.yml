@@ -63,11 +63,21 @@ jobs:
       # Start the REAL Hermes gateway (web_server, not a mock) with a
       # per-run ephemeral password. Non-loopback bind engages the auth gate;
       # the bundled basic_auth provider accepts the test credentials.
+      # hermes_cli lives in OUR hermes-agent fork, so check it out first and
+      # run the gateway from there (the app repo doesn't contain it).
+      - name: Checkout hermes-agent (gateway source)
+        uses: actions/checkout@v5
+        with:
+          repository: Likivik/hermes-agent
+          path: hermes-agent
+          token: ${{ secrets.GITHUBCLASSIC }}
+
       - name: Start real Hermes gateway with ephemeral auth
         run: |
           E2E_PASS="e2e-$(openssl rand -hex 12)"
           echo "E2E_PASS=$E2E_PASS" >> "$GITHUB_ENV"
           mkdir -p /tmp/e2e-home
+          cd hermes-agent
           HERMES_DASHBOARD_BASIC_AUTH_USERNAME=admin \
           HERMES_DASHBOARD_BASIC_AUTH_PASSWORD="$E2E_PASS" \
           HERMES_HOME=/tmp/e2e-home \
