@@ -242,7 +242,7 @@ private fun ReorderableCollectionItemScope.RailItem(
                 // In reorder mode the long-press belongs to the drag handle
                 // (dragModifier below); the popup is suppressed so combinedClickable
                 // never consumes the long-press.
-                onLongClick = if (reordering) null else { menuOpen = true },
+                onLongClick = if (reordering) null else ({ menuOpen = true }),
             )
             .then(dragModifier),
     ) {
