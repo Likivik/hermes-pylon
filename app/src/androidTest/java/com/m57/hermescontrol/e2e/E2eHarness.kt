@@ -122,7 +122,7 @@ object E2eHarness {
      *     as-is — backward-compatible with the ScriptedGatewayServer tests.)
      */
     fun seedRealGatewayProfile(
-        baseUrl: String = "http://127.0.0.1:8642/",
+        baseUrl: String = "http://10.0.2.2:8642/",
         password: String,
     ) {
         require(password.isNotBlank()) {
@@ -197,7 +197,9 @@ object E2eHarness {
         AuthManager.setSelectedProfileId(AuthManager.DEFAULT_PROFILE_ID)
         // Point the WS client at the real /api/ws endpoint of the gateway.
         // openSocket() appends ?ticket=<minted> in gated mode.
+        // 10.0.2.2 = emulator alias for the host loopback (gateway hosts on
+        // the CI runner). ws:// scheme for the WS upgrade.
         HermesWsClient.e2eWsOverride =
-            baseUrl.trimEnd('/') + "/api/ws"
+            baseUrl.trimEnd('/').replaceFirst("http://", "ws://") + "/api/ws"
     }
 }
