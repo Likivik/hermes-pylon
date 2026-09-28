@@ -114,12 +114,10 @@ object E2eHarness {
      *     `AuthManager.isGatedMode()` into true. Subsequent
      *     `HermesWsClient.openSocket()` mints a ws-ticket via
      *     `POST /api/auth/ws-ticket` (carrying the session cookie from step 1).
-     *  3. Set `HermesWsClient.e2eWsOverride = baseUrl + "/api/ws"`. The override
-     *     is a BASE url only — `openSocket()` appends `?ticket=<minted>` when a
-     *     ticket was just minted in gated mode, so the real `/api/ws` rejects
-     *     unauthenticated handshakes. (Mock-gateway tests set the override to
-     *     a non-auth URL, leave `wsAuthParam=null`, and the override is used
-     *     as-is — backward-compatible with the ScriptedGatewayServer tests.)
+     *     3. Set `HermesWsClient.e2eWsOverride = baseUrl + "/api/ws"`. The override
+         *        is a BASE url — `openSocket()` appends `?ticket=<minted>` when a
+         *        ticket was just minted in gated mode, so the real `/api/ws` rejects
+         *        unauthenticated handshakes.
      */
     fun seedRealGatewayProfile(
         baseUrl: String = "http://10.0.2.2:8642/",

@@ -59,11 +59,10 @@ import org.junit.runners.model.Statement
  *    SessionRail's `rail_item_*` testTags are wired (they render once the WS
  *    session.list ack arrives).
  *
- * `HermesWsClient.e2eWsOverride` stays in the test body, because the mock's
- * port is allocated at runtime by `ScriptedGatewayServer.start()`. The
- * HermesWsClient backoff (1 s initial, 30 s max) picks up the override on
- * its next retry after the test body sets it; `gatewayServer.awaitOpen()`
- * waits up to 30 s, which comfortably covers the first retry.
+ * `HermesWsClient.e2eWsOverride` is set in the test body (typically via
+ * [E2eHarness.seedRealGatewayProfile] before launch, or directly before the
+ * first awaited RPC). The HermesWsClient backoff (1 s initial, 30 s max)
+ * picks up the override on its next retry after the test body sets it.
  */
 class E2eScenarioRule(
     private val seed: () -> Unit = { E2eHarness.seedServerProfile() },

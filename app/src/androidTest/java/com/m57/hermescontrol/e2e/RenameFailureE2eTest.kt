@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -15,6 +16,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import com.m57.hermescontrol.MainActivity
 import com.m57.hermescontrol.data.ws.HermesWsClient
+import com.m57.hermescontrol.data.ws.WsMethods
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Rule
 import org.junit.Test
@@ -23,20 +26,23 @@ import org.junit.runner.RunWith
 /**
  * E2E: rename-resume FAILURE path against the REAL Hermes gateway.
  *
- * The workflow seeds `/tmp/e2e-home/state.db` with a `reaped-bg` row whose
- * `message_count=99999` exceeds the gateway's `sessions.max_resume_messages`
- * default (20_000). `session.resume(reaped-bg)` then trips
- * `SessionResumeTooLargeError` in `_resume_guard` and returns 4130 — the
- * rename flow surfaces the error and NEVER sends `session.title` (the bug
- * the surfaced-failure path fixes).
+ * Per-test isolation: each run creates its own session via `session.create`
+ * RPC, immediately DELETEs it (`session.delete`) so the gateway has no record
+ * of the id. The next `session.list` reply excludes the deleted row, but the
+ * rail still shows the row in its optimistic local state (the rail list is
+ * only refreshed on explicit `session.list` requests, which ChatViewModel does
+ * NOT auto-fire after a rename). We use that visibility window to drive the
+ * rename UI for the now-nonexistent id — `session.resume` returns 4007
+ * "session not found", the rename-resume error handler
+ * (ChatViewModel.kt:1075) detects `pendingRenameTitle != null` AND method ==
+ * `session.resume`, and surfaces the error via the snackbar host with text
+ * `Error (session.resume): session not found`.
  *
- * Without a scripted gateway, the test asserts the UI observable: an "Error"
- * surface from the rename RPC error handler. The optimistic title update at
- * ChatViewModel.kt:1666 is unchanged on this path (no session.list refresh is
- * scheduled on resume-failure), so the rail title remains the original
- * "Reaped chat" — but we don't assert that strictly, since the optimistic
- * update + no-list-refresh means the displayed title reflects the user's
- * typed value locally. The defining assertion is the surfaced error.
+ * We assert against the snackbar text "Error (session.resume)" specifically —
+ * that scopes the assertion to the rename pipeline's surface, so any
+ * unrelated "Error" widget from a peer test can't false-positive (the e2e-66
+ * failure mode). The session.delete is the trigger that turns the real
+ * gateway's resume contract into 4007.
  */
 @RunWith(AndroidJUnit4::class)
 @OptIn(ExperimentalTestApi::class)
@@ -61,42 +67,92 @@ class RenameFailureE2eTest {
 
     private var activityScenario: ActivityScenario<MainActivity>? = null
 
+    /** Session id created for this test (and immediately deleted via RPC). */
+    private var ownSessionId: String? = null
+
     @After
     fun tearDown() {
+        // The session we created was already DELETEd mid-test, so the
+        // @After cleanup is just teardown — no second delete needed.
         activityScenario?.close()
         HermesWsClient.e2eWsOverride = null
+        ownSessionId = null
     }
 
     @Test
-    fun reapedResume_4001_surfacesError_neverTitles() {
+    fun renameOwnSession_afterDeleteResumeReturns4007_surfacesError() {
         val password = E2eHarness.realGatewayPasswordFromArgs()
             ?: error("e2ePassword not set — CI must pass -Pandroid.testInstrumentationRunnerArguments.e2ePassword=\$E2E_PASS")
 
-        // 1. Reset state and seed the real-gateway profile (ticket mode). The
-        //    seed sets e2eWsOverride to /api/ws of the real gateway BEFORE
-        //    MainActivity launches; openSocket() appends ?ticket=<minted>.
+        // 1. Reset state and seed the real-gateway profile (ticket mode).
         E2eHarness.resetStateForTest()
         E2eHarness.seedRealGatewayProfile(password = password)
 
-        // 2. Launch and wait for the seeded reaped-bg rail item. The rail
-        //    renders once the gateway's session.list replies with the seeded
-        //    row — even with message_count=99999, list_sessions_rich does
-        //    NOT filter by message_count, so reaped-bg is shown.
+        // 2. Launch. Wait briefly for the WS connect to settle (the app's
+        //    auto-create + session.list land first) — those use the seeded
+        //    baseline rows. Our own session/list round-trip below rides the
+        //    same WS session.
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         activityScenario = scenario
-        DeviceLog.withEvidence("rename-failure-e2e") {
-            composeRule.waitUntilAtLeastOneExists(
-                hasTestTag("rail_item_reaped-bg"),
-                timeoutMillis = 30_000,
-            )
-            composeRule.onNodeWithTag("rail_item_reaped-bg").assertIsDisplayed()
+
+        // 3. Create our session through the real gateway, then DELETE it
+        //    before driving the rename UI. After the delete, any future
+        //    `session.resume(<our_id>)` from the app returns 4007.
+        var sessionId: String? = null
+        DeviceLog.withEvidence("rename-failure-e2e:create") {
+            sessionId = runBlocking {
+                HermesWsClient.request(
+                    method = WsMethods.SESSION_CREATE,
+                    params = mapOf("source" to "desktop"),
+                    timeoutMs = 10_000L,
+                ).await()
+            }.let { result ->
+                val map = result as? Map<String, Any?>
+                    ?: error("session.create returned non-map result: $result")
+                map["stored_session_id"] as? String
+                    ?: map["session_id"] as? String
+                    ?: error("session.create result missing session ids: $map")
+            }
+        }
+        ownSessionId = sessionId ?: error("session.create produced no id")
+
+        val itemTag = "rail_item_$ownSessionId"
+
+        // 4. Refresh session.list so the rail contains our row by our tag.
+        runBlocking {
+            HermesWsClient.request(
+                method = WsMethods.SESSION_LIST,
+                timeoutMs = 10_000L,
+            ).await()
+        }
+        composeRule.waitUntilAtLeastOneExists(
+            hasTestTag(itemTag),
+            timeoutMillis = 30_000,
+        )
+
+        // 5. Delete the session. The next session.list reply would exclude
+        //    this row, but ChatViewModel does NOT auto-issue a session.list
+        //    after this — the rail stays in its current shape until the user
+        //    manually refreshes or a different RPC reply forces a list.
+        //    That window is exactly what we need to drive the rename UI.
+        val idToDelete = ownSessionId
+            ?: error("ownSessionId unset before delete — create must have failed")
+        runBlocking {
+            HermesWsClient.request(
+                method = WsMethods.SESSION_DELETE,
+                params = mapOf("session_id" to idToDelete),
+                timeoutMs = 10_000L,
+            ).await()
         }
 
-        // 3. Long-press the rail item, tap Edit, type, Save. The rename path
-        //    fires session.resume(reaped-bg) → gateway returns 4130 →
-        //    ChatViewModel surfaces the error and DOES NOT send session.title.
-        composeRule.onNodeWithTag("rail_item_reaped-bg")
-            .performTouchInput { longClick() }
+        // 6. Long-press, Edit, rename, Save. The rename pipeline fires
+        //    session.resume(ownId) → gateway returns 4007 "session not found"
+        //    → the rename-resume handler logs the failure AND falls through
+        //    to the surfaced-error branch at ChatViewModel.kt:1082 that sets
+        //    errorMessage = "Error (session.resume): session not found".
+        //    The Compose lifecycle effect (ChatLifecycleEffects.kt:140)
+        //    pumps that into the snackbar host.
+        composeRule.onNodeWithTag(itemTag).performTouchInput { longClick() }
         composeRule.waitForIdle()
 
         composeRule.onNodeWithText("Edit icon / name").performClick()
@@ -106,11 +162,19 @@ class RenameFailureE2eTest {
             .performTextReplacement("Renamed E2E")
         composeRule.onNodeWithText("Save").performClick()
 
-        // 4. UI assertion: the rename RPC error handler surfaces an "Error"
-        //    surface (ChatViewModel.kt:1075: "rename-resume failed (...)"). The
-        //    rename-resume path's surfaced-error fix ensures the error text is
-        //    visible — this is the test pin. assertIsDisplayed has its own
-        //    polling up to the compose rule's default timeout.
-        composeRule.onNodeWithText("Error", substring = true).assertIsDisplayed()
+        // 7. UI assertion pin: the rename-resume error snackbar carries text
+        //    "Error (session.resume)" — scoping to the rename pipeline's
+        //    surface rules out unrelated "Error" widgets (snackbars from
+        //    peer tests, e.g. e2e-66's leak mode). Substring match catches
+        //    the trailing "session not found" message variant. Poll because
+        //    the snackbar shows after the round-trip completes.
+        DeviceLog.withEvidence("rename-failure-e2e:assertError") {
+            composeRule.waitUntil(15_000) {
+                composeRule.onAllNodesWithText("Error (session.resume)", substring = true)
+                    .fetchSemanticsNodes().isNotEmpty()
+            }
+            composeRule.onNodeWithText("Error (session.resume)", substring = true)
+                .assertIsDisplayed()
+        }
     }
 }

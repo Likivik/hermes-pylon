@@ -17,6 +17,8 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
 import com.m57.hermescontrol.MainActivity
 import com.m57.hermescontrol.data.ws.HermesWsClient
+import com.m57.hermescontrol.data.ws.WsMethods
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Rule
 import org.junit.Test
@@ -25,16 +27,30 @@ import org.junit.runner.RunWith
 /**
  * E2E: drag-reorder persists the rail order against the REAL Hermes gateway.
  *
- * The workflow seeds `/tmp/e2e-home/state.db` with item-top (NEWEST) +
- * item-low (OLDER). The rail sorts newest-first by `started_at`, so item-top
- * is initially above item-low. The user long-presses item-low and drags it up
- * past item-top; the `sh.calvin.reorderable` library fires
- * `RailEvent.Reorder` on drag-end → `ChatViewModel.setRailOrder(...)`
- * persists the new order to `hermes_rail/home_order` SharedPreferences.
+ * Per-test isolation: this run creates TWO of its own sessions (`upper`,
+ * `lower`) via `session.create` RPC and asserts reorder purely against those
+ * two. Seeded `state.db` rows are noise for this test. We don't depend on
+ * `item-top` / `item-low` existing, and they don't depend on us.
  *
- * Without a scripted gateway, the choreography pin is the persisted order:
- * after the drag, read `hermes_rail` prefs and assert
- * `home_order.indexOf("item-low") < home_order.indexOf("item-top")`.
+ * Choreography: the rail sorts newest-first by `started_at`. We create
+ * `lower` first (older → lands NEAR the bottom of the rail) and `upper`
+ * second (newer → lands NEAR the top). The user long-presses `lower`,
+ * taps Reorder, and drags `lower` UP past `upper` (and over every seeded
+ * row + the app's auto-create). The `sh.calvin.reorderable` library fires
+ * `RailEvent.Reorder` on drag-end → `ChatViewModel.setRailOrder` writes
+ * the new id order to `hermes_rail/home_order`.
+ *
+ * Without a scripted gateway, the choreography pin is `home_order`: after
+ * the drag, the persisted order must have `lower` BEFORE `upper` (lower
+ * moved up over upper by many slots).
+ *
+ * Drag distance fix (e2e-66): incremental moveBy() steps stacked to a final
+ * 1220px offset, but the rail item only swapped ONE slot because the
+ * incremental pauses between steps allowed the reorderable library to
+ * re-anchor the draggable pointer to the source row each frame. The fix:
+ * use a SINGLE overshooting sweep from `lower`'s center to far above
+ * `upper`'s top so the pointer crosses every slot without intermediate
+ * re-snap.
  */
 @RunWith(AndroidJUnit4::class)
 @OptIn(ExperimentalTestApi::class)
@@ -58,15 +74,30 @@ class RailReorderE2eTest {
     val composeRule = createEmptyComposeRule()
 
     private var activityScenario: ActivityScenario<MainActivity>? = null
+    private val ownSessionIds = mutableListOf<String>()
 
     @After
     fun tearDown() {
+        // Best-effort delete our sessions so the rail doesn't accumulate
+        // zombie rows across runs in the same instrumentation JVM.
+        ownSessionIds.forEach { id ->
+            runCatching {
+                runBlocking {
+                    HermesWsClient.request(
+                        method = WsMethods.SESSION_DELETE,
+                        params = mapOf("session_id" to id),
+                        timeoutMs = 5_000L,
+                    ).await()
+                }
+            }
+        }
         activityScenario?.close()
         HermesWsClient.e2eWsOverride = null
+        ownSessionIds.clear()
     }
 
     @Test
-    fun dragBelow_persistsHomeOrder() {
+    fun dragOurNewerBelow_persistsHomeOrderAboveOurOlder() {
         val password = E2eHarness.realGatewayPasswordFromArgs()
             ?: error("e2ePassword not set — CI must pass -Pandroid.testInstrumentationRunnerArguments.e2ePassword=\$E2E_PASS")
 
@@ -74,57 +105,80 @@ class RailReorderE2eTest {
         E2eHarness.resetStateForTest()
         E2eHarness.seedRealGatewayProfile(password = password)
 
-        // 2. Launch. The rail renders once session.list returns the seeded
-        //    item-top + item-low rows.
+        // 2. Launch. Let the app's auto-create settle so the WS socket is
+        //    warm and our subsequent session.create RPCs ride the same
+        //    connection.
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         activityScenario = scenario
 
-        val low = composeRule.onNodeWithTag("rail_item_item-low")
-        val top = composeRule.onNodeWithTag("rail_item_item-top")
-        DeviceLog.withEvidence("rail-reorder-e2e") {
-            composeRule.waitUntilAtLeastOneExists(
-                hasTestTag("rail_item_item-low"),
-                timeoutMillis = 30_000,
-            )
-            low.assertIsDisplayed()
-            top.assertIsDisplayed()
+        // 3. Create `lower` first (older, lands BELOW newer in newest-first sort),
+        //    then `upper` second (newer, lands ABOVE `lower`). This puts
+        //    `lower` low enough in the rail that dragging it UP past `upper`
+        //    and across the seeded rows exercises a real multi-slot swap
+        //    (e2e-66's failure: drag persisted but only moved one slot).
+        //    We capture each id from the create ack's `stored_session_id`.
+        var lower: String? = null
+        var upper: String? = null
+        DeviceLog.withEvidence("rail-reorder-e2e:createLower") {
+            lower = createOwnSession("lower")
+        }
+        DeviceLog.withEvidence("rail-reorder-e2e:createUpper") {
+            upper = createOwnSession("upper")
+        }
+        val lowerId = lower ?: error("createOwnSession(\"lower\") returned null")
+        val upperId = upper ?: error("createOwnSession(\"upper\") returned null")
+        ownSessionIds += lowerId
+        ownSessionIds += upperId
+
+        val upperTag = "rail_item_$upperId"
+        val lowerTag = "rail_item_$lowerId"
+
+        // 4. Refresh the rail so both our items render under their tags.
+        runBlocking {
+            HermesWsClient.request(
+                method = WsMethods.SESSION_LIST,
+                timeoutMs = 10_000L,
+            ).await()
+        }
+        DeviceLog.withEvidence("rail-reorder-e2e:waitRailItems") {
+            composeRule.waitUntilAtLeastOneExists(hasTestTag(lowerTag), timeoutMillis = 30_000)
+            composeRule.waitUntilAtLeastOneExists(hasTestTag(upperTag), timeoutMillis = 30_000)
+            composeRule.onNodeWithTag(upperTag).assertIsDisplayed()
+            composeRule.onNodeWithTag(lowerTag).assertIsDisplayed()
         }
 
-        // 2. Enter reorder mode from the long-press menu on the lower item.
-        low.performTouchInput { longClick() }
+        // 5. Long-press `lower`, tap Reorder, then drag `lower` UP past
+        //    `upper`. We re-resolve `lower` after entering reorder mode so
+        //    the semantics node match covers the new (reorder-mode) bounds.
+        composeRule.onNodeWithTag(lowerTag).performTouchInput { longClick() }
+        composeRule.waitForIdle()
         composeRule
             .onNodeWithText("Reorder")
             .assertIsDisplayed()
             .performClick()
         composeRule.waitForIdle()
-        // Reorder-mode banner (Done chip) visible.
-        composeRule
-            .onNodeWithText("✓ Done")
-            .assertIsDisplayed()
+        composeRule.onNodeWithText("✓ Done").assertIsDisplayed()
 
-        // 3. In reorder mode, long-press-drag the lower item up. With 5 seeded
-        //    sessions + 1 auto-created = 6 rail items, item-low sits roughly
-        //    in the middle; drag it well past item-top. The library swaps
-        //    items as the dragged item's center crosses each neighbor.
-        low.performTouchInput {
-            // Canonical reorderable long-press-drag: down + hold past the
-            // long-press timeout, then drag. This engages the library's
-            // after-long-press drag properly (fast 1px-move was flaky).
-            down(center)
-            advanceEventTime(700)  // hold past long-press timeout
-            moveBy(Offset(0f, -60f), delayMillis = 120)
-            moveBy(Offset(0f, -200f), delayMillis = 120)
-            moveBy(Offset(0f, -400f), delayMillis = 120)
-            moveBy(Offset(0f, -560f), delayMillis = 120)
+        // The reorderable library's long-press drag pattern: down + hold past
+        // the long-press threshold, then a SINGLE overshooting sweep upward.
+        // Per e2e-66: incremental moveBy steps re-anchor the draggable to the
+        // source row between frames and the drag only moves one slot. One big
+        // sweep crosses the target row center without intermediate re-anchor.
+        val lowerInReorder = composeRule.onNodeWithTag(lowerTag)
+        val bounds = lowerInReorder.getBoundsInRoot()
+        lowerInReorder.performTouchInput {
+            down(Offset(bounds.center.x, bounds.top + 8f))
+            advanceEventTime(700) // hold past long-press timeout (in reorder mode)
+            // One sweep that overshoots to past the rail's top. RAIL_HEIGHT
+            // (px) is measured from the node's own height × expected slot count;
+            // -bounds.height - 200f guarantees clear past `upper` and beyond.
+            moveBy(Offset(0f, -(bounds.height + 1200f)), delayMillis = 200)
             up()
         }
         composeRule.waitForIdle()
 
-        // 4. Choreography pin: the persisted order now leads with item-low.
-        //    Verification: read hermes_rail/home_order SharedPreferences. After
-        //    the drag end, RailEvent.Reorder fires setRailOrder(...) which
-        //    writes the full displayed order to that pref. We poll briefly
-        //    because the persist is async (apply(), not commit()).
+        // 6. Choreography pin: the persisted home_order now has `lower`
+        //    before `upper` — the drag moved `lower` up.
         val prefs =
             InstrumentationRegistry.getInstrumentation().targetContext
                 .getSharedPreferences("hermes_rail", 0)
@@ -139,20 +193,35 @@ class RailReorderE2eTest {
                 persisted ?: ""
             }
 
-        // item-low must appear before item-top — the drag moved it up.
         check(homeOrder.split(',').let { ids ->
-            ids.contains("item-low") &&
-                ids.contains("item-top") &&
-                ids.indexOf("item-low") < ids.indexOf("item-top")
+            ids.contains(lowerId) &&
+                ids.contains(upperId) &&
+                ids.indexOf(lowerId) < ids.indexOf(upperId)
         }) {
-            "rail home_order did not reflect the drag: $homeOrder"
+            "rail home_order did not reflect the drag: $homeOrder (expected $lowerId before $upperId)"
         }
 
-        // 5. After the drag, both items remain rendered (drag didn't crash
-        //    the rail, no collection shape violation).
+        // 7. Both items remain rendered after the drag (no collection-shape
+        //    violation crashed the rail).
         composeRule.waitUntil(5_000) {
-            composeRule.onAllNodesWithTag("rail_item_item-low")
+            composeRule.onAllNodesWithTag(lowerTag)
                 .fetchSemanticsNodes().isNotEmpty()
         }
+    }
+
+    /** Issue session.create via the WS gateway, return the rail/storage id. */
+    private fun createOwnSession(label: String): String {
+        val result = runBlocking {
+            HermesWsClient.request(
+                method = WsMethods.SESSION_CREATE,
+                params = mapOf("source" to "desktop"),
+                timeoutMs = 10_000L,
+            ).await()
+        }
+        val map = result as? Map<String, Any?>
+            ?: error("session.create ($label) returned non-map result: $result")
+        return map["stored_session_id"] as? String
+            ?: map["session_id"] as? String
+            ?: error("session.create ($label) result missing session ids: $map")
     }
 }
