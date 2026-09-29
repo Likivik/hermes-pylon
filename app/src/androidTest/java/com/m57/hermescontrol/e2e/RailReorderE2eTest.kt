@@ -4,7 +4,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
-import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -166,14 +165,13 @@ class RailReorderE2eTest {
         // source row between frames and the drag only moves one slot. One big
         // sweep crosses the target row center without intermediate re-anchor.
         val lowerInReorder = composeRule.onNodeWithTag(lowerTag)
-        val bounds = lowerInReorder.getBoundsInRoot()
         lowerInReorder.performTouchInput {
-            down(Offset(bounds.center.x, bounds.top + 8f))
+            down(Offset(centerX, centerY))
             advanceEventTime(700) // hold past long-press timeout (in reorder mode)
-            // One sweep that overshoots to past the rail's top. RAIL_HEIGHT
-            // (px) is measured from the node's own height × expected slot count;
-            // -bounds.height - 200f guarantees clear past `upper` and beyond.
-            moveBy(Offset(0f, -(bounds.height + 1200f)), delayMillis = 200)
+            // One sweep to the TOP of the rail + overshoot so `lower` clears
+            // `upper` and every row between. No incremental steps: those
+            // re-anchored the draggable and stalled at one slot (e2e-66).
+            moveBy(Offset(0f, -2000f), delayMillis = 200)
             up()
         }
         composeRule.waitForIdle()
