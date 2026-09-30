@@ -105,41 +105,20 @@ class RailReorderE2eTest {
         E2eHarness.resetStateForTest()
         E2eHarness.seedRealGatewayProfile(password = password)
 
-        // 2. Launch. Let the app's auto-create settle so the WS socket is
-        //    warm and our subsequent session.create RPCs ride the same
-        //    connection.
+        // 2. Launch. App auto-creates its session; rail populates with the
+        //    seeded baseline (item-top newest, item-low older → newest-first
+        //    sort puts item-top ABOVE item-low).
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         activityScenario = scenario
 
-        // 3. Create `lower` first (older, lands BELOW newer in newest-first sort),
-        //    then `upper` second (newer, lands ABOVE `lower`). This puts
-        //    `lower` low enough in the rail that dragging it UP past `upper`
-        //    and across the seeded rows exercises a real multi-slot swap
-        //    (e2e-66's failure: drag persisted but only moved one slot).
-        //    We capture each id from the create ack's `stored_session_id`.
-        var lower: String? = null
-        var upper: String? = null
-        DeviceLog.withEvidence("rail-reorder-e2e:createLower") {
-            lower = createOwnSession("lower")
-        }
-        DeviceLog.withEvidence("rail-reorder-e2e:createUpper") {
-            upper = createOwnSession("upper")
-        }
-        val lowerId = lower ?: error("createOwnSession(\"lower\") returned null")
-        val upperId = upper ?: error("createOwnSession(\"upper\") returned null")
-        ownSessionIds += lowerId
-        ownSessionIds += upperId
+        // 3. Use the SEEDED baseline rows item-top/item-low (deterministic —
+        //    this test only REORDERS them; no other test renames/deletes
+        //    them). The rail renders them under rail_item_item-top /
+        //    rail_item_item-low.
+        val lowerTag = "rail_item_item-low"
+        val upperTag = "rail_item_item-top"
 
-        val upperTag = "rail_item_$upperId"
-        val lowerTag = "rail_item_$lowerId"
-
-        // 4. Refresh the rail so both our items render under their tags.
-        runBlocking {
-            HermesWsClient.request(
-                method = WsMethods.SESSION_LIST,
-                timeoutMs = 10_000L,
-            ).await()
-        }
+        // 4. Wait for both to render.
         DeviceLog.withEvidence("rail-reorder-e2e:waitRailItems") {
             composeRule.waitUntilAtLeastOneExists(hasTestTag(lowerTag), timeoutMillis = 30_000)
             composeRule.waitUntilAtLeastOneExists(hasTestTag(upperTag), timeoutMillis = 30_000)
@@ -206,21 +185,5 @@ class RailReorderE2eTest {
             composeRule.onAllNodesWithTag(lowerTag)
                 .fetchSemanticsNodes().isNotEmpty()
         }
-    }
-
-    /** Issue session.create via the WS gateway, return the rail/storage id. */
-    private fun createOwnSession(label: String): String {
-        val result = runBlocking {
-            HermesWsClient.request(
-                method = WsMethods.SESSION_CREATE,
-                params = mapOf("source" to "desktop"),
-                timeoutMs = 10_000L,
-            ).await()
-        }
-        val map = result as? Map<String, Any?>
-            ?: error("session.create ($label) returned non-map result: $result")
-        return map["stored_session_id"] as? String
-            ?: map["session_id"] as? String
-            ?: error("session.create ($label) result missing session ids: $map")
     }
 }

@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.e2e
 
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.junit4.AndroidComposeTestRule
 import com.m57.hermescontrol.data.config.ConnectionProfile
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.remote.AuthPayloads
@@ -199,5 +201,29 @@ object E2eHarness {
         // the CI runner). ws:// scheme for the WS upgrade.
         HermesWsClient.e2eWsOverride =
             baseUrl.trimEnd('/').replaceFirst("http://", "ws://") + "/api/ws"
+    }
+
+    /**
+     * Wait (up to [timeoutMillis]) for at least one rail item to render and
+     * return its UI tag (`rail_item_<id>`). Matches by tag PREFIX so tests
+     * never parse/depend on RPC id fields — session.list's `id` is the only
+     * id the rail tags by (stored_session_id ≠ list id, e2e-69 lesson).
+     */
+    fun waitForFirstRailItem(
+        composeRule: AndroidComposeTestRule<*, *>,
+        timeoutMillis: Long = 30_000,
+    ): String {
+        val railItemMatcher = SemanticsMatcher("rail item") { node ->
+            node.config.getOrNull(androidx.compose.ui.semantics.TestTag)
+                ?.startsWith("rail_item_") == true
+        }
+        composeRule.waitUntil(timeoutMillis) {
+            composeRule.onAllNodes(railItemMatcher).fetchSemanticsNodes().isNotEmpty()
+        }
+        return composeRule.onAllNodes(railItemMatcher)
+            .fetchSemanticsNodes()
+            .firstOrNull()
+            ?.config?.getOrNull(androidx.compose.ui.semantics.TestTag)
+            ?: error("rail item rendered but no tag found")
     }
 }
