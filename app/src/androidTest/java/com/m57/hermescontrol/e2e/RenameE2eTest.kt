@@ -65,7 +65,7 @@ class RenameE2eTest {
     @Test
     fun renameBackgroundSession_resumeFirst_thenTitleBySessionKey() {
         val password = E2eHarness.realGatewayPasswordFromArgs()
-            ?: error("e2ePassword not set — CI must pass -Pandroid.testInstrumentationRunnerArguments.e2ePassword=\\$E2E_PASS")
+            ?: error("e2ePassword not set — CI must pass -Pandroid.testInstrumentationRunnerArguments.e2ePassword=\$E2E_PASS")
 
         // 1. Wipe process-wide state + log into the real gateway.
         E2eHarness.resetStateForTest()

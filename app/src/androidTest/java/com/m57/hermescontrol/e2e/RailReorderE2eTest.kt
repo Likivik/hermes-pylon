@@ -172,11 +172,11 @@ class RailReorderE2eTest {
             }
 
         check(homeOrder.split(',').let { ids ->
-            ids.contains(lowerId) &&
-                ids.contains(upperId) &&
-                ids.indexOf(lowerId) < ids.indexOf(upperId)
+            ids.contains("item-low") &&
+                ids.contains("item-top") &&
+                ids.indexOf("item-low") < ids.indexOf("item-top")
         }) {
-            "rail home_order did not reflect the drag: $homeOrder (expected $lowerId before $upperId)"
+            "rail home_order did not reflect the drag: $homeOrder (expected item-low before item-top)"
         }
 
         // 7. Both items remain rendered after the drag (no collection-shape

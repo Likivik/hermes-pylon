@@ -1,7 +1,7 @@
 package com.m57.hermescontrol.e2e
 
 import androidx.compose.ui.test.SemanticsMatcher
-import androidx.compose.ui.test.junit4.AndroidComposeTestRule
+import androidx.compose.ui.test.junit4.ComposeTestRule
 import com.m57.hermescontrol.data.config.ConnectionProfile
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.remote.AuthPayloads
@@ -210,11 +210,11 @@ object E2eHarness {
      * id the rail tags by (stored_session_id ≠ list id, e2e-69 lesson).
      */
     fun waitForFirstRailItem(
-        composeRule: AndroidComposeTestRule<*, *>,
+        composeRule: ComposeTestRule,
         timeoutMillis: Long = 30_000,
     ): String {
         val railItemMatcher = SemanticsMatcher("rail item") { node ->
-            node.config.getOrNull(androidx.compose.ui.semantics.TestTag)
+            node.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.TestTag)
                 ?.startsWith("rail_item_") == true
         }
         composeRule.waitUntil(timeoutMillis) {
