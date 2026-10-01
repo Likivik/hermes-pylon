@@ -89,17 +89,17 @@ class RenameFailureE2eTest {
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         activityScenario = scenario
 
-        // 3. No RPC create — the app auto-creates its own session on launch.
-        //    We delete THAT session (server-side, by its session.list id from
-        //    the rail tag) before driving the rename UI. After the delete, any
-        //    `session.resume(<that_id>)` from the app returns 4007.
+        // 3. No RPC create — the app auto-creates its own session on launch and
+        //    it is ACTIVE (resumed). The gateway refuses to delete an active
+        //    session ("cannot delete an active session", e2e-77), so we target
+        //    the SECOND rail item — a seeded background session that is
+        //    inactive and deletable. After the delete, its `session.resume`
+        //    from the app returns 4007.
 
-        // 4. Grab the FIRST rail item's tag by UI matcher. This is the app's OWN
-        //    auto-created session (newest-first sort → first is freshest). The
+        // 4. Grab the SECOND rail item's tag by UI matcher (index 1). The
         //    tag embeds the session.list id — the SAME id the gateway's
-        //    session.delete expects (we do NOT use the RPC create's
-        //    stored_session_id; that mismatch burned e2e-69).
-        val itemTag = E2eHarness.waitForFirstRailItem(composeRule)
+        //    session.delete expects (stored_session_id ≠ list id, e2e-69).
+        val itemTag = E2eHarness.waitForRailItemAt(composeRule, index = 1)
         val listId = itemTag.removePrefix("rail_item_")
 
         // 5. Delete that session server-side via its session.list id. The rail

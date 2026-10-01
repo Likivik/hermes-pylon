@@ -205,28 +205,39 @@ object E2eHarness {
     }
 
     /**
-     * Wait (up to [timeoutMillis]) for at least one rail item to render and
-     * return its UI tag (`rail_item_<id>`). Matches by tag PREFIX so tests
-     * never parse/depend on RPC id fields — session.list's `id` is the only
-     * id the rail tags by (stored_session_id ≠ list id, e2e-69 lesson).
+     * Wait (up to [timeoutMillis]) for at least [index]+1 rail items to render
+     * and return the UI tag (`rail_item_<id>`) at [index] in semantics order.
+     * Matches by tag PREFIX so tests never parse/depend on RPC id fields —
+     * session.list's `id` is the only id the rail tags by (stored_session_id
+     * ≠ list id, e2e-69 lesson).
      */
+    fun waitForRailItemAt(
+        composeRule: ComposeTestRule,
+        index: Int,
+        timeoutMillis: Long = 30_000,
+    ): String {
+        val railItemMatcher = railItemMatcher()
+        composeRule.waitUntil(timeoutMillis) {
+            composeRule.onAllNodes(railItemMatcher).fetchSemanticsNodes().size > index
+        }
+        return composeRule.onAllNodes(railItemMatcher)
+            .fetchSemanticsNodes()
+            .getOrNull(index)
+            ?.config?.getOrElse(SemanticsProperties.TestTag) { "" }
+            ?.takeIf { it.isNotEmpty() }
+            ?: error("rail item at index $index rendered but no tag found")
+    }
+
+    /** First rail item — convenience wrapper over [waitForRailItemAt]. */
     fun waitForFirstRailItem(
         composeRule: ComposeTestRule,
         timeoutMillis: Long = 30_000,
-    ): String {
-        val railItemMatcher = SemanticsMatcher("rail item") { node ->
+    ): String = waitForRailItemAt(composeRule, 0, timeoutMillis)
+
+    private fun railItemMatcher() =
+        SemanticsMatcher("rail item") { node ->
             node.config.getOrElse(SemanticsProperties.TestTag) { "" }
                 .takeIf { it.isNotEmpty() }
                 ?.startsWith("rail_item_") == true
         }
-        composeRule.waitUntil(timeoutMillis) {
-            composeRule.onAllNodes(railItemMatcher).fetchSemanticsNodes().isNotEmpty()
-        }
-        return composeRule.onAllNodes(railItemMatcher)
-            .fetchSemanticsNodes()
-            .firstOrNull()
-            ?.config?.getOrElse(SemanticsProperties.TestTag) { "" }
-            ?.takeIf { it.isNotEmpty() }
-            ?: error("rail item rendered but no tag found")
-    }
 }

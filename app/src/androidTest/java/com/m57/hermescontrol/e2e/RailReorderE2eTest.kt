@@ -130,13 +130,13 @@ class RailReorderE2eTest {
         lowerInReorder.performTouchInput {
             down(Offset(centerX, centerY))
             advanceEventTime(700) // hold past long-press timeout (in reorder mode)
-            // A series of short upward moves over frames — a single 2000px
-            // jump registered as a flick, not a drag (no Reorder event, e2e-76).
-            // Incremental steps re-anchor (e2e-66), but ~8 discrete frames at
-            // 250px each is a real drag trajectory without stalling.
+            // 8 discrete 250px upward moves with time between frames so the
+            // reorderable renders the floating drag state (rapid moves w/o
+            // frames register as a flick — no Reorder event, e2e-77).
             repeat(8) {
-                moveBy(Offset(0f, -250f), delayMillis = 30)
+                moveBy(Offset(0f, -250f), delayMillis = 60)
             }
+            advanceEventTime(300) // let the last move settle before up()
             up()
         }
         composeRule.waitForIdle()
