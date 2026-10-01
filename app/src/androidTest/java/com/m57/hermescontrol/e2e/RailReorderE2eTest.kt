@@ -17,8 +17,6 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
 import com.m57.hermescontrol.MainActivity
 import com.m57.hermescontrol.data.ws.HermesWsClient
-import com.m57.hermescontrol.data.ws.WsMethods
-import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Rule
 import org.junit.Test
@@ -74,26 +72,11 @@ class RailReorderE2eTest {
     val composeRule = createEmptyComposeRule()
 
     private var activityScenario: ActivityScenario<MainActivity>? = null
-    private val ownSessionIds = mutableListOf<String>()
 
     @After
     fun tearDown() {
-        // Best-effort delete our sessions so the rail doesn't accumulate
-        // zombie rows across runs in the same instrumentation JVM.
-        ownSessionIds.forEach { id ->
-            runCatching {
-                runBlocking {
-                    HermesWsClient.request(
-                        method = WsMethods.SESSION_DELETE,
-                        params = mapOf("session_id" to id),
-                        timeoutMs = 5_000L,
-                    ).await()
-                }
-            }
-        }
         activityScenario?.close()
         HermesWsClient.e2eWsOverride = null
-        ownSessionIds.clear()
     }
 
     @Test
@@ -147,10 +130,13 @@ class RailReorderE2eTest {
         lowerInReorder.performTouchInput {
             down(Offset(centerX, centerY))
             advanceEventTime(700) // hold past long-press timeout (in reorder mode)
-            // One sweep to the TOP of the rail + overshoot so `lower` clears
-            // `upper` and every row between. No incremental steps: those
-            // re-anchored the draggable and stalled at one slot (e2e-66).
-            moveBy(Offset(0f, -2000f), delayMillis = 200)
+            // A series of short upward moves over frames — a single 2000px
+            // jump registered as a flick, not a drag (no Reorder event, e2e-76).
+            // Incremental steps re-anchor (e2e-66), but ~8 discrete frames at
+            // 250px each is a real drag trajectory without stalling.
+            repeat(8) {
+                moveBy(Offset(0f, -250f), delayMillis = 30)
+            }
             up()
         }
         composeRule.waitForIdle()

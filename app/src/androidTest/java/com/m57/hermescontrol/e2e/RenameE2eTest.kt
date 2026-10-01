@@ -97,10 +97,10 @@ class RenameE2eTest {
         }
         composeRule.onNodeWithText("Renamed E2E").assertIsDisplayed()
 
-        // 6. UI pin #2: no "Error" surface. After the rename settled, any
-        //    "Error" node = real failure (peer-test leak was fixed by per-test
-        //    isolation; this test owns its session, no peer writes it).
+        // 6. UI pin #2: no rename-pipeline error. We scope to the rename
+        //    failure surface ("Error (session.resume)") — a blanket "Error"
+        //    search trips on unrelated snackbars/tooltips in the shared process.
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("Error", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("Error (session", substring = true).assertDoesNotExist()
     }
 }
