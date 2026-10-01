@@ -129,14 +129,14 @@ class RailReorderE2eTest {
         val lowerInReorder = composeRule.onNodeWithTag(lowerTag)
         lowerInReorder.performTouchInput {
             down(Offset(centerX, centerY))
-            advanceEventTime(700) // hold past long-press timeout (in reorder mode)
-            // 8 discrete 250px upward moves with time between frames so the
-            // reorderable renders the floating drag state (rapid moves w/o
-            // frames register as a flick — no Reorder event, e2e-77).
-            repeat(8) {
-                moveBy(Offset(0f, -250f), delayMillis = 60)
-            }
-            advanceEventTime(300) // let the last move settle before up()
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+            // ONE upward sweep past `upper`, then a long settle with the
+            // pointer still down — the reorderable needs the hold-at-
+            // destination for its drop animation + onMove to commit.
+            // (Library-documented pattern; the settle is essential — without
+            // it the drag registers as a flick, e2e-76..78.)
+            moveBy(Offset(0f, -2000f))
+            advanceEventTime(1000)
             up()
         }
         composeRule.waitForIdle()
