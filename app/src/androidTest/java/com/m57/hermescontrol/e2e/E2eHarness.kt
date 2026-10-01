@@ -215,7 +215,7 @@ object E2eHarness {
         timeoutMillis: Long = 30_000,
     ): String {
         val railItemMatcher = SemanticsMatcher("rail item") { node ->
-            node.config.getOrNull(SemanticsProperties.TestTag)
+            node.config[SemanticsProperties.TestTag]
                 ?.startsWith("rail_item_") == true
         }
         composeRule.waitUntil(timeoutMillis) {
@@ -224,7 +224,7 @@ object E2eHarness {
         return composeRule.onAllNodes(railItemMatcher)
             .fetchSemanticsNodes()
             .firstOrNull()
-            ?.config?.getOrNull(SemanticsProperties.TestTag)
+            ?.config?.get(SemanticsProperties.TestTag)
             ?: error("rail item rendered but no tag found")
     }
 }
