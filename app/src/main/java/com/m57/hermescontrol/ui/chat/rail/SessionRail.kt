@@ -107,6 +107,7 @@ private fun RailBody(
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     val dragState = rememberReorderableLazyListState(listState) { from, to ->
         // Item keys are session ids — the library hands them straight back.
+        Log.i("RailReorder", "onMove from=${from.key} toIndex=${to.index}")
         val fromId = from.key as? String ?: return@rememberReorderableLazyListState
         val arranged = (groups.pinned.map { it.id } + groups.fresh.map { it.id } +
             if (state.archiveOpen) groups.stale.map { it.id } else emptyList())
