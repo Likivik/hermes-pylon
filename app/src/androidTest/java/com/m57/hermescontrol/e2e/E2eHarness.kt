@@ -1,5 +1,6 @@
 package com.m57.hermescontrol.e2e
 
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.junit4.ComposeTestRule
 import com.m57.hermescontrol.data.config.ConnectionProfile
@@ -214,7 +215,7 @@ object E2eHarness {
         timeoutMillis: Long = 30_000,
     ): String {
         val railItemMatcher = SemanticsMatcher("rail item") { node ->
-            node.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.TestTag)
+            node.config.getOrNull(SemanticsProperties.TestTag)
                 ?.startsWith("rail_item_") == true
         }
         composeRule.waitUntil(timeoutMillis) {
@@ -223,7 +224,7 @@ object E2eHarness {
         return composeRule.onAllNodes(railItemMatcher)
             .fetchSemanticsNodes()
             .firstOrNull()
-            ?.config?.getOrNull(androidx.compose.ui.semantics.TestTag)
+            ?.config?.getOrNull(SemanticsProperties.TestTag)
             ?: error("rail item rendered but no tag found")
     }
 }
