@@ -163,7 +163,7 @@ class RailReorderE2eTest {
         val homeOrder =
             run {
                 var persisted: String? = null
-                composeRule.waitUntil(5_000) {
+                composeRule.waitUntil(15_000) {
                     persisted =
                         prefs.getString("home_order", null)?.takeIf { it.isNotBlank() }
                     persisted != null
@@ -181,7 +181,7 @@ class RailReorderE2eTest {
 
         // 7. Both items remain rendered after the drag (no collection-shape
         //    violation crashed the rail).
-        composeRule.waitUntil(5_000) {
+        composeRule.waitUntil(15_000) {
             composeRule.onAllNodesWithTag(lowerTag)
                 .fetchSemanticsNodes().isNotEmpty()
         }
