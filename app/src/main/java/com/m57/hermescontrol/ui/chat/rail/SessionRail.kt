@@ -45,6 +45,7 @@ import androidx.compose.ui.zIndex
 import kotlin.math.roundToInt
 import org.kodein.emoji.*
 import org.kodein.emoji.compose.NotoAnimatedEmoji
+import android.util.Log
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.ReorderableCollectionItemScope
 import sh.calvin.reorderable.rememberReorderableLazyListState
