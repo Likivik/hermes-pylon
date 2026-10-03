@@ -235,17 +235,23 @@ private fun ReorderableCollectionItemScope.RailItem(
             .zIndex(if (dragging) 1f else 0f)
             // combinedClickable first, then the drag handle OUTERMOST so it
             // gets first shot at the long-press in reorder mode.
-            .combinedClickable(
-                interactionSource = remember(id) { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                indication = androidx.compose.material3.ripple(
-                    color = com.m57.hermescontrol.theme.HermesPurple,
-                ),
-                onClick = { onEvent(RailEvent.Switch(id)) },
-                // In reorder mode the long-press belongs to the drag handle
-                // (dragModifier below); the popup is suppressed so combinedClickable
-                // never consumes the long-press.
-                onLongClick = if (reordering) null else ({ menuOpen = true }),
-            )
+            .then(if (reordering) {
+                // Reorder mode: the drag handle owns the pointer. combinedClickable's
+                // tap recognizer claims the down (innermost wins arbitration) and
+                // starves detectDragGesturesAfterLongPress — the dragon never starts
+                // (e2e-80 diagnostic: onMove never fires). Give the item NO click
+                // recognizer in reorder mode; the explicit Done chip exits the mode.
+                Modifier
+            } else {
+                Modifier.combinedClickable(
+                    interactionSource = remember(id) { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = androidx.compose.material3.ripple(
+                        color = com.m57.hermescontrol.theme.HermesPurple,
+                    ),
+                    onClick = { onEvent(RailEvent.Switch(id)) },
+                    onLongClick = { menuOpen = true },
+                )
+            })
             .then(dragModifier),
     ) {
         if (display.active) {
