@@ -45,7 +45,7 @@ class SwitchE2eTest {
     @Test
     fun tapBackgroundRow_switchesActiveSession() {
         val password = E2eHarness.realGatewayPasswordFromArgs()
-            ?: error("e2ePassword not set — CI must pass -Pandroid.testInstrumentationRunnerArguments.e2ePassword=\\$E2E_PASS")
+            ?: error("e2ePassword not set — CI must pass -Pandroid.testInstrumentationRunnerArguments.e2ePassword=${'$'}E2E_PASS")
 
         E2eHarness.resetStateForTest()
         E2eHarness.seedRealGatewayProfile(password = password)

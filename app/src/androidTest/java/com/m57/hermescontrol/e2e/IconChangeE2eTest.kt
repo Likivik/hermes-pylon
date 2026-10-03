@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -53,7 +54,7 @@ class IconChangeE2eTest {
     @Test
     fun editDialogOnBackgroundRow_renameReflectsInRail() {
         val password = E2eHarness.realGatewayPasswordFromArgs()
-            ?: error("e2ePassword not set — CI must pass -Pandroid.testInstrumentationRunnerArguments.e2ePassword=\\$E2E_PASS")
+            ?: error("e2ePassword not set — CI must pass -Pandroid.testInstrumentationRunnerArguments.e2ePassword=${'$'}E2E_PASS")
 
         E2eHarness.resetStateForTest()
         E2eHarness.seedRealGatewayProfile(password = password)

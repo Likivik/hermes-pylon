@@ -1,7 +1,7 @@
 package com.m57.hermescontrol.e2e
 
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.hasTestText
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -49,7 +49,7 @@ class ArchiveE2eTest {
     @Test
     fun archiveChipTogglesStaleDrawer() {
         val password = E2eHarness.realGatewayPasswordFromArgs()
-            ?: error("e2ePassword not set — CI must pass -Pandroid.testInstrumentationRunnerArguments.e2ePassword=\\$E2E_PASS")
+            ?: error("e2ePassword not set — CI must pass -Pandroid.testInstrumentationRunnerArguments.e2ePassword=${'$'}E2E_PASS")
 
         E2eHarness.resetStateForTest()
         E2eHarness.seedRealGatewayProfile(password = password)
