@@ -3,6 +3,9 @@ package com.m57.hermescontrol.e2e
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.junit4.ComposeTestRule
+import androidx.compose.ui.test.onAllNodes
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import com.m57.hermescontrol.data.config.ConnectionProfile
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.remote.AuthPayloads
@@ -243,6 +246,14 @@ object E2eHarness {
     } catch (t: Throwable) {
         null
     }
+
+    /**
+     * Number of currently rendered rail_item_ nodes. Used by
+     * NoAutoCreateE2eTest to assert the rail contains only the seeded rows
+     * (an auto-created session would add one).
+     */
+    fun countRailItems(composeRule: ComposeTestRule): Int =
+        composeRule.onAllNodes(railItemMatcher()).fetchSemanticsNodes().size
 
     /**
      * WITH AUTO-CREATE DISABLED: launch lands on an EMPTY chat pane (no
