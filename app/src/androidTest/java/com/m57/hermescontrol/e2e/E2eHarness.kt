@@ -234,6 +234,16 @@ object E2eHarness {
         timeoutMillis: Long = 30_000,
     ): String = waitForRailItemAt(composeRule, 0, timeoutMillis)
 
+    /** First rail item or null if none rendered within a short poll (non-throwing). */
+    fun waitForFirstRailItemOrNull(
+        composeRule: ComposeTestRule,
+        timeoutMillis: Long = 15_000,
+    ): String? = try {
+        waitForRailItemAt(composeRule, 0, timeoutMillis)
+    } catch (t: Throwable) {
+        null
+    }
+
     private fun railItemMatcher() =
         SemanticsMatcher("rail item") { node ->
             node.config.getOrElse(SemanticsProperties.TestTag) { "" }

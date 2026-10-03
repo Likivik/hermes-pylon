@@ -180,11 +180,20 @@ jobs:
             # by started_at); the test drags item-low up past item-top.
             ("item-top",       "Top chat", 5, now - 1800),
             ("item-low",       "Low chat", 3, now - 5400),
+            # ArchiveE2eTest: an ENDED/old session so it lands in the archive
+            # (stale) group; insert with ended_at set (see second insert below).
+            ("stale-bg",       "Stale chat", 2, now - 7 * 86400),
           ]
           con.executemany(
             "INSERT OR REPLACE INTO sessions(id, source, title, message_count, started_at, ended_at, end_reason) "
             "VALUES (?, 'telegram', ?, ?, ?, NULL, NULL)",
             rows,
+          )
+          # stale-bg: ENDED session (ended_at 1 day ago) → archived/stale group.
+          con.execute(
+            "INSERT OR REPLACE INTO sessions(id, source, title, message_count, started_at, ended_at, end_reason) "
+            "VALUES ('stale-bg', 'telegram', 'Stale chat', 2, ?, ?, 'ended')",
+            (now - 7 * 86400, now - 86400),
           )
           con.commit(); con.close()
           print(f"seeded {len(rows)} sessions")
@@ -201,7 +210,7 @@ jobs:
           ./gradlew e2eApi34IrisDebugAndroidTest --no-daemon
           -Dorg.gradle.workers.max=2
           -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
-          -Pandroid.testInstrumentationRunnerArguments.class=com.m57.hermescontrol.e2e.RenameE2eTest,com.m57.hermescontrol.e2e.RenameFailureE2eTest,com.m57.hermescontrol.e2e.RailReorderE2eTest
+          -Pandroid.testInstrumentationRunnerArguments.class=com.m57.hermescontrol.e2e.RenameE2eTest,com.m57.hermescontrol.e2e.RenameFailureE2eTest,com.m57.hermescontrol.e2e.RailReorderE2eTest,com.m57.hermescontrol.e2e.IconChangeE2eTest,com.m57.hermescontrol.e2e.PinE2eTest,com.m57.hermescontrol.e2e.DeleteE2eTest,com.m57.hermescontrol.e2e.ArchiveE2eTest,com.m57.hermescontrol.e2e.ReorderPersistenceE2eTest,com.m57.hermescontrol.e2e.SwitchE2eTest
           -Pandroid.testInstrumentationRunnerArguments.e2ePassword=${{ env.E2E_PASS }}
 
       - name: Upload instrumented results on failure

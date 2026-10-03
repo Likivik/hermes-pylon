@@ -64,4 +64,41 @@ class RailGroupingTest {
         // ghost (unknown) ignored; group order persisted for known ids.
         assertEquals(listOf("c", "a", "b"), merged)
     }
+
+    @Test
+    fun `mergeArrangement keeps pinned first regardless of arranged order`() {
+        val pin = s("pin"); val a = s("a"); val b = s("b")
+        val groups = groupRail(listOf(pin, a, b), pinnedIds = setOf("pin"), order = emptyList())
+        // Drag puts `b` first, but pinned group ALWAYS precedes fresh.
+        val merged = mergeArrangement(groups, listOf("b", "pin", "a"))
+        assertEquals(listOf("pin", "b", "a"), merged)
+    }
+
+    @Test
+    fun `mergeArrangement cannot move a fresh id into pinned group`() {
+        val pin = s("pin"); val fresh = s("fresh")
+        val groups = groupRail(listOf(pin, fresh), pinnedIds = setOf("pin"), order = emptyList())
+        // Arranged claims `fresh` first — membership is canonical, fresh stays in fresh.
+        val merged = mergeArrangement(groups, listOf("fresh", "pin"))
+        assertEquals(listOf("pin", "fresh"), merged)
+    }
+
+    @Test
+    fun `mergeArrangement drops ids not in any group`() {
+        val a = s("a"); val b = s("b")
+        val groups = groupRail(listOf(a, b), emptySet(), emptyList())
+        val merged = mergeArrangement(groups, listOf("a", "ghost-1", "b", "ghost-2"))
+        assertEquals(listOf("a", "b"), merged)
+    }
+
+    @Test
+    fun `mergeArrangement preserves order of same-group drag with stale`() {
+        val fresh = s("a"); val stale = s("old", lastActive = 1L)
+        val groups = groupRail(listOf(fresh, stale), emptySet(), emptyList())
+        assertEquals(1, groups.stale.size)
+        // Drag `stale` before `fresh` — stale group order is preserved within itself,
+        // and stale always renders AFTER fresh (drawer).
+        val merged = mergeArrangement(groups, listOf("old", "a"))
+        assertEquals(listOf("a", "old"), merged)
+    }
 }
