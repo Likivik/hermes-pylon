@@ -76,10 +76,11 @@ class IconChangeE2eTest {
         composeRule.onNodeWithTag("rename_field").performTextReplacement("IconEdit E2E")
         composeRule.onNodeWithText("Save").performClick()
 
-        // The rail reflects the new name.
+        // The rail reflects the new name — scoped to the rail item (the chat
+        // header also shows the same title).
         composeRule.waitUntil(10_000) {
             composeRule.onAllNodesWithText("IconEdit E2E").fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithText("IconEdit E2E").assertIsDisplayed()
+        composeRule.onNodeWithTag(tag).assertIsDisplayed()
     }
 }

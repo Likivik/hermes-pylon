@@ -92,12 +92,14 @@ class RenameE2eTest {
             .performTextReplacement("Renamed E2E")
         composeRule.onNodeWithText("Save").performClick()
 
-        // 5. UI pin #1: the rail title updates to the typed name.
+        // 5. UI pin #1: the rail title updates to the typed name. The SAME
+        //    title also shows in the chat-pane header (2 nodes), so scope to
+        //    the rail item's tag — assert the renamed row is displayed.
         composeRule.waitUntil(10_000) {
             composeRule.onAllNodesWithText("Renamed E2E")
                 .fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithText("Renamed E2E").assertIsDisplayed()
+        composeRule.onNodeWithTag(tag).assertIsDisplayed()
 
         // 6. UI pin #2: no rename-pipeline error. We scope to the rename
         //    failure surface ("Error (session.resume)") — a blanket "Error"

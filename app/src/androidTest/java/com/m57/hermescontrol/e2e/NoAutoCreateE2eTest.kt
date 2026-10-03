@@ -61,20 +61,22 @@ class NoAutoCreateE2eTest {
         // stale-bg is behind the old·1 chip and NOT counted).
         // stored-current, stored-bg, reaped-bg, item-top, item-low = 5.
         val expectedVisible = 5
+        var observedTags: List<String> = emptyList()
         composeRule.waitUntil(30_000) {
-            E2eHarness.countRailItems(composeRule) >= expectedVisible
+            observedTags = E2eHarness.renderedRailTags(composeRule)
+            observedTags.size >= expectedVisible
         }
 
         // Give a hypothetical auto-create enough time to appear (it would
         // land as a 6th fresh row).
         composeRule.waitForIdle()
 
-        val visibleCount = E2eHarness.countRailItems(composeRule)
+        val visibleCount = observedTags.size
 
         check(visibleCount == expectedVisible) {
-            "auto-create regression: rail shows $visibleCount visible sessions, " +
-                "expected $expectedVisible (seeded). An auto-created session " +
-                "would have added a row."
+            "auto-create regression: rail shows $visibleCount visible sessions " +
+                "(tags: $observedTags), expected $expectedVisible (seeded). " +
+                "An auto-created session would have added a row."
         }
     }
 }

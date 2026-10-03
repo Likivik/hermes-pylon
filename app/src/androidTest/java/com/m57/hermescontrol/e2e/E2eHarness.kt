@@ -254,6 +254,13 @@ object E2eHarness {
     fun countRailItems(composeRule: ComposeTestRule): Int =
         composeRule.onAllNodes(railItemMatcher()).fetchSemanticsNodes().size
 
+    /** All currently rendered rail tag strings (diagnostic for NoAutoCreate). */
+    fun renderedRailTags(composeRule: ComposeTestRule): List<String> =
+        composeRule.onAllNodes(railItemMatcher())
+            .fetchSemanticsNodes()
+            .mapNotNull { it.config.getOrElse(SemanticsProperties.TestTag) { "" } }
+            .filter { it.isNotEmpty() }
+
     /**
      * WITH AUTO-CREATE DISABLED: launch lands on an EMPTY chat pane (no
      * session selected). Tests must explicitly pick a rail session — this
