@@ -127,16 +127,19 @@ class RailReorderE2eTest {
         // source row between frames and the drag only moves one slot. One big
         // sweep crosses the target row center without intermediate re-anchor.
         val lowerInReorder = composeRule.onNodeWithTag(lowerTag)
+        // Item height controls the drag step: the library only fires onMove
+        // when an item's CENTER enters the dragged item's bounds, so steps
+        // taller than one row skip the target (this is why the blind -2000px
+        // sweep never reordered — e2e-76..81). Step in ~1-row increments.
+        val rowPx = lowerInReorder.fetchSemanticsNode().size.height.toFloat()
         lowerInReorder.performTouchInput {
             down(Offset(centerX, centerY))
             advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
-            // ONE upward sweep past `upper`, then a long settle with the
-            // pointer still down — the reorderable needs the hold-at-
-            // destination for its drop animation + onMove to commit.
-            // (Library-documented pattern; the settle is essential — without
-            // it the drag registers as a flick, e2e-76..78.)
-            moveBy(Offset(0f, -2000f))
-            advanceEventTime(1000)
+            repeat(6) {
+                moveBy(Offset(0f, -rowPx), delayMillis = 100)
+                advanceEventTime(150) // overlap must register as a frame
+            }
+            advanceEventTime(1000) // settle at destination before up()
             up()
         }
         composeRule.waitForIdle()

@@ -45,7 +45,6 @@ import androidx.compose.ui.zIndex
 import kotlin.math.roundToInt
 import org.kodein.emoji.*
 import org.kodein.emoji.compose.NotoAnimatedEmoji
-import android.util.Log
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.ReorderableCollectionItemScope
 import sh.calvin.reorderable.rememberReorderableLazyListState
@@ -108,7 +107,6 @@ private fun RailBody(
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     val dragState = rememberReorderableLazyListState(listState) { from, to ->
         // Item keys are session ids — the library hands them straight back.
-        Log.i("RailReorder", "onMove from=${from.key} toIndex=${to.index}")
         val fromId = from.key as? String ?: return@rememberReorderableLazyListState
         val arranged = (groups.pinned.map { it.id } + groups.fresh.map { it.id } +
             if (state.archiveOpen) groups.stale.map { it.id } else emptyList())
@@ -116,7 +114,12 @@ private fun RailBody(
         val currentIndex = arranged.indexOf(fromId)
         if (currentIndex == -1) return@rememberReorderableLazyListState
         arranged.removeAt(currentIndex)
-        arranged.add(to.index, fromId)
+        // to.index is the LAZYCOLUMN index (0 = reorder-mode DoneChip header),
+        // while `arranged` is session ids only — offset by the header so the
+        // drop lands on the visually targeted slot (library docs: adjust
+        // indices when headers/footers are present).
+        val targetIndex = (to.index - 1).coerceAtLeast(0)
+        arranged.add(targetIndex, fromId)
         onEvent(RailEvent.Reorder(mergeArrangement(groups, arranged)))
     }
     // In reorder mode every item is grabbable (long-press-drag), not just the
