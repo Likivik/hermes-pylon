@@ -57,34 +57,31 @@ class NoAutoCreateE2eTest {
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         activityScenario = scenario
 
-        // Wait for the seeded fresh rows to render. Visible fresh set:
-        // stored-current, stored-bg, item-top, item-low = 4. NOT counted:
-        //  - reaped-bg (99999 messages → gateway refuses resume / never lists
-        //    it as fresh — RenameFailure's target)
-        //  - stale-bg (archived, behind the old·1 chip)
-        val expectedVisible = 4
+        // The gateway's session store is SHARED across tests in one run
+        // (seeded once; earlier tests may delete rows), so the absolute count
+        // is not stable. The auto-create tripwire is: the count must STABILIZE
+        // and stay CONSTANT — an auto-created session would add a row during
+        // the observation window, no matter what the starting count is.
         val deadline = System.currentTimeMillis() + 30_000
-        var observedTags: List<String> = emptyList()
+        var stableTags: List<String>? = null
         while (System.currentTimeMillis() < deadline) {
-            observedTags = E2eHarness.renderedRailTags(composeRule)
-            if (observedTags.size >= expectedVisible) break
+            val tags = E2eHarness.renderedRailTags(composeRule)
+            if (tags.isNotEmpty() && tags == stableTags) break
+            stableTags = tags
             Thread.sleep(250)
         }
-        check(observedTags.size >= expectedVisible) {
-            "rail never rendered $expectedVisible items in 30s. " +
-                "Got ${observedTags.size}: $observedTags. " +
-                "Expected seeded fresh rows: stored-current, stored-bg, item-top, item-low."
+        val count = stableTags?.size ?: 0
+        check(count > 0) {
+            "rail never rendered any session in 30s: $stableTags"
         }
 
-        // Give a hypothetical auto-create enough time to appear (it would
-        // land as a 6th fresh row).
+        // Give a hypothetical auto-create enough time to appear (it would add
+        // a row and break the stability we just confirmed).
         composeRule.waitForIdle()
-
-        val visibleCount = observedTags.size
-
-        check(visibleCount == expectedVisible) {
-            "auto-create regression: rail shows $visibleCount visible sessions " +
-                "(tags: $observedTags), expected $expectedVisible (seeded). " +
+        val afterTags = E2eHarness.renderedRailTags(composeRule)
+        check(afterTags == stableTags) {
+            "auto-create regression: rail changed during observation — " +
+                "before: $stableTags after: $afterTags. " +
                 "An auto-created session would have added a row."
         }
     }
