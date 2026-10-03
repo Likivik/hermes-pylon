@@ -57,14 +57,23 @@ class NoAutoCreateE2eTest {
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         activityScenario = scenario
 
-        // Wait for the seeded fresh rows to render (5 visible; the archived
-        // stale-bg is behind the old·1 chip and NOT counted).
-        // stored-current, stored-bg, reaped-bg, item-top, item-low = 5.
-        val expectedVisible = 5
+        // Wait for the seeded fresh rows to render. Visible fresh set:
+        // stored-current, stored-bg, item-top, item-low = 4. NOT counted:
+        //  - reaped-bg (99999 messages → gateway refuses resume / never lists
+        //    it as fresh — RenameFailure's target)
+        //  - stale-bg (archived, behind the old·1 chip)
+        val expectedVisible = 4
+        val deadline = System.currentTimeMillis() + 30_000
         var observedTags: List<String> = emptyList()
-        composeRule.waitUntil(30_000) {
+        while (System.currentTimeMillis() < deadline) {
             observedTags = E2eHarness.renderedRailTags(composeRule)
-            observedTags.size >= expectedVisible
+            if (observedTags.size >= expectedVisible) break
+            Thread.sleep(250)
+        }
+        check(observedTags.size >= expectedVisible) {
+            "rail never rendered $expectedVisible items in 30s. " +
+                "Got ${observedTags.size}: $observedTags. " +
+                "Expected seeded fresh rows: stored-current, stored-bg, item-top, item-low."
         }
 
         // Give a hypothetical auto-create enough time to appear (it would
