@@ -359,10 +359,13 @@ private fun ReorderableCollectionItemScope.RailItem(
                     // words intact — no mid-word splits across lines. With the
                     // narrower rail, long single words ellipsize instead of
                     // breaking inside.
+                    // Likivik: no ellipsis — smaller font + CLIP so whatever
+                    // doesn't fit is cut at the edge (no "…").
                     lineBreak = LineBreak.Paragraph,
+                    fontSize = MaterialTheme.typography.labelSmall.fontSize * 0.8f,
                 ),
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                overflow = TextOverflow.Clip,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .width(ItemWidth)
