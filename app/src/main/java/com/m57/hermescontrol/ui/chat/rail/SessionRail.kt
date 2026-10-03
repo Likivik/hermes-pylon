@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -50,7 +51,7 @@ import sh.calvin.reorderable.ReorderableCollectionItemScope
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
 /** Rail pill width — single source of truth for cells + chip + surface. */
-internal val RailWidth = 72.dp
+internal val RailWidth = 64.dp
 /** Item content width = pill minus the horizontal inset (4dp each side). */
 internal val ItemWidth = RailWidth - 8.dp
 internal val RailShape = RoundedCornerShape(26.dp)
@@ -352,8 +353,15 @@ private fun ReorderableCollectionItemScope.RailItem(
             Spacer(Modifier.height(1.dp))
             Text(
                 text = display.label,
-                style = MaterialTheme.typography.labelSmall,
-                maxLines = 3,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    // Researched: TextStyle.lineBreak (Compose 1.4+) controls
+                    // word-boundary breaking. LineBreak.Phrase/Paragraph keeps
+                    // words intact — no mid-word splits across lines. With the
+                    // narrower rail, long single words ellipsize instead of
+                    // breaking inside.
+                    lineBreak = LineBreak.Paragraph,
+                ),
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
                 modifier = Modifier

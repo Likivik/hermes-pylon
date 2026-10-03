@@ -880,6 +880,11 @@ class ChatViewModel(
                     (resultMap?.get("resumed") as? String)
                         ?: requestedSessionId
                         ?: selectedSessionId
+                // Capture the PREVIOUS runtime id BEFORE the ack clobbers
+                // runtimeSessionId below. A current-session rename (resume
+                // fast-path) may ack WITHOUT session_id — we need the id the
+                // chat already holds to fire session.title on it.
+                val preAckRuntimeId = runtimeSessionId
                 runtimeSessionId = resultMap?.get("session_id") as? String
 
                 // Parse the session-scoped snapshot returned by the backend.
@@ -948,7 +953,14 @@ class ChatViewModel(
                 // field IS the storage id we asked for, so send the title with
                 // THAT (stable across the runtime-id rotation the ack's
                 // "session_id" introduces). Falls back to the runtime id.
-                val liveRuntimeId = runtimeSessionId
+                //
+                // CRITICAL for CURRENT-session renames: the gateway's resume
+                // fast-path (already-live session) may ack WITHOUT
+                // session_id/session_key (nothing changed to report). The ack
+                // just clobbered runtimeSessionId to null above — fall back to
+                // the runtime id the app already held for the current chat.
+                val ackRuntimeId = runtimeSessionId
+                val liveRuntimeId = ackRuntimeId ?: preAckRuntimeId
                 val renameTarget = (resultMap?.get("session_key") as? String)
                     ?: liveRuntimeId
                 if (liveRuntimeId != null && request.pendingRenameTitle != null) {
