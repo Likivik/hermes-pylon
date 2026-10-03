@@ -60,12 +60,12 @@ class DeleteE2eTest {
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         activityScenario = scenario
 
-        // Wait for the seeded background row to render.
-        val bgTag = "rail_item_stored-bg"
-        composeRule.waitUntilAtLeastOneExists(
-            androidx.compose.ui.test.hasTestTag(bgTag),
-            timeoutMillis = 30_000,
-        )
+        // The seeded background session is the SECOND rail item (index 1:
+        // [0] = app's auto-created fresh session, [1] = stored-bg). Grab its
+        // ACTUAL rail tag — never derive from the seeded id (e2e-69: the DB id
+        // ≠ the rail tag id; the rail keys by the gateway's session.list id).
+        val itemTag = E2eHarness.waitForRailItemAt(composeRule, index = 1)
+        val bgTag = itemTag
 
         // Long-press → Delete → confirm not-auto: the popup's Delete fires
         // immediately (no confirm dialog), then the row disappears from the rail.
