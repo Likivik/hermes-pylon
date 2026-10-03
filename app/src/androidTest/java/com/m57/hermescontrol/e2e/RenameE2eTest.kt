@@ -24,12 +24,11 @@ import org.junit.runner.RunWith
 /**
  * E2E: rename succeeds against the REAL Hermes gateway.
  *
- * Isolation strategy: the app auto-creates a fresh session on EVERY launch
- * (ChatViewModel: session.create on first connect). So this test picks the
- * FIRST rail item (newest-first sort → the app's own fresh session), renames
- * it, and asserts the title updated + no error surfaced. No RPC-create, no
- * dependence on stored_session_id vs session.list id (the mismatch that
- * burned e2e-69).
+ * Isolation strategy: with auto-create disabled, launch lands on an empty
+ * pane and this test SELECTS the first rail item (seeded stored-current),
+ * renames it, and asserts the title updated + no error surfaced.
+ * No RPC-create, no dependence on stored_session_id vs session.list id
+ * (the mismatch that burned e2e-69).
  */
 @RunWith(AndroidJUnit4::class)
 @OptIn(ExperimentalTestApi::class)
@@ -71,13 +70,16 @@ class RenameE2eTest {
         E2eHarness.resetStateForTest()
         E2eHarness.seedRealGatewayProfile(password = password)
 
-        // 2. Launch. App auto-creates its session; rail populates.
+        // 2. Launch. Rail populates from the gateway's session.list; with
+        //    auto-create disabled the pane stays empty until we select.
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         activityScenario = scenario
 
-        // 3. Grab the FIRST rail item (the app's own fresh session) by tag.
+        // 3. Grab the FIRST rail item (the seeded stored-current — with
+        //    auto-create disabled there is no fresh session occupying index 0)
+        //    and SELECT it explicitly (launch now lands on an empty pane).
         DeviceLog.withEvidence("rename-e2e:firstItem") {
-            itemTag = E2eHarness.waitForFirstRailItem(composeRule)
+            itemTag = E2eHarness.selectSessionAt(composeRule, 0)
         }
         val tag = itemTag ?: error("no rail item tag")
 

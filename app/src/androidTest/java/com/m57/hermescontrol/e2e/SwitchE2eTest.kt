@@ -19,6 +19,8 @@ import org.junit.runner.RunWith
  * E2E: tapping a (non-active) rail session switches the active session.
  * The app highlights the current session with the HermesPurple active tint;
  * we assert a seeded background row becomes the active one after a tap.
+ * With auto-create disabled the rail starts with seeded rows only; we
+ * explicitly select index 1 (stored-bg) — the tap itself is the selection.
  */
 @RunWith(AndroidJUnit4::class)
 @OptIn(ExperimentalTestApi::class)

@@ -58,7 +58,9 @@ class PinE2eTest {
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         activityScenario = scenario
 
-        val tag = E2eHarness.waitForFirstRailItem(composeRule)
+        // With auto-create disabled, launch lands on an empty pane — select the
+        // first rail session explicitly before pinning it.
+        val tag = E2eHarness.selectSessionAt(composeRule, 0)
 
         // Pin via popup.
         composeRule.onNodeWithTag(tag).performTouchInput { longClick() }

@@ -62,7 +62,9 @@ class IconChangeE2eTest {
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         activityScenario = scenario
 
-        val tag = E2eHarness.waitForFirstRailItem(composeRule)
+        // With auto-create disabled, launch lands on an empty pane — select the
+        // first rail session explicitly before opening its edit dialog.
+        val tag = E2eHarness.selectSessionAt(composeRule, 0)
 
         // Long-press → Edit icon / name (the shared dialog).
         composeRule.onNodeWithTag(tag).performTouchInput { longClick() }

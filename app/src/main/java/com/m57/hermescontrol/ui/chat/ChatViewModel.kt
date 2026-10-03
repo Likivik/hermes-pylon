@@ -482,13 +482,17 @@ class ChatViewModel(
                 switchSession(initial)
             } else {
                 // Likivik patch: resume the last-open session across launches
-                // instead of creating a new one every cold open.
+                // instead of creating a new one every cold open. If there is
+                // no last session, do NOT auto-create — leave the chat pane
+                // empty and let the user pick from the rail (which
+                // loadSessions() above populates). The send path is guarded
+                // on currentSessionId != null, so a null selection safely
+                // disables input until a session is chosen.
                 val last = lastSession()
                 if (!last.isNullOrBlank()) {
                     switchSession(last)
-                } else {
-                    createNewSession(setLoading = false)
                 }
+                // else: no auto-create. Stay on the empty state.
             }
         }
     }

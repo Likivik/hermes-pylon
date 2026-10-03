@@ -89,12 +89,9 @@ class RenameFailureE2eTest {
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         activityScenario = scenario
 
-        // 3. No RPC create — the app auto-creates its own session on launch and
-        //    it is ACTIVE (resumed). The gateway refuses to delete an active
-        //    session ("cannot delete an active session", e2e-77), so we target
-        //    the SECOND rail item — a seeded background session that is
-        //    inactive and deletable. After the delete, its `session.resume`
-        //    from the app returns 4007.
+        // 3. No RPC create — we target the SECOND rail item — a seeded
+        //    background session (stored-bg) that is inactive and deletable.
+        //    After the delete, its `session.resume` from the app returns 4007.
 
         // 4. Grab the SECOND rail item's tag by UI matcher (index 1). The
         //    tag embeds the session.list id — the SAME id the gateway's

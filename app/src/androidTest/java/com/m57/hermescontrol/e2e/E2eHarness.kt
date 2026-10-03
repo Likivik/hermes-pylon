@@ -244,6 +244,28 @@ object E2eHarness {
         null
     }
 
+    /**
+     * WITH AUTO-CREATE DISABLED: launch lands on an EMPTY chat pane (no
+     * session selected). Tests must explicitly pick a rail session — this
+     * waits for rail item [index], taps it, and waits for the session to be
+     * selected & ready. Returns the tapped item's UI tag.
+     *
+     * Preserves the old rail item at [index] semantics (the auto-create used
+     * to occupy index 0, so tests that wanted the seeded background row used
+     * [index]=1; with no auto-create, the seeded rows shift up by one and
+     * callers pass the same logical position).
+     */
+    fun selectSessionAt(
+        composeRule: ComposeTestRule,
+        index: Int,
+        timeoutMillis: Long = 30_000,
+    ): String {
+        val tag = waitForRailItemAt(composeRule, index, timeoutMillis)
+        composeRule.onNodeWithTag(tag).performClick()
+        composeRule.waitForIdle()
+        return tag
+    }
+
     private fun railItemMatcher() =
         SemanticsMatcher("rail item") { node ->
             node.config.getOrElse(SemanticsProperties.TestTag) { "" }

@@ -20,12 +20,13 @@ import org.junit.runner.RunWith
 
 /**
  * E2E: delete a rail session through the long-press popup. Deleting a
- * NON-active session (the app's fresh auto-create is active; we delete a
- * seeded background row) removes it from the rail.
+ * NON-active session (a seeded background row) removes it from the rail.
  *
  * The gateway refuses to delete the ACTIVE session ("cannot delete an
  * active session"), and the UI guard also blocks deleting the current one —
  * so this targets a seeded background item (stored-bg), never the active one.
+ * With auto-create disabled, no fresh session occupies index 0; the rail's
+ * index 1 is the seeded stored-bg row.
  */
 @RunWith(AndroidJUnit4::class)
 @OptIn(ExperimentalTestApi::class)
