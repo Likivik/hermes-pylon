@@ -17,6 +17,7 @@ import androidx.test.rule.GrantPermissionRule
 import com.m57.hermescontrol.MainActivity
 import com.m57.hermescontrol.data.ws.HermesWsClient
 import org.junit.After
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -127,6 +128,13 @@ class RenameE2eTest {
             composeRule.onAllNodesWithText("Renamed E2E")
                 .fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithText("Renamed E2E").assertIsDisplayed()
+        // The name must be back on BOTH surfaces after a cold start: the rail row
+        // (scoped by tag — a bare onNodeWithText sees two nodes, rail + header)
+        // and the chat-pane header.
+        composeRule.onNodeWithTag(tag).assertIsDisplayed()
+        assertTrue(
+            "expected 'Renamed E2E' on both the rail row and the header after recreate",
+            composeRule.onAllNodesWithText("Renamed E2E").fetchSemanticsNodes().size >= 2,
+        )
     }
 }

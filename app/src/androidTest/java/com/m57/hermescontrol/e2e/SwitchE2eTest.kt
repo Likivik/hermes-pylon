@@ -25,8 +25,8 @@ import org.junit.runner.RunWith
  * therefore passed even if the tap did nothing at all.
  *
  * The real signal is that the tapped session becomes the one the chat pane is
- * bound to: its title moves into the top-bar header (`chat_title`), so the
- * seeded row's label must appear a SECOND time after the tap (rail + header).
+ * bound to: the top-bar header (`chat_title`) stops showing the unbound-pane
+ * default title and shows that session's own title instead.
  */
 @RunWith(AndroidJUnit4::class)
 @OptIn(ExperimentalTestApi::class)
@@ -61,30 +61,30 @@ class SwitchE2eTest {
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         activityScenario = scenario
 
-        // The seeded background row is rail index 1 (the rail sorts the seeded
-        // rows by last activity: [0] = stored-current, [1] = stored-bg titled
-        // "Background chat"). Grab its ACTUAL rail tag — never derive it from
-        // the seeded id (e2e-69: the seeded DB id ≠ the rail tag id).
+        // The seeded background row is rail index 1 (the rail orders seeded rows
+        // by last activity: [0] = stored-current, [1] = stored-bg). Grab its
+        // ACTUAL rail tag — never derive it from the seeded id, and never match
+        // the row by TEXT: the rail renders a derived label rather than the seed
+        // title, which is how the previous version managed to assert nothing.
         val bgTag = E2eHarness.waitForRailItemAt(composeRule, index = 1)
         composeRule.onNodeWithTag(bgTag).assertIsDisplayed()
 
-        // Before the tap its title exists ONCE (the rail row only).
-        val label = "Background chat"
-        val before = composeRule.onAllNodesWithText(label).fetchSemanticsNodes().size
-        check(before == 1) {
-            "expected '$label' to render exactly once (rail row) before switching, found $before — " +
-                "is the seed/order still [0]=stored-current, [1]=stored-bg?"
-        }
+        // BEFORE: with auto-create disabled and no session selected the pane is
+        // unbound, so the top-bar header carries the default title.
+        composeRule.waitUntil(10_000) { defaultHeaderTitleCount() >= 1 }
+        val beforeDefault = defaultHeaderTitleCount()
 
         composeRule.onNodeWithTag(bgTag).performClick()
 
-        // After the tap the chat pane is bound to that session, so its title
-        // also lands in the top-bar header → two nodes, and the header itself
-        // exists. This is what fails when the tap does nothing.
-        composeRule.waitUntil(20_000) {
-            composeRule.onAllNodesWithText(label).fetchSemanticsNodes().size >= 2
-        }
+        // AFTER: the pane binds to the tapped session, so the header's default
+        // title is replaced by that session's own title — the count DROPS. If the
+        // tap did nothing (undetectable in the previous version) it stays put.
+        composeRule.waitUntil(20_000) { defaultHeaderTitleCount() < beforeDefault }
         composeRule.onNodeWithTag("chat_title", useUnmergedTree = true)
             .assertIsDisplayed()
     }
+
+    /** Rendered nodes carrying the unbound-pane default header title. */
+    private fun defaultHeaderTitleCount(): Int =
+        composeRule.onAllNodesWithText("Hermes").fetchSemanticsNodes().size
 }
