@@ -1982,19 +1982,21 @@ class ChatViewModelTest {
             assertEquals("xhigh", viewModel.uiState.value.reasoningLevel)
             assertEquals(44_000L, viewModel.uiState.value.contextUsage?.usedTokens)
             assertEquals(640_000L, viewModel.uiState.value.contextUsage?.inputTokens)
-            assertEquals(3, messages.size)
+            // Only the payload's two messages: "Session resumed" is transient
+            // connection noise and is surfaced as a status pill, never as a
+            // list item (see addSystemMessage(transient = true)).
+            assertEquals(2, messages.size)
             assertEquals("Earlier question", messages[0].content)
             assertEquals(MessageRole.USER, messages[0].role)
             assertEquals("Earlier answer", messages[1].content)
             assertEquals(MessageRole.ASSISTANT, messages[1].role)
             assertEquals("Earlier reasoning", messages[1].reasoningText)
-            assertEquals("Session resumed", messages[2].content)
 
             viewModel.refreshCurrentSession()
             advanceUntilIdle()
 
             assertEquals(
-                listOf("Earlier question", "Earlier answer", "Session resumed"),
+                listOf("Earlier question", "Earlier answer"),
                 viewModel.uiState.value.messages.map { it.content },
             )
         }

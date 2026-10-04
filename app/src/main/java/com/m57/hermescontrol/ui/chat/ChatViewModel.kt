@@ -400,7 +400,11 @@ class ChatViewModel(
             // `launch` may run immediately on the main dispatcher while the
             // constructor is still initializing later properties. Post one
             // message-loop turn so all property initializers have completed.
-            android.os.Handler(android.os.Looper.getMainLooper()).post {
+            // Dispatchers.Main (NOT viewModelScope's Main.immediate) so the body
+            // really is deferred one queue turn. Using the dispatcher instead of
+            // a Looper Handler keeps the ViewModel free of an android.os.Looper
+            // dependency, which a plain JVM unit test can then drive.
+            viewModelScope.launch(Dispatchers.Main) {
                 handleGatewayReady()
             }
         }

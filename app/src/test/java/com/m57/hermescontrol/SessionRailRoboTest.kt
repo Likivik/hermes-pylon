@@ -52,7 +52,14 @@ import com.github.takahirom.roborazzi.captureRoboImage
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [34], qualifiers = "w460dp-h920dp-420dpi")
+// Plain Application on purpose: HermesControlApp.onCreate initializes
+// AuthManager → SecureBlobStore → AndroidKeyStore, which Robolectric does not
+// provide ("AndroidKeyStore not found"). Rendering needs no app init.
+@Config(
+    sdk = [34],
+    qualifiers = "w460dp-h920dp-420dpi",
+    application = android.app.Application::class,
+)
 class SessionRailRoboTest {
 
     @get:Rule

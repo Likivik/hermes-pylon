@@ -25,7 +25,10 @@ import org.robolectric.annotation.Config
  * that exact round-trip here.
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+// Plain Application on purpose: the real HermesControlApp.onCreate initializes
+// AuthManager → SecureBlobStore → AndroidKeyStore, which Robolectric does not
+// provide ("AndroidKeyStore not found"). This test only needs an app Context.
+@Config(sdk = [34], application = android.app.Application::class)
 class RailOrderPersistenceTest {
 
     private fun session(id: String, lastActive: Long = nowSeconds() - 60): SessionUi =
