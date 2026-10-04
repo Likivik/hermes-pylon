@@ -116,6 +116,8 @@ data class ChatUiState(
     val currentSessionId: String? = null,
     val isSessionReady: Boolean = false,
     val sessions: List<SessionUi> = emptyList(),
+    /** True while a user-triggered session.list refresh is in flight (rail pull-to-refresh). */
+    val railRefreshing: Boolean = false,
     val chatTitle: String = "Hermes",
     val connectionStatus: ConnectionStatus = ConnectionStatus.DISCONNECTED,
     val statusPill: String? = null,
@@ -868,6 +870,7 @@ class ChatViewModel(
                     state.copy(
                         sessions = sessions,
                         chatTitle = newTitle ?: state.chatTitle,
+                        railRefreshing = false,
                     )
                 }
             }
@@ -1970,6 +1973,17 @@ class ChatViewModel(
                 onSent = { id -> trackRequest(id, WsMethods.SESSION_LIST) },
             )
         }
+    }
+
+    /**
+     * User-triggered rail refresh (pull-to-refresh / the top-bar refresh icon).
+     * Re-lists sessions so the rail reflects SERVER truth — titles, deletions
+     * and ordering are all owned by the gateway, and the rename/delete paths
+     * update the rail optimistically.
+     */
+    fun refreshSessions() {
+        _uiState.update { it.copy(railRefreshing = true) }
+        loadSessions()
     }
 
     private fun fetchCommandCatalog() {

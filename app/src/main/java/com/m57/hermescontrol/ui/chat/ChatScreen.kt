@@ -461,6 +461,11 @@ fun ChatScreen(
     HermesScaffold(
         modifier = modifier,
         pinTopBar = true,
+        // Session titles/deletions are owned by the gateway and the rail updates
+        // optimistically, so give the user (and the E2E suite) a way to re-list
+        // and see server truth.
+        onRefresh = { viewModel.refreshSessions() },
+        isRefreshing = state.railRefreshing,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AutoScrollingTitleText(

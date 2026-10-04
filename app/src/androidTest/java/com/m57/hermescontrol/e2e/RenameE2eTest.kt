@@ -29,6 +29,13 @@ import org.junit.runner.RunWith
  * renames it, and asserts the title updated + no error surfaced.
  * No RPC-create, no dependence on stored_session_id vs session.list id
  * (the mismatch that burned e2e-69).
+ *
+ * SERVER TRUTH: the optimistic rail title alone is a false alibi — this test
+ * used to pass while every rename was silently rejected with 4001, because
+ * `session.title` is session-scoped and resolves params["session_id"] as an
+ * exact LIVE runtime sid (stored ids 4001). So after renaming we force a
+ * session.list re-list (rail refresh) and a full activity recreate, then assert
+ * the gateway itself still reports the new name.
  */
 @RunWith(AndroidJUnit4::class)
 @OptIn(ExperimentalTestApi::class)
@@ -62,7 +69,7 @@ class RenameE2eTest {
      */
 
     @Test
-    fun renameBackgroundSession_resumeFirst_thenTitleBySessionKey() {
+    fun renameBackgroundSession_thenTitleSurvivesServerRelist() {
         val password = E2eHarness.realGatewayPasswordFromArgs()
             ?: error("e2ePassword not set — CI must pass -Pandroid.testInstrumentationRunnerArguments.e2ePassword=\$E2E_PASS")
 
@@ -102,9 +109,25 @@ class RenameE2eTest {
         composeRule.onNodeWithTag(tag).assertIsDisplayed()
 
         // 6. UI pin #2: no rename-pipeline error. We scope to the rename
-        //    failure surface ("Error (session.resume)") — a blanket "Error"
-        //    search trips on unrelated snackbars/tooltips in the shared process.
+        //    failure surfaces ("Error (session…" / "Rename failed…") — a blanket
+        //    "Error" search trips on unrelated snackbars in the shared process.
         composeRule.waitForIdle()
         composeRule.onNodeWithText("Error (session", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("Rename failed", substring = true).assertDoesNotExist()
+
+        // 7. SERVER TRUTH #1: the rail refresh re-lists sessions straight from
+        //    the gateway, replacing the optimistic row with the server's view.
+        composeRule.onNodeWithTag("refresh_button").performClick()
+        composeRule.waitForIdle()
+
+        // 8. SERVER TRUTH #2: a full app restart re-reads session.list from
+        //    scratch. If the title had only ever been applied optimistically,
+        //    the gateway would report the old name here and this fails.
+        scenario.recreate()
+        composeRule.waitUntil(25_000) {
+            composeRule.onAllNodesWithText("Renamed E2E")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("Renamed E2E").assertIsDisplayed()
     }
 }
