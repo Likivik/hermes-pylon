@@ -199,7 +199,7 @@ class SessionRenameTest {
         advanceUntilIdle()
 
         check(viewModel.uiState.value.currentSessionId == "session-123") {
-            "createViewModelWithSession: live session was not installed",
+            "createViewModelWithSession: live session was not installed"
         }
         return viewModel
     }
