@@ -13,6 +13,7 @@ object WsMethods {
     const val SESSION_REDIRECT = "session.redirect"
     const val SESSION_DELETE = "session.delete"
     const val SESSION_TITLE = "session.title"
+    const val SESSION_CLOSE = "session.close"
     const val SESSION_BRANCH = "session.branch"
 
     // ── Interaction ───────────────────────────────────────────────────────

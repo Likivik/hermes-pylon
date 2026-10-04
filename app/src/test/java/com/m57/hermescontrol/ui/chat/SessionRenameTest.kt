@@ -36,6 +36,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -218,7 +219,7 @@ class SessionRenameTest {
     // ── Tests ────────────────────────────────────────────────────────────────
 
     @Test
-    fun backgroundRename_resumesFirst_thenTitlesByStorageKey() =
+    fun backgroundRename_resumesFirst_thenTitlesByRuntimeId() =
         runTest {
             val viewModel = createViewModelWithSession()
             captureResumeRequestId()
@@ -235,7 +236,8 @@ class SessionRenameTest {
                 )
             }
 
-            // 2. Ack rotates the runtime id but keeps session_key = storage id.
+            // 2. Ack reports both ids: session_id = the live runtime sid,
+            //    session_key = the STORED id.
             mockEventsFlow.emit(
                 WsEvent.RpcResult(
                     resumeRequestId,
@@ -249,19 +251,22 @@ class SessionRenameTest {
             )
             advanceUntilIdle()
 
-            // 3. Title addressed by the STORAGE id…
+            // 3. Title addressed by the RUNTIME sid — session.title is a
+            //    session-scoped RPC resolved against the gateway's live
+            //    `_sessions` map, so only the runtime sid can match.
             verify {
                 HermesWsClient.send(
                     WsMethods.SESSION_TITLE,
-                    mapOf("session_id" to "stored-bg", "title" to "New Test Name"),
+                    mapOf("session_id" to "runtime-8hex", "title" to "New Test Name"),
                     any(),
                 )
             }
-            // …and never by the rotated runtime id.
+            // …and never by the stored id (that 4001s "session not found";
+            // addressing the title with it was the rename bug).
             verify(exactly = 0) {
                 HermesWsClient.send(
                     WsMethods.SESSION_TITLE,
-                    mapOf("session_id" to "runtime-8hex", "title" to "New Test Name"),
+                    mapOf("session_id" to "stored-bg", "title" to "New Test Name"),
                     any(),
                 )
             }
@@ -291,7 +296,7 @@ class SessionRenameTest {
         }
 
     @Test
-    fun currentSessionRename_titlesByStorageKeyFromAck() =
+    fun currentSessionRename_titlesByRuntimeIdFromAck() =
         runTest {
             val viewModel = createViewModelWithSession()
             captureResumeRequestId()
@@ -322,7 +327,15 @@ class SessionRenameTest {
             )
             advanceUntilIdle()
 
+            // Addressed by the ack's runtime sid, not the stored id.
             verify {
+                HermesWsClient.send(
+                    WsMethods.SESSION_TITLE,
+                    mapOf("session_id" to "runtime-live-8hex", "title" to "Live Rename"),
+                    any(),
+                )
+            }
+            verify(exactly = 0) {
                 HermesWsClient.send(
                     WsMethods.SESSION_TITLE,
                     mapOf("session_id" to "session-123", "title" to "Live Rename"),
@@ -410,5 +423,163 @@ class SessionRenameTest {
 
             // The active chat must NOT be switched onto the renamed session.
             assertEquals("session-123", viewModel.uiState.value.currentSessionId)
+        }
+
+    // ── Delete addressing ────────────────────────────────────────────────────
+    // session.delete is NOT session-scoped: it deletes the DB row by the
+    // STORED id (exactly what session.list hands the rail) and refuses with
+    // 4023 only while a live runtime still owns that stored id.
+
+    @Test
+    fun deleteSession_sendsTheStoredIdTheRailHolds() =
+        runTest {
+            val viewModel = createViewModelWithSession()
+            every {
+                HermesWsClient.send(WsMethods.SESSION_DELETE, any(), any())
+            } answers {
+                arg<((String) -> Unit)?>(2)?.invoke("del-1")
+                "del-1"
+            }
+
+            viewModel.deleteRailSession("stored-bg")
+            advanceUntilIdle()
+
+            verify {
+                HermesWsClient.send(
+                    WsMethods.SESSION_DELETE,
+                    mapOf("session_id" to "stored-bg"),
+                    any(),
+                )
+            }
+            mockEventsFlow.emit(WsEvent.RpcResult("del-1", mapOf("deleted" to "stored-bg")))
+            advanceUntilIdle()
+            assertNull(viewModel.uiState.value.errorMessage)
+        }
+
+    @Test
+    fun deleteRefusedWhileActive_closesTheRuntime_thenRetriesOnce() =
+        runTest {
+            val viewModel = createViewModelWithSession()
+            var deleteCount = 0
+            every {
+                HermesWsClient.send(WsMethods.SESSION_DELETE, any(), any())
+            } answers {
+                deleteCount++
+                val id = "del-$deleteCount"
+                arg<((String) -> Unit)?>(2)?.invoke(id)
+                id
+            }
+            every {
+                HermesWsClient.send(WsMethods.SESSION_RESUME, any(), any())
+            } answers {
+                arg<((String) -> Unit)?>(2)?.invoke("res-1")
+                "res-1"
+            }
+            every {
+                HermesWsClient.send(WsMethods.SESSION_CLOSE, any(), any())
+            } answers {
+                arg<((String) -> Unit)?>(2)?.invoke("cls-1")
+                "cls-1"
+            }
+
+            viewModel.deleteRailSession("stored-bg")
+            advanceUntilIdle()
+
+            // The gateway refuses: the target's runtime is still live.
+            mockEventsFlow.emit(
+                WsEvent.RpcError(
+                    "del-1",
+                    JsonRpcError(code = 4023, message = "cannot delete an active session"),
+                ),
+            )
+            advanceUntilIdle()
+
+            // 1. Resume the STORED id purely to learn its runtime sid.
+            verify {
+                HermesWsClient.send(
+                    WsMethods.SESSION_RESUME,
+                    mapOf("session_id" to "stored-bg", "omit_messages" to true),
+                    any(),
+                )
+            }
+            mockEventsFlow.emit(
+                WsEvent.RpcResult("res-1", mapOf("session_id" to "runtime-a1b2")),
+            )
+            advanceUntilIdle()
+
+            // 2. Close that runtime — session.close resolves an exact live
+            //    runtime sid (`_pop_session_by_id` pops the `_sessions` key).
+            verify {
+                HermesWsClient.send(
+                    WsMethods.SESSION_CLOSE,
+                    mapOf("session_id" to "runtime-a1b2"),
+                    any(),
+                )
+            }
+            mockEventsFlow.emit(WsEvent.RpcResult("cls-1", mapOf("closed" to true)))
+            advanceUntilIdle()
+
+            // 3. Retry the stored delete (two sends total, not a loop).
+            verify(exactly = 2) {
+                HermesWsClient.send(
+                    WsMethods.SESSION_DELETE,
+                    mapOf("session_id" to "stored-bg"),
+                    any(),
+                )
+            }
+            assertNull(viewModel.uiState.value.errorMessage)
+        }
+
+    @Test
+    fun deleteRefusedTwice_surfacesTheReason_andStops() =
+        runTest {
+            val viewModel = createViewModelWithSession()
+            var deleteCount = 0
+            every {
+                HermesWsClient.send(WsMethods.SESSION_DELETE, any(), any())
+            } answers {
+                deleteCount++
+                val id = "del-$deleteCount"
+                arg<((String) -> Unit)?>(2)?.invoke(id)
+                id
+            }
+            every {
+                HermesWsClient.send(WsMethods.SESSION_RESUME, any(), any())
+            } answers {
+                arg<((String) -> Unit)?>(2)?.invoke("res-1")
+                "res-1"
+            }
+            every {
+                HermesWsClient.send(WsMethods.SESSION_CLOSE, any(), any())
+            } answers {
+                arg<((String) -> Unit)?>(2)?.invoke("cls-1")
+                "cls-1"
+            }
+
+            viewModel.deleteRailSession("stored-bg")
+            advanceUntilIdle()
+            mockEventsFlow.emit(
+                WsEvent.RpcError("del-1", JsonRpcError(4023, "cannot delete an active session")),
+            )
+            advanceUntilIdle()
+            mockEventsFlow.emit(WsEvent.RpcResult("res-1", mapOf("session_id" to "runtime-a1b2")))
+            advanceUntilIdle()
+            mockEventsFlow.emit(WsEvent.RpcResult("cls-1", mapOf("closed" to true)))
+            advanceUntilIdle()
+
+            // The retry is refused too — surface it and give up (no third send).
+            mockEventsFlow.emit(
+                WsEvent.RpcError("del-2", JsonRpcError(4023, "cannot delete an active session")),
+            )
+            advanceUntilIdle()
+
+            verify(exactly = 2) {
+                HermesWsClient.send(WsMethods.SESSION_DELETE, any(), any())
+            }
+            assertTrue(
+                "expected a delete failure message, got " +
+                    viewModel.uiState.value.errorMessage,
+                viewModel.uiState.value.errorMessage?.startsWith("Delete failed") == true,
+            )
         }
 }

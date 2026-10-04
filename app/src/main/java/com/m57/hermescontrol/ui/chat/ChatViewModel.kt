@@ -101,6 +101,14 @@ private data class PendingRpcRequest(
      */
     val pendingRenameTitle: String? = null,
     val pendingRenameIcon: String? = null,
+    /** Runtime id a session.title was addressed to (error attribution). */
+    val titleTargetId: String? = null,
+    /** Stored id a session.delete is working on; also drives close-then-delete. */
+    val deleteSessionId: String? = null,
+    /** True when this resume exists only to learn a runtime sid for a refused delete. */
+    val closeAfterResume: Boolean = false,
+    /** True once a delete has been retried after closing — stops the recovery looping. */
+    val deleteRetried: Boolean = false,
 )
 
 data class ChatUiState(
@@ -868,6 +876,23 @@ class ChatViewModel(
                 val resultMap = result as? Map<String, Any?>
                 val requestedSessionId = request.resumeSessionId
                 val selectedSessionId = _uiState.value.currentSessionId
+                // Delete recovery: session.delete was refused (4023) because the
+                // target is still LIVE server-side. This resume exists only to
+                // learn its runtime sid so we can close it, then retry the
+                // stored delete. Never touches the visible chat.
+                if (request.closeAfterResume) {
+                    val runtimeToClose = resultMap?.get("session_id") as? String
+                    val stored = request.deleteSessionId
+                    if (runtimeToClose != null && stored != null) {
+                        sendCloseSession(runtimeToClose, stored)
+                    } else {
+                        Log.w(
+                            TAG,
+                            "delete recovery: resume ack gave no runtime id for stored=$stored",
+                        )
+                    }
+                    return
+                }
                 if (
                     requestedSessionId != null &&
                     selectedSessionId != requestedSessionId &&
@@ -950,19 +975,23 @@ class ChatViewModel(
                     ActiveSessionHolder.set(runtimeSessionId ?: sessionId, sessionId)
                     addSystemMessage("Session resumed", transient = true)
                 }
-                // Likivik patch: a rename queued on this resume fires now that
-                // the runtime session is live. Addressing: session.title
-                // resolves via _session_lookup_key = agent.session_id OR
-                // session["session_key"]. The resume payload's "session_key"
-                // field IS the storage id we asked for, so send the title with
-                // THAT (stable across the runtime-id rotation the ack's
-                // "session_id" introduces). Falls back to the runtime id.
+                // A rename queued on this resume fires now that the runtime
+                // session is live.
                 //
-                // CRITICAL for CURRENT-session renames: the gateway's resume
-                // fast-path (already-live session) may ack WITHOUT
-                // session_id/session_key (nothing changed to report). The ack
-                // just clobbered runtimeSessionId to null above — fall back to
-                // the runtime id the app already held for the current chat.
+                // ADDRESSING (root-caused against the gateway source,
+                // tui_gateway/server.py `_sess_nowait`): `session.title` is a
+                // SESSION-SCOPED RPC — it resolves params["session_id"] as an
+                // EXACT key in the live `_sessions` map. That key is the RUNTIME
+                // sid (the ack's "session_id"), never the stored id. The ack's
+                // "session_key" is `_session_lookup_key` = agent.session_id =
+                // the STORED key, so addressing the title with it always missed
+                // and returned 4001 "session not found" — the rename silently
+                // never applied. Always address the RUNTIME sid.
+                //
+                // Fast-path acks (already-live session) may omit session_id;
+                // fall back to the cached runtime id ONLY for a current-session
+                // rename — for a background rename that id belongs to the
+                // session the user is viewing and would title the WRONG one.
                 val ackRuntimeId = runtimeSessionId
                 // Fallback to the cached runtime id ONLY for a current-session
                 // rename (renameOnly == false). For a BACKGROUND rename the
@@ -979,14 +1008,17 @@ class ChatViewModel(
                             "requested=$requestedSessionId (renameOnly=$renameOnly) — title not sent",
                     )
                 }
-                val renameTarget = (resultMap?.get("session_key") as? String)
-                    ?: liveRuntimeId
-                if (liveRuntimeId != null && request.pendingRenameTitle != null) {
-                    sendSessionTitle(
-                        renameTarget ?: liveRuntimeId,
-                        request.pendingRenameTitle,
-                    )
+                val renameTarget = liveRuntimeId
+                if (renameTarget != null && request.pendingRenameTitle != null) {
+                    sendSessionTitle(renameTarget, request.pendingRenameTitle)
                 }
+            }
+
+            WsMethods.SESSION_CLOSE -> {
+                // Close-then-delete recovery: the runtime is down, so the stored
+                // delete can now succeed. Marked retried so a second refusal
+                // surfaces instead of looping.
+                request.deleteSessionId?.let { sendDeleteSession(it, retried = true) }
             }
 
             WsMethods.SESSION_INTERRUPT -> {
@@ -1101,6 +1133,33 @@ class ChatViewModel(
                 }
                 return
             }
+        }
+
+        // 4023: the gateway refuses to delete a session whose runtime is still
+        // live. Close that runtime (learned via a resume) and retry the delete
+        // exactly once — `deleteRetried` stops this from looping.
+        if (method == WsMethods.SESSION_DELETE && errorCode == 4023) {
+            val stored = request.deleteSessionId
+            if (stored != null && !request.deleteRetried) {
+                Log.i(TAG, "session.delete refused (still active) — closing runtime, then retrying: $stored")
+                _uiState.update { it.copy(errorMessage = null) }
+                startCloseThenDelete(stored)
+                return
+            }
+        }
+
+        // Failures of the rename/delete RPCs get an action-shaped message: the
+        // optimistic rail state reverts on the next session.list refresh, so the
+        // user has to know the server refused, and why.
+        if (method == WsMethods.SESSION_TITLE) {
+            Log.e(TAG, "session.title failed ($errorCode): $errorMsg target=${request.titleTargetId}")
+            _uiState.update { it.copy(isLoading = false, errorMessage = "Rename failed: $errorMsg") }
+            return
+        }
+        if (method == WsMethods.SESSION_DELETE) {
+            Log.e(TAG, "session.delete failed ($errorCode): $errorMsg target=${request.deleteSessionId}")
+            _uiState.update { it.copy(isLoading = false, errorMessage = "Delete failed: $errorMsg") }
+            return
         }
 
         // Likivik patch: a failed rename-resume means the rename is LOST —
@@ -1709,8 +1768,71 @@ class ChatViewModel(
             wsClient.send(
                 WsMethods.SESSION_TITLE,
                 mapOf("session_id" to runtimeSessionId, "title" to title),
+                // Tracked so a rejection is attributed to session.title and
+                // handled here instead of falling through to the reducer's raw
+                // JsonRpcError banner.
+                onSent = { id ->
+                    pendingRequests[id] =
+                        PendingRpcRequest(
+                            method = WsMethods.SESSION_TITLE,
+                            titleTargetId = runtimeSessionId,
+                        )
+                },
             )
         }
+    }
+
+    /**
+     * `session.delete` is refused with 4023 while the target is LIVE on the
+     * gateway (the agent's next flush would trip a foreign key), and
+     * `session.close` — like every session-scoped RPC — resolves an EXACT live
+     * runtime id (`_pop_session_by_id` pops the `_sessions` key). The stored id
+     * the rail holds is not that key, so resume it once to learn the runtime
+     * sid, close it, then retry the stored delete.
+     */
+    private fun startCloseThenDelete(storedId: String) {
+        wsClient.send(
+            WsMethods.SESSION_RESUME,
+            mapOf("session_id" to storedId, "omit_messages" to true),
+            onSent = { id ->
+                pendingRequests[id] =
+                    PendingRpcRequest(
+                        method = WsMethods.SESSION_RESUME,
+                        resumeSessionId = storedId,
+                        deleteSessionId = storedId,
+                        closeAfterResume = true,
+                    )
+            },
+        )
+    }
+
+    private fun sendCloseSession(runtimeSessionId: String, storedId: String) {
+        wsClient.send(
+            WsMethods.SESSION_CLOSE,
+            mapOf("session_id" to runtimeSessionId),
+            onSent = { id ->
+                pendingRequests[id] =
+                    PendingRpcRequest(
+                        method = WsMethods.SESSION_CLOSE,
+                        deleteSessionId = storedId,
+                    )
+            },
+        )
+    }
+
+    private fun sendDeleteSession(storedId: String, retried: Boolean = false) {
+        wsClient.send(
+            WsMethods.SESSION_DELETE,
+            mapOf("session_id" to storedId),
+            onSent = { id ->
+                pendingRequests[id] =
+                    PendingRpcRequest(
+                        method = WsMethods.SESSION_DELETE,
+                        deleteSessionId = storedId,
+                        deleteRetried = retried,
+                    )
+            },
+        )
     }
 
     fun togglePinSession(sessionId: String) {
@@ -1730,12 +1852,10 @@ class ChatViewModel(
      * for the next session.list round-trip.
      */
     fun deleteRailSession(sessionId: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            wsClient.send(
-                WsMethods.SESSION_DELETE,
-                mapOf("session_id" to sessionId),
-            )
-        }
+        // session.delete takes the STORED id (it deletes the DB row and refuses
+        // only when that id belongs to a live runtime, 4023) — which is exactly
+        // what the rail holds from session.list.
+        sendDeleteSession(sessionId)
         _pinnedSessionIds.value.let { pins ->
             if (sessionId in pins) togglePinSession(sessionId)
         }
