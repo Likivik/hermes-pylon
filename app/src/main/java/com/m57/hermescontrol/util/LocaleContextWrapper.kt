@@ -86,6 +86,7 @@ object LocaleContextWrapper {
                 @Suppress("DEPRECATION")
                 setLocale(locale)
             }
+            setLayoutDirection(locale)
         }
 
     /**

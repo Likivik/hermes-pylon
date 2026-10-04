@@ -14,6 +14,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -29,6 +30,7 @@ import com.m57.hermescontrol.ui.chat.ChatViewModel
 import com.m57.hermescontrol.ui.chat.ClarifyUi
 import com.m57.hermescontrol.ui.chat.SecretPromptUi
 import com.m57.hermescontrol.ui.chat.SudoPromptUi
+import com.m57.hermescontrol.ui.chat.VaultPromptUi
 
 @Composable
 fun ChatLifecycleEffects(
@@ -46,6 +48,7 @@ fun ChatLifecycleEffects(
     clarifyRequest: ClarifyUi?,
     sudoPrompt: SudoPromptUi?,
     secretPrompt: SecretPromptUi?,
+    vaultPrompt: VaultPromptUi?,
     listState: LazyListState,
     scrollController: ChatScrollController,
     snackbarHostState: SnackbarHostState,
@@ -162,17 +165,41 @@ fun ChatLifecycleEffects(
 
     // Sudo / secret prompt dialogs (issue #524)
     sudoPrompt?.let { prompt ->
-        SudoPromptDialog(
-            onConfirm = viewModel::respondToSudo,
-            onDismiss = viewModel::dismissSudo,
-        )
+        key(prompt.fullBinding) {
+            SudoPromptDialog(
+                binding = prompt.fullBinding,
+                onConfirm = viewModel::respondToSudo,
+                onCancel = viewModel::cancelSudo,
+                onDismiss = viewModel::dismissSudo,
+                isSubmitting = prompt.isSubmitting,
+            )
+        }
     }
 
     secretPrompt?.let { prompt ->
-        SecretPromptDialog(
-            onConfirm = viewModel::respondToSecret,
-            onDismiss = viewModel::dismissSecret,
-        )
+        key(prompt.fullBinding) {
+            SecretPromptDialog(
+                binding = prompt.fullBinding,
+                onConfirm = viewModel::respondToSecret,
+                onCancel = viewModel::cancelSecret,
+                onDismiss = viewModel::dismissSecret,
+                envVar = prompt.envVar,
+                prompt = prompt.prompt,
+                isSubmitting = prompt.isSubmitting,
+            )
+        }
+    }
+
+    vaultPrompt?.let { prompt ->
+        key(prompt.binding, prompt.method) {
+            VaultPromptDialog(
+                prompt = prompt,
+                onConfirm = viewModel::respondToVault,
+                onConfirmLogin = viewModel::respondToVaultLogin,
+                onCancel = viewModel::cancelVault,
+                onDismiss = viewModel::dismissVault,
+            )
+        }
     }
 
     // Scroll to current search match (serialized through the controller so it

@@ -118,7 +118,7 @@ private fun resolveStatusColors(
 @Composable
 fun HermesControlTheme(
     themePreference: ThemePreference = LocalThemePreference.current,
-    useDynamicColors: Boolean = true,
+    useDynamicColors: Boolean = false,
     themePreset: ThemePreset = ThemePreset.DEFAULT,
     chatFontScale: Float = 1.0f,
     content: @Composable () -> Unit,

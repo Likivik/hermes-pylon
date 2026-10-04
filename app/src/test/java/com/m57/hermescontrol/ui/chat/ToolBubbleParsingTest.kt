@@ -10,6 +10,63 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ToolBubbleParsingTest {
+    @Test
+    fun processPreviewFallbackAndOmission() {
+        listOf("process", "process_manage").forEach { tool ->
+            val parsed =
+                parseToolOutput(
+                    (
+                        """{"args":{"action":"poll","session_id":"p1"},"result":{"status":"running",""" +
+                            """"output_preview":"ready","output_cut":42}}"""
+                    ),
+                    tool,
+                    false,
+                )!!
+            assertEquals("Status: running\nready", parsed.mainOutput)
+            assertEquals(42L, parsed.outputCut)
+            assertEquals("⚙️ poll: p1", parsed.summaryText)
+            val preferred =
+                parseToolOutput(
+                    """{"result":{"output":"complete","output_preview":"old","output_cut":1}}""",
+                    tool,
+                    false,
+                )!!
+            assertEquals("complete", preferred.mainOutput)
+            assertEquals(1L, preferred.outputCut)
+            assertNull(parseToolOutput("""{"result":{"output_cut":1}}""", tool, true)!!.outputCut)
+        }
+    }
+
+    @Test
+    fun processOmissionRequiresPositiveExactInteger() {
+        val rejected = listOf("null", "0", "-1", "1.5", "1e2", "\"12\"", "true", "9223372036854775808")
+        rejected.forEach { value ->
+            val parsed = parseToolOutput("""{"result":{"output":"ok","output_cut":$value}}""", "process", false)
+            assertNotNull(value, parsed)
+            assertNull(value, parsed!!.outputCut)
+            assertEquals("ok", parsed.mainOutput)
+        }
+        val maximum =
+            parseToolOutput(
+                """{"result":{"output_cut":9223372036854775807}}""",
+                "process",
+                false,
+            )!!
+        assertEquals(Long.MAX_VALUE, maximum.outputCut)
+    }
+
+    @Test
+    fun skillManageMissingOrInvalidSuccessFailsClosed() {
+        listOf("", "\"success\":null,", "\"success\":\"true\",").forEach { field ->
+            val parsed = parseToolOutput("""{"result":{$field"message":"unexpected"}}""", "skill_manage", false)!!
+            assertEquals("❌ unexpected", parsed.mainOutput)
+        }
+        assertEquals(
+            "✅ created",
+            parseToolOutput("""{"result":{"success":true,"message":"created"}}""", "skill_manage", false)!!.mainOutput,
+        )
+    }
+
     // ── Terminal ──────────────────────────────────────────────
 
     @Test

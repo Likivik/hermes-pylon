@@ -34,6 +34,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.CallSplit
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
@@ -41,6 +42,7 @@ import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Search
@@ -54,6 +56,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -63,6 +66,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -91,12 +95,12 @@ import com.m57.hermescontrol.NavigationController
 import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.model.SessionInfo
+import com.m57.hermescontrol.data.model.SessionLiveStatus
 import com.m57.hermescontrol.data.model.SessionSearchResult
 import com.m57.hermescontrol.data.model.SessionTreeItem
 import com.m57.hermescontrol.data.model.flattenSessionTree
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.theme.LocalSpacing
-import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.EmptyState
 import com.m57.hermescontrol.ui.common.ErrorState
 import com.m57.hermescontrol.ui.common.HermesScaffold
@@ -272,7 +276,7 @@ private fun JsonElement.searchText(): String? =
 private fun displayedSessions(state: SessionsUiState): List<SessionTreeItem> =
     if (state.isSearchMode) {
         state.searchResults.map { searchResult ->
-            val session = searchResult.toSessionInfo()
+            val session = searchResult.toSessionInfo().copy(title = state.searchTitles[searchResult.session_id])
             SessionTreeItem(
                 session = session,
                 depth = 0,
@@ -286,6 +290,22 @@ private fun displayedSessions(state: SessionsUiState): List<SessionTreeItem> =
         }
     } else {
         flattenSessionTree(state.sessions)
+    }
+
+/** Every input read by the cached projection must participate in its remember key. */
+@Composable
+internal fun rememberSessionsToDisplay(
+    state: SessionsUiState,
+    sessionSections: SessionSections,
+): List<SessionTreeItem> =
+    remember(
+        state.isSearchMode,
+        state.searchQuery,
+        state.searchResults,
+        state.searchTitles,
+        sessionSections,
+    ) {
+        if (state.isSearchMode) displayedSessions(state) else sessionSections.pinned + sessionSections.recent
     }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -311,6 +331,7 @@ fun SessionsScreen(
     val onPrimaryContainer = MaterialTheme.colorScheme.onPrimaryContainer
 
     var pruneDays by remember { mutableStateOf("7") }
+    var expandedAutomationGroups by remember { mutableStateOf(emptySet<String>()) }
 
     val sessionSections =
         remember(state.sessions, state.pinnedSessionIds) {
@@ -319,21 +340,17 @@ fun SessionsScreen(
                 pinnedSessionIds = state.pinnedSessionIds,
             )
         }
-    val sessionsToDisplay =
-        remember(
-            state.isSearchMode,
-            state.searchQuery,
-            state.searchResults,
-            sessionSections,
-        ) {
-            if (state.isSearchMode) {
-                displayedSessions(state)
-            } else {
-                sessionSections.pinned + sessionSections.recent
-            }
-        }
+    val sessionsToDisplay = rememberSessionsToDisplay(state, sessionSections)
 
     val hasSelection = state.selectedIds.isNotEmpty()
+    val automationRunGroups =
+        remember(sessionSections.recent) {
+            automationGroups(sessionSections.recent.map { it.session })
+        }
+    val recentItemsById =
+        remember(sessionSections.recent) {
+            sessionSections.recent.associateBy { it.session.id }
+        }
     val visibleSessionIds =
         remember(sessionsToDisplay) {
             sessionsToDisplay.mapTo(linkedSetOf()) { it.session.id }
@@ -352,6 +369,10 @@ fun SessionsScreen(
         screenViewModel.loadSessions()
         screenViewModel.loadStats()
     }
+    DisposableEffect(screenViewModel) {
+        screenViewModel.startLiveStatusTracking()
+        onDispose { screenViewModel.stopLiveStatusTracking() }
+    }
 
     // Toast effect
     ToastEffect(
@@ -367,7 +388,7 @@ fun SessionsScreen(
             text = {
                 Column {
                     Text(stringResource(R.string.sessions_prune_desc))
-                    Spacer(modifier = Modifier.height(Spacing.md))
+                    Spacer(modifier = Modifier.height(spacing.md))
                     OutlinedTextField(
                         value = pruneDays,
                         onValueChange = { pruneDays = it.filter { c -> c.isDigit() } },
@@ -415,6 +436,7 @@ fun SessionsScreen(
                 .find { it.id == sessionToDelete }
                 ?.title
                 ?.takeIf { it.isNotBlank() }
+                ?: state.searchTitles[sessionToDelete]?.takeIf(String::isNotBlank)
                 ?: state.searchResults
                     .find { it.session_id == sessionToDelete }
                     ?.snippet
@@ -489,12 +511,34 @@ fun SessionsScreen(
         // (The scaffold already applies top-bar padding via its inner Box, so we
         //  must NOT re-apply paddingValues here.)
         Column(modifier = Modifier.fillMaxSize()) {
+            // ── History section tabs ──────────────────────────────
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = spacing.md, vertical = spacing.sm),
+                horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+            ) {
+                FilterChip(
+                    selected = state.section == HistorySection.CONVERSATIONS,
+                    onClick = { screenViewModel.selectSection(HistorySection.CONVERSATIONS) },
+                    label = { Text(stringResource(R.string.sessions_tab_conversations)) },
+                    modifier = Modifier.testTag("history_tab_conversations"),
+                )
+                FilterChip(
+                    selected = state.section == HistorySection.AUTOMATIONS,
+                    onClick = { screenViewModel.selectSection(HistorySection.AUTOMATIONS) },
+                    label = { Text(stringResource(R.string.sessions_tab_automations)) },
+                    modifier = Modifier.testTag("history_tab_automations"),
+                )
+            }
+
             // ── Search + bulk toggle (always visible) ─────────────
             Row(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+                        .padding(horizontal = spacing.md, vertical = spacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 SearchBar(
@@ -503,7 +547,7 @@ fun SessionsScreen(
                     placeholder = stringResource(R.string.sessions_search_placeholder),
                     modifier = Modifier.weight(1f),
                 )
-                Spacer(modifier = Modifier.width(Spacing.sm))
+                Spacer(modifier = Modifier.width(spacing.sm))
                 IconButton(onClick = { screenViewModel.toggleSelecting() }) {
                     Icon(
                         imageVector = if (state.isSelecting) Icons.Filled.Close else Icons.Filled.SelectAll,
@@ -563,8 +607,8 @@ fun SessionsScreen(
                                                 Modifier
                                                     .fillMaxWidth()
                                                     .padding(
-                                                        horizontal = Spacing.md,
-                                                        vertical = Spacing.sm,
+                                                        horizontal = spacing.md,
+                                                        vertical = spacing.sm,
                                                     ),
                                         )
                                         LazyColumn(
@@ -576,6 +620,7 @@ fun SessionsScreen(
                                                 val session = item.session
                                                 SearchResultCard(
                                                     session = session,
+                                                    liveStatus = state.liveStatuses[session.id],
                                                     query = state.searchQuery,
                                                     isSelecting = state.isSelecting,
                                                     isSelected = session.id in state.selectedIds,
@@ -632,79 +677,101 @@ fun SessionsScreen(
                     }
 
                     state.sessions.isEmpty() -> {
+                        val isAutomations = state.section == HistorySection.AUTOMATIONS
                         EmptyState(
-                            title = stringResource(R.string.history_empty_title),
-                            subtitle = stringResource(R.string.history_empty_desc),
+                            title =
+                                stringResource(
+                                    if (isAutomations) {
+                                        R.string.sessions_automations_empty_title
+                                    } else {
+                                        R.string.history_empty_title
+                                    },
+                                ),
+                            subtitle =
+                                stringResource(
+                                    if (isAutomations) {
+                                        R.string.sessions_automations_empty_desc
+                                    } else {
+                                        R.string.history_empty_desc
+                                    },
+                                ),
                             icon = Icons.Filled.History,
-                            actionLabel = stringResource(R.string.empty_action_start_chat),
+                            // Automation runs are started by the scheduler, never from chat.
+                            actionLabel =
+                                if (isAutomations) {
+                                    null
+                                } else {
+                                    stringResource(R.string.empty_action_start_chat)
+                                },
                             onAction = { NavigationController.navigateTo(ChatScreen) },
                         )
                     }
 
                     else -> {
                         Column(modifier = Modifier.fillMaxSize()) {
-                            // ── Stats row ───────────────────────────────────────
-                            Row(
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .height(IntrinsicSize.Max)
-                                        .padding(horizontal = Spacing.md, vertical = Spacing.sm),
-                                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                            ) {
-                                StatCard(
-                                    label = stringResource(R.string.sessions_stat_total),
-                                    value = if (state.isLoadingStats) "…" else state.stats.total.toString(),
-                                    icon = Icons.Filled.History,
-                                    modifier = Modifier.weight(1f).fillMaxHeight(),
-                                )
-                                StatCard(
-                                    label = stringResource(R.string.sessions_stat_messages),
-                                    value = if (state.isLoadingStats) "…" else state.stats.messages.toString(),
-                                    icon = Icons.Filled.CheckCircle,
-                                    accentColor = statusColors.success,
-                                    modifier = Modifier.weight(1f).fillMaxHeight(),
-                                )
-                                // Prune button card
-                                Card(
-                                    modifier = Modifier.weight(1f).fillMaxHeight(),
-                                    colors =
-                                        CardDefaults.cardColors(
-                                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                        ),
-                                    onClick = { screenViewModel.showPruneDialog() },
+                            // The stats and prune APIs are global, so only show them alongside
+                            // Conversations where they cannot be mistaken for automation totals.
+                            if (state.section.showsGlobalStats) {
+                                Row(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .height(IntrinsicSize.Max)
+                                            .padding(horizontal = spacing.md, vertical = spacing.sm),
+                                    horizontalArrangement = Arrangement.spacedBy(spacing.sm),
                                 ) {
-                                    Box(
-                                        modifier = Modifier.fillMaxSize().padding(Spacing.md),
-                                        contentAlignment = Alignment.Center,
+                                    StatCard(
+                                        label = stringResource(R.string.sessions_stat_total),
+                                        value = if (state.isLoadingStats) "…" else state.stats.total.toString(),
+                                        icon = Icons.Filled.History,
+                                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                                    )
+                                    StatCard(
+                                        label = stringResource(R.string.sessions_stat_messages),
+                                        value = if (state.isLoadingStats) "…" else state.stats.messages.toString(),
+                                        icon = Icons.Filled.CheckCircle,
+                                        accentColor = statusColors.success,
+                                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                                    )
+                                    Card(
+                                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                                        colors =
+                                            CardDefaults.cardColors(
+                                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                            ),
+                                        onClick = { screenViewModel.showPruneDialog() },
                                     ) {
-                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                            Icon(
-                                                imageVector = Icons.Filled.DeleteSweep,
-                                                contentDescription = null,
-                                                tint = statusColors.warning,
-                                                modifier = Modifier.size(20.dp),
-                                            )
-                                            Spacer(modifier = Modifier.height(Spacing.xs))
-                                            Text(
-                                                text = stringResource(R.string.sessions_action_prune),
-                                                style = MaterialTheme.typography.labelMedium,
-                                                color = statusColors.warning,
-                                                fontWeight = FontWeight.SemiBold,
-                                            )
+                                        Box(
+                                            modifier = Modifier.fillMaxSize().padding(spacing.md),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                Icon(
+                                                    imageVector = Icons.Filled.DeleteSweep,
+                                                    contentDescription = null,
+                                                    tint = statusColors.warning,
+                                                    modifier = Modifier.size(20.dp),
+                                                )
+                                                Spacer(modifier = Modifier.height(spacing.xs))
+                                                Text(
+                                                    text = stringResource(R.string.sessions_action_prune),
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    color = statusColors.warning,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                )
+                                            }
                                         }
                                     }
                                 }
-                            }
-                            // Stats error snack
-                            val statsError = state.statsError
-                            if (statsError != null) {
-                                Text(
-                                    text = statsError,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = statusColors.error,
-                                    modifier = Modifier.padding(horizontal = Spacing.md),
-                                )
+                                val statsError = state.statsError
+                                if (statsError != null) {
+                                    Text(
+                                        text = statsError,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = statusColors.error,
+                                        modifier = Modifier.padding(horizontal = spacing.md),
+                                    )
+                                }
                             }
 
                             // ── Session list ────────────────────────────────────
@@ -731,6 +798,8 @@ fun SessionsScreen(
                                 val session = item.session
                                 SessionCard(
                                     session = session,
+                                    liveStatus = state.liveStatuses[session.id],
+                                    liveStatusesAuthoritative = state.liveStatusesAuthoritative,
                                     displayTitle = item.displayTitle,
                                     isFork = item.isFork,
                                     forkDepth = item.forkDepth,
@@ -799,11 +868,39 @@ fun SessionsScreen(
                                         }
                                     }
                                 }
-                                items(
-                                    items = sessionSections.recent,
-                                    key = { it.session.id },
-                                ) { item ->
-                                    sessionRow(item)
+                                if (state.section == HistorySection.AUTOMATIONS) {
+                                    automationRunGroups.forEach { group ->
+                                        val expanded = group.key in expandedAutomationGroups
+                                        item(key = "automation_group_${group.key}") {
+                                            AutomationGroupHeader(
+                                                group = group,
+                                                expanded = expanded,
+                                                onToggle = {
+                                                    expandedAutomationGroups =
+                                                        if (expanded) {
+                                                            expandedAutomationGroups - group.key
+                                                        } else {
+                                                            expandedAutomationGroups + group.key
+                                                        }
+                                                },
+                                            )
+                                        }
+                                        if (expanded) {
+                                            items(
+                                                items = group.sessions,
+                                                key = { "automation_${it.id}" },
+                                            ) { session ->
+                                                recentItemsById[session.id]?.let { sessionRow(it) }
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    items(
+                                        items = sessionSections.recent,
+                                        key = { it.session.id },
+                                    ) { item ->
+                                        sessionRow(item)
+                                    }
                                 }
 
                                 // Load more
@@ -813,7 +910,7 @@ fun SessionsScreen(
                                             modifier =
                                                 Modifier
                                                     .fillMaxWidth()
-                                                    .padding(vertical = Spacing.sm),
+                                                    .padding(vertical = spacing.sm),
                                             contentAlignment = Alignment.Center,
                                         ) {
                                             if (state.isLoadingMore) {
@@ -865,7 +962,7 @@ fun SessionsScreen(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+                                .padding(horizontal = spacing.md, vertical = spacing.sm),
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -889,7 +986,7 @@ fun SessionsScreen(
                                 contentDescription = null,
                                 modifier = Modifier.size(18.dp),
                             )
-                            Spacer(modifier = Modifier.width(Spacing.xs))
+                            Spacer(modifier = Modifier.width(spacing.xs))
                             Text(
                                 if (allVisibleSessionsSelected) {
                                     stringResource(R.string.sessions_action_deselect_all)
@@ -921,7 +1018,7 @@ fun SessionsScreen(
                                     modifier = Modifier.size(18.dp),
                                 )
                             }
-                            Spacer(modifier = Modifier.width(Spacing.xs))
+                            Spacer(modifier = Modifier.width(spacing.xs))
                             Text(
                                 stringResource(
                                     R.string.sessions_action_delete_n,
@@ -945,7 +1042,7 @@ private fun SessionSectionHeader(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = Spacing.xs, vertical = 6.dp),
+                .padding(horizontal = 4.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -960,6 +1057,72 @@ private fun SessionSectionHeader(
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.Bold,
         )
+    }
+}
+
+/**
+ * Collapsible header for one automation job's runs. The job identity comes from the run ID,
+ * so a renamed or duplicated job title never merges or splits groups.
+ */
+@Composable
+private fun AutomationGroupHeader(
+    group: AutomationSessionGroup,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+) {
+    val spacing = LocalSpacing.current
+    val expandLabel =
+        stringResource(
+            if (expanded) {
+                R.string.content_desc_collapse_automation_group
+            } else {
+                R.string.content_desc_expand_automation_group
+            },
+        )
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .testTag("automation_group_${group.key}")
+                .clickable(onClickLabel = expandLabel, role = Role.Button, onClick = onToggle)
+                .padding(horizontal = 4.dp, vertical = spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector =
+                if (expanded) {
+                    Icons.Filled.KeyboardArrowDown
+                } else {
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight
+                },
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(20.dp),
+        )
+        Spacer(modifier = Modifier.width(spacing.sm))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text =
+                    group.title
+                        ?: group.jobId?.let {
+                            stringResource(R.string.sessions_section_automation_job, it)
+                        }
+                        ?: stringResource(R.string.sessions_section_automation_unknown),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text =
+                    stringResource(
+                        R.string.sessions_section_automation_runs,
+                        group.sessions.size,
+                    ),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -1002,10 +1165,23 @@ private fun SessionPinButton(
     }
 }
 
+internal fun isSessionActive(
+    liveStatus: SessionLiveStatus?,
+    liveStatusesAuthoritative: Boolean,
+    persistedStatus: String?,
+): Boolean {
+    if (liveStatus != null) return true
+    if (liveStatusesAuthoritative) return false
+    return persistedStatus.equals("active", ignoreCase = true) ||
+        persistedStatus.equals("streaming", ignoreCase = true)
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SessionCard(
     session: com.m57.hermescontrol.data.model.SessionInfo,
+    liveStatus: SessionLiveStatus?,
+    liveStatusesAuthoritative: Boolean,
     displayTitle: String,
     isFork: Boolean,
     forkDepth: Int,
@@ -1024,7 +1200,7 @@ private fun SessionCard(
 ) {
     val spacing = LocalSpacing.current
     val statusColors = LocalHermesStatusColors.current
-    val isActive = session.status?.lowercase() == "active" || session.status?.lowercase() == "streaming"
+    val isActive = isSessionActive(liveStatus, liveStatusesAuthoritative, session.status)
     val srcIcon = sourceIcon(session.source)
 
     Card(
@@ -1042,7 +1218,10 @@ private fun SessionCard(
             ),
         border =
             if (isActive && !isSelecting) {
-                BorderStroke(2.dp, statusColors.success)
+                BorderStroke(
+                    2.dp,
+                    if (liveStatus == SessionLiveStatus.WAITING) statusColors.info else statusColors.success,
+                )
             } else if (isSelected) {
                 BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
             } else {
@@ -1050,7 +1229,7 @@ private fun SessionCard(
             },
     ) {
         Row(
-            modifier = Modifier.padding(Spacing.md),
+            modifier = Modifier.padding(spacing.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // Checkbox in select mode
@@ -1060,7 +1239,7 @@ private fun SessionCard(
                     onCheckedChange = { onToggleSelection() },
                     modifier = Modifier.testTag("session_checkbox_${session.id}"),
                 )
-                Spacer(modifier = Modifier.width(Spacing.sm))
+                Spacer(modifier = Modifier.width(spacing.sm))
             }
 
             if (isFork && forkDepth > 0 && !isSelecting) {
@@ -1074,14 +1253,14 @@ private fun SessionCard(
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(16.dp),
                 )
-                Spacer(modifier = Modifier.width(Spacing.xs))
+                Spacer(modifier = Modifier.width(spacing.xs))
                 Text(
                     text = forkDepth.toString(),
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
                 )
-                Spacer(modifier = Modifier.width(Spacing.sm))
+                Spacer(modifier = Modifier.width(spacing.sm))
             }
 
             // Source icon
@@ -1092,7 +1271,7 @@ private fun SessionCard(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp),
                 )
-                Spacer(modifier = Modifier.width(Spacing.sm))
+                Spacer(modifier = Modifier.width(spacing.sm))
             }
 
             // Main content
@@ -1110,7 +1289,7 @@ private fun SessionCard(
                     overflow = TextOverflow.Ellipsis,
                 )
 
-                Spacer(modifier = Modifier.height(Spacing.xs))
+                Spacer(modifier = Modifier.height(spacing.xs))
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -1121,18 +1300,22 @@ private fun SessionCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     if (!session.status.isNullOrBlank()) {
-                        Spacer(modifier = Modifier.width(Spacing.sm))
+                        Spacer(modifier = Modifier.width(spacing.sm))
                         StatusBadge(
                             text = session.status,
                             status = if (isActive) StatusBadgeType.SUCCESS else StatusBadgeType.NEUTRAL,
                         )
+                    }
+                    if (liveStatus != null) {
+                        Spacer(modifier = Modifier.width(spacing.sm))
+                        LiveStatusBadge(liveStatus)
                     }
                 }
             }
 
             // Action buttons (not in select mode)
             if (!isSelecting) {
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
                     SessionPinButton(
                         sessionId = session.id,
                         isPinned = isPinned,
@@ -1163,6 +1346,25 @@ private fun SessionCard(
     }
 }
 
+@Composable
+private fun LiveStatusBadge(status: SessionLiveStatus) {
+    val label =
+        stringResource(
+            when (status) {
+                SessionLiveStatus.WORKING -> R.string.sessions_live_status_working
+                SessionLiveStatus.WAITING -> R.string.sessions_live_status_waiting
+            },
+        )
+    StatusBadge(
+        text = label,
+        status =
+            when (status) {
+                SessionLiveStatus.WORKING -> StatusBadgeType.SUCCESS
+                SessionLiveStatus.WAITING -> StatusBadgeType.INFO
+            },
+    )
+}
+
 /**
  * Search-result card. The backend search payload has no session title, so this card is
  * honest about it: it shows a "Match" label + the highlighted snippet as the body, plus
@@ -1172,6 +1374,7 @@ private fun SessionCard(
 @Composable
 private fun SearchResultCard(
     session: com.m57.hermescontrol.data.model.SessionInfo,
+    liveStatus: SessionLiveStatus?,
     query: String,
     isSelecting: Boolean,
     isSelected: Boolean,
@@ -1207,12 +1410,17 @@ private fun SearchResultCard(
         border =
             if (isSelected) {
                 BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+            } else if (liveStatus != null) {
+                BorderStroke(
+                    2.dp,
+                    if (liveStatus == SessionLiveStatus.WAITING) statusColors.info else statusColors.success,
+                )
             } else {
                 null
             },
     ) {
         Row(
-            modifier = Modifier.padding(Spacing.sm),
+            modifier = Modifier.padding(spacing.sm),
             verticalAlignment = Alignment.Top,
         ) {
             // Checkbox in select mode
@@ -1222,14 +1430,14 @@ private fun SearchResultCard(
                     onCheckedChange = { onToggleSelection() },
                     modifier = Modifier.testTag("session_checkbox_${session.id}"),
                 )
-                Spacer(modifier = Modifier.width(Spacing.sm))
+                Spacer(modifier = Modifier.width(spacing.sm))
             }
 
             Column(modifier = Modifier.weight(1f)) {
                 // Header row: "Match" label + source icon
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.xs),
                 ) {
                     val srcIcon = sourceIcon(session.source)
                     if (srcIcon != null && !isSelecting) {
@@ -1256,7 +1464,18 @@ private fun SearchResultCard(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(Spacing.xs))
+                Spacer(modifier = Modifier.height(spacing.xs))
+
+                // Locally confirmed renames are titles; legacy snippets remain excerpts.
+                session.title?.takeIf(String::isNotBlank)?.let { title ->
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(modifier = Modifier.height(spacing.xs))
+                }
 
                 // The matched snippet, highlighted — shown as the body, NOT as a title.
                 Text(
@@ -1267,13 +1486,16 @@ private fun SearchResultCard(
                     overflow = TextOverflow.Ellipsis,
                 )
 
-                Spacer(modifier = Modifier.height(Spacing.xs))
+                Spacer(modifier = Modifier.height(spacing.xs))
 
                 // Metadata chips row
                 FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+                    verticalArrangement = Arrangement.spacedBy(spacing.xs),
                 ) {
+                    if (liveStatus != null) {
+                        LiveStatusBadge(liveStatus)
+                    }
                     session.source?.let { src ->
                         StatusBadge(
                             text = sourceLabel(src),
@@ -1297,7 +1519,7 @@ private fun SearchResultCard(
 
             // Action buttons (not in select mode)
             if (!isSelecting) {
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
                     SessionPinButton(
                         sessionId = session.id,
                         isPinned = isPinned,

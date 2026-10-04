@@ -246,6 +246,7 @@
     <string name="settings_item_language">言語</string>
     <string name="language_system">システム</string>
     <string name="language_english">英語</string>
+    <string name="language_arabic">العربية</string>
     <string name="language_chinese">简体中文</string>
     <string name="language_japanese">日本語</string>
     <string name="language_korean">한국어</string>
@@ -521,6 +522,8 @@
     <string name="sessions_search_played_at">実行日時: %1$s</string>
     <string name="sessions_search_match_label">一致箇所</string>
     <string name="sessions_search_model_label">モデル</string>
+    <string name="sessions_live_status_working">作業中</string>
+    <string name="sessions_live_status_waiting">待機中</string>
     <string name="sessions_stat_total">合計</string>
     <string name="sessions_stat_messages">メッセージ</string>
     <string name="sessions_action_prune">整理</string>

@@ -23,6 +23,18 @@ object WsMethods {
     const val SUDO_RESPOND = "sudo.respond"
     const val SECRET_RESPOND = "secret.respond"
 
+    // ── Typed privileged cancellation (hermes-agent a77692158) ────────────
+    // An explicit user Cancel is its own gateway verb, acknowledged with
+    // {"status": "cancelled"}. It is never a silent dialog dismissal and never
+    // an approval choice.
+
+    const val APPROVAL_CANCEL = "approval.cancel"
+    const val SUDO_CANCEL = "sudo.cancel"
+    const val SECRET_CANCEL = "secret.cancel"
+
+    /** Inline WebSocket read-loop ping, bypasses server thread pool dispatch. */
+    const val GATEWAY_PING = "gateway.ping"
+
     // ── Commands catalog ──────────────────────────────────────────────────
     const val COMMANDS_CATALOG = "commands.catalog"
     const val COMMAND_DISPATCH = "command.dispatch"

@@ -60,9 +60,7 @@ class ApiClientTest {
         every { AuthManager.getHost() } returns "127.0.0.1"
         every { AuthManager.getPort() } returns 9119
 
-        // PR #540 registers ProfileScopeInterceptor in ApiClient.buildService(),
-        // which calls getSelectedProfileId(). Stub it to null so the interceptor
-        // short-circuits (no profile scope) and these auth tests stay focused.
+        // Connection identity selects credentials, never a management scope.
         every { AuthManager.getSelectedProfileId() } returns null
         every { AuthManager.isGatedMode() } returns false
     }
@@ -73,6 +71,67 @@ class ApiClientTest {
         mockWebServer.shutdown()
         unmockkAll()
     }
+
+    @Test
+    fun localConnectionIdentityIsNeverAManagementScope() =
+        runTest {
+            every { AuthManager.getToken() } returns "test-token"
+            for (connectionId in listOf("default", "local-connection-id")) {
+                every { AuthManager.getSelectedProfileId() } returns
+                    connectionId
+                ApiClient.rebuild()
+                mockWebServer.enqueue(
+                    MockResponse().setResponseCode(200).setBody("{}"),
+                )
+
+                assertTrue(ApiClient.hermesApi.getConfig().isSuccessful)
+
+                val request = mockWebServer.takeRequest()
+                assertNull(request.requestUrl!!.queryParameter("profile"))
+                assertEquals("Bearer test-token", request.getHeader("Authorization"))
+            }
+        }
+
+    @Test
+    fun explicitManagementScopeSurvivesConnectionSelection() =
+        runTest {
+            every { AuthManager.getToken() } returns "test-token"
+            every { AuthManager.getSelectedProfileId() } returns
+                "local-connection-id"
+            ApiClient.rebuild()
+            mockWebServer.enqueue(MockResponse().setResponseCode(204))
+
+            ApiClient.hermesApi.getAnalytics(days = 7, profile = "work")
+
+            val url = mockWebServer.takeRequest().requestUrl!!
+            assertEquals(listOf("work"), url.queryParameterValues("profile"))
+        }
+
+    @Test
+    fun unscopedManagementMutationPreservesProxyPrefix() =
+        runTest {
+            every { AuthManager.getToken() } returns "test-token"
+            every { AuthManager.getSelectedProfileId() } returns "default"
+            val endpoint =
+                ServerEndpoint.parse(
+                    mockWebServer.url("/dashboard/").toString(),
+                    CleartextPolicy.ALLOW_WITH_WARNING,
+                )
+            every { AuthManager.endpointForBuild() } returns endpoint
+            every { AuthManager.endpoint() } returns endpoint
+            ApiClient.rebuild()
+            mockWebServer.enqueue(MockResponse().setResponseCode(204))
+
+            ApiClient.hermesApi.updateConfig(
+                com.m57.hermescontrol.data.model.ConfigUpdateRequest(
+                    config = emptyMap(),
+                ),
+            )
+
+            val request = mockWebServer.takeRequest()
+            assertEquals("PUT", request.method)
+            assertEquals("/dashboard/api/config", request.path)
+        }
 
     @Test
     fun testAuthInterceptor_addsBearerTokenWhenPresent() =

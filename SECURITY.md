@@ -60,6 +60,21 @@ The app does not persist the user's dashboard password after login. A successful
 basic-authentication login stores the resulting session cookie and short-lived
 WebSocket ticket instead.
 
+## Management profiles versus connections
+
+A saved connection profile identifies a dashboard endpoint and its credentials.
+Its local ID (including the legacy `default` ID) is not a server-side Hermes
+profile name and must never be injected into REST `?profile=` parameters.
+Requests retain an explicit profile query or body field supplied by their
+caller. Without one, they use the backend's unscoped behavior; the client must
+not guess a profile to bypass a server rejection requiring explicit scope.
+
+This fork does not yet provide a separately validated, connection-bound
+management-profile selector. The Profiles screen's active-profile action
+changes the backend's sticky CLI default, not the running dashboard's profile.
+Expanding implicit route scoping requires implementing and testing that distinct
+identity first, including connection switches and stale asynchronous responses.
+
 ## Android component exposure
 
 Only the launcher activity is exported. The notification service, notification

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.Autorenew
@@ -29,6 +30,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,7 +43,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.m57.hermescontrol.R
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
-import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.chat.SubagentIndicator
 import com.m57.hermescontrol.ui.chat.TodoItem
 
@@ -57,6 +58,7 @@ fun SubagentInspectionSheet(
     modifier: Modifier = Modifier,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val todoRows = remember(todos) { buildTodoHierarchy(todos) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -67,8 +69,8 @@ fun SubagentInspectionSheet(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = Spacing.md)
-                    .padding(bottom = Spacing.lg),
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 24.dp),
         ) {
             // Header
             Row(
@@ -106,7 +108,7 @@ fun SubagentInspectionSheet(
                     text = "No active tasks or plan items.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = Spacing.md),
+                    modifier = Modifier.padding(vertical = 16.dp),
                 )
             } else {
                 LazyColumn(
@@ -117,7 +119,7 @@ fun SubagentInspectionSheet(
                         item(key = "todos_header") {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(vertical = Spacing.xs),
+                                modifier = Modifier.padding(vertical = 4.dp),
                             ) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.FormatListBulleted,
@@ -135,10 +137,10 @@ fun SubagentInspectionSheet(
                             }
                         }
                         itemsIndexed(
-                            items = todos,
-                            key = { index, todo -> "todo-${todo.id}_$index" },
-                        ) { _, todo ->
-                            TodoInspectionCard(todo = todo)
+                            items = todoRows,
+                            key = { _, row -> row.key },
+                        ) { _, row ->
+                            TodoInspectionCard(todo = row.todo, depth = row.depth)
                         }
                     }
 
@@ -147,7 +149,7 @@ fun SubagentInspectionSheet(
                             item(key = "subagents_header") {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(top = Spacing.sm, bottom = Spacing.xs),
+                                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Groups,
@@ -181,10 +183,13 @@ fun SubagentInspectionSheet(
 }
 
 @Composable
-internal fun TodoInspectionCard(todo: TodoItem) {
+internal fun TodoInspectionCard(
+    todo: TodoItem,
+    depth: Int = 0,
+) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.medium,
+        modifier = Modifier.fillMaxWidth().padding(start = (depth.coerceIn(0, MAX_TODO_DEPTH) * 12).dp),
+        shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Row(
@@ -251,7 +256,7 @@ internal fun TodoInspectionCard(todo: TodoItem) {
 internal fun InspectionItemCard(indicator: SubagentIndicator) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.medium,
+        shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
@@ -310,9 +315,9 @@ internal fun InspectionItemCard(indicator: SubagentIndicator) {
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .clip(MaterialTheme.shapes.small)
+                            .clip(RoundedCornerShape(8.dp))
                             .background(MaterialTheme.colorScheme.surfaceContainerLowest)
-                            .padding(Spacing.sm),
+                            .padding(8.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     Text(

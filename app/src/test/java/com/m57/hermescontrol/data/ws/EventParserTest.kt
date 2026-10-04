@@ -6,6 +6,7 @@ import io.mockk.unmockkAll
 import kotlinx.serialization.json.JsonObject
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -56,6 +57,79 @@ class EventParserTest {
         val rpcResult = event as WsEvent.RpcResult
         assertEquals("123", rpcResult.id)
         assertEquals(mapOf("status" to "success"), rpcResult.result)
+    }
+
+    @Test
+    fun testParseServerRequest_withIdAndMethod_isNotRpcResult() {
+        val event =
+            EventParser.parse(
+                createJsonRpcResponse(
+                    jsonrpc = "2.0",
+                    id = "srq-123",
+                    method = "clarify",
+                    params = mapOf("session_id" to "session-1", "question" to "Continue?"),
+                ),
+            )
+
+        assertTrue(event is WsEvent.ServerRequest)
+        assertFalse(event is WsEvent.RpcResult)
+        val request = event as WsEvent.ServerRequest
+        assertEquals("srq-123", request.id)
+        assertEquals("clarify", request.method)
+        assertEquals("session-1", request.params["session_id"])
+        assertEquals("Continue?", request.params["question"])
+    }
+
+    @Test
+    fun testParseRequestCancel_notification_returnsCancellationEvent() {
+        val event =
+            EventParser.parse(
+                createJsonRpcResponse(
+                    jsonrpc = "2.0",
+                    id = null,
+                    method = "event",
+                    params =
+                        mapOf(
+                            "type" to "request.cancel",
+                            "session_id" to "session-1",
+                            "payload" to
+                                mapOf(
+                                    "id" to "srq-123",
+                                    "method" to "clarify",
+                                    "reason" to "timeout",
+                                ),
+                        ),
+                ),
+            )
+
+        assertTrue(event is WsEvent.ServerRequestCancelled)
+        val cancelled = event as WsEvent.ServerRequestCancelled
+        assertEquals("srq-123", cancelled.id)
+        assertEquals("clarify", cancelled.method)
+        assertEquals("timeout", cancelled.reason)
+        assertEquals("session-1", cancelled.sessionId)
+    }
+
+    @Test
+    fun testParseRequestCancel_rejectsMissingOrBlankIdentity() {
+        listOf(
+            mapOf("method" to "secret", "session_id" to "session-1"),
+            mapOf("id" to "", "method" to "secret", "session_id" to "session-1"),
+            mapOf("id" to "srq-1", "method" to "", "session_id" to "session-1"),
+            mapOf("id" to "srq-1", "method" to "secret"),
+        ).forEach { payload ->
+            val event =
+                EventParser.parse(
+                    createJsonRpcResponse(
+                        jsonrpc = "2.0",
+                        id = null,
+                        method = "event",
+                        params = mapOf("type" to "request.cancel", "payload" to payload),
+                    ),
+                )
+
+            assertTrue("Expected malformed cancellation to be unknown: $payload", event is WsEvent.Unknown)
+        }
     }
 
     @Test
@@ -220,8 +294,10 @@ class EventParserTest {
                 params =
                     mapOf(
                         "type" to "clarify.request",
+                        "session_id" to "session-1",
                         "payload" to
                             mapOf(
+                                "request_id" to "request-1",
                                 "text" to "Select option?",
                                 "options" to listOf("Yes", "No"),
                             ),
@@ -246,8 +322,10 @@ class EventParserTest {
                 params =
                     mapOf(
                         "type" to "clarify.request",
+                        "session_id" to "session-1",
                         "payload" to
                             mapOf(
+                                "request_id" to "request-1",
                                 "question" to "Which environment?",
                                 "choices" to listOf("staging", "production"),
                             ),
@@ -258,6 +336,94 @@ class EventParserTest {
         val clarifyEvent = event as WsEvent.ClarifyRequest
         assertEquals("Which environment?", clarifyEvent.text)
         assertEquals(listOf("staging", "production"), clarifyEvent.options)
+    }
+
+    @Test
+    fun testParseClarifyRequest_preservesBatchQuestionIdentityAndSelectionMode() {
+        val response =
+            createJsonRpcResponse(
+                jsonrpc = "2.0",
+                id = null,
+                result = null,
+                error = null,
+                method = "event",
+                params =
+                    mapOf(
+                        "type" to "clarify.request",
+                        "session_id" to "session-1",
+                        "payload" to
+                            mapOf(
+                                "request_id" to "request-1",
+                                "questions" to
+                                    listOf(
+                                        mapOf(
+                                            "qid" to "language",
+                                            "question" to "Languages?",
+                                            "choices" to listOf("Kotlin", "Rust"),
+                                            "multi_select" to true,
+                                        ),
+                                        mapOf(
+                                            "qid" to "target",
+                                            "question" to "Target?",
+                                            "choices" to listOf("Android", "Desktop"),
+                                            "multi_select" to false,
+                                        ),
+                                    ),
+                            ),
+                    ),
+            )
+
+        val event = EventParser.parse(response) as WsEvent.ClarifyRequest
+
+        assertEquals("request-1", event.clarifyId)
+        assertEquals("session-1", event.sessionId)
+        assertEquals(listOf("language", "target"), event.questions.map { it.qid })
+        assertTrue(event.questions.first().multiSelect)
+        assertFalse(event.questions.last().multiSelect)
+    }
+
+    @Test
+    fun clarifyRequestWithoutExactRequestAndSessionBindingIsRejected() {
+        val invalidBindings =
+            listOf(
+                null to "session-1",
+                "" to "session-1",
+                "request-1" to null,
+                "request-1" to " ",
+            )
+
+        invalidBindings.forEach { (requestId, sessionId) ->
+            val payload = mutableMapOf<String, Any>("question" to "Must not render")
+            requestId?.let { payload["request_id"] = it }
+            val params = mutableMapOf<String, Any>("type" to "clarify.request", "payload" to payload)
+            sessionId?.let { params["session_id"] = it }
+
+            val event = EventParser.parse(createJsonRpcResponse("2.0", null, null, null, "event", params))
+
+            assertTrue(event is WsEvent.Unknown)
+        }
+    }
+
+    @Test
+    fun testParseClarifyExpire_preservesRequestAndSessionIdentity() {
+        val response =
+            createJsonRpcResponse(
+                jsonrpc = "2.0",
+                id = null,
+                result = null,
+                error = null,
+                method = "event",
+                params =
+                    mapOf(
+                        "type" to "clarify.expire",
+                        "session_id" to "session-1",
+                        "payload" to mapOf("request_id" to "request-1"),
+                    ),
+            )
+
+        val event = EventParser.parse(response) as WsEvent.ClarifyExpire
+        assertEquals("request-1", event.clarifyId)
+        assertEquals("session-1", event.sessionId)
     }
 
     // ── TEST-07: Untested subtypes ─────────────────────────────────────
@@ -554,7 +720,12 @@ class EventParserTest {
                     mapOf(
                         "type" to "tool.progress",
                         "session_id" to "sess-123",
-                        "payload" to mapOf("name" to "web_search", "preview" to "downloading content..."),
+                        "payload" to
+                            mapOf(
+                                "tool_id" to "call-1",
+                                "name" to "web_search",
+                                "preview" to "downloading content...",
+                            ),
                     ),
             )
         val event = EventParser.parse(response)
@@ -563,6 +734,7 @@ class EventParserTest {
         assertEquals("web_search", toolProgress.name)
         assertEquals("downloading content...", toolProgress.preview)
         assertEquals("sess-123", toolProgress.sessionId)
+        assertEquals("call-1", toolProgress.toolId)
     }
 
     @Test
@@ -578,7 +750,7 @@ class EventParserTest {
                     mapOf(
                         "type" to "tool.generating",
                         "session_id" to "sess-123",
-                        "payload" to mapOf("name" to "code_writer"),
+                        "payload" to mapOf("tool_id" to "call-2", "name" to "code_writer"),
                     ),
             )
         val event = EventParser.parse(response)
@@ -586,6 +758,7 @@ class EventParserTest {
         val toolGenerating = event as WsEvent.ToolGenerating
         assertEquals("code_writer", toolGenerating.name)
         assertEquals("sess-123", toolGenerating.sessionId)
+        assertEquals("call-2", toolGenerating.toolId)
     }
 
     @Test
@@ -656,5 +829,239 @@ class EventParserTest {
         val usage = usageEvent.data?.get("usage") as? Map<*, *>
         assertEquals(0, (usage?.get("context_used") as? Number)?.toInt())
         assertEquals(2, (usage?.get("compressions") as? Number)?.toInt())
+    }
+}
+
+// ── Privileged request binding (hermes-agent d90045be2 / a77692158) ──────────
+//
+// The gateway stamps an opaque `request_id` on every privileged frame and
+// publishes the approval's exact `timeout_seconds`. A frame missing either is a
+// legacy request this client cannot bind a response to, so it is rejected
+// rather than surfaced with controls that would resolve some other request.
+
+private fun privilegedEvent(
+    type: String,
+    payload: Map<String, Any?>,
+    sessionId: String? = "session-a",
+): JsonRpcResponse =
+    createJsonRpcResponse(
+        jsonrpc = "2.0",
+        id = null,
+        method = "event",
+        params =
+            mapOf(
+                "type" to type,
+                "session_id" to sessionId,
+                "payload" to payload,
+            ),
+    )
+
+class EventParserPrivilegedTest {
+    @Before
+    fun setUp() {
+        mockkStatic(android.util.Log::class)
+        every { android.util.Log.w(any<String>(), any<String>()) } returns 0
+    }
+
+    @After
+    fun tearDown() {
+        unmockkAll()
+    }
+
+    @Test
+    fun approvalRequestCarriesTheRequestIdAndPublishedTimeout() {
+        val event =
+            EventParser.parse(
+                privilegedEvent(
+                    "approval.request",
+                    mapOf(
+                        "command" to "rm -rf /data",
+                        "description" to "Dangerous",
+                        "pattern_keys" to listOf("shell:rm", 7),
+                        "request_id" to "req-abc",
+                        "timeout_seconds" to 300,
+                    ),
+                ),
+            )
+
+        assertTrue(event is WsEvent.ApprovalRequest)
+        val approval = event as WsEvent.ApprovalRequest
+        assertEquals("req-abc", approval.requestId)
+        assertEquals(300.0, approval.timeoutSeconds, 0.0)
+        assertEquals("session-a", approval.sessionId)
+        assertEquals(listOf("shell:rm"), approval.patternKeys)
+    }
+
+    @Test
+    fun privilegedFramesWithoutAnExactRuntimeSessionAreRejected() {
+        listOf("approval.request", "sudo.request", "sudo.expire", "secret.request", "secret.expire").forEach { type ->
+            val payload =
+                if (type == "approval.request") {
+                    mapOf("request_id" to "req-1", "timeout_seconds" to 300)
+                } else {
+                    mapOf("request_id" to "req-1")
+                }
+            listOf(null, "", "   ").forEach { sessionId ->
+                assertTrue(
+                    "$type with session_id=$sessionId must reject",
+                    EventParser.parse(privilegedEvent(type, payload, sessionId)) is
+                        WsEvent.PrivilegedRequestRejected,
+                )
+            }
+        }
+    }
+
+    @Test
+    fun privilegedFramesWithConflictingRuntimeSessionsAreRejected() {
+        val event =
+            EventParser.parse(
+                privilegedEvent(
+                    "sudo.request",
+                    mapOf("request_id" to "req-1", "session_id" to "different-session"),
+                ),
+            )
+
+        assertTrue(event is WsEvent.PrivilegedRequestRejected)
+    }
+
+    @Test
+    fun clarifyExpiryRequiresExactRequestAndRuntimeSessionProvenance() {
+        val valid =
+            EventParser.parse(
+                privilegedEvent(
+                    "clarify.expire",
+                    mapOf("clarify_id" to "clarify-1", "request_id" to "clarify-1"),
+                ),
+            )
+        assertEquals(WsEvent.ClarifyExpire("clarify-1", "session-a"), valid)
+
+        val malformed =
+            listOf(
+                privilegedEvent("clarify.expire", mapOf("request_id" to "")),
+                privilegedEvent("clarify.expire", mapOf("request_id" to "   ")),
+                privilegedEvent(
+                    "clarify.expire",
+                    mapOf("request_id" to "clarify-1", "clarify_id" to "clarify-2"),
+                ),
+                privilegedEvent("clarify.expire", mapOf("request_id" to "clarify-1"), null),
+                privilegedEvent("clarify.expire", mapOf("request_id" to "clarify-1"), " "),
+                privilegedEvent(
+                    "clarify.expire",
+                    mapOf("request_id" to "clarify-1", "session_id" to "other-session"),
+                ),
+            )
+        malformed.forEach { assertTrue(EventParser.parse(it) is WsEvent.Unknown) }
+    }
+
+    @Test
+    fun approvalRequestWithoutARequestIdIsRejected() {
+        val event =
+            EventParser.parse(
+                privilegedEvent(
+                    "approval.request",
+                    mapOf("command" to "rm", "timeout_seconds" to 300),
+                ),
+            )
+
+        assertEquals(
+            WsEvent.PrivilegedRequestRejected("approval.request", "session-a"),
+            event,
+        )
+    }
+
+    @Test
+    fun approvalRequestWithABlankRequestIdIsRejected() {
+        val event =
+            EventParser.parse(
+                privilegedEvent(
+                    "approval.request",
+                    mapOf("request_id" to "   ", "timeout_seconds" to 300),
+                ),
+            )
+
+        assertTrue(event is WsEvent.PrivilegedRequestRejected)
+    }
+
+    @Test
+    fun approvalRequestWithoutATimeoutIsRejected() {
+        val event =
+            EventParser.parse(
+                privilegedEvent("approval.request", mapOf("request_id" to "req-abc")),
+            )
+
+        assertEquals(
+            WsEvent.PrivilegedRequestRejected("approval.request", "session-a"),
+            event,
+        )
+    }
+
+    /** Only a finite, strictly positive lifetime can drive a local expiry. */
+    @Test
+    fun approvalRequestWithAnUnusableTimeoutIsRejected() {
+        listOf(0, -5, Double.NaN, Double.POSITIVE_INFINITY, "300").forEach { timeout ->
+            val event =
+                EventParser.parse(
+                    privilegedEvent(
+                        "approval.request",
+                        mapOf("request_id" to "req-abc", "timeout_seconds" to timeout),
+                    ),
+                )
+            assertTrue("timeout_seconds=$timeout must reject", event is WsEvent.PrivilegedRequestRejected)
+        }
+    }
+
+    @Test
+    fun sudoAndSecretFramesRequireARequestId() {
+        listOf("sudo.request", "sudo.expire", "secret.request", "secret.expire").forEach { type ->
+            assertEquals(
+                WsEvent.PrivilegedRequestRejected(type, "session-a"),
+                EventParser.parse(privilegedEvent(type, mapOf("env_var" to "TOKEN"))),
+            )
+            assertEquals(
+                WsEvent.PrivilegedRequestRejected(type, "session-a"),
+                EventParser.parse(privilegedEvent(type, mapOf("request_id" to ""))),
+            )
+        }
+    }
+
+    @Test
+    fun boundSudoAndSecretFramesParse() {
+        assertEquals(
+            WsEvent.SudoRequest("req-1", "session-a"),
+            EventParser.parse(privilegedEvent("sudo.request", mapOf("request_id" to "req-1"))),
+        )
+        assertEquals(
+            WsEvent.SudoExpire("req-1", "session-a"),
+            EventParser.parse(privilegedEvent("sudo.expire", mapOf("request_id" to "req-1"))),
+        )
+        assertEquals(
+            WsEvent.SecretExpire("req-2", "session-a"),
+            EventParser.parse(privilegedEvent("secret.expire", mapOf("request_id" to "req-2"))),
+        )
+
+        val secret =
+            EventParser.parse(
+                privilegedEvent(
+                    "secret.request",
+                    mapOf("request_id" to "req-2", "env_var" to "GITHUB_TOKEN", "prompt" to "Token?"),
+                ),
+            )
+        assertEquals(WsEvent.SecretRequest("req-2", "session-a", "GITHUB_TOKEN", "Token?"), secret)
+    }
+
+    /** A rejection is observable, but must not retain the rejected payload. */
+    @Test
+    fun aRejectionRetainsOnlyTheEventTypeAndSession() {
+        val event =
+            EventParser.parse(
+                privilegedEvent(
+                    "secret.request",
+                    mapOf("env_var" to "GITHUB_TOKEN", "prompt" to "Token for github.com"),
+                ),
+            ) as WsEvent.PrivilegedRequestRejected
+
+        assertEquals("secret.request", event.eventType)
+        assertEquals("session-a", event.sessionId)
+        assertFalse(event.toString().contains("GITHUB_TOKEN"))
     }
 }

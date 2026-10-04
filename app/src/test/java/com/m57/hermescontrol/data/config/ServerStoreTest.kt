@@ -3,6 +3,7 @@ package com.m57.hermescontrol.data.config
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -21,7 +22,19 @@ class ServerStoreTest {
         assertTrue(state.connectionProfiles.isEmpty())
         assertNull(state.selectedProfileId)
         assertEquals(1.0f, state.chatFontScale)
+        assertFalse(state.useDynamicColors)
     }
+
+    @Test
+    fun `explicit dynamic color choice survives serialization`() =
+        runTest {
+            val output = ByteArrayOutputStream()
+            ServerStoreSerializer.writeTo(ServerStoreState(useDynamicColors = true), output)
+
+            val restored = ServerStoreSerializer.readFrom(ByteArrayInputStream(output.toByteArray()))
+
+            assertTrue(restored.useDynamicColors)
+        }
 
     @Test
     fun `chat font scale survives serialization round trip and defaults for legacy state`() =

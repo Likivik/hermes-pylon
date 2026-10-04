@@ -27,21 +27,112 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.m57.hermescontrol.R
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
+import com.m57.hermescontrol.ui.chat.VaultPromptUi
+
+@Composable
+fun VaultPromptDialog(
+    prompt: VaultPromptUi,
+    onConfirm: (String) -> Unit,
+    onConfirmLogin: (String, String) -> Unit,
+    onCancel: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var value by remember(prompt.binding, prompt.method) { mutableStateOf("") }
+    var identifier by remember(prompt.binding, prompt.method) { mutableStateOf(prompt.identifier.orEmpty()) }
+    val saveLogin = prompt.method == "vault.save_login"
+    AlertDialog(
+        onDismissRequest = { if (!prompt.isSubmitting) onDismiss() },
+        title = {
+            Text(
+                prompt.title ?: when (prompt.method) {
+                    "vault.code" -> "Verification code required"
+                    "vault.unlock_prompt" -> "Unlock vault"
+                    else -> "Save login"
+                },
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                prompt.prompt?.takeIf(String::isNotBlank)?.let { Text(it) }
+                if (saveLogin) {
+                    Text(
+                        text = "Requested site: ${prompt.requestedOrigin ?: "Missing origin"}",
+                        modifier = Modifier.testTag("vault_requested_origin"),
+                    )
+                    if (prompt.hasValidRequestedOrigin) {
+                        OutlinedTextField(
+                            value = identifier,
+                            onValueChange = { identifier = it },
+                            label = { Text("Identifier") },
+                            modifier = Modifier.fillMaxWidth().testTag("vault_identifier_input"),
+                            enabled = !prompt.isSubmitting,
+                        )
+                    } else {
+                        Text("This request has no valid web origin. Cancel it without entering credentials.")
+                    }
+                }
+                if (!saveLogin || prompt.hasValidRequestedOrigin) {
+                    OutlinedTextField(
+                        value = value,
+                        onValueChange = { value = it },
+                        label = { Text(if (prompt.method == "vault.code") "Code" else "Password") },
+                        modifier = Modifier.fillMaxWidth().testTag("vault_secret_input"),
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions =
+                            KeyboardOptions(
+                                autoCorrectEnabled = false,
+                                keyboardType = KeyboardType.Password,
+                            ),
+                        enabled = !prompt.isSubmitting,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { if (saveLogin) onConfirmLogin(identifier, value) else onConfirm(value) },
+                enabled =
+                    value.isNotBlank() &&
+                        (!saveLogin || (prompt.hasValidRequestedOrigin && identifier.isNotBlank())) &&
+                        !prompt.isSubmitting,
+                modifier = Modifier.testTag("vault_send_button"),
+            ) { Text(stringResource(R.string.chat_send)) }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onCancel,
+                enabled = !prompt.isSubmitting,
+                modifier = Modifier.testTag("vault_cancel_button"),
+            ) {
+                Text(stringResource(R.string.chat_privileged_cancel))
+            }
+        },
+    )
+}
 
 /**
  * Secure password dialog for a pending `sudo.request` (issue #524).
  * The backend blocked the turn waiting for the sudo password — previously
  * mobile dropped the event and the agent hung forever.
+ *
+ * [onDismiss] (back gesture / outside tap) is an incidental gesture and must
+ * stay a no-op; only [onCancel] tells the gateway anything. The typed password
+ * lives in this composition and in the single call [onConfirm] makes — it is
+ * never lifted into ViewModel state, logs, or errors.
  */
 @Composable
 fun SudoPromptDialog(
+    binding: Any,
     onConfirm: (String) -> Unit,
+    onCancel: () -> Unit,
     onDismiss: () -> Unit,
+    isSubmitting: Boolean = false,
 ) {
-    var password by remember { mutableStateOf("") }
+    var password by remember(binding) { mutableStateOf("") }
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!isSubmitting) onDismiss() },
         title = { Text(stringResource(R.string.chat_sudo_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -55,6 +146,7 @@ fun SudoPromptDialog(
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, keyboardType = KeyboardType.Password),
+                    enabled = !isSubmitting,
                 )
             }
         },
@@ -65,14 +157,19 @@ fun SudoPromptDialog(
                         onConfirm(password)
                     }
                 },
-                enabled = password.isNotBlank(),
+                enabled = password.isNotBlank() && !isSubmitting,
+                modifier = Modifier.testTag("sudo_send_button"),
             ) {
                 Text(stringResource(R.string.chat_send))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.chat_dismiss))
+            TextButton(
+                onClick = onCancel,
+                modifier = Modifier.testTag("sudo_cancel_button"),
+                enabled = !isSubmitting,
+            ) {
+                Text(stringResource(R.string.chat_privileged_cancel))
             }
         },
     )
@@ -82,29 +179,42 @@ fun SudoPromptDialog(
  * Secure value dialog for a pending `secret.request` (issue #524).
  * The backend blocked the turn waiting for a secret (token/password) —
  * previously mobile dropped the event and the agent hung forever.
+ *
+ * Same contract as [SudoPromptDialog]: dismissal is a no-op, [onCancel] is the
+ * only cancellation, and the entered value never leaves this composition except
+ * through [onConfirm].
  */
 @Composable
 fun SecretPromptDialog(
+    binding: Any,
     onConfirm: (String) -> Unit,
+    onCancel: () -> Unit,
     onDismiss: () -> Unit,
+    envVar: String? = null,
+    prompt: String? = null,
+    isSubmitting: Boolean = false,
 ) {
-    var secret by remember { mutableStateOf("") }
+    var secret by remember(binding) { mutableStateOf("") }
+    val titleText = envVar?.takeIf { it.isNotBlank() } ?: stringResource(R.string.chat_secret_title)
+    val bodyText = prompt?.takeIf { it.isNotBlank() } ?: stringResource(R.string.chat_secret_body)
+    val labelText = envVar?.takeIf { it.isNotBlank() } ?: stringResource(R.string.chat_secret_value)
 
     AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.chat_secret_title)) },
+        onDismissRequest = { if (!isSubmitting) onDismiss() },
+        title = { Text(titleText) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(text = stringResource(R.string.chat_secret_body))
+                Text(text = bodyText)
                 Spacer(modifier = Modifier.height(4.dp))
                 OutlinedTextField(
                     value = secret,
                     onValueChange = { secret = it },
-                    label = { Text(stringResource(R.string.chat_secret_value)) },
+                    label = { Text(labelText) },
                     modifier = Modifier.fillMaxWidth().testTag("secret_value_input"),
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, keyboardType = KeyboardType.Password),
+                    enabled = !isSubmitting,
                 )
             }
         },
@@ -115,14 +225,19 @@ fun SecretPromptDialog(
                         onConfirm(secret)
                     }
                 },
-                enabled = secret.isNotBlank(),
+                enabled = secret.isNotBlank() && !isSubmitting,
+                modifier = Modifier.testTag("secret_send_button"),
             ) {
                 Text(stringResource(R.string.chat_send))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.chat_dismiss))
+            TextButton(
+                onClick = onCancel,
+                modifier = Modifier.testTag("secret_cancel_button"),
+                enabled = !isSubmitting,
+            ) {
+                Text(stringResource(R.string.chat_privileged_cancel))
             }
         },
     )

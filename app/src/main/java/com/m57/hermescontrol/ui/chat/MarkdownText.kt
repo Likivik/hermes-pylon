@@ -25,6 +25,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -32,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
@@ -43,7 +45,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hrm.latex.renderer.LatexAutoWrap
@@ -54,9 +58,9 @@ import com.hrm.latex.renderer.model.LatexTheme
 import com.m57.hermescontrol.data.remote.GatewayFileClient
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.theme.SearchHighlightColors
-import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.theme.WithoutChatFontScale
 import com.m57.hermescontrol.theme.searchHighlightColors
+import com.m57.hermescontrol.util.BidiUtils
 
 private val URL_PATTERN = Regex("""https?://[^\s)>\[\]"'‘’]+""")
 private val TABLE_COL_WIDTH = 160.dp
@@ -65,6 +69,8 @@ private val TASK_LINE_RE = Regex("""^(\s*)[-*+]\s+\[([ xX])\]\s+(.*)$""")
 private val BULLET_LINE_RE = Regex("""^(\s*)[-*+]\s+(.*)$""")
 private val ORDERED_LINE_RE = Regex("""^(\s*)(\d+)\.\s+(.*)$""")
 private val LIST_ITEM_LINE_RE = Regex("""^(\s*)(?:[-*+]\s+(?:\[([ xX])\]\s+)?|(\d+)\.\s+)(.*)$""")
+
+private fun bidiTextDirection(isRtl: Boolean): TextDirection = if (isRtl) TextDirection.Rtl else TextDirection.Ltr
 
 /**
  * Renders chat assistant text as Markdown — but ONLY once the message has finished streaming.
@@ -89,12 +95,19 @@ fun MarkdownText(
     val statusColors = LocalHermesStatusColors.current
     val highlights = searchHighlightColors(statusColors)
     if (isStreaming) {
-        Text(
-            text = text,
-            color = textColor,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = modifier,
-        )
+        val isRtl = remember(text) { BidiUtils.isRtlText(text) }
+        val streamingDirection = if (isRtl) LayoutDirection.Rtl else LocalLayoutDirection.current
+        CompositionLocalProvider(LocalLayoutDirection provides streamingDirection) {
+            Text(
+                text = if (isRtl) BidiUtils.anchorTrailingRtl(text) else text,
+                color = textColor,
+                style =
+                    MaterialTheme.typography.bodyMedium.copy(
+                        textDirection = bidiTextDirection(isRtl),
+                    ),
+                modifier = modifier,
+            )
+        }
         return
     }
 
@@ -111,6 +124,8 @@ fun MarkdownText(
                             code = block.code,
                             language = block.language,
                             onCopy = { /* clipboard handled internally */ },
+                            searchQuery = searchQuery,
+                            isCurrentMatch = isCurrentMatch,
                         )
                     }
                 }
@@ -144,7 +159,7 @@ fun MarkdownText(
 
                 is MdBlock.Hr -> {
                     HorizontalDivider(
-                        modifier = Modifier.padding(vertical = Spacing.sm),
+                        modifier = Modifier.padding(vertical = 8.dp),
                         color = textColor.copy(alpha = 0.25f),
                     )
                 }
@@ -159,154 +174,191 @@ fun MarkdownText(
                             5 -> 15.sp
                             else -> 14.sp
                         }
-                    MarkdownInlineText(
-                        text = block.text,
-                        textColor = textColor,
-                        latexMeasurer = latexMeasurer,
-                        style =
-                            MaterialTheme.typography.bodyMedium
-                                .copy(fontSize = fontSize, fontWeight = FontWeight.Bold),
-                        searchQuery = searchQuery,
-                        isCurrentMatch = isCurrentMatch,
-                        linkColor = linkColor,
-                        highlights = highlights,
-                        modifier = Modifier.padding(vertical = 2.dp),
-                    )
-                }
-
-                is MdBlock.Bullet -> {
-                    val indent = (block.level * 16).dp
-                    Row(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(start = indent)
-                                .padding(vertical = 1.dp),
-                        verticalAlignment = Alignment.Top,
-                    ) {
-                        val bulletChar =
-                            when (block.level % 3) {
-                                0 -> "•"
-                                1 -> "◦"
-                                else -> "▪"
-                            }
-                        Text(
-                            text = bulletChar,
-                            color = textColor,
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(end = 6.dp),
-                        )
+                    val isRtl = remember(block.text) { BidiUtils.isRtlText(block.text) }
+                    val blockDirection = if (isRtl) LayoutDirection.Rtl else LocalLayoutDirection.current
+                    CompositionLocalProvider(LocalLayoutDirection provides blockDirection) {
                         MarkdownInlineText(
                             text = block.text,
                             textColor = textColor,
                             latexMeasurer = latexMeasurer,
-                            style = MaterialTheme.typography.bodyMedium,
+                            style =
+                                MaterialTheme.typography.bodyMedium
+                                    .copy(
+                                        fontSize = fontSize,
+                                        fontWeight = FontWeight.Bold,
+                                        textDirection = bidiTextDirection(isRtl),
+                                    ),
                             searchQuery = searchQuery,
                             isCurrentMatch = isCurrentMatch,
                             linkColor = linkColor,
                             highlights = highlights,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.padding(vertical = 2.dp),
                         )
+                    }
+                }
+
+                is MdBlock.Bullet -> {
+                    val indent = (block.level * 16).dp
+                    val isRtl = remember(block.text) { BidiUtils.isRtlText(block.text) }
+                    val blockDirection = if (isRtl) LayoutDirection.Rtl else LocalLayoutDirection.current
+                    CompositionLocalProvider(LocalLayoutDirection provides blockDirection) {
+                        Row(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = indent)
+                                    .padding(vertical = 1.dp),
+                            verticalAlignment = Alignment.Top,
+                        ) {
+                            val bulletChar =
+                                when (block.level % 3) {
+                                    0 -> "•"
+                                    1 -> "◦"
+                                    else -> "▪"
+                                }
+                            Text(
+                                text = bulletChar,
+                                color = textColor,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(end = 6.dp),
+                            )
+                            MarkdownInlineText(
+                                text = block.text,
+                                textColor = textColor,
+                                latexMeasurer = latexMeasurer,
+                                style =
+                                    MaterialTheme.typography.bodyMedium.copy(
+                                        textDirection = bidiTextDirection(isRtl),
+                                    ),
+                                searchQuery = searchQuery,
+                                isCurrentMatch = isCurrentMatch,
+                                linkColor = linkColor,
+                                highlights = highlights,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
                     }
                 }
 
                 is MdBlock.Task -> {
                     val indent = (block.level * 16).dp
-                    Row(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(start = indent)
-                                .padding(vertical = 1.dp),
-                        verticalAlignment = Alignment.Top,
-                    ) {
-                        Icon(
-                            imageVector =
-                                if (block.checked) {
-                                    Icons.Outlined.CheckBox
-                                } else {
-                                    Icons.Outlined.CheckBoxOutlineBlank
-                                },
-                            contentDescription = null,
-                            tint =
-                                if (block.checked) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    textColor.copy(
-                                        alpha = 0.6f,
-                                    )
-                                },
-                            modifier = Modifier.size(18.dp).padding(top = 1.dp, end = 6.dp),
-                        )
-                        MarkdownInlineText(
-                            text = block.text,
-                            textColor = textColor,
-                            latexMeasurer = latexMeasurer,
-                            style = MaterialTheme.typography.bodyMedium,
-                            searchQuery = searchQuery,
-                            isCurrentMatch = isCurrentMatch,
-                            linkColor = linkColor,
-                            highlights = highlights,
-                            modifier = Modifier.weight(1f),
-                        )
+                    val isRtl = remember(block.text) { BidiUtils.isRtlText(block.text) }
+                    val blockDirection = if (isRtl) LayoutDirection.Rtl else LocalLayoutDirection.current
+                    CompositionLocalProvider(LocalLayoutDirection provides blockDirection) {
+                        Row(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = indent)
+                                    .padding(vertical = 1.dp),
+                            verticalAlignment = Alignment.Top,
+                        ) {
+                            Icon(
+                                imageVector =
+                                    if (block.checked) {
+                                        Icons.Outlined.CheckBox
+                                    } else {
+                                        Icons.Outlined.CheckBoxOutlineBlank
+                                    },
+                                contentDescription = null,
+                                tint =
+                                    if (block.checked) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        textColor.copy(
+                                            alpha = 0.6f,
+                                        )
+                                    },
+                                modifier = Modifier.size(18.dp).padding(top = 1.dp, end = 6.dp),
+                            )
+                            MarkdownInlineText(
+                                text = block.text,
+                                textColor = textColor,
+                                latexMeasurer = latexMeasurer,
+                                style =
+                                    MaterialTheme.typography.bodyMedium.copy(
+                                        textDirection = bidiTextDirection(isRtl),
+                                    ),
+                                searchQuery = searchQuery,
+                                isCurrentMatch = isCurrentMatch,
+                                linkColor = linkColor,
+                                highlights = highlights,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
                     }
                 }
 
                 is MdBlock.Ordered -> {
                     val indent = (block.level * 16).dp
-                    Row(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(start = indent)
-                                .padding(vertical = 1.dp),
-                        verticalAlignment = Alignment.Top,
-                    ) {
-                        Text(
-                            text = "${block.index}.",
-                            color = textColor,
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(end = 6.dp),
-                        )
-                        MarkdownInlineText(
-                            text = block.text,
-                            textColor = textColor,
-                            latexMeasurer = latexMeasurer,
-                            style = MaterialTheme.typography.bodyMedium,
-                            searchQuery = searchQuery,
-                            isCurrentMatch = isCurrentMatch,
-                            linkColor = linkColor,
-                            highlights = highlights,
-                            modifier = Modifier.weight(1f),
-                        )
+                    val isRtl = remember(block.text) { BidiUtils.isRtlText(block.text) }
+                    val blockDirection = if (isRtl) LayoutDirection.Rtl else LocalLayoutDirection.current
+                    CompositionLocalProvider(LocalLayoutDirection provides blockDirection) {
+                        Row(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = indent)
+                                    .padding(vertical = 1.dp),
+                            verticalAlignment = Alignment.Top,
+                        ) {
+                            Text(
+                                text = "${block.index}.",
+                                color = textColor,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(end = 6.dp),
+                            )
+                            MarkdownInlineText(
+                                text = block.text,
+                                textColor = textColor,
+                                latexMeasurer = latexMeasurer,
+                                style =
+                                    MaterialTheme.typography.bodyMedium.copy(
+                                        textDirection = bidiTextDirection(isRtl),
+                                    ),
+                                searchQuery = searchQuery,
+                                isCurrentMatch = isCurrentMatch,
+                                linkColor = linkColor,
+                                highlights = highlights,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
                     }
                 }
 
                 is MdBlock.Quote -> {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).padding(vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Box(
-                            modifier =
-                                Modifier
-                                    .width(3.dp)
-                                    .fillMaxHeight()
-                                    .clip(RoundedCornerShape(2.dp))
-                                    .background(textColor.copy(alpha = 0.35f)),
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        MarkdownInlineText(
-                            text = block.text,
-                            textColor = textColor,
-                            latexMeasurer = latexMeasurer,
-                            style = MaterialTheme.typography.bodyMedium.copy(fontStyle = FontStyle.Italic),
-                            searchQuery = searchQuery,
-                            isCurrentMatch = isCurrentMatch,
-                            linkColor = linkColor,
-                            highlights = highlights,
-                            modifier = Modifier.weight(1f),
-                        )
+                    val isRtl = remember(block.text) { BidiUtils.isRtlText(block.text) }
+                    val blockDirection = if (isRtl) LayoutDirection.Rtl else LocalLayoutDirection.current
+                    CompositionLocalProvider(LocalLayoutDirection provides blockDirection) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .width(3.dp)
+                                        .fillMaxHeight()
+                                        .clip(RoundedCornerShape(2.dp))
+                                        .background(textColor.copy(alpha = 0.35f)),
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            MarkdownInlineText(
+                                text = block.text,
+                                textColor = textColor,
+                                latexMeasurer = latexMeasurer,
+                                style =
+                                    MaterialTheme.typography.bodyMedium.copy(
+                                        fontStyle = FontStyle.Italic,
+                                        textDirection = bidiTextDirection(isRtl),
+                                    ),
+                                searchQuery = searchQuery,
+                                isCurrentMatch = isCurrentMatch,
+                                linkColor = linkColor,
+                                highlights = highlights,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
                     }
                 }
 
@@ -321,7 +373,7 @@ fun MarkdownText(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = Spacing.xs),
+                                .padding(vertical = 4.dp),
                     ) {
                         com.m57.hermescontrol.ui.chat.components.GifImageThumbnail(
                             model = source.model,
@@ -343,28 +395,55 @@ fun MarkdownText(
                 }
 
                 is MdBlock.DefList -> {
-                    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-                        block.items.forEach { item ->
-                            Text(
-                                text = item.term,
-                                color = textColor,
-                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                            )
-                            item.definitions.forEach { def ->
-                                Text(
-                                    text = def,
-                                    color = textColor,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    modifier = Modifier.padding(start = Spacing.md, bottom = 2.dp),
-                                )
+                    val isRtl =
+                        remember(block.items) {
+                            block.items.any { item ->
+                                BidiUtils.isRtlText(item.term) ||
+                                    item.definitions.any { BidiUtils.isRtlText(it) }
                             }
-                            Spacer(modifier = Modifier.height(2.dp))
+                        }
+                    val blockDirection = if (isRtl) LayoutDirection.Rtl else LocalLayoutDirection.current
+                    CompositionLocalProvider(LocalLayoutDirection provides blockDirection) {
+                        Column(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+                            block.items.forEach { item ->
+                                val itemRtl = BidiUtils.isRtlText(item.term)
+                                Text(
+                                    text = if (itemRtl) BidiUtils.anchorTrailingRtl(item.term) else item.term,
+                                    color = textColor,
+                                    style =
+                                        MaterialTheme.typography.bodyMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            textDirection = bidiTextDirection(itemRtl),
+                                        ),
+                                )
+                                item.definitions.forEach { def ->
+                                    val defRtl = BidiUtils.isRtlText(def)
+                                    Text(
+                                        text = if (defRtl) BidiUtils.anchorTrailingRtl(def) else def,
+                                        color = textColor,
+                                        style =
+                                            MaterialTheme.typography.bodyMedium.copy(
+                                                textDirection = bidiTextDirection(defRtl),
+                                            ),
+                                        modifier = Modifier.padding(start = 16.dp, bottom = 2.dp),
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(2.dp))
+                            }
                         }
                     }
                 }
 
                 is MdBlock.Table -> {
-                    MarkdownTable(block = block, textColor = textColor)
+                    MarkdownTable(
+                        block = block,
+                        textColor = textColor,
+                        latexMeasurer = latexMeasurer,
+                        searchQuery = searchQuery,
+                        isCurrentMatch = isCurrentMatch,
+                        linkColor = linkColor,
+                        highlights = highlights,
+                    )
                 }
 
                 is MdBlock.Footnotes -> {
@@ -380,40 +459,54 @@ fun MarkdownText(
                             modifier = Modifier.padding(bottom = 2.dp),
                         )
                         block.notes.forEach { note ->
-                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp)) {
-                                Text(
-                                    text = "[${note.id}] ",
-                                    color = textColor,
-                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                                )
-                                MarkdownInlineText(
-                                    text = note.text,
-                                    textColor = textColor,
-                                    latexMeasurer = latexMeasurer,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    searchQuery = searchQuery,
-                                    isCurrentMatch = isCurrentMatch,
-                                    linkColor = linkColor,
-                                    highlights = highlights,
-                                    modifier = Modifier.weight(1f),
-                                )
+                            val isRtl = remember(note.text) { BidiUtils.isRtlText(note.text) }
+                            val noteDirection = if (isRtl) LayoutDirection.Rtl else LocalLayoutDirection.current
+                            CompositionLocalProvider(LocalLayoutDirection provides noteDirection) {
+                                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp)) {
+                                    Text(
+                                        text = "[${note.id}] ",
+                                        color = textColor,
+                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                    )
+                                    MarkdownInlineText(
+                                        text = note.text,
+                                        textColor = textColor,
+                                        latexMeasurer = latexMeasurer,
+                                        style =
+                                            MaterialTheme.typography.bodySmall.copy(
+                                                textDirection = bidiTextDirection(isRtl),
+                                            ),
+                                        searchQuery = searchQuery,
+                                        isCurrentMatch = isCurrentMatch,
+                                        linkColor = linkColor,
+                                        highlights = highlights,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                }
                             }
                         }
                     }
                 }
 
                 is MdBlock.Paragraph -> {
-                    MarkdownInlineText(
-                        text = block.text,
-                        textColor = textColor,
-                        latexMeasurer = latexMeasurer,
-                        style = MaterialTheme.typography.bodyMedium,
-                        searchQuery = searchQuery,
-                        isCurrentMatch = isCurrentMatch,
-                        linkColor = linkColor,
-                        highlights = highlights,
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                    )
+                    val isRtl = remember(block.text) { BidiUtils.isRtlText(block.text) }
+                    val blockDirection = if (isRtl) LayoutDirection.Rtl else LocalLayoutDirection.current
+                    CompositionLocalProvider(LocalLayoutDirection provides blockDirection) {
+                        MarkdownInlineText(
+                            text = block.text,
+                            textColor = textColor,
+                            latexMeasurer = latexMeasurer,
+                            style =
+                                MaterialTheme.typography.bodyMedium.copy(
+                                    textDirection = bidiTextDirection(isRtl),
+                                ),
+                            searchQuery = searchQuery,
+                            isCurrentMatch = isCurrentMatch,
+                            linkColor = linkColor,
+                            highlights = highlights,
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                        )
+                    }
                 }
             }
         }
@@ -447,74 +540,96 @@ private fun MarkdownInlineText(
     highlights: SearchHighlightColors,
     modifier: Modifier = Modifier,
 ) {
+    val isRtl = remember(text) { BidiUtils.isRtlText(text) }
+    val resolvedStyle = style.copy(textDirection = bidiTextDirection(isRtl))
     val markup = remember(text) { buildInlineMathMarkup(text) }
     if (markup.math.isEmpty()) {
         Text(
             text =
                 remember(text, searchQuery, isCurrentMatch, textColor, linkColor, highlights) {
-                    parseInlineSource(text, textColor, searchQuery, isCurrentMatch, linkColor, highlights)
+                    anchorTrailingRtlPresentation(
+                        parseInlineSource(
+                            text,
+                            textColor,
+                            searchQuery,
+                            isCurrentMatch,
+                            linkColor,
+                            highlights,
+                            isRtl,
+                        ),
+                        isRtl,
+                    )
                 },
             color = textColor,
-            style = style,
+            style = resolvedStyle,
             modifier = modifier,
         )
         return
     }
 
-    val inlineContent = mutableMapOf<String, InlineTextContent>()
-    markup.math.forEach { placeholder ->
-        val matchColors = formulaSearchColors(placeholder.latex, searchQuery, isCurrentMatch, highlights)
-        val config =
-            LatexConfig(
-                fontSize = style.fontSize,
-                theme =
-                    LatexTheme.light(
-                        color = matchColors?.second ?: textColor,
-                        backgroundColor = Color.Transparent,
-                    ),
-                accessibilityEnabled = true,
-            )
-        latexMeasurer.inlineContent(placeholder.latex, config)?.let {
-            inlineContent[placeholder.id] = it
-        }
-    }
-    val parsed =
-        remember(markup.source, searchQuery, isCurrentMatch, textColor, linkColor, highlights) {
-            parseInlineSource(markup.source, textColor, searchQuery, isCurrentMatch, linkColor, highlights)
-        }
-    val byMarker = markup.math.associateBy(InlineMathPlaceholder::marker)
-    val annotated =
-        buildAnnotatedString {
-            var plainStart = 0
-            parsed.forEachIndexed { index, char ->
-                val placeholder = byMarker[char] ?: return@forEachIndexed
-                append(parsed.subSequence(plainStart, index))
-
-                val styles = parsed.spanStyles.filter { index in it.start until it.end }
-                val links = parsed.getLinkAnnotations(index, index + 1)
-                styles.forEach { pushStyle(it.item) }
-                links.forEach { pushLink(it.item) }
-                formulaSearchColors(placeholder.latex, searchQuery, isCurrentMatch, highlights)
-                    ?.let { (background, foreground) ->
-                        pushStyle(SpanStyle(background = background, color = foreground))
-                    }
-                if (placeholder.id in inlineContent) {
-                    appendInlineContent(placeholder.id, placeholder.latex)
-                } else {
-                    append(placeholder.latex)
+    val inlineContent =
+        remember(markup, latexMeasurer, style.fontSize, textColor, searchQuery, isCurrentMatch, highlights) {
+            val inlineContent = mutableMapOf<String, InlineTextContent>()
+            markup.math.forEach { placeholder ->
+                val matchColors = formulaSearchColors(placeholder.latex, searchQuery, isCurrentMatch, highlights)
+                val config =
+                    LatexConfig(
+                        fontSize = style.fontSize,
+                        theme =
+                            LatexTheme.light(
+                                color = matchColors?.second ?: textColor,
+                                backgroundColor = Color.Transparent,
+                            ),
+                        accessibilityEnabled = true,
+                    )
+                latexMeasurer.inlineContent(placeholder.latex, config)?.let {
+                    inlineContent[placeholder.id] = it
                 }
-                val pushedSearchStyle =
-                    formulaSearchColors(placeholder.latex, searchQuery, isCurrentMatch, highlights) != null
-                repeat(styles.size + links.size + if (pushedSearchStyle) 1 else 0) { pop() }
-                plainStart = index + 1
             }
-            append(parsed.subSequence(plainStart, parsed.length))
+            inlineContent
+        }
+    val parsed =
+        remember(markup.source, searchQuery, isCurrentMatch, textColor, linkColor, highlights, isRtl) {
+            parseInlineSource(markup.source, textColor, searchQuery, isCurrentMatch, linkColor, highlights, isRtl)
+        }
+    val byMarker = remember(markup) { markup.math.associateBy(InlineMathPlaceholder::marker) }
+    val annotated =
+        remember(parsed, byMarker, inlineContent, searchQuery, isCurrentMatch, highlights, isRtl) {
+            anchorTrailingRtlPresentation(
+                buildAnnotatedString {
+                    var plainStart = 0
+                    parsed.forEachIndexed { index, char ->
+                        val placeholder = byMarker[char] ?: return@forEachIndexed
+                        append(parsed.subSequence(plainStart, index))
+
+                        val styles = parsed.spanStyles.filter { index in it.start until it.end }
+                        val links = parsed.getLinkAnnotations(index, index + 1)
+                        styles.forEach { pushStyle(it.item) }
+                        links.forEach { pushLink(it.item) }
+                        formulaSearchColors(placeholder.latex, searchQuery, isCurrentMatch, highlights)
+                            ?.let { (background, foreground) ->
+                                pushStyle(SpanStyle(background = background, color = foreground))
+                            }
+                        if (placeholder.id in inlineContent) {
+                            appendInlineContent(placeholder.id, placeholder.latex)
+                        } else {
+                            append(placeholder.latex)
+                        }
+                        val pushedSearchStyle =
+                            formulaSearchColors(placeholder.latex, searchQuery, isCurrentMatch, highlights) != null
+                        repeat(styles.size + links.size + if (pushedSearchStyle) 1 else 0) { pop() }
+                        plainStart = index + 1
+                    }
+                    append(parsed.subSequence(plainStart, parsed.length))
+                },
+                isRtl,
+            )
         }
     Text(
         text = annotated,
         inlineContent = inlineContent,
         color = textColor,
-        style = style,
+        style = resolvedStyle,
         modifier = modifier,
     )
 }
@@ -523,41 +638,39 @@ private fun MarkdownInlineText(
 private fun MarkdownTable(
     block: MdBlock.Table,
     textColor: Color,
+    latexMeasurer: LatexMeasurerState,
+    searchQuery: String,
+    isCurrentMatch: Boolean,
+    linkColor: Color,
+    highlights: SearchHighlightColors,
 ) {
+    val tableDirection = tableStructureDirection(LocalLayoutDirection.current)
     val headerBg = textColor.copy(alpha = 0.08f)
     val alignments = block.alignments
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(vertical = Spacing.xs),
-    ) {
-        // Header row
-        Row(modifier = Modifier.background(headerBg)) {
-            block.header.forEachIndexed { idx, cell ->
-                Text(
-                    text = cell,
-                    textAlign = tableTextAlign(alignments.getOrNull(idx)),
-                    color = textColor,
-                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                    modifier =
-                        Modifier
-                            .width(TABLE_COL_WIDTH)
-                            .padding(6.dp),
-                )
-            }
-        }
-        HorizontalDivider(color = textColor.copy(alpha = 0.25f))
-        // Body rows
-        block.rows.forEach { row ->
-            Row {
-                row.forEachIndexed { idx, cell ->
-                    Text(
+    CompositionLocalProvider(LocalLayoutDirection provides tableDirection) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(vertical = 4.dp),
+        ) {
+            // Header row
+            Row(modifier = Modifier.background(headerBg)) {
+                block.header.forEachIndexed { idx, cell ->
+                    MarkdownInlineText(
                         text = cell,
-                        textAlign = tableTextAlign(alignments.getOrNull(idx)),
-                        color = textColor,
-                        style = MaterialTheme.typography.bodySmall,
+                        textColor = textColor,
+                        latexMeasurer = latexMeasurer,
+                        searchQuery = searchQuery,
+                        isCurrentMatch = isCurrentMatch,
+                        linkColor = linkColor,
+                        highlights = highlights,
+                        style =
+                            MaterialTheme.typography.bodySmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                textAlign = tableTextAlign(alignments.getOrNull(idx)),
+                            ),
                         modifier =
                             Modifier
                                 .width(TABLE_COL_WIDTH)
@@ -565,16 +678,43 @@ private fun MarkdownTable(
                     )
                 }
             }
-            HorizontalDivider(color = textColor.copy(alpha = 0.1f))
+            HorizontalDivider(color = textColor.copy(alpha = 0.25f))
+            // Body rows
+            block.rows.forEach { row ->
+                Row {
+                    row.forEachIndexed { idx, cell ->
+                        MarkdownInlineText(
+                            text = cell,
+                            textColor = textColor,
+                            latexMeasurer = latexMeasurer,
+                            searchQuery = searchQuery,
+                            isCurrentMatch = isCurrentMatch,
+                            linkColor = linkColor,
+                            highlights = highlights,
+                            style =
+                                MaterialTheme.typography.bodySmall.copy(
+                                    textAlign = tableTextAlign(alignments.getOrNull(idx)),
+                                ),
+                            modifier =
+                                Modifier
+                                    .width(TABLE_COL_WIDTH)
+                                    .padding(6.dp),
+                        )
+                    }
+                }
+                HorizontalDivider(color = textColor.copy(alpha = 0.1f))
+            }
         }
     }
 }
 
-private fun tableTextAlign(align: TableAlign?): TextAlign? =
+internal fun tableStructureDirection(ambient: LayoutDirection): LayoutDirection = ambient
+
+private fun tableTextAlign(align: TableAlign?): TextAlign =
     when (align) {
         TableAlign.CENTER -> TextAlign.Center
         TableAlign.RIGHT -> TextAlign.End
-        else -> null
+        else -> TextAlign.Start
     }
 
 internal sealed interface InlineMathSegment {
@@ -1208,6 +1348,7 @@ internal fun parseInline(
     isCurrentMatch: Boolean,
     linkColor: Color,
     highlights: SearchHighlightColors,
+    isRtl: Boolean = BidiUtils.isRtlText(text),
 ): AnnotatedString =
     parseInlineSource(
         text =
@@ -1222,7 +1363,108 @@ internal fun parseInline(
         isCurrentMatch = isCurrentMatch,
         linkColor = linkColor,
         highlights = highlights,
+        isRtl = isRtl,
     )
+
+private fun AnnotatedString.isolateLtrSnippet(isRtl: Boolean): AnnotatedString =
+    if (isRtl && BidiUtils.isLtrSnippet(text)) {
+        buildAnnotatedString {
+            append(BidiUtils.LRI)
+            append(this@isolateLtrSnippet)
+            append(BidiUtils.PDI)
+        }
+    } else {
+        this
+    }
+
+// Index exact backtick runs once; unmatched runs must not repeatedly scan the suffix.
+private fun nextCodeRuns(text: String): Map<Int, Int> {
+    val runs = mutableListOf<Pair<Int, Int>>()
+    var index = 0
+    while (index < text.length) {
+        if (text[index] != '`') {
+            index++
+            continue
+        }
+        val start = index
+        while (index < text.length && text[index] == '`') index++
+        runs.add(start to index - start)
+    }
+    val nextByLength = mutableMapOf<Int, Int>()
+    val next = mutableMapOf<Int, Int>()
+    for ((start, length) in runs.asReversed()) {
+        nextByLength[length]?.let { next[start] = it }
+        nextByLength[length] = start
+    }
+    return next
+}
+
+// Pair runs once, discarding unmatched inner openers instead of hiding an outer close.
+// Each opener is pushed/popped at most once; code and link destinations are opaque.
+internal fun emphasisPairs(
+    text: String,
+    codeRuns: Map<Int, Int>,
+): Map<Int, Int> {
+    val pairs = mutableMapOf<Int, Int>()
+    val starts = mutableListOf<Int>()
+    val widths = mutableListOf<Int>()
+    val byWidth = Array(4) { mutableListOf<Int>() }
+    val nextParen = IntArray(text.length + 1) { -1 }
+    for (index in text.indices.reversed()) {
+        nextParen[index] = if (text[index] == ')') index else nextParen[index + 1]
+    }
+
+    fun consume(
+        start: Int,
+        width: Int,
+    ) {
+        val match = byWidth[width].lastOrNull()
+        if (match == null) {
+            byWidth[width].add(starts.size)
+            starts.add(start)
+            widths.add(width)
+        } else {
+            pairs[starts[match]] = start
+            while (starts.size > match) {
+                val removedWidth = widths.removeAt(widths.lastIndex)
+                byWidth[removedWidth].removeAt(byWidth[removedWidth].lastIndex)
+                starts.removeAt(starts.lastIndex)
+            }
+        }
+    }
+    var index = 0
+    while (index < text.length) {
+        when {
+            text[index] == '`' -> {
+                var end = index
+                while (end < text.length && text[end] == '`') end++
+                index = codeRuns[index]?.plus(end - index) ?: end
+            }
+            text.startsWith("](", index) && nextParen[index + 2] >= 0 -> {
+                index = nextParen[index + 2] + 1
+            }
+            text[index] == '*' -> {
+                var end = index
+                while (end < text.length && text[end] == '*') end++
+                val width = end - index
+                if (width in 1..3) {
+                    if (width == 3 && widths.size >= 2 &&
+                        widths.last() + widths[widths.lastIndex - 1] == 3
+                    ) {
+                        val inner = widths.last()
+                        consume(index, inner)
+                        consume(index + inner, 3 - inner)
+                    } else {
+                        consume(index, width)
+                    }
+                }
+                index = end
+            }
+            else -> index++
+        }
+    }
+    return pairs
+}
 
 private fun parseInlineSource(
     text: String,
@@ -1231,40 +1473,89 @@ private fun parseInlineSource(
     isCurrentMatch: Boolean,
     linkColor: Color,
     highlights: SearchHighlightColors,
+    isRtl: Boolean = BidiUtils.isRtlText(text),
+    depth: Int = 0,
 ): AnnotatedString {
-    val searchHighlightColor =
-        if (isCurrentMatch) {
-            highlights.currentSearchBackground to highlights.currentSearchForeground
-        } else {
-            highlights.searchBackground to highlights.searchForeground
-        }
-
+    // Bound recursive rendering and repeated indexing of nested substrings.
+    if (depth >= 32) return AnnotatedString(text)
     return buildAnnotatedString {
         var i = 0
         val src = text
+        val codeRuns = nextCodeRuns(src)
+        val emphasis = emphasisPairs(src, codeRuns)
+
         while (i < src.length) {
+            // Cheap prefix gate: URL_PATTERN only matches at "http(s)://", so skip the regex elsewhere.
+            val urlMatch =
+                if (src.startsWith("http", i, ignoreCase = true)) URL_PATTERN.matchAt(src, i) else null
             when {
-                // ***bold italic***
-                src.startsWith("***", i) -> {
-                    val end = src.indexOf("***", i + 3)
-                    if (end != -1) {
-                        withStyle(SpanStyle(fontWeight = FontWeight.Bold, fontStyle = FontStyle.Italic)) {
-                            append(src.substring(i + 3, end))
+                // Inline code is opaque to emphasis parsing, and delimiters must match by run length.
+                src[i] == '`' -> {
+                    var runEnd = i
+                    while (runEnd < src.length && src[runEnd] == '`') runEnd++
+                    val runLength = runEnd - i
+                    val matchingEnd = codeRuns[i] ?: -1
+                    if (matchingEnd >= 0) {
+                        val raw = src.substring(runEnd, matchingEnd)
+                        val content = if (isRtl) BidiUtils.wrapInlineCodeLtrIsolate(raw) else raw
+                        withStyle(
+                            SpanStyle(
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 13.sp,
+                                background = textColor.copy(alpha = 0.08f),
+                            ),
+                        ) {
+                            append(content)
                         }
-                        i = end + 3
+                        i = matchingEnd + runLength
                     } else {
-                        append(src[i])
-                        i++
+                        append(src.substring(i, runEnd))
+                        i = runEnd
                     }
                 }
 
-                // **bold**
-                src.startsWith("**", i) -> {
-                    val end = src.indexOf("**", i + 2)
-                    if (end != -1) {
-                        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                            append(src.substring(i + 2, end))
+                // Combined / nested emphasis delimiters.
+                src.startsWith("***", i) -> {
+                    val end = emphasis[i] ?: -1
+                    if (end >= 0) {
+                        val raw = src.substring(i + 3, end)
+                        val content =
+                            parseInlineSource(
+                                raw,
+                                textColor,
+                                searchQuery,
+                                isCurrentMatch,
+                                linkColor,
+                                highlights,
+                                isRtl && !BidiUtils.isLtrSnippet(raw),
+                                depth + 1,
+                            ).isolateLtrSnippet(isRtl)
+                        withStyle(SpanStyle(fontWeight = FontWeight.Bold, fontStyle = FontStyle.Italic)) {
+                            append(content)
                         }
+                        i = end + 3
+                    } else {
+                        append("***")
+                        i += 3
+                    }
+                }
+
+                src.startsWith("**", i) -> {
+                    val end = emphasis[i] ?: -1
+                    if (end != -1) {
+                        val raw = src.substring(i + 2, end)
+                        val nested =
+                            parseInlineSource(
+                                raw,
+                                textColor,
+                                searchQuery,
+                                isCurrentMatch,
+                                linkColor,
+                                highlights,
+                                isRtl && !BidiUtils.isLtrSnippet(raw),
+                                depth + 1,
+                            ).isolateLtrSnippet(isRtl)
+                        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(nested) }
                         i = end + 2
                     } else {
                         append(src[i])
@@ -1276,8 +1567,10 @@ private fun parseInlineSource(
                 src.startsWith("~~", i) -> {
                     val end = src.indexOf("~~", i + 2)
                     if (end != -1) {
+                        val raw = src.substring(i + 2, end)
+                        val toAppend = if (isRtl) BidiUtils.wrapLtrIsolate(raw) else raw
                         withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) {
-                            append(src.substring(i + 2, end))
+                            append(toAppend)
                         }
                         i = end + 2
                     } else {
@@ -1286,14 +1579,25 @@ private fun parseInlineSource(
                     }
                 }
 
-                // *italic*
+                // *italic*; bold spans keep their styles while nested text is appended.
                 src.startsWith("*", i) -> {
-                    val end = src.indexOf('*', i + 1)
-                    if (end != -1 && end > i + 1) {
-                        withStyle(SpanStyle(fontStyle = FontStyle.Italic)) {
-                            append(src.substring(i + 1, end))
-                        }
-                        i = end + 1
+                    val close = emphasis[i] ?: -1
+                    if (close > i + 1) {
+                        val raw = src.substring(i + 1, close)
+                        val italic = SpanStyle(fontStyle = FontStyle.Italic)
+                        val nested =
+                            parseInlineSource(
+                                raw,
+                                textColor,
+                                searchQuery,
+                                isCurrentMatch,
+                                linkColor,
+                                highlights,
+                                isRtl && !BidiUtils.isLtrSnippet(raw),
+                                depth + 1,
+                            ).isolateLtrSnippet(isRtl)
+                        withStyle(italic) { append(nested) }
+                        i = close + 1
                     } else {
                         append(src[i])
                         i++
@@ -1304,8 +1608,10 @@ private fun parseInlineSource(
                 src.startsWith("==", i) -> {
                     val end = src.indexOf("==", i + 2)
                     if (end != -1) {
+                        val raw = src.substring(i + 2, end)
+                        val toAppend = if (isRtl) BidiUtils.wrapLtrIsolate(raw) else raw
                         withStyle(SpanStyle(background = highlights.markupBackground)) {
-                            append(src.substring(i + 2, end))
+                            append(toAppend)
                         }
                         i = end + 2
                     } else {
@@ -1346,13 +1652,15 @@ private fun parseInlineSource(
                 src.startsWith("<kbd>", i) -> {
                     val end = src.indexOf("</kbd>", i)
                     if (end != -1) {
+                        val raw = src.substring(i + 5, end)
+                        val toAppend = if (isRtl) BidiUtils.wrapLtrIsolate(raw) else raw
                         withStyle(
                             SpanStyle(
                                 fontFamily = FontFamily.Monospace,
                                 background = textColor.copy(alpha = 0.12f),
                             ),
                         ) {
-                            append(src.substring(i + 5, end))
+                            append(toAppend)
                         }
                         i = end + 6
                     } else {
@@ -1391,13 +1699,19 @@ private fun parseInlineSource(
                             val label = src.substring(i + 1, close)
                             val url = src.substring(close + 2, urlEnd)
                             pushLink(LinkAnnotation.Url(url))
-                            withStyle(
-                                SpanStyle(
-                                    color = linkColor,
-                                    textDecoration = TextDecoration.Underline,
-                                ),
-                            ) {
-                                append(label)
+                            val labelText =
+                                parseInlineSource(
+                                    label,
+                                    textColor,
+                                    searchQuery,
+                                    isCurrentMatch,
+                                    linkColor,
+                                    highlights,
+                                    isRtl && !BidiUtils.isLtrSnippet(label),
+                                    depth + 1,
+                                ).isolateLtrSnippet(isRtl)
+                            withStyle(SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)) {
+                                append(labelText)
                             }
                             pop()
                             i = urlEnd + 1
@@ -1411,30 +1725,10 @@ private fun parseInlineSource(
                     }
                 }
 
-                // `inline code`
-                src.startsWith("`", i) -> {
-                    val end = src.indexOf('`', i + 1)
-                    if (end != -1) {
-                        withStyle(
-                            SpanStyle(
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 13.sp,
-                                background = textColor.copy(alpha = 0.08f),
-                            ),
-                        ) {
-                            append(src.substring(i + 1, end))
-                        }
-                        i = end + 1
-                    } else {
-                        append(src[i])
-                        i++
-                    }
-                }
-
                 // bare URL
-                URL_PATTERN.matchAt(src, i) != null -> {
-                    val match = URL_PATTERN.matchAt(src, i)!!
-                    val url = match.value
+                urlMatch != null -> {
+                    val url = urlMatch.value
+                    val urlToAppend = if (isRtl) BidiUtils.wrapLtrIsolate(url) else url
                     pushLink(LinkAnnotation.Url(url))
                     withStyle(
                         SpanStyle(
@@ -1442,24 +1736,46 @@ private fun parseInlineSource(
                             textDecoration = TextDecoration.Underline,
                         ),
                     ) {
-                        append(url)
+                        append(urlToAppend)
                     }
                     pop()
-                    i = match.range.last + 1
+                    i = urlMatch.range.last + 1
                 }
 
-                // search highlight
+                // Search highlighting must win before an LTR run is isolated, otherwise an English
+                // query in an RTL paragraph is consumed without receiving its highlight style.
                 searchQuery.isNotEmpty() &&
                     src.regionMatches(i, searchQuery, 0, searchQuery.length, ignoreCase = true) -> {
-                    withStyle(
-                        SpanStyle(
-                            background = searchHighlightColor.first,
-                            color = searchHighlightColor.second,
-                        ),
-                    ) {
-                        append(src.substring(i, i + searchQuery.length))
-                    }
+                    val match = src.substring(i, i + searchQuery.length)
+                    val toAppend = if (isRtl) BidiUtils.wrapLtrIsolate(match) else match
+                    append(toAppend)
                     i += searchQuery.length
+                }
+
+                // Keep consecutive Latin words together inside a resolved RTL paragraph.
+                isRtl && Character.isLetterOrDigit(src.codePointAt(i)) &&
+                    Character.getDirectionality(src.codePointAt(i)) == Character.DIRECTIONALITY_LEFT_TO_RIGHT -> {
+                    var end = i + Character.charCount(src.codePointAt(i))
+                    while (end < src.length) {
+                        val cp = src.codePointAt(end)
+                        val directionality = Character.getDirectionality(cp)
+                        if (directionality == Character.DIRECTIONALITY_LEFT_TO_RIGHT ||
+                            directionality == Character.DIRECTIONALITY_EUROPEAN_NUMBER ||
+                            directionality == Character.DIRECTIONALITY_EUROPEAN_NUMBER_SEPARATOR ||
+                            directionality == Character.DIRECTIONALITY_EUROPEAN_NUMBER_TERMINATOR ||
+                            (
+                                directionality == Character.DIRECTIONALITY_WHITESPACE && end + 1 < src.length &&
+                                    Character.getDirectionality(src.codePointAt(end + 1)) ==
+                                    Character.DIRECTIONALITY_LEFT_TO_RIGHT
+                            )
+                        ) {
+                            end += Character.charCount(cp)
+                        } else {
+                            break
+                        }
+                    }
+                    append(BidiUtils.wrapLtrIsolate(src.substring(i, end)))
+                    i = end
                 }
 
                 else -> {
@@ -1468,8 +1784,49 @@ private fun parseInlineSource(
                 }
             }
         }
+    }.withSearchHighlights(searchQuery, isCurrentMatch, highlights)
+}
+
+/** Overlay search-hit spans on an already syntax-highlighted string, keeping its existing styles. */
+internal fun AnnotatedString.withSearchHighlights(
+    query: String,
+    isCurrent: Boolean,
+    highlights: SearchHighlightColors,
+): AnnotatedString {
+    if (query.isEmpty()) return this
+    val (bg, fg) =
+        if (isCurrent) {
+            highlights.currentSearchBackground to highlights.currentSearchForeground
+        } else {
+            highlights.searchBackground to highlights.searchForeground
+        }
+    return buildAnnotatedString {
+        append(this@withSearchHighlights)
+        var from = 0
+        while (true) {
+            val hit = text.indexOf(query, from, ignoreCase = true)
+            if (hit < 0) break
+            val start = if (hit > 0 && text[hit - 1] == BidiUtils.LRI.single()) hit - 1 else hit
+            val end = hit + query.length
+            val isolatedEnd = if (end < text.length && text[end] == BidiUtils.PDI.single()) end + 1 else end
+            addStyle(SpanStyle(background = bg, color = fg), start, isolatedEnd)
+            from = hit + query.length
+        }
     }
 }
+
+internal fun anchorTrailingRtlPresentation(
+    text: AnnotatedString,
+    isRtl: Boolean,
+): AnnotatedString =
+    if (isRtl && !text.endsWith(BidiUtils.RLM)) {
+        buildAnnotatedString {
+            append(text)
+            append(BidiUtils.RLM)
+        }
+    } else {
+        text
+    }
 
 internal sealed interface MdBlock {
     data class Code(

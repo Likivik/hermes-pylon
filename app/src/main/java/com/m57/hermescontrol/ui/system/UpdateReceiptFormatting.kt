@@ -16,6 +16,8 @@ data class UpdateReceiptDisplay(
     val toVersion: String? = null,
 )
 
+internal fun shouldLoadUpdateReceipt(actionName: String?): Boolean = actionName == "hermes-update"
+
 /**
  * Extracts only the backend update outcome and version transition.
  *

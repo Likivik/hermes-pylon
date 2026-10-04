@@ -12,6 +12,7 @@ from xml.etree import ElementTree
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 RESOURCE_ROOT = ROOT / "app" / "src" / "main" / "res"
 LOCALES = ("zh", "ja", "ko")
+SPARSE_LOCALES = ("ar",)
 FORMAT_ARGUMENT = re.compile(
     r"%(?:\d+\$)?[-#+ 0,(<]*\d*(?:\.\d+)?(?:[tT][a-zA-Z]|[a-zA-Z%])"
 )
@@ -51,7 +52,7 @@ def main() -> int:
     default_path = RESOURCE_ROOT / "values" / "strings.xml"
     default = strings(default_path)
     failures: list[str] = []
-    for locale in LOCALES:
+    for locale in LOCALES + SPARSE_LOCALES:
         path = RESOURCE_ROOT / f"values-{locale}" / "strings.xml"
         if not path.exists():
             failures.append(f"{locale}: missing {path.relative_to(ROOT)}")
@@ -59,7 +60,7 @@ def main() -> int:
         localized = strings(path)
         missing = sorted(default.keys() - localized.keys())
         extra = sorted(localized.keys() - default.keys())
-        if missing:
+        if missing and locale not in SPARSE_LOCALES:
             failures.append(f"{locale}: missing keys: {', '.join(missing)}")
         if extra:
             failures.append(f"{locale}: extra keys: {', '.join(extra)}")
@@ -72,7 +73,8 @@ def main() -> int:
         print("\n".join(failures), file=sys.stderr)
         return 1
     print(
-        f"Resource parity OK: {len(default)} translatable strings in {', '.join(LOCALES)}"
+        f"Resource parity OK: {len(default)} translatable strings in {', '.join(LOCALES)}; "
+        f"sparse overrides: {', '.join(SPARSE_LOCALES)}"
     )
     return 0
 

@@ -25,6 +25,16 @@ object ChatWsEventReducer {
         event: WsEvent,
         currentSessionId: String? = null,
     ): ReducerResult {
+        if (event is WsEvent.ClarifyRequest &&
+            (
+                event.clarifyId.isNullOrBlank() ||
+                    event.sessionId.isNullOrBlank() ||
+                    event.sourceProfileId.isNullOrBlank() ||
+                    event.connectionGeneration == null
+            )
+        ) {
+            return ReducerResult(state = state, streamingState = streamingState)
+        }
         val eventSessionId =
             when (event) {
                 is WsEvent.MessageStart -> event.sessionId
@@ -37,6 +47,7 @@ object ChatWsEventReducer {
                 is WsEvent.ToolComplete -> event.sessionId
                 is WsEvent.ToolOutputRisk -> event.sessionId
                 is WsEvent.ClarifyRequest -> event.sessionId
+                is WsEvent.ClarifyExpire -> event.sessionId
                 is WsEvent.ToolProgress -> event.sessionId
                 is WsEvent.ToolGenerating -> event.sessionId
                 is WsEvent.SubagentEvent -> event.sessionId
@@ -87,6 +98,23 @@ object ChatWsEventReducer {
 
             is WsEvent.ClarifyRequest -> onClarifyRequest(state, streamingState, event)
 
+            is WsEvent.ClarifyExpire ->
+                ReducerResult(
+                    state =
+                        if (state.clarifyRequest?.let { clarify ->
+                                clarify.clarifyId == event.clarifyId &&
+                                    clarify.sessionId == event.sessionId &&
+                                    clarify.sourceProfileId == event.sourceProfileId &&
+                                    clarify.connectionGeneration == event.connectionGeneration
+                            } == true
+                        ) {
+                            state.copy(clarifyRequest = null)
+                        } else {
+                            state
+                        },
+                    streamingState = streamingState,
+                )
+
             is WsEvent.ReviewSummary -> onReviewSummary(state, streamingState, event)
 
             is WsEvent.RpcError -> onRpcError(state, streamingState, event)
@@ -117,7 +145,20 @@ object ChatWsEventReducer {
             // SudoRequest / SecretRequest are handled by the ViewModel (issue #524)
             is WsEvent.SudoRequest -> ReducerResult(state = state, streamingState = streamingState)
 
+            is WsEvent.SudoExpire -> ReducerResult(state = state, streamingState = streamingState)
+
             is WsEvent.SecretRequest -> ReducerResult(state = state, streamingState = streamingState)
+
+            is WsEvent.SecretExpire -> ReducerResult(state = state, streamingState = streamingState)
+
+            // A privileged frame the parser refused to bind. Never surfaced.
+            is WsEvent.PrivilegedRequestRejected -> ReducerResult(state = state, streamingState = streamingState)
+
+            // Gateway server requests are translated/handled by the ViewModel.
+            is WsEvent.ServerRequest,
+            is WsEvent.ServerRequestCancelled,
+            is WsEvent.TranscriptResyncRequired,
+            -> ReducerResult(state = state, streamingState = streamingState)
 
             // ReactionEvent is handled by the ViewModel — purely cosmetic animation
             is WsEvent.ReactionEvent -> ReducerResult(state = state, streamingState = streamingState)
@@ -523,6 +564,29 @@ object ChatWsEventReducer {
                             text = event.text.orEmpty(),
                             options = event.options.orEmpty(),
                             clarifyId = event.clarifyId,
+                            questionId = event.questionId,
+                            multiSelect = event.multiSelect,
+                            questions =
+                                event.questions.map {
+                                    ClarifyQuestionUi(it.qid, it.question, it.choices, it.multiSelect)
+                                },
+                            sessionId = event.sessionId,
+                            sourceProfileId = event.sourceProfileId,
+                            connectionGeneration = event.connectionGeneration,
+                            serverRequestBinding =
+                                if (event.serverRequestId != null && event.sessionId != null &&
+                                    event.sourceProfileId != null && event.connectionGeneration != null
+                                ) {
+                                    com.m57.hermescontrol.data.ws.ServerRequestBinding(
+                                        event.serverRequestId,
+                                        event.sessionId,
+                                        event.sourceProfileId,
+                                        event.connectionGeneration,
+                                    )
+                                } else {
+                                    null
+                                },
+                            lockedAnswers = event.lockedAnswers,
                         ),
                     isAgentTyping = false,
                 ),
@@ -629,12 +693,7 @@ object ChatWsEventReducer {
         event: WsEvent.ToolProgress,
     ): ReducerResult {
         val messages = state.messages.toMutableList()
-        val toolIdx =
-            messages.indexOfLast {
-                it.role == MessageRole.TOOL &&
-                    it.toolName == event.name &&
-                    it.toolStatus == ToolStatus.RUNNING
-            }
+        val toolIdx = findRunningToolIndex(messages, event.name, event.toolId)
         if (toolIdx < 0) return ReducerResult(state = state, streamingState = streamingState)
 
         messages[toolIdx] = messages[toolIdx].copy(progressPreview = event.preview ?: "")
@@ -650,12 +709,7 @@ object ChatWsEventReducer {
         event: WsEvent.ToolGenerating,
     ): ReducerResult {
         val messages = state.messages.toMutableList()
-        val toolIdx =
-            messages.indexOfLast {
-                it.role == MessageRole.TOOL &&
-                    it.toolName == event.name &&
-                    it.toolStatus == ToolStatus.RUNNING
-            }
+        val toolIdx = findRunningToolIndex(messages, event.name, event.toolId)
         if (toolIdx < 0) return ReducerResult(state = state, streamingState = streamingState)
 
         messages[toolIdx] = messages[toolIdx].copy(progressPreview = "")
@@ -663,6 +717,27 @@ object ChatWsEventReducer {
             state = state.copy(messages = messages),
             streamingState = streamingState,
         )
+    }
+
+    /** An explicit ID never falls back to a name; legacy name-only events need a unique running match. */
+    private fun findRunningToolIndex(
+        messages: List<ChatMessage>,
+        name: String?,
+        toolId: String?,
+    ): Int {
+        if (toolId != null) {
+            return messages.indexOfLast {
+                it.role == MessageRole.TOOL && it.toolStatus == ToolStatus.RUNNING &&
+                    it.toolCallId == toolId && (name == null || it.toolName == name)
+            }
+        }
+        if (name == null) return -1
+        val matches =
+            messages.indices.filter {
+                messages[it].role == MessageRole.TOOL && messages[it].toolStatus == ToolStatus.RUNNING &&
+                    messages[it].toolName == name
+            }
+        return matches.singleOrNull() ?: -1
     }
 
     private fun onSubagentEvent(
@@ -805,7 +880,8 @@ fun extractTodosFromMap(data: Map<String, Any?>?): List<TodoItem>? {
         val id = (map["id"] as? String) ?: continue
         val content = (map["content"] as? String) ?: (map["text"] as? String) ?: ""
         val status = (map["status"] as? String) ?: "pending"
-        items.add(TodoItem(id = id, content = content, status = status))
+        val parent = (map["parent"] as? String)?.takeIf { it.isNotBlank() }
+        items.add(TodoItem(id = id, content = content, status = status, parent = parent))
     }
     return items.takeIf { it.isNotEmpty() }
 }
@@ -829,7 +905,12 @@ fun extractTodosFromJson(content: String): List<TodoItem>? {
                 (itemObj["content"] as? JsonPrimitive)?.content
                     ?: (itemObj["text"] as? JsonPrimitive)?.content ?: ""
             val status = (itemObj["status"] as? JsonPrimitive)?.content ?: "pending"
-            TodoItem(id = id, content = contentStr, status = status)
+            val parent =
+                (itemObj["parent"] as? JsonPrimitive)
+                    ?.takeIf { it.isString }
+                    ?.content
+                    ?.takeIf { it.isNotBlank() }
+            TodoItem(id = id, content = contentStr, status = status, parent = parent)
         }.takeIf { it.isNotEmpty() }
     } catch (_: Exception) {
         null

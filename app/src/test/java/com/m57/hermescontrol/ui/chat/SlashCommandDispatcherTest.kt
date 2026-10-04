@@ -61,6 +61,13 @@ class SlashCommandDispatcherTest {
     }
 
     @Test
+    fun `undo routes to a dedicated result without changing other commands`() {
+        assertEquals(SlashResult.Undo(""), dispatcher.dispatch("/undo"))
+        assertEquals(SlashResult.Undo("2"), dispatcher.dispatch("/UNDO 2"))
+        assertEquals(SlashResult.RpcDispatch, dispatcher.dispatch("/help"))
+    }
+
+    @Test
     fun `resume and history route to client history navigation`() {
         assertEquals(SlashResult.OpenHistory, dispatcher.dispatch("/resume"))
         assertEquals(SlashResult.OpenHistory, dispatcher.dispatch("/HISTORY"))

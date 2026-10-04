@@ -2,8 +2,11 @@ package com.m57.hermescontrol.ui.chat
 
 import com.m57.hermescontrol.data.ws.WsEvent
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 /**
  * Holds chat message-streaming state and logic, extracted from [ChatViewModel]
@@ -29,6 +32,7 @@ class ChatStreamingController(
 ) {
     private val streamingBuffer = java.lang.StringBuilder()
     private var lastFlushMs = 0L
+    private var trailingMessageFlushJob: Job? = null
 
     private val thinkingBuffer = java.lang.StringBuilder()
     private var lastThinkingFlushMs = 0L
@@ -42,6 +46,7 @@ class ChatStreamingController(
      * ToolStart, ClarifyRequest, session switches, and interrupt handling.
      */
     fun resetStreaming() {
+        trailingMessageFlushJob?.cancel()
         streamingBuffer.clear()
         thinkingBuffer.clear()
         reasoningBuffer.clear()
@@ -69,38 +74,49 @@ class ChatStreamingController(
         // Always flush in tests, or if enough time has passed
         val shouldFlush = (now - lastFlushMs >= 33L) || lastFlushMs == 0L || isTestEnvironment()
         if (shouldFlush) {
-            val currentContent = streamingBuffer.toString()
-            lastFlushMs = now
-            streamingState.update { state ->
-                val current = state.streamingMessage
-                if (current != null) {
-                    val currentReasoning =
-                        current.reasoningText.ifBlank { state.reasoningText }
-                    state.copy(
-                        streamingMessage =
-                            current.copy(
-                                content = currentContent,
-                                reasoningText = currentReasoning,
-                            ),
-                        isThinking = false,
-                    )
-                } else {
-                    // Fallback: no MessageStart was received — create one now
-                    val msg =
-                        ChatMessage(
-                            role = MessageRole.ASSISTANT,
-                            content = currentContent,
-                            reasoningText = state.reasoningText,
-                            isStreaming = true,
-                        )
-                    state.copy(
-                        streamingMessage = msg,
-                        isThinking = false,
-                    )
+            trailingMessageFlushJob?.cancel()
+            flushTokens(now)
+        } else if (trailingMessageFlushJob?.isActive != true) {
+            trailingMessageFlushJob =
+                scope.launch {
+                    delay(33L)
+                    flushTokens(System.currentTimeMillis())
                 }
-            }
-            uiState.update { it.copy(isAgentTyping = true) }
         }
+    }
+
+    private fun flushTokens(now: Long) {
+        val currentContent = streamingBuffer.toString()
+        lastFlushMs = now
+        streamingState.update { state ->
+            val current = state.streamingMessage
+            if (current != null) {
+                val currentReasoning =
+                    current.reasoningText.ifBlank { state.reasoningText }
+                state.copy(
+                    streamingMessage =
+                        current.copy(
+                            content = currentContent,
+                            reasoningText = currentReasoning,
+                        ),
+                    isThinking = false,
+                )
+            } else {
+                // Fallback: no MessageStart was received — create one now
+                val msg =
+                    ChatMessage(
+                        role = MessageRole.ASSISTANT,
+                        content = currentContent,
+                        reasoningText = state.reasoningText,
+                        isStreaming = true,
+                    )
+                state.copy(
+                    streamingMessage = msg,
+                    isThinking = false,
+                )
+            }
+        }
+        uiState.update { it.copy(isAgentTyping = true) }
     }
 
     fun handleThinkingDelta(event: WsEvent.ThinkingDelta) {

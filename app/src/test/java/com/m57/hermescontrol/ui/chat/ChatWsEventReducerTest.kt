@@ -8,6 +8,105 @@ import org.junit.Test
 
 class ChatWsEventReducerTest {
     @Test
+    fun unbindableClarifyRequestsDoNotReplaceAnExistingPromptOrItsDraftIdentity() {
+        val existing =
+            ClarifyUi(
+                text = "Valid question",
+                options = listOf("Keep this draft"),
+                clarifyId = "valid-request",
+                questionId = "draft-question",
+                sessionId = "session-1",
+                sourceProfileId = "profile-a",
+                connectionGeneration = 8,
+            )
+        val state = ChatUiState(currentSessionId = "session-1", clarifyRequest = existing)
+        val invalidEvents =
+            listOf(
+                WsEvent.ClarifyRequest(
+                    "Invalid",
+                    emptyList(),
+                    "",
+                    "session-1",
+                    sourceProfileId = "profile-a",
+                    connectionGeneration = 8,
+                ),
+                WsEvent.ClarifyRequest(
+                    "Invalid",
+                    emptyList(),
+                    "new-request",
+                    "",
+                    sourceProfileId = "profile-a",
+                    connectionGeneration = 8,
+                ),
+                WsEvent.ClarifyRequest(
+                    "Invalid",
+                    emptyList(),
+                    "new-request",
+                    "session-1",
+                    sourceProfileId = "",
+                    connectionGeneration = 8,
+                ),
+                WsEvent.ClarifyRequest(
+                    "Invalid",
+                    emptyList(),
+                    "new-request",
+                    "session-1",
+                    sourceProfileId = "profile-a",
+                ),
+            )
+
+        invalidEvents.forEach { event ->
+            val result = ChatWsEventReducer.reduce(state, StreamingState(), event, "session-1")
+
+            assertEquals(existing, result.state.clarifyRequest)
+        }
+    }
+
+    @Test
+    fun staleClarifyExpiryFromOldSocketDoesNotClearReusedRequestId() {
+        val clarify =
+            ClarifyUi(
+                text = "Fresh question",
+                options = emptyList(),
+                clarifyId = "reused-id",
+                sessionId = "session-1",
+                sourceProfileId = "profile-a",
+                connectionGeneration = 8,
+            )
+        val result =
+            ChatWsEventReducer.reduce(
+                state = ChatUiState(currentSessionId = "session-1", clarifyRequest = clarify),
+                streamingState = StreamingState(),
+                event = WsEvent.ClarifyExpire("reused-id", "session-1", "profile-a", 7),
+                currentSessionId = "session-1",
+            )
+
+        assertEquals(clarify, result.state.clarifyRequest)
+    }
+
+    @Test
+    fun exactClarifyExpiryClearsOnlyItsBoundPrompt() {
+        val clarify =
+            ClarifyUi(
+                text = "Question",
+                options = emptyList(),
+                clarifyId = "clarify-1",
+                sessionId = "session-1",
+                sourceProfileId = "profile-a",
+                connectionGeneration = 8,
+            )
+        val result =
+            ChatWsEventReducer.reduce(
+                state = ChatUiState(currentSessionId = "session-1", clarifyRequest = clarify),
+                streamingState = StreamingState(),
+                event = WsEvent.ClarifyExpire("clarify-1", "session-1", "profile-a", 8),
+                currentSessionId = "session-1",
+            )
+
+        assertEquals(null, result.state.clarifyRequest)
+    }
+
+    @Test
     fun testMessageComplete_clearsResolvedClarifyRequest() {
         val state =
             ChatUiState(
@@ -94,6 +193,86 @@ class ChatWsEventReducerTest {
         val updatedMessage = result.state.messages.first()
         assertEquals(ToolStatus.RUNNING, updatedMessage.toolStatus)
         assertEquals("", updatedMessage.progressPreview)
+    }
+
+    @Test
+    fun progressAndGeneratingTargetExactConcurrentToolId() {
+        val first =
+            ChatMessage(
+                role = MessageRole.TOOL,
+                content = "",
+                toolName = "terminal",
+                toolCallId = "a",
+                toolStatus = ToolStatus.RUNNING,
+                progressPreview = "first",
+            )
+        val second = first.copy(toolCallId = "b", progressPreview = "second")
+        val state = ChatUiState(messages = listOf(first, second), currentSessionId = "session-1")
+        val progress =
+            ChatWsEventReducer.reduce(
+                state,
+                StreamingState(),
+                WsEvent.ToolProgress("terminal", "updated", "session-1", "a"),
+                "session-1",
+            )
+        assertEquals(listOf("updated", "second"), progress.state.messages.map { it.progressPreview })
+        val generating =
+            ChatWsEventReducer.reduce(
+                progress.state,
+                StreamingState(),
+                WsEvent.ToolGenerating("terminal", "session-1", "a"),
+                "session-1",
+            )
+        assertEquals(listOf("", "second"), generating.state.messages.map { it.progressPreview })
+
+        val unknown =
+            ChatWsEventReducer.reduce(
+                state,
+                StreamingState(),
+                WsEvent.ToolProgress("terminal", "wrong", "session-1", "unknown"),
+                "session-1",
+            )
+        assertEquals(state.messages, unknown.state.messages)
+        val conflicting =
+            ChatWsEventReducer.reduce(
+                state,
+                StreamingState(),
+                WsEvent.ToolGenerating("other", "session-1", "a"),
+                "session-1",
+            )
+        assertEquals(state.messages, conflicting.state.messages)
+        val ambiguous =
+            ChatWsEventReducer.reduce(
+                state,
+                StreamingState(),
+                WsEvent.ToolProgress("terminal", "wrong", "session-1"),
+                "session-1",
+            )
+        assertEquals(state.messages, ambiguous.state.messages)
+        val stale =
+            ChatWsEventReducer.reduce(
+                state,
+                StreamingState(),
+                WsEvent.ToolProgress("terminal", "wrong", "old-session", "a"),
+                "session-1",
+            )
+        assertEquals(state.messages, stale.state.messages)
+    }
+
+    @Test
+    fun missingIdMatchesOnlyOneRunningTool() {
+        val running =
+            ChatMessage(role = MessageRole.TOOL, content = "", toolName = "terminal", toolStatus = ToolStatus.RUNNING)
+        val completed = running.copy(toolStatus = ToolStatus.COMPLETED)
+        val state = ChatUiState(messages = listOf(completed, running), currentSessionId = "session-1")
+        val result =
+            ChatWsEventReducer.reduce(
+                state,
+                StreamingState(),
+                WsEvent.ToolProgress("terminal", "legacy", "session-1"),
+                "session-1",
+            )
+        assertEquals(listOf(null, "legacy"), result.state.messages.map { it.progressPreview })
     }
 
     @Test

@@ -682,7 +682,7 @@ class SystemViewModel(
                     if (result is NetworkResult.Success) {
                         _uiState.update { it.copy(actionLog = result.data) }
                         if (result.data.running != true) {
-                            if (name == "hermes-update") {
+                            if (shouldLoadUpdateReceipt(name)) {
                                 loadUpdateReceipt()
                             }
                             loadAll()

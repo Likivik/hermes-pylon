@@ -31,6 +31,10 @@ class SlashCommandDispatcher {
                 SlashResult.QueuePrompt(arg.ifBlank { command })
             }
             "/resume", "/history" -> SlashResult.OpenHistory
+            "/undo" -> {
+                val count = command.split(" ", limit = 2).getOrElse(1) { "" }.trim()
+                SlashResult.Undo(count)
+            }
             else -> SlashResult.RpcDispatch
         }
     }
@@ -65,4 +69,6 @@ sealed class SlashResult {
     data class QueuePrompt(val displayContent: String) : SlashResult()
 
     data object OpenHistory : SlashResult()
+
+    data class Undo(val count: String) : SlashResult()
 }

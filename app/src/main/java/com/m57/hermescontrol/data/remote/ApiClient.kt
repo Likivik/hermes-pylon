@@ -168,7 +168,8 @@ object ApiClient {
                 .base
                 .newBuilder()
                 .addInterceptor(authInterceptor)
-                .addInterceptor(ProfileScopeInterceptor)
+                // A local connection ID is not a server management profile.
+                // Preserve explicit request scopes; never infer one here.
                 .addInterceptor(logging)
                 .authenticator(TokenRefreshAuthenticator)
                 .build()

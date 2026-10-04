@@ -9,7 +9,7 @@ import java.util.concurrent.ConcurrentMap
  * In-memory [ChatMessageDao] for use in tests.
  * Uses [ConcurrentHashMap] for thread safety — no manual synchronization needed.
  */
-class FakeChatMessageDao : ChatMessageDao {
+open class FakeChatMessageDao : ChatMessageDao {
     private val messages: ConcurrentMap<String, ChatMessageEntity> = ConcurrentHashMap()
 
     override suspend fun sessionExists(sessionId: String): Boolean = messages.values.any { it.sessionId == sessionId }
@@ -23,7 +23,19 @@ class FakeChatMessageDao : ChatMessageDao {
         messages[message.id] = message
     }
 
-    override suspend fun upsertAll(messageList: List<ChatMessageEntity>) {
+    open override fun upsertAll(messageList: List<ChatMessageEntity>) {
+        messageList.forEach { messages[it.id] = it }
+    }
+
+    override fun deleteMessagesForSession(sessionId: String) {
+        messages.values.removeAll { it.sessionId == sessionId }
+    }
+
+    override fun replaceMessagesForSession(
+        sessionId: String,
+        messageList: List<ChatMessageEntity>,
+    ) {
+        messages.values.removeAll { it.sessionId == sessionId }
         messageList.forEach { messages[it.id] = it }
     }
 

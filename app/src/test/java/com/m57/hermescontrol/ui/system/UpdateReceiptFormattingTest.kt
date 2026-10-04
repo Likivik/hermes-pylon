@@ -11,6 +11,13 @@ import org.junit.Test
 
 class UpdateReceiptFormattingTest {
     @Test
+    fun `receipt loading is limited to the Hermes update action`() {
+        assertEquals(true, shouldLoadUpdateReceipt("hermes-update"))
+        assertEquals(false, shouldLoadUpdateReceipt("gateway-restart"))
+        assertEquals(false, shouldLoadUpdateReceipt(null))
+    }
+
+    @Test
     fun `null and empty receipts yield no display`() {
         assertNull(summarizeUpdateReceipt(null))
         assertNull(summarizeUpdateReceipt(UpdateReceiptResponse()))

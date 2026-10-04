@@ -32,6 +32,7 @@ internal val SUPPORTED_LANGUAGE_CODES =
     listOf(
         LocaleContextWrapper.SYSTEM_LANGUAGE,
         "en",
+        "ar",
         "zh",
         "ja",
         "ko",
@@ -42,6 +43,7 @@ internal fun supportedLanguages(): List<Pair<String, String>> =
     listOf(
         LocaleContextWrapper.SYSTEM_LANGUAGE to stringResource(R.string.language_system),
         "en" to stringResource(R.string.language_english),
+        "ar" to stringResource(R.string.language_arabic),
         "zh" to stringResource(R.string.language_chinese),
         "ja" to stringResource(R.string.language_japanese),
         "ko" to stringResource(R.string.language_korean),

@@ -16,15 +16,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.m57.hermescontrol.R
-import com.m57.hermescontrol.data.model.Attachment
+import com.m57.hermescontrol.data.ws.PrivilegedRequestBinding
 import com.m57.hermescontrol.ui.chat.ChatBubble
 import com.m57.hermescontrol.ui.chat.ChatMessage
+import com.m57.hermescontrol.ui.chat.ChatViewModel
 import com.m57.hermescontrol.ui.chat.ClarifyUi
 import com.m57.hermescontrol.ui.chat.ImageViewerModel
 import com.m57.hermescontrol.ui.chat.MessageRole
 import com.m57.hermescontrol.ui.common.EmptyState
 
 internal val CHAT_LIST_VERTICAL_CONTENT_PADDING = 8.dp
+
+internal fun chatMessageContentType(message: ChatMessage): String =
+    when {
+        message.approvalInfo != null -> "approval"
+        message.clarifyInfo != null -> "clarify"
+        message.displayKind != null -> "system_event"
+        else -> message.role.name
+    }
 
 internal fun chatListItemCount(
     messageCount: Int,
@@ -57,11 +66,12 @@ fun ChatMessageList(
     listState: androidx.compose.foundation.lazy.LazyListState,
     lastAnimatedMessageId: String?,
     onLastAnimatedMessageIdChange: (String?) -> Unit,
-    onRespondApproval: (String) -> Unit = {},
-    onOpenAttachment: (Attachment) -> Unit = {},
+    viewModel: ChatViewModel,
+    onRespondApproval: (String, PrivilegedRequestBinding, String) -> Unit,
+    onCancelApproval: (String, PrivilegedRequestBinding) -> Unit,
     openingAttachmentPath: String? = null,
     clarifyRequest: ClarifyUi? = null,
-    onRespondClarify: ((String) -> Unit)? = null,
+    onRespondClarify: ((ClarifyUi, Map<String, String>) -> Unit)? = null,
     onDismissClarify: (() -> Unit)? = null,
     onImageClick: (ImageViewerModel) -> Unit = {},
 ) {
@@ -82,7 +92,7 @@ fun ChatMessageList(
             contentPadding = PaddingValues(vertical = CHAT_LIST_VERTICAL_CONTENT_PADDING),
         ) {
             if (isLoadingOlder) {
-                item(key = "loading-older") {
+                item(key = "loading-older", contentType = "loading-older") {
                     Box(
                         modifier = Modifier.fillMaxWidth().padding(12.dp),
                         contentAlignment = Alignment.Center,
@@ -94,6 +104,7 @@ fun ChatMessageList(
             itemsIndexed(
                 items = messages,
                 key = { _, message -> message.id },
+                contentType = { _, message -> chatMessageContentType(message) },
             ) { index, message ->
                 val isCurrentMatch =
                     isSearchActive &&
@@ -122,7 +133,8 @@ fun ChatMessageList(
                         searchQuery = if (isSearchActive) searchQuery else "",
                         isCurrentMatch = isCurrentMatch,
                         onRespondApproval = onRespondApproval,
-                        onOpenAttachment = onOpenAttachment,
+                        onCancelApproval = onCancelApproval,
+                        onOpenAttachment = viewModel::openAttachment,
                         openingAttachmentPath = openingAttachmentPath,
                         onImageClick = onImageClick,
                     )
@@ -131,7 +143,7 @@ fun ChatMessageList(
 
             // Streaming message
             streamingMessage?.let { streaming ->
-                item(key = "streaming-${streaming.id}") {
+                item(key = "streaming-${streaming.id}", contentType = chatMessageContentType(streaming)) {
                     if (typingEffectEnabled && streaming.isStreaming) {
                         StreamingBubbleWithTypingEffect(
                             streaming = streaming,
@@ -144,7 +156,7 @@ fun ChatMessageList(
                             isDarkTheme = isDark,
                             searchQuery = "",
                             isCurrentMatch = false,
-                            onOpenAttachment = onOpenAttachment,
+                            onOpenAttachment = viewModel::openAttachment,
                             openingAttachmentPath = openingAttachmentPath,
                             onImageClick = onImageClick,
                         )
@@ -154,18 +166,17 @@ fun ChatMessageList(
 
             // Typing indicator — bouncing dots
             if (isThinking) {
-                item(key = "typing_indicator") {
+                item(key = "typing_indicator", contentType = "typing_indicator") {
                     TypingIndicator()
                 }
             }
 
             // Clarify bubble — rendered at the very bottom
             if (clarifyRequest != null) {
-                item(key = "clarify_bubble") {
+                item(key = "clarify_bubble", contentType = "clarify") {
                     ClarifyBubble(
-                        text = clarifyRequest.text,
-                        options = clarifyRequest.options,
-                        onOptionSelected = { option -> onRespondClarify?.invoke(option) },
+                        clarifyRequest = clarifyRequest,
+                        onSubmit = { expected, answers -> onRespondClarify?.invoke(expected, answers) },
                         onDismiss = { onDismissClarify?.invoke() },
                     )
                 }

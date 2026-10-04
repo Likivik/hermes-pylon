@@ -20,9 +20,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Key
@@ -41,6 +43,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SecondaryTabRow
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
@@ -124,6 +127,21 @@ fun McpServersScreen(
         navigationIcon = onOpenDrawer?.let { NavIcon.Menu(it) },
         isRefreshing = state.isLoading,
         onRefresh = { viewModel.loadServers() },
+        actions = {
+            IconButton(
+                onClick = viewModel::testAllServers,
+                enabled = !state.isTestingAll && state.servers.any { it.enabled },
+            ) {
+                if (state.isTestingAll) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(
+                        imageVector = Icons.Filled.Science,
+                        contentDescription = stringResource(R.string.mcp_servers_action_test_all),
+                    )
+                }
+            }
+        },
     ) { paddingValues ->
         when {
             state.isLoading && state.servers.isEmpty() -> {
@@ -412,6 +430,9 @@ private fun ServerCard(
     onOpenBrowser: (String) -> Boolean,
 ) {
     var showEnv by remember { mutableStateOf(false) }
+    val isTesting = server.name in state.testingServers
+    val testResult = state.serverTestResults[server.name]
+    val healthStatus = McpHealthStatus.resolve(isTesting, testResult, server.status, server.error)
 
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
@@ -440,13 +461,55 @@ private fun ServerCard(
                             fontWeight = FontWeight.Bold,
                         )
                         Spacer(modifier = Modifier.width(spacing.sm))
-                        ServerStatusBadge(server.status)
+                        when (healthStatus) {
+                            McpHealthStatus.HEALTHY ->
+                                HealthBadge(
+                                    R.string.mcp_servers_status_healthy,
+                                    StatusBadgeType.SUCCESS,
+                                )
+                            McpHealthStatus.AUTH_REQUIRED ->
+                                HealthBadge(R.string.mcp_servers_status_needs_auth, StatusBadgeType.WARNING)
+                            McpHealthStatus.ERROR ->
+                                HealthBadge(
+                                    R.string.mcp_servers_status_error,
+                                    StatusBadgeType.ERROR,
+                                )
+                            McpHealthStatus.TESTING ->
+                                HealthBadge(
+                                    R.string.mcp_servers_status_testing,
+                                    StatusBadgeType.INFO,
+                                )
+                            McpHealthStatus.UNKNOWN -> ServerStatusBadge(server.status)
+                        }
                     }
                     Text(
                         text = stringResource(R.string.mcp_servers_label_transport, server.transport ?: "stdio"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    val toolInfos = testResult?.tools
+                    val toolCount = toolInfos?.size ?: server.tools?.size
+                    if (toolCount != null && toolCount > 0) {
+                        val estimate = toolInfos?.let(McpTokenEstimator::estimateTokens)
+                        Spacer(modifier = Modifier.height(spacing.xs))
+                        Surface(
+                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(6.dp),
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(Icons.Filled.Build, contentDescription = null, modifier = Modifier.size(12.dp))
+                                Spacer(modifier = Modifier.width(spacing.xs))
+                                Text(
+                                    text = McpTokenEstimator.formatTokenOverhead(toolCount, estimate),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Medium,
+                                )
+                            }
+                        }
+                    }
                 }
                 Switch(
                     checked = server.enabled,
@@ -507,12 +570,19 @@ private fun ServerCard(
             ) {
                 FilledTonalButton(
                     onClick = { viewModel.testServer(server.name) },
+                    enabled = !isTesting,
                     modifier = Modifier.weight(1f),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
                 ) {
-                    Icon(Icons.Filled.Science, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(spacing.xs))
-                    Text(stringResource(R.string.mcp_servers_action_test), maxLines = 1)
+                    if (isTesting) {
+                        CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(spacing.xs))
+                        Text(stringResource(R.string.mcp_servers_status_testing), maxLines = 1)
+                    } else {
+                        Icon(Icons.Filled.Science, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(spacing.xs))
+                        Text(stringResource(R.string.mcp_servers_action_test), maxLines = 1)
+                    }
                 }
                 IconButton(onClick = { viewModel.deleteServer(server.name) }) {
                     Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_delete))
@@ -628,6 +698,14 @@ private fun ServerStatusBadge(status: String?) {
             else -> StatusBadgeType.NEUTRAL
         }
     StatusBadge(text = status, status = badgeType)
+}
+
+@Composable
+private fun HealthBadge(
+    textRes: Int,
+    type: StatusBadgeType,
+) {
+    StatusBadge(text = stringResource(textRes), status = type)
 }
 
 // ── Catalog ─────────────────────────────────────────────────────

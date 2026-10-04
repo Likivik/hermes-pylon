@@ -61,8 +61,9 @@ android {
 
         val gitSha =
             providers.exec {
-                commandLine("git", "rev-parse", "--short", "HEAD")
-            }.standardOutput.asText.get().trim()
+                // Fixed width: --short varies with the checkout's object graph.
+                commandLine("git", "rev-parse", "HEAD")
+            }.standardOutput.asText.get().trim().take(7)
         buildConfigField("String", "GIT_SHA", "\"$gitSha\"")
     }
 

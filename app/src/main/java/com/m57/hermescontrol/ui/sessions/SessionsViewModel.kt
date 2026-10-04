@@ -2,14 +2,21 @@ package com.m57.hermescontrol.ui.sessions
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.model.BulkDeleteRequest
 import com.m57.hermescontrol.data.model.PruneRequest
 import com.m57.hermescontrol.data.model.SessionInfo
+import com.m57.hermescontrol.data.model.SessionLiveStatus
 import com.m57.hermescontrol.data.model.SessionRenameRequest
 import com.m57.hermescontrol.data.model.SessionSearchResult
 import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.HermesApiService
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.data.ws.ConnectionStatus
+import com.m57.hermescontrol.data.ws.HermesSessionLiveStatusSource
+import com.m57.hermescontrol.data.ws.SessionLiveConnection
+import com.m57.hermescontrol.data.ws.SessionLiveStatusSource
 import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.ui.common.safeLaunchLoad
 import kotlinx.coroutines.CoroutineDispatcher
@@ -27,7 +34,23 @@ data class SessionStats(
     val messages: Int = 0,
 )
 
+/** History is split by provenance: interactive conversations vs. scheduled automation runs. */
+enum class HistorySection {
+    CONVERSATIONS,
+    AUTOMATIONS,
+}
+
+internal val HistorySection.showsGlobalStats: Boolean
+    get() = this == HistorySection.CONVERSATIONS
+
+internal val HistorySection.source: String?
+    get() = if (this == HistorySection.AUTOMATIONS) AUTOMATION_SOURCE else null
+
+internal val HistorySection.excludeSources: String?
+    get() = if (this == HistorySection.CONVERSATIONS) AUTOMATION_SOURCE else null
+
 data class SessionsUiState(
+    val section: HistorySection = HistorySection.CONVERSATIONS,
     val isLoading: Boolean = false,
     val isLoadingMore: Boolean = false,
     val sessions: List<SessionInfo> = emptyList(),
@@ -54,14 +77,21 @@ data class SessionsUiState(
     val isSearching: Boolean = false,
     val searchResults: List<SessionSearchResult> = emptyList(),
     val searchError: String? = null,
+    val searchTitles: Map<String, String> = emptyMap(),
+    val liveStatuses: Map<String, SessionLiveStatus> = emptyMap(),
+    val liveStatusesAuthoritative: Boolean = false,
 ) {
     val hasMore: Boolean get() = !paginationExhausted && total > serverOffset
     val isSearchMode: Boolean get() = searchQuery.isNotBlank()
 }
 
+private fun com.m57.hermescontrol.data.model.SessionListResponse.nextOffset(requestOffset: Int): Int =
+    if (limit > 0) offset + limit else requestOffset + sessions.size
+
 class SessionsViewModel(
     private val pinStore: SessionPinStore = AuthManagerSessionPinStore(),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val liveStatusSource: SessionLiveStatusSource = HermesSessionLiveStatusSource(),
 ) : ViewModel(), ToastHost {
     private val _uiState =
         MutableStateFlow(
@@ -72,13 +102,73 @@ class SessionsViewModel(
     private var loadJob: Job? = null
     private var loadMoreJob: Job? = null
     private var loadGeneration = 0
+    private var mutationOperation = 0L
+    private val deleteOperations = mutableMapOf<String, Long>()
+    private var bulkDeleteOperation = 0L
+
+    /** Fence pre-mutation pages and pin hydration, including cancellation-resistant calls. */
+    private fun fencePendingSessionLoads() {
+        loadGeneration += 1
+        loadJob?.cancel()
+        loadMoreJob?.cancel()
+        hydratePinsJob?.cancel()
+        _uiState.update { it.copy(isLoading = false, isLoadingMore = false) }
+    }
+
     private var statsJob: Job? = null
     private var hydratePinsJob: Job? = null
+    private var liveTrackingJob: Job? = null
+    private var liveSnapshotJob: Job? = null
+    private var liveTrackingGeneration = 0L
+    private var liveEventRevision = 0L
+    private var liveTrackingState = SessionLiveTrackingState()
+    private var selectedLiveProfileId: String? = null
+    private var activeLiveConnection: SessionLiveConnection? = null
+    private var liveRefreshInFlight = false
+    private var liveRefreshPending = false
+    private var hasAuthoritativeLiveSnapshot = false
 
     /** Page size matches the desktop sidebar while staying below the server cap. */
     private companion object {
         const val PAGE_SIZE = 50
         const val SEARCH_DEBOUNCE_MS = 300L
+        const val LIVE_STATUS_POLL_INTERVAL_MS = 30_000L
+    }
+
+    /**
+     * Switch between conversation and automation history. Every section owns its own
+     * server-paginated window, so the previous section's rows, offset, selection, and
+     * search results are dropped and its in-flight loads are fenced out by generation.
+     */
+    fun selectSection(section: HistorySection) {
+        if (_uiState.value.section == section) return
+        loadGeneration += 1
+        loadJob?.cancel()
+        loadJob = null
+        loadMoreJob?.cancel()
+        loadMoreJob = null
+        hydratePinsJob?.cancel()
+        searchJob?.cancel()
+        val query = _uiState.value.searchQuery
+        _uiState.update {
+            it.copy(
+                section = section,
+                isLoading = false,
+                isLoadingMore = false,
+                sessions = emptyList(),
+                loadedSessionIds = emptySet(),
+                serverOffset = 0,
+                paginationExhausted = false,
+                total = 0,
+                errorMessage = null,
+                isSelecting = false,
+                selectedIds = emptySet(),
+                isSearching = false,
+                searchResults = emptyList(),
+                searchError = null,
+            )
+        }
+        if (query.isBlank()) loadSessions() else setSearchQuery(query)
     }
 
     /** Load (or reload) sessions from page 0. Used by pull-to-refresh and initial load. */
@@ -86,6 +176,8 @@ class SessionsViewModel(
         loadGeneration += 1
         loadMoreJob?.cancel()
         loadMoreJob = null
+        val section = _uiState.value.section
+        val generation = loadGeneration
         _uiState.update { it.copy(isLoadingMore = false) }
         loadJob =
             safeLaunchLoad(
@@ -97,12 +189,16 @@ class SessionsViewModel(
                             limit = PAGE_SIZE,
                             offset = 0,
                             order = "recent",
+                            source = section.source,
+                            excludeSources = section.excludeSources,
                         )
                     }
                 },
                 onStart = { _uiState.update { it.copy(isLoading = true, errorMessage = null) } },
                 onSuccess = { data ->
+                    if (generation != loadGeneration) return@safeLaunchLoad
                     val incoming = data.sessions.orEmpty()
+                    val nextOffset = data.nextOffset(0)
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -114,8 +210,8 @@ class SessionsViewModel(
                                     pinnedSessionIds = it.pinnedSessionIds,
                                 ),
                             loadedSessionIds = incoming.mapTo(mutableSetOf()) { it.id },
-                            serverOffset = incoming.size,
-                            paginationExhausted = incoming.isEmpty(),
+                            serverOffset = nextOffset,
+                            paginationExhausted = incoming.isEmpty() || nextOffset <= 0,
                             total = data.total,
                             selectedIds = emptySet(),
                         )
@@ -123,6 +219,7 @@ class SessionsViewModel(
                     hydrateMissingPinnedSessions()
                 },
                 onError = { errorMsg ->
+                    if (generation != loadGeneration) return@safeLaunchLoad
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -137,7 +234,7 @@ class SessionsViewModel(
     /** Load the next page and append to the existing session list. */
     fun loadMore() {
         val state = _uiState.value
-        if (state.isLoadingMore || !state.hasMore) return
+        if (state.isLoading || state.isLoadingMore || !state.hasMore || state.isSearchMode) return
         val generation = loadGeneration
 
         _uiState.update { it.copy(isLoadingMore = true) }
@@ -145,15 +242,20 @@ class SessionsViewModel(
             viewModelScope.launch {
                 val result =
                     safeApiCall {
+                        // Paginate strictly on the server window: the offset counts rows the
+                        // server returned, never the locally merged or filtered row count.
                         ApiClient.hermesApi.getSessions(
                             limit = PAGE_SIZE,
                             offset = state.serverOffset,
                             order = "recent",
+                            source = state.section.source,
+                            excludeSources = state.section.excludeSources,
                         )
                     }
                 when (result) {
                     is NetworkResult.Success -> {
                         val data = result.data
+                        val nextOffset = data.nextOffset(state.serverOffset)
                         _uiState.update {
                             if (generation != loadGeneration) return@update it
                             it.copy(
@@ -161,8 +263,8 @@ class SessionsViewModel(
                                 sessions = mergeSessionRows(it.sessions, data.sessions),
                                 loadedSessionIds =
                                     it.loadedSessionIds + data.sessions.map { session -> session.id },
-                                serverOffset = it.serverOffset + data.sessions.size,
-                                paginationExhausted = data.sessions.isEmpty(),
+                                serverOffset = nextOffset,
+                                paginationExhausted = data.sessions.isEmpty() || nextOffset <= state.serverOffset,
                                 total = data.total,
                             )
                         }
@@ -206,6 +308,8 @@ class SessionsViewModel(
     private fun hydrateMissingPinnedSessions() {
         hydratePinsJob?.cancel()
         val state = _uiState.value
+        val generation = loadGeneration
+        val section = state.section
         val missingPinIds =
             state.pinnedSessionIds.filter { pinId ->
                 state.sessions.none { it.matchesPin(pinId) }
@@ -214,12 +318,14 @@ class SessionsViewModel(
 
         hydratePinsJob =
             viewModelScope.launch {
+                // A pin only names a lineage root, so its provenance is unknown until the
+                // session is fetched; drop the ones that belong to the other section.
                 val hydrated =
                     hydratePinnedSessions(
                         api = ApiClient.hermesApi,
                         pinIds = missingPinIds,
-                    )
-                if (hydrated.isNotEmpty()) {
+                    ).filter { it.inSection(section) }
+                if (hydrated.isNotEmpty() && generation == loadGeneration) {
                     _uiState.update {
                         it.copy(sessions = mergeSessionRows(it.sessions, hydrated))
                     }
@@ -230,6 +336,10 @@ class SessionsViewModel(
     // ── Search (server-backed FTS5) ──────────────────────────────────
 
     private var searchJob: Job? = null
+    private var searchGeneration = 0L
+    private var searchApi: HermesApiService? = null
+    private var searchProfileId: String? = null
+    private val deletedSearchIds = mutableSetOf<String>()
 
     /**
      * Debounced server-side session search. A non-blank query schedules a search
@@ -237,28 +347,81 @@ class SessionsViewModel(
      * paginated list mode.
      */
     fun setSearchQuery(query: String) {
-        _uiState.update { it.copy(searchQuery = query) }
+        val generation = ++searchGeneration
+        val section = _uiState.value.section
+        val api = ApiClient.hermesApi
+        val profileId = AuthManager.getSelectedProfileId()
+        val connectionChanged = searchApi !== api || searchProfileId != profileId
+        searchApi = api
+        searchProfileId = profileId
+        if (connectionChanged) deletedSearchIds.clear()
         searchJob?.cancel()
+        _uiState.update {
+            it.copy(
+                searchQuery = query,
+                searchResults = emptyList(),
+                searchError = null,
+                isSearching = query.isNotBlank(),
+                searchTitles = if (connectionChanged) emptyMap() else it.searchTitles,
+                isSelecting = false,
+                selectedIds = emptySet(),
+            )
+        }
         if (query.isBlank()) {
             _uiState.update {
                 it.copy(searchResults = emptyList(), searchError = null, isSearching = false)
             }
+            // A section switch made while searching clears the paged rows; restore them.
+            if (_uiState.value.sessions.isEmpty() && !_uiState.value.isLoading) loadSessions()
             return
         }
         searchJob =
             viewModelScope.launch {
                 delay(SEARCH_DEBOUNCE_MS)
-                _uiState.update { it.copy(isSearching = true, searchError = null) }
+                if (api !== ApiClient.hermesApi || profileId != AuthManager.getSelectedProfileId()) {
+                    if (generation == searchGeneration) {
+                        _uiState.update {
+                            it.copy(
+                                isSearching = false,
+                                searchResults = emptyList(),
+                                searchError = null,
+                                searchTitles = emptyMap(),
+                            )
+                        }
+                    }
+                    return@launch
+                }
                 val result =
                     safeApiCall {
-                        ApiClient.hermesApi.searchSessions(q = query, profile = null)
+                        api.searchSessions(
+                            q = query,
+                            profile = null,
+                            source = section.source,
+                            excludeSources = section.excludeSources,
+                        )
                     }
+                // #1186: query text alone cannot fence an A -> B -> A race.
+                if (generation != searchGeneration || _uiState.value.section != section) return@launch
+                if (api !== ApiClient.hermesApi || profileId != AuthManager.getSelectedProfileId()) {
+                    _uiState.update {
+                        it.copy(
+                            isSearching = false,
+                            searchResults = emptyList(),
+                            searchError = null,
+                            searchTitles = emptyMap(),
+                        )
+                    }
+                    return@launch
+                }
                 when (result) {
                     is NetworkResult.Success -> {
                         _uiState.update {
                             it.copy(
                                 isSearching = false,
-                                searchResults = result.data.results.orEmpty(),
+                                // #1186: LazyList uses surfaced session IDs, not lineage roots.
+                                searchResults =
+                                    result.data.results.distinctBy { hit -> hit.session_id }
+                                        .filterNot { hit -> hit.session_id in deletedSearchIds },
                                 searchError = null,
                             )
                         }
@@ -347,16 +510,20 @@ class SessionsViewModel(
             _uiState.update { it.copy(renamingSessionId = null, toastMessage = "Title cannot be empty") }
             return
         }
+        val api = ApiClient.hermesApi
+        val profileId = AuthManager.getSelectedProfileId()
         viewModelScope.launch {
             val result =
                 safeApiCall {
-                    ApiClient.hermesApi.renameSession(
+                    api.renameSession(
                         sessionId = sessionId,
                         body = SessionRenameRequest(title = newTitle),
                     )
                 }
+            if (api !== ApiClient.hermesApi || profileId != AuthManager.getSelectedProfileId()) return@launch
             when (result) {
                 is NetworkResult.Success -> {
+                    fencePendingSessionLoads()
                     _uiState.update {
                         it.copy(
                             renamingSessionId = null,
@@ -364,6 +531,7 @@ class SessionsViewModel(
                                 it.sessions.map { s ->
                                     if (s.id == sessionId) s.copy(title = newTitle) else s
                                 },
+                            searchTitles = it.searchTitles + (sessionId to newTitle),
                             toastMessage = "Session renamed",
                         )
                     }
@@ -393,19 +561,31 @@ class SessionsViewModel(
 
     fun confirmDeleteSession() {
         val sessionId = _uiState.value.sessionToDeleteConfirm ?: return
+        val operation = ++mutationOperation
+        deleteOperations[sessionId] = operation
         _uiState.update {
             it.copy(
                 sessionToDeleteConfirm = null,
                 deletingSessionIds = it.deletingSessionIds + sessionId,
             )
         }
+        val api = ApiClient.hermesApi
+        val profileId = AuthManager.getSelectedProfileId()
         viewModelScope.launch {
             val result =
                 safeApiCall {
-                    ApiClient.hermesApi.deleteSession(sessionId)
+                    api.deleteSession(sessionId)
                 }
+            if (deleteOperations[sessionId] != operation) return@launch
+            deleteOperations.remove(sessionId)
+            if (api !== ApiClient.hermesApi || profileId != AuthManager.getSelectedProfileId()) {
+                _uiState.update { it.copy(deletingSessionIds = it.deletingSessionIds - sessionId) }
+                return@launch
+            }
             when (result) {
                 is NetworkResult.Success -> {
+                    fencePendingSessionLoads()
+                    deletedSearchIds += sessionId
                     val state = _uiState.value
                     val updatedPins =
                         remainingPinsAfterDeleting(
@@ -454,20 +634,33 @@ class SessionsViewModel(
     fun confirmBulkDelete() {
         val ids = _uiState.value.selectedIds.toList()
         if (ids.isEmpty()) return
+        val operation = ++mutationOperation
+        bulkDeleteOperation = operation
 
         _uiState.update { it.copy(showBulkDeleteConfirm = false, isDeletingBulk = true) }
+        val api = ApiClient.hermesApi
+        val profileId = AuthManager.getSelectedProfileId()
         viewModelScope.launch {
             val result =
                 safeApiCall {
-                    ApiClient.hermesApi.bulkDeleteSessions(
+                    api.bulkDeleteSessions(
                         body = BulkDeleteRequest(ids = ids),
                     )
                 }
+            if (bulkDeleteOperation != operation) return@launch
+            if (api !== ApiClient.hermesApi || profileId != AuthManager.getSelectedProfileId()) {
+                _uiState.update { it.copy(isDeletingBulk = false) }
+                return@launch
+            }
             when (result) {
                 is NetworkResult.Success -> {
                     val deletedCount = result.data.deleted
                     val state = _uiState.value
-                    val deletedIds = ids.toSet()
+                    fencePendingSessionLoads()
+                    // A count alone cannot identify which rows survived a partial response.
+                    val complete = result.data.ok && deletedCount == ids.size
+                    val deletedIds = if (complete) ids.toSet() else emptySet()
+                    deletedSearchIds += deletedIds
                     val updatedPins =
                         remainingPinsAfterDeleting(
                             pinnedSessionIds = state.pinnedSessionIds,
@@ -478,10 +671,11 @@ class SessionsViewModel(
                         pinStore.save(updatedPins)
                     }
                     val toastMsg =
-                        if (deletedCount > 0) {
-                            "$deletedCount session(s) deleted"
-                        } else {
-                            "No sessions were deleted"
+                        when {
+                            !result.data.ok -> "Deletion was not confirmed; refreshing sessions"
+                            complete -> "$deletedCount session(s) deleted"
+                            deletedCount == 0 -> "No sessions were deleted"
+                            else -> "Partial deletion reported; refreshing sessions"
                         }
                     _uiState.update {
                         it.copy(
@@ -498,6 +692,7 @@ class SessionsViewModel(
                             toastMessage = toastMsg,
                         )
                     }
+                    if (!complete && _uiState.value.isSearchMode) setSearchQuery(_uiState.value.searchQuery)
                     loadSessions()
                     loadStats()
                 }
@@ -562,5 +757,147 @@ class SessionsViewModel(
 
     override fun clearToast() {
         _uiState.update { it.copy(toastMessage = null) }
+    }
+
+    // ── Live session status tracking ─────────────────────────────────────
+
+    fun startLiveStatusTracking() {
+        if (liveTrackingJob?.isActive == true) return
+        liveTrackingJob =
+            viewModelScope.launch {
+                launch {
+                    liveStatusSource.selectedProfileIds.collect { profileId ->
+                        if (selectedLiveProfileId != profileId) {
+                            selectedLiveProfileId = profileId
+                            resetLiveTracking()
+                            reconnectLiveTrackingIfPossible()
+                        }
+                    }
+                }
+                launch {
+                    liveStatusSource.connectionStatus.collect { status ->
+                        if (status == ConnectionStatus.CONNECTED) {
+                            reconnectLiveTrackingIfPossible()
+                        } else {
+                            resetLiveTracking()
+                        }
+                    }
+                }
+                launch {
+                    liveStatusSource.sourcedEvents.collect { sourced ->
+                        val connection = activeLiveConnection ?: return@collect
+                        if (sourced.profileId != selectedLiveProfileId ||
+                            sourced.profileId != connection.profileId ||
+                            sourced.connectionGeneration != connection.generation
+                        ) {
+                            return@collect
+                        }
+                        val previousState = liveTrackingState
+                        val nextState = SessionLiveStatusReducer.applyWsEvent(previousState, sourced.event)
+                        val isLiveStatusEvent =
+                            SessionLiveStatusReducer.isLiveStatusEvent(sourced.event) || nextState != previousState
+                        if (isLiveStatusEvent) liveEventRevision++
+                        liveTrackingState = nextState
+                        publishLiveStatuses()
+                        if (isLiveStatusEvent && liveRefreshInFlight) liveRefreshPending = true
+                    }
+                }
+                launch {
+                    while (true) {
+                        delay(LIVE_STATUS_POLL_INTERVAL_MS)
+                        requestLiveStatusSnapshot()
+                    }
+                }
+            }
+    }
+
+    fun stopLiveStatusTracking() {
+        liveTrackingJob?.cancel()
+        liveTrackingJob = null
+        selectedLiveProfileId = null
+        resetLiveTracking()
+    }
+
+    fun refreshLiveStatuses() {
+        requestLiveStatusSnapshot()
+    }
+
+    private fun reconnectLiveTrackingIfPossible() {
+        val profileId = selectedLiveProfileId ?: return
+        if (liveStatusSource.connectionStatus.value != ConnectionStatus.CONNECTED) return
+        val connection = liveStatusSource.currentConnection(profileId) ?: return
+        if (activeLiveConnection != connection) {
+            resetLiveTracking()
+            activeLiveConnection = connection
+        }
+        requestLiveStatusSnapshot()
+    }
+
+    private fun resetLiveTracking() {
+        liveTrackingGeneration++
+        liveEventRevision++
+        liveSnapshotJob?.cancel()
+        liveSnapshotJob = null
+        activeLiveConnection = null
+        liveRefreshInFlight = false
+        liveRefreshPending = false
+        hasAuthoritativeLiveSnapshot = false
+        liveTrackingState = SessionLiveStatusReducer.clear()
+        publishLiveStatuses()
+    }
+
+    private fun requestLiveStatusSnapshot() {
+        val connection = activeLiveConnection ?: return
+        if (liveTrackingJob?.isActive != true ||
+            liveStatusSource.connectionStatus.value != ConnectionStatus.CONNECTED
+        ) {
+            return
+        }
+        if (liveRefreshInFlight) {
+            liveRefreshPending = true
+            return
+        }
+        liveRefreshInFlight = true
+        val generation = liveTrackingGeneration
+        val eventRevision = liveEventRevision
+        liveSnapshotJob =
+            viewModelScope.launch {
+                try {
+                    val snapshot = liveStatusSource.fetchActiveSessionsSnapshot(connection)
+                    if (snapshot != null &&
+                        generation == liveTrackingGeneration &&
+                        eventRevision == liveEventRevision &&
+                        connection == activeLiveConnection &&
+                        liveStatusSource.connectionStatus.value == ConnectionStatus.CONNECTED
+                    ) {
+                        liveTrackingState = SessionLiveStatusReducer.applySnapshot(liveTrackingState, snapshot)
+                        hasAuthoritativeLiveSnapshot = true
+                        publishLiveStatuses()
+                    }
+                } finally {
+                    if (generation == liveTrackingGeneration && connection == activeLiveConnection) {
+                        liveSnapshotJob = null
+                        liveRefreshInFlight = false
+                        if (liveRefreshPending) {
+                            liveRefreshPending = false
+                            requestLiveStatusSnapshot()
+                        }
+                    }
+                }
+            }
+    }
+
+    private fun publishLiveStatuses() {
+        _uiState.update {
+            it.copy(
+                liveStatuses = liveTrackingState.liveStatuses,
+                liveStatusesAuthoritative = hasAuthoritativeLiveSnapshot,
+            )
+        }
+    }
+
+    override fun onCleared() {
+        stopLiveStatusTracking()
+        super.onCleared()
     }
 }

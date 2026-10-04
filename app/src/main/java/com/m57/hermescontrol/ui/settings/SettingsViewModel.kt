@@ -32,7 +32,7 @@ data class SettingsUiState(
     val token: String = "",
     val autoReconnect: Boolean = true,
     val themePreference: ThemePreference = ThemePreference.SYSTEM,
-    val useDynamicColors: Boolean = true,
+    val useDynamicColors: Boolean = false,
     val themePreset: ThemePreset = ThemePreset.DEFAULT,
     val chatFontScale: Float = 1.0f,
     val isTesting: Boolean = false,

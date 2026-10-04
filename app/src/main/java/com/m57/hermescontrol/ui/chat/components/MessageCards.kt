@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
@@ -37,12 +38,11 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SuggestionChip
-import androidx.compose.material3.SuggestionChipDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -50,6 +50,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -77,8 +78,14 @@ import com.m57.hermescontrol.theme.CodeTerminalBg
 import com.m57.hermescontrol.theme.CodeTerminalBorder
 import com.m57.hermescontrol.theme.CodeTerminalMuted
 import com.m57.hermescontrol.theme.CodeTerminalText
-import com.m57.hermescontrol.theme.Spacing
+import com.m57.hermescontrol.theme.LocalHermesStatusColors
+import com.m57.hermescontrol.theme.searchHighlightColors
+import com.m57.hermescontrol.ui.chat.ClarifyUi
+import com.m57.hermescontrol.ui.chat.MarkdownText
 import com.m57.hermescontrol.ui.chat.SubagentIndicator
+import com.m57.hermescontrol.ui.chat.withSearchHighlights
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 // ── ReasoningCard ─────────────────────────────────────────────────────────
 
@@ -87,7 +94,7 @@ import com.m57.hermescontrol.ui.chat.SubagentIndicator
  * (reasoning-model thinking steps) before the final answer.
  *
  * Collapsed: "🧠 Reasoning · {N} steps" with chevron.
- * Expanded: full reasoning text in monospace bodySmall.
+ * Expanded: completed reasoning is Markdown; streaming reasoning remains raw text.
  * Streaming: pulsing indicator at bottom while [isStreaming].
  */
 @Composable
@@ -95,7 +102,10 @@ fun ReasoningCard(
     reasoningText: String,
     isStreaming: Boolean = false,
     modifier: Modifier = Modifier,
+    searchQuery: String = "",
+    isCurrentMatch: Boolean = false,
 ) {
+    val highlights = searchHighlightColors(LocalHermesStatusColors.current)
     var expanded by remember { mutableStateOf(false) }
     val stepCount = remember(reasoningText) { reasoningText.count { it == '\n' } + 1 }
 
@@ -109,10 +119,10 @@ fun ReasoningCard(
             CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
             ),
-        shape = MaterialTheme.shapes.medium,
+        shape = RoundedCornerShape(12.dp),
         onClick = { expanded = !expanded },
     ) {
-        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = Spacing.sm)) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "🧠",
@@ -134,12 +144,27 @@ fun ReasoningCard(
             }
             AnimatedVisibility(visible = expanded) {
                 Column {
-                    Text(
-                        text = reasoningText,
-                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = Spacing.xs),
-                    )
+                    if (isStreaming) {
+                        Text(
+                            text =
+                                AnnotatedString(reasoningText).withSearchHighlights(
+                                    searchQuery,
+                                    isCurrentMatch,
+                                    highlights,
+                                ),
+                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    } else {
+                        MarkdownText(
+                            text = reasoningText,
+                            textColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            searchQuery = searchQuery,
+                            isCurrentMatch = isCurrentMatch,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
                     if (isStreaming) {
                         ReasoningPulsingDot(modifier = Modifier.padding(top = 6.dp))
                     }
@@ -196,7 +221,10 @@ fun CodeBlockCard(
     language: String?,
     onCopy: (String) -> Unit,
     modifier: Modifier = Modifier,
+    searchQuery: String = "",
+    isCurrentMatch: Boolean = false,
 ) {
+    val highlights = searchHighlightColors(LocalHermesStatusColors.current)
     val context = LocalContext.current
 
     Surface(
@@ -204,14 +232,14 @@ fun CodeBlockCard(
             modifier
                 .fillMaxWidth()
                 .testTag("code_block"),
-        shape = MaterialTheme.shapes.small,
+        shape = RoundedCornerShape(8.dp),
         color = CodeTerminalBg,
         border = BorderStroke(1.dp, CodeTerminalBorder),
     ) {
         Column {
             // Header row: language badge (left) + copy button (right)
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (!language.isNullOrBlank()) {
@@ -249,9 +277,20 @@ fun CodeBlockCard(
                 }
             }
             // Code content with syntax highlighting
-            val highlighted = remember(code) { highlightSyntax(code) }
+            val highlighted by produceState(
+                initialValue = remember(code) { AnnotatedString(code) },
+                key1 = code,
+            ) {
+                value =
+                    withContext(Dispatchers.Default) {
+                        highlightSyntax(code)
+                    }
+            }
             Text(
-                text = highlighted,
+                text =
+                    remember(highlighted, searchQuery, isCurrentMatch, highlights) {
+                        highlighted.withSearchHighlights(searchQuery, isCurrentMatch, highlights)
+                    },
                 fontFamily = FontFamily.Monospace,
                 fontSize = 13.sp,
                 color = CodeTerminalText,
@@ -369,21 +408,29 @@ private fun copyToClipboard(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ClarifyBubble(
-    text: String,
-    options: List<String>,
-    onOptionSelected: (String) -> Unit,
+    clarifyRequest: ClarifyUi,
+    onSubmit: (ClarifyUi, Map<String, String>) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var typedText by remember { mutableStateOf("") }
+    val questions = clarifyRequest.resolvedQuestions
+    val draftBinding =
+        listOf(
+            clarifyRequest.clarifyId,
+            clarifyRequest.sessionId,
+            clarifyRequest.sourceProfileId,
+            clarifyRequest.connectionGeneration,
+        )
+    var selected by remember(draftBinding) { mutableStateOf<Map<String, Set<String>>>(emptyMap()) }
+    var typed by remember(draftBinding) { mutableStateOf<Map<String, String>>(emptyMap()) }
 
     Surface(
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(horizontal = Spacing.lg, vertical = Spacing.xs)
+                .padding(horizontal = 24.dp, vertical = 4.dp)
                 .testTag("clarify_bubble"),
-        shape = MaterialTheme.shapes.medium,
+        shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         border =
             BorderStroke(
@@ -395,54 +442,77 @@ fun ClarifyBubble(
             modifier = Modifier.padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            if (options.isNotEmpty()) {
-                Spacer(Modifier.height(10.dp))
-                FlowRow(
+            questions.forEachIndexed { index, question ->
+                Text(
+                    text = if (questions.size > 1) "${index + 1}. ${question.question}" else question.question,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = if (questions.size > 1) FontWeight.SemiBold else FontWeight.Normal,
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    options.forEach { option ->
-                        SuggestionChip(
-                            onClick = { onOptionSelected(option) },
-                            label = { Text(option) },
-                            colors =
-                                SuggestionChipDefaults.suggestionChipColors(
-                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                    labelColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                                ),
-                        )
+                )
+                val lockedAnswer = clarifyRequest.lockedAnswers[question.qid]
+                if (lockedAnswer != null) {
+                    Text(
+                        text = lockedAnswer,
+                        modifier = Modifier.fillMaxWidth().testTag("clarify_locked_${question.qid}"),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    if (question.multiSelect) Text("Select all that apply", style = MaterialTheme.typography.labelSmall)
+                    if (question.choices.isNotEmpty()) {
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            question.choices.forEach { choice ->
+                                val values = selected[question.qid].orEmpty()
+                                val isSelected = choice in values
+                                FilterChip(
+                                    modifier = Modifier.testTag("clarify_choice_${question.qid}_$choice"),
+                                    selected = isSelected,
+                                    onClick = {
+                                        val next =
+                                            if (question.multiSelect) {
+                                                if (isSelected) values - choice else values + choice
+                                            } else {
+                                                setOf(choice)
+                                            }
+                                        selected = selected + (question.qid to next)
+                                    },
+                                    label = { Text(choice) },
+                                )
+                            }
+                        }
                     }
+                    OutlinedTextField(
+                        value = typed[question.qid].orEmpty(),
+                        onValueChange = { typed = typed + (question.qid to it) },
+                        label = { Text(if (question.choices.isEmpty()) "Your response" else "Other (optional)") },
+                        modifier = Modifier.fillMaxWidth().testTag("clarify_text_${question.qid}"),
+                        singleLine = true,
+                    )
                 }
+                Spacer(Modifier.height(10.dp))
             }
-            Spacer(Modifier.height(10.dp))
-            OutlinedTextField(
-                value = typedText,
-                onValueChange = { typedText = it },
-                label = { Text("Your response") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-            )
             Spacer(Modifier.height(8.dp))
+            val answers =
+                questions.associate { question ->
+                    val choices = selected[question.qid].orEmpty().toList()
+                    val custom = typed[question.qid].orEmpty().trim()
+                    question.qid to (choices + listOfNotNull(custom.takeIf(String::isNotEmpty))).joinToString(", ")
+                }
+            val hasAnswer = answers.values.any(String::isNotBlank)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
             ) {
                 FilledTonalButton(
-                    onClick = {
-                        if (typedText.isNotBlank()) {
-                            onOptionSelected(typedText)
-                            typedText = ""
-                        }
-                    },
-                    enabled = typedText.isNotBlank(),
+                    onClick = { onSubmit(clarifyRequest, answers) },
+                    enabled = hasAnswer,
                 ) {
-                    Text("Send")
+                    Text(if (questions.size > 1) "Submit all" else "Send")
                 }
                 TextButton(onClick = onDismiss) {
                     Text("Dismiss")
@@ -468,11 +538,11 @@ fun SubagentCard(
     val isComplete = indicator.type == "subagent.complete"
     Surface(
         modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp).testTag("subagent_card"),
-        shape = MaterialTheme.shapes.medium,
+        shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.tertiaryContainer,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = Spacing.sm),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (isComplete) {
@@ -513,7 +583,7 @@ fun SubagentCard(
 @Composable
 fun TypingIndicator(modifier: Modifier = Modifier) {
     Row(
-        modifier = modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm).testTag("typing_indicator"),
+        modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp).testTag("typing_indicator"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {

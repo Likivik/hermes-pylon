@@ -250,9 +250,20 @@ class HermesDatabaseMigrationTest {
         }
     }
 
+    @Test
+    fun bundledSqlCipherVersionMatchesValidatedDependency() {
+        helper.createDatabase(TEST_DATABASE_CIPHER_VERSION, 6).use { database ->
+            database.query("PRAGMA cipher_version").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertTrue(cursor.getString(0).startsWith("4.18.0"))
+            }
+        }
+    }
+
     private companion object {
         const val PRODUCTION_DATABASE = "hermes_control.db"
         const val TEST_DATABASE = "hermes-migration-test"
+        const val TEST_DATABASE_CIPHER_VERSION = "hermes-cipher-version-test"
         const val TEST_DATABASE_FROM_2 = "hermes-migration-test-from-2"
         const val TEST_DATABASE_FROM_5 = "hermes-migration-test-from-5"
         val TEST_PASSWORD = "room-migration-test-only".encodeToByteArray()

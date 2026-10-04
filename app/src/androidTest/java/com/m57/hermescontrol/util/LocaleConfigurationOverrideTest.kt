@@ -95,6 +95,25 @@ class LocaleConfigurationOverrideTest {
     }
 
     @Test
+    fun arabicRtlOverridePreservesGeometryAndFontScale() {
+        val override = LocaleContextWrapper.overrideConfigurationFor(Locale.forLanguageTag("ar"))
+        assertEquals(0f, override.fontScale, 0f)
+        assertEquals(Configuration.SCREEN_WIDTH_DP_UNDEFINED, override.screenWidthDp)
+        assertEquals(Configuration.SCREEN_HEIGHT_DP_UNDEFINED, override.screenHeightDp)
+        assertEquals(Configuration.SMALLEST_SCREEN_WIDTH_DP_UNDEFINED, override.smallestScreenWidthDp)
+        assertEquals(Configuration.ORIENTATION_UNDEFINED, override.orientation)
+        assertEquals(android.view.View.LAYOUT_DIRECTION_RTL, override.layoutDirection)
+        val merged = Configuration(postFoldBaseConfiguration()).apply { updateFrom(override) }
+        assertEquals("ar", merged.locales[0].language)
+        assertEquals(android.view.View.LAYOUT_DIRECTION_RTL, merged.layoutDirection)
+        assertEquals(1200, merged.screenWidthDp)
+        assertEquals(1000, merged.screenHeightDp)
+        assertEquals(900, merged.smallestScreenWidthDp)
+        assertEquals(Configuration.ORIENTATION_LANDSCAPE, merged.orientation)
+        assertEquals(1.3f, merged.fontScale, 0f)
+    }
+
+    @Test
     fun copyingTheBaseConfigurationWouldRePinGeometry() {
         // Control: the pre-fix shape, kept here so the assertions above are
         // demonstrably discriminating rather than vacuously true.

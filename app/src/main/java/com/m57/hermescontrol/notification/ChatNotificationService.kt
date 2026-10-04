@@ -86,22 +86,20 @@ class ChatNotificationService : Service() {
                         launch {
                             delay(500)
                             if (!isAppInForeground.get()) {
-                                when (event) {
-                                    is WsEvent.MessageComplete -> {
-                                        val preview =
-                                            event.text
-                                                .take(100)
-                                                .replace("\n", " ")
-                                                .ifBlank { getString(R.string.notif_new_message) }
+                                when (
+                                    val decision =
+                                        notificationDecisionFor(event, sourcedEvent.storedSessionId)
+                                ) {
+                                    is ChatNotificationDecision.Reply -> {
                                         showReplyNotification(
-                                            preview,
-                                            sourcedEvent.storedSessionId ?: event.sessionId,
+                                            decision.preview ?: getString(R.string.notif_new_message),
+                                            decision.sessionId,
                                             notificationProfileId,
                                         )
-                                        stopSelf()
+                                        if (decision.stopService) stopSelf()
                                     }
 
-                                    is WsEvent.ClarifyRequest -> {
+                                    is ChatNotificationDecision.Clarify -> {
                                         showReplyNotification(
                                             getString(R.string.notif_clarification_needed),
                                             null,
@@ -109,7 +107,7 @@ class ChatNotificationService : Service() {
                                         )
                                     }
 
-                                    else -> {}
+                                    ChatNotificationDecision.Ignore -> Unit
                                 }
                             }
                         }
@@ -211,6 +209,62 @@ class ChatNotificationService : Service() {
         super.onDestroy()
     }
 }
+
+/**
+ * What a background [WsEvent] is allowed to put in the system shade.
+ *
+ * Kept as a pure decision (mirroring [resolveNotificationEntry]) so the
+ * privileged-event exclusion is a testable contract rather than an incidental
+ * property of a `when` branch inside a Service coroutine.
+ */
+sealed interface ChatNotificationDecision {
+    /** A completed assistant reply. [preview] is `null` when the text is blank. */
+    data class Reply(
+        val preview: String?,
+        val sessionId: String?,
+        val stopService: Boolean,
+    ) : ChatNotificationDecision
+
+    /** A non-privileged clarification prompt; carries no request content. */
+    data object Clarify : ChatNotificationDecision
+
+    /** Nothing is posted. */
+    data object Ignore : ChatNotificationDecision
+}
+
+/** Longest reply preview that may appear in a notification. */
+private const val NOTIFICATION_PREVIEW_CHARS = 100
+
+/**
+ * Classify a background event.
+ *
+ * `sudo.request`, `secret.request`, and `approval.request` deliberately fall
+ * through to [ChatNotificationDecision.Ignore]. Each is answered only from the
+ * foreground against an exact request binding, and a direct-reply notification
+ * would become an out-of-app secret-entry surface that persists the typed value
+ * in system UI. Their expiry frames are equally silent — a notification about a
+ * privileged request is itself a disclosure that one was made.
+ */
+fun notificationDecisionFor(
+    event: WsEvent,
+    storedSessionId: String?,
+): ChatNotificationDecision =
+    when (event) {
+        is WsEvent.MessageComplete ->
+            ChatNotificationDecision.Reply(
+                preview =
+                    event.text
+                        .take(NOTIFICATION_PREVIEW_CHARS)
+                        .replace("\n", " ")
+                        .ifBlank { null },
+                sessionId = storedSessionId ?: event.sessionId,
+                stopService = true,
+            )
+
+        is WsEvent.ClarifyRequest -> ChatNotificationDecision.Clarify
+
+        else -> ChatNotificationDecision.Ignore
+    }
 
 /**
  * Helper to start/stop the notification service from the UI layer.

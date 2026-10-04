@@ -1,8 +1,8 @@
 {
   "schema_version": 3,
-  "fork_base": "60ff6322fd7e422377fc2a5fcee68fdbc5a437bd",
+  "fork_base": "2b8e0647154e393ff4584d3b8f701b8e480134d9",
   "review_start_exclusive": "daf33dcb4c8f7fdafc890acfffc2fbb04569f004",
-  "reviewed_through": "bb6b38c41e7cf18b72849e29a12d38e5e3e2cbae",
+  "reviewed_through": "74cabbe681e47067d63f716eaf33c190b7dc46ba",
   "entries": [
     {
       "commit": "3c0f281276dd695f09cf38a43fa379f843483646",
@@ -664,6 +664,295 @@
       "commit": "bb6b38c41e7cf18b72849e29a12d38e5e3e2cbae",
       "disposition": "accepted",
       "reason": "downstream-equivalent"
+    },
+    {
+      "commit": "fa17c95296d2750a923e5a31f6a6d66c90db9fac",
+      "disposition": "accepted",
+      "reason": "downstream-adaptation"
+    },
+    {
+      "commit": "cd8c27e62b8180eafb4ee1b5d699b0676875e869",
+      "disposition": "accepted",
+      "reason": "downstream-adaptation"
+    },
+    {
+      "commit": "78e104f4320d6764da00ccba4513d98d19e7fbef",
+      "disposition": "excluded",
+      "reason": "product-scope"
+    },
+    {
+      "commit": "fb80be04b48e6d555f25d9657392998fb6aecfcb",
+      "disposition": "excluded",
+      "reason": "product-scope"
+    },
+    {
+      "commit": "efe6fe81cbe93fd1a4f4c39896df22574dbeaead",
+      "disposition": "accepted",
+      "reason": "downstream-equivalent"
+    },
+    {
+      "commit": "b3439d87c9302fe6939653f3924615d4739ced16",
+      "disposition": "accepted",
+      "reason": "downstream-adaptation"
+    },
+    {
+      "commit": "5a79da96f7fb39ab8aadc589884cd8e48ed437b6",
+      "disposition": "excluded",
+      "reason": "product-scope"
+    },
+    {
+      "commit": "8c2d4216a797c54264156755e9fb0de6d6654158",
+      "disposition": "excluded",
+      "reason": "product-scope"
+    },
+    {
+      "commit": "50773945f91b3c298ec7f4b76d7cf05356b7a9a6",
+      "disposition": "accepted",
+      "reason": "downstream-adaptation"
+    },
+    {
+      "commit": "6d2362ba8aa4929191a35231056c61adc0f168ab",
+      "disposition": "accepted",
+      "reason": "downstream-adaptation"
+    },
+    {
+      "commit": "077ad1fa81d68f9bd7e3499b99c4635774ccaa80",
+      "disposition": "accepted",
+      "reason": "downstream-adaptation"
+    },
+    {
+      "commit": "bd0b4c2d553dd96a61651cca4217c1065f922e08",
+      "disposition": "accepted",
+      "reason": "downstream-adaptation"
+    },
+    {
+      "commit": "7ae8977dc3e8e21a2d89ebab1e0339f6678f8beb",
+      "disposition": "excluded",
+      "reason": "product-scope"
+    },
+    {
+      "commit": "9288883de42a2eaf7734344d70a863b9f9c78b73",
+      "disposition": "deferred",
+      "reason": "toolchain-validation"
+    },
+    {
+      "commit": "1126cf1477d8a2e4e130bef66547d5edadd5a605",
+      "disposition": "excluded",
+      "reason": "product-scope"
+    },
+    {
+      "commit": "2d0d749cbe4d3f1a47db0374587462cfaeac0f48",
+      "disposition": "excluded",
+      "reason": "product-scope"
+    },
+    {
+      "commit": "fd011ac78d2f690f424520ea6d7a1f1a4bac3b8f",
+      "disposition": "excluded",
+      "reason": "product-scope"
+    },
+    {
+      "commit": "31e292d7fea5f85faf55b0e621e50f53929e25e8",
+      "disposition": "excluded",
+      "reason": "product-scope"
+    },
+    {
+      "commit": "c34701f4e2b10699a18eb43bd5a7cbc29307f1d5",
+      "disposition": "excluded",
+      "reason": "product-scope"
+    },
+    {
+      "commit": "5888acd6ac7f2e6e465969d3ad78a2334845f6ed",
+      "disposition": "excluded",
+      "reason": "product-scope"
+    },
+    {
+      "commit": "eef4d87f3f62a144f898d26b984ade033d11b8f3",
+      "disposition": "excluded",
+      "reason": "product-scope"
+    },
+    {
+      "commit": "199771b7982321044ba8e5be48478a3ada9eb4cf",
+      "disposition": "excluded",
+      "reason": "product-scope"
+    },
+    {
+      "commit": "e71745de1fd0432d2633d425033ff51321a93dfb",
+      "disposition": "excluded",
+      "reason": "product-scope"
+    },
+    {
+      "commit": "5ce01e429b421447e197a16b4c9a700d32539e3b",
+      "disposition": "accepted",
+      "reason": "downstream-adaptation"
+    },
+    {
+      "commit": "20b57af770997d2daf66608f5fbca4285350bf85",
+      "disposition": "partial",
+      "reason": "downstream-adaptation",
+      "scope": [
+        "app/src/main/java/com/m57/hermescontrol/ui/chat/ChatBubble.kt",
+        "app/src/main/java/com/m57/hermescontrol/ui/chat/MarkdownText.kt",
+        "app/src/test/java/com/m57/hermescontrol/ui/chat/MarkdownTextFeatureTest.kt"
+      ]
+    },
+    {
+      "commit": "89a14eb765830f166360503cfee47edfe5235851",
+      "disposition": "accepted",
+      "reason": "downstream-equivalent"
+    },
+    {
+      "commit": "aff1b7ed3a75bd5d07d65fbb72bdde41dbf456a3",
+      "disposition": "accepted",
+      "reason": "downstream-adaptation"
+    },
+    {
+      "commit": "67d26697b816a536915bb7bf2db2b4567aba196e",
+      "disposition": "accepted",
+      "reason": "downstream-adaptation"
+    },
+    {
+      "commit": "a15e609c9a399d9ea273fd3da629310c6763f3ec",
+      "disposition": "partial",
+      "reason": "downstream-adaptation",
+      "scope": [
+        "app/src/main/java/com/m57/hermescontrol/ui/chat/ChatViewModel.kt",
+        "app/src/main/java/com/m57/hermescontrol/ui/chat/MarkdownText.kt",
+        "app/src/main/java/com/m57/hermescontrol/ui/chat/SlashCommandDispatcher.kt"
+      ]
+    },
+    {
+      "commit": "ad34a51846a29fd34146f46b5b3746922ffb0998",
+      "disposition": "partial",
+      "reason": "downstream-adaptation",
+      "scope": [
+        "app/src/main/java/com/m57/hermescontrol/ui/chat/ChatScreen.kt",
+        "app/src/main/java/com/m57/hermescontrol/ui/chat/ChatViewModel.kt"
+      ]
+    },
+    {
+      "commit": "fd485a69990b358f81d8dd4c12c761e7d2555d24",
+      "disposition": "accepted",
+      "reason": "downstream-equivalent"
+    },
+    {
+      "commit": "474b77a259cb94e4f381388aaa06cdbc51f7ad43",
+      "disposition": "partial",
+      "reason": "downstream-adaptation",
+      "scope": [
+        "app/src/main/java/com/m57/hermescontrol/ui/chat/ChatScreen.kt",
+        "app/src/main/java/com/m57/hermescontrol/ui/chat/ChatViewModel.kt"
+      ]
+    },
+    {
+      "commit": "acc9c7ce9ab34dd11f670e7f3651448ff7dfd9d4",
+      "disposition": "accepted",
+      "reason": "downstream-adaptation"
+    },
+    {
+      "commit": "1135f05011b00bdf68ceb9f15ce1e32f6e0006a4",
+      "disposition": "accepted",
+      "reason": "downstream-adaptation"
+    },
+    {
+      "commit": "114654867fabcd36ad0915cbd0f896445c32d129",
+      "disposition": "accepted",
+      "reason": "downstream-adaptation"
+    },
+    {
+      "commit": "b9ff160ae45879a4900b9d4faa0c096292bc62fa",
+      "disposition": "accepted",
+      "reason": "downstream-adaptation"
+    },
+    {
+      "commit": "6a659732da6326dc1b26f6c49b33c7520dfe186d",
+      "disposition": "partial",
+      "reason": "downstream-adaptation",
+      "scope": [
+        "app/src/main/java/com/m57/hermescontrol/ui/sessions/AutomationSessionGroup.kt",
+        "app/src/main/java/com/m57/hermescontrol/ui/sessions/SessionsScreen.kt",
+        "app/src/main/java/com/m57/hermescontrol/ui/sessions/SessionsViewModel.kt"
+      ]
+    },
+    {
+      "commit": "7223c60a97ca097dbd578b49446fe4819c666a75",
+      "disposition": "deferred",
+      "reason": "security-review"
+    },
+    {
+      "commit": "487d8d1feb7c9785a0c196fc3aad8038fc42594a",
+      "disposition": "deferred",
+      "reason": "security-review"
+    },
+    {
+      "commit": "230a3dac5b9734fb8bfc999fff1bb77b53cdb851",
+      "disposition": "deferred",
+      "reason": "security-review"
+    },
+    {
+      "commit": "ae2d0d8494829bfbfb257bc1d393c0b8510211a7",
+      "disposition": "deferred",
+      "reason": "security-review"
+    },
+    {
+      "commit": "f7318325c71b4c5b1610033d55f84efc37100ba3",
+      "disposition": "excluded",
+      "reason": "product-scope"
+    },
+    {
+      "commit": "629a150c28fb4177126b2bbf0dad4e3f1be9de80",
+      "disposition": "deferred",
+      "reason": "security-review"
+    },
+    {
+      "commit": "beef8478be1deb2a8fe46ba089510625efb4f1d4",
+      "disposition": "partial",
+      "reason": "downstream-adaptation",
+      "scope": [
+        "app/src/main/java/com/m57/hermescontrol/MainActivity.kt",
+        "app/src/test/java/com/m57/hermescontrol/MainActivityLifecycleTest.kt"
+      ]
+    },
+    {
+      "commit": "fb509c3cae4f51818088ef296c6239de8b04f74f",
+      "disposition": "excluded",
+      "reason": "product-scope"
+    },
+    {
+      "commit": "f97e1d1eb3f6a1324d3261ba40c28fd0dceb46ff",
+      "disposition": "partial",
+      "reason": "downstream-adaptation",
+      "scope": [
+        "app/src/main/java/com/m57/hermescontrol/MainActivity.kt",
+        "app/src/main/java/com/m57/hermescontrol/notification/ChatNotificationService.kt"
+      ]
+    },
+    {
+      "commit": "850d01ca89b5c83d3c562b6abb88a9d641a91a22",
+      "disposition": "excluded",
+      "reason": "distribution-policy"
+    },
+    {
+      "commit": "09fbcf9d24881b8f2815c7deacaa26521dd32594",
+      "disposition": "excluded",
+      "reason": "distribution-policy"
+    },
+    {
+      "commit": "6edca8180af9f2c830e725fcc4f86df235a36c23",
+      "disposition": "excluded",
+      "reason": "distribution-policy"
+    },
+    {
+      "commit": "0f6f6d2a6704366d91d20a24a17523093e37f71e",
+      "disposition": "excluded",
+      "reason": "distribution-policy"
+    },
+    {
+      "commit": "74cabbe681e47067d63f716eaf33c190b7dc46ba",
+      "disposition": "partial",
+      "reason": "downstream-adaptation",
+      "scope": [
+        "app/src/main/java/com/m57/hermescontrol/ui/chat/ChatScreen.kt"
+      ]
     }
   ],
   "resolutions": [
@@ -768,6 +1057,38 @@
       "disposition": "accepted",
       "reason": "downstream-adaptation",
       "downstream_commit": "608fa9d172af08b575ce6d98ffde64efe5659c3a"
+    },
+    {
+      "upstream_commit": "680b4082ca9df02681158e8567d7131b315bc45a",
+      "disposition": "accepted",
+      "reason": "downstream-adaptation",
+      "downstream_commit": "6cae935d6ed297d2bf05b7253eebcd4de82ea446"
+    },
+    {
+      "upstream_commit": "ece0288ca8e451f52e4e115ad4611f79e3bbbcea",
+      "disposition": "accepted",
+      "reason": "downstream-adaptation",
+      "downstream_commit": "0a5c50c898349e72eda454276318921a2d5bd3e7"
+    },
+    {
+      "upstream_commit": "7c00f4407dfe722567ea5b6b6417a999df0ed415",
+      "disposition": "accepted",
+      "reason": "downstream-adaptation",
+      "downstream_commit": "522c5b1666fd12f54a6434e94d51bb979a508aec"
+    },
+    {
+      "upstream_commit": "ceb48132181348a9f752db5ce9d26b54fb305bb7",
+      "disposition": "partial",
+      "reason": "downstream-adaptation",
+      "downstream_commit": "267510643fa2bcfe3c8c1e73799309f75bb3b1c0",
+      "scope": [
+        "app/src/main/java/com/m57/hermescontrol/ui/chat/ChatMessage.kt",
+        "app/src/main/java/com/m57/hermescontrol/ui/chat/ChatWsEventReducer.kt",
+        "app/src/main/java/com/m57/hermescontrol/ui/chat/components/SubagentInspectionSheet.kt",
+        "app/src/main/java/com/m57/hermescontrol/ui/chat/components/TodoHierarchy.kt",
+        "app/src/test/java/com/m57/hermescontrol/ui/chat/TodoParentPreservationTest.kt",
+        "app/src/test/java/com/m57/hermescontrol/ui/chat/components/TodoHierarchyTest.kt"
+      ]
     }
   ]
 }

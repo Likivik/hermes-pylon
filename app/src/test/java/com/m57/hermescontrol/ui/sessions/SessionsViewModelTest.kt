@@ -11,6 +11,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.unmockkAll
+import io.mockk.verify
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -105,7 +106,7 @@ class SessionsViewModelTest {
     fun `load more dedupes churn without advancing by hydrated pins`() {
         val pinStore = FakeSessionPinStore(listOf("lineage-pinned"))
         val vm = SessionsViewModel(pinStore = pinStore, ioDispatcher = testDispatcher)
-        coEvery { mockApi.getSessions(50, 0, "recent") } returns
+        coEvery { mockApi.getSessions(50, 0, "recent", null, "cron") } returns
             Response.success(
                 SessionListResponse(
                     sessions = listOf(SessionInfo("recent-1"), SessionInfo("recent-2")),
@@ -115,7 +116,7 @@ class SessionsViewModelTest {
         coEvery { mockApi.getSessionLatestDescendant("lineage-pinned") } returns
             Response.success(com.m57.hermescontrol.data.model.SessionLatestDescendantResponse("pinned-child"))
         coEvery { mockApi.getSession("pinned-child") } returns Response.success(SessionInfo("pinned-child"))
-        coEvery { mockApi.getSessions(50, 2, "recent") } returns
+        coEvery { mockApi.getSessions(50, 2, "recent", null, "cron") } returns
             Response.success(
                 SessionListResponse(
                     sessions = listOf(SessionInfo("recent-2"), SessionInfo("recent-3")),
@@ -129,7 +130,7 @@ class SessionsViewModelTest {
         vm.loadMore()
         awaitState { !vm.uiState.value.isLoadingMore && vm.uiState.value.loadedSessionIds.size == 3 }
 
-        coVerify { mockApi.getSessions(50, 2, "recent") }
+        coVerify { mockApi.getSessions(50, 2, "recent", null, "cron") }
         assertEquals(
             setOf("pinned-child", "recent-1", "recent-2", "recent-3"),
             vm.uiState.value.sessions.map { it.id }.toSet(),
@@ -145,21 +146,21 @@ class SessionsViewModelTest {
                 pinStore = FakeSessionPinStore(emptyList()),
                 ioDispatcher = testDispatcher,
             )
-        coEvery { mockApi.getSessions(50, 0, "recent") } returns
+        coEvery { mockApi.getSessions(50, 0, "recent", null, "cron") } returns
             Response.success(
                 SessionListResponse(
                     sessions = listOf(SessionInfo("recent-1"), SessionInfo("recent-2")),
                     total = 5,
                 ),
             )
-        coEvery { mockApi.getSessions(50, 2, "recent") } returns
+        coEvery { mockApi.getSessions(50, 2, "recent", null, "cron") } returns
             Response.success(
                 SessionListResponse(
                     sessions = listOf(SessionInfo("recent-1"), SessionInfo("recent-2")),
                     total = 5,
                 ),
             )
-        coEvery { mockApi.getSessions(50, 4, "recent") } returns
+        coEvery { mockApi.getSessions(50, 4, "recent", null, "cron") } returns
             Response.success(SessionListResponse(sessions = emptyList(), total = 4))
 
         vm.loadSessions()
@@ -169,8 +170,8 @@ class SessionsViewModelTest {
         vm.loadMore()
         awaitState { !vm.uiState.value.isLoadingMore && !vm.uiState.value.hasMore }
 
-        coVerify { mockApi.getSessions(50, 2, "recent") }
-        coVerify { mockApi.getSessions(50, 4, "recent") }
+        coVerify { mockApi.getSessions(50, 2, "recent", null, "cron") }
+        coVerify { mockApi.getSessions(50, 4, "recent", null, "cron") }
     }
 
     @Test
@@ -181,7 +182,7 @@ class SessionsViewModelTest {
                 ioDispatcher = testDispatcher,
             )
         val stalePage = CompletableDeferred<Response<SessionListResponse>>()
-        coEvery { mockApi.getSessions(50, 0, "recent") } returnsMany
+        coEvery { mockApi.getSessions(50, 0, "recent", null, "cron") } returnsMany
             listOf(
                 Response.success(
                     SessionListResponse(
@@ -196,7 +197,7 @@ class SessionsViewModelTest {
                     ),
                 ),
             )
-        coEvery { mockApi.getSessions(50, 2, "recent") } coAnswers { stalePage.await() }
+        coEvery { mockApi.getSessions(50, 2, "recent", null, "cron") } coAnswers { stalePage.await() }
 
         vm.loadSessions()
         awaitState { vm.uiState.value.sessions.map { it.id } == listOf("old-1", "old-2") }
@@ -217,6 +218,254 @@ class SessionsViewModelTest {
         assertEquals(listOf("fresh-1", "fresh-2"), vm.uiState.value.sessions.map { it.id })
         assertEquals(2, vm.uiState.value.serverOffset)
         assertFalse(vm.uiState.value.isLoadingMore)
+    }
+
+    // ── History sections (conversations vs. automations) ─────────────────
+
+    @Test
+    fun `global statistics are only shown for conversations`() {
+        assertTrue(HistorySection.CONVERSATIONS.showsGlobalStats)
+        assertFalse(HistorySection.AUTOMATIONS.showsGlobalStats)
+    }
+
+    @Test
+    fun `automation pagination advances on server rows not merged pin rows`() {
+        val vm =
+            SessionsViewModel(
+                pinStore = FakeSessionPinStore(listOf("lineage-pinned")),
+                ioDispatcher = testDispatcher,
+            )
+        val firstPage =
+            listOf(
+                SessionInfo("cron_job-a_20260905_180000", source = "cron"),
+                SessionInfo("cron_job-a_20260905_180500", source = "cron"),
+            )
+        coEvery { mockApi.getSessions(50, 0, "recent", "cron", null) } returns
+            Response.success(SessionListResponse(sessions = firstPage, total = 3))
+        coEvery { mockApi.getSessions(50, 2, "recent", "cron", null) } returns
+            Response.success(
+                SessionListResponse(
+                    sessions = listOf(SessionInfo("cron_job-a_20260905_190000", source = "cron")),
+                    total = 3,
+                ),
+            )
+        coEvery { mockApi.getSessionLatestDescendant("lineage-pinned") } returns
+            Response.success(
+                com.m57.hermescontrol.data.model.SessionLatestDescendantResponse("cron_job-b_20260905_120000"),
+            )
+        coEvery { mockApi.getSession("cron_job-b_20260905_120000") } returns
+            Response.success(SessionInfo("cron_job-b_20260905_120000", source = "cron"))
+
+        vm.selectSection(HistorySection.AUTOMATIONS)
+        awaitState { !vm.uiState.value.isLoading && vm.uiState.value.sessions.size == 3 }
+
+        // Three rows are displayed, but only two came from the server window.
+        assertEquals(2, vm.uiState.value.serverOffset)
+        assertTrue(vm.uiState.value.hasMore)
+
+        vm.loadMore()
+        awaitState { !vm.uiState.value.isLoadingMore && vm.uiState.value.serverOffset == 3 }
+
+        coVerify { mockApi.getSessions(50, 2, "recent", "cron", null) }
+        assertFalse(vm.uiState.value.hasMore)
+        assertEquals(
+            listOf("job-a", "job-b"),
+            automationGroups(vm.uiState.value.sessions).map { it.jobId }.sortedBy { it },
+        )
+    }
+
+    @Test
+    fun `automation pagination honors server offset and limit`() {
+        val vm = createViewModel()
+        coEvery { mockApi.getSessions(50, 0, "recent", "cron", null) } returns
+            Response.success(
+                SessionListResponse(
+                    sessions = listOf(SessionInfo("cron_job_20260905_100000", source = "cron")),
+                    total = 75,
+                    limit = 25,
+                    offset = 10,
+                ),
+            )
+        coEvery { mockApi.getSessions(50, 35, "recent", "cron", null) } returns
+            Response.success(
+                SessionListResponse(
+                    sessions = listOf(SessionInfo("cron_job_20260905_110000", source = "cron")),
+                    total = 36,
+                    limit = 1,
+                    offset = 35,
+                ),
+            )
+
+        vm.selectSection(HistorySection.AUTOMATIONS)
+        awaitState { !vm.uiState.value.isLoading }
+        assertEquals(35, vm.uiState.value.serverOffset)
+
+        vm.loadMore()
+        awaitState { !vm.uiState.value.isLoadingMore }
+
+        coVerify { mockApi.getSessions(50, 35, "recent", "cron", null) }
+        assertEquals(36, vm.uiState.value.serverOffset)
+        assertEquals(36, vm.uiState.value.total)
+        assertFalse(vm.uiState.value.hasMore)
+    }
+
+    @Test
+    fun `pins hydrate into their own section only`() {
+        val vm =
+            SessionsViewModel(
+                pinStore = FakeSessionPinStore(listOf("chat-pin", "cron-pin")),
+                ioDispatcher = testDispatcher,
+            )
+        coEvery { mockApi.getSessions(50, 0, "recent", null, "cron") } returns
+            Response.success(SessionListResponse(sessions = listOf(SessionInfo("chat-1")), total = 1))
+        coEvery { mockApi.getSessions(50, 0, "recent", "cron", null) } returns
+            Response.success(
+                SessionListResponse(
+                    sessions = listOf(SessionInfo("cron_job_20260905_100000", source = "cron")),
+                    total = 1,
+                ),
+            )
+        coEvery { mockApi.getSessionLatestDescendant("chat-pin") } returns
+            Response.success(com.m57.hermescontrol.data.model.SessionLatestDescendantResponse("chat-pin"))
+        coEvery { mockApi.getSession("chat-pin") } returns Response.success(SessionInfo("chat-pin"))
+        coEvery { mockApi.getSessionLatestDescendant("cron-pin") } returns
+            Response.success(
+                com.m57.hermescontrol.data.model.SessionLatestDescendantResponse("cron_job_20260904_100000"),
+            )
+        coEvery { mockApi.getSession("cron_job_20260904_100000") } returns
+            Response.success(SessionInfo("cron_job_20260904_100000", source = "cron"))
+
+        vm.loadSessions()
+        awaitState { vm.uiState.value.sessions.size == 2 }
+        assertEquals(
+            setOf("chat-pin", "chat-1"),
+            vm.uiState.value.sessions.map { it.id }.toSet(),
+        )
+
+        vm.selectSection(HistorySection.AUTOMATIONS)
+        awaitState { vm.uiState.value.sessions.size == 2 }
+        assertEquals(
+            setOf("cron_job_20260904_100000", "cron_job_20260905_100000"),
+            vm.uiState.value.sessions.map { it.id }.toSet(),
+        )
+        assertEquals(listOf("chat-pin", "cron-pin"), vm.uiState.value.pinnedSessionIds)
+    }
+
+    @Test
+    fun `section switch rescopes the active search query`() {
+        val vm = createViewModel()
+        coEvery { mockApi.searchSessions("deploy", null, null, "cron") } returns
+            Response.success(
+                com.m57.hermescontrol.data.model.SessionSearchResponse(
+                    listOf(com.m57.hermescontrol.data.model.SessionSearchResult(session_id = "chat-hit")),
+                ),
+            )
+        coEvery { mockApi.searchSessions("deploy", null, "cron", null) } returns
+            Response.success(
+                com.m57.hermescontrol.data.model.SessionSearchResponse(
+                    listOf(
+                        com.m57.hermescontrol.data.model.SessionSearchResult(
+                            session_id = "cron-hit",
+                            source = "cron",
+                        ),
+                    ),
+                ),
+            )
+
+        vm.setSearchQuery("deploy")
+        awaitState { vm.uiState.value.searchResults.size == 1 }
+        assertEquals("chat-hit", vm.uiState.value.searchResults.single().session_id)
+        vm.selectAll(setOf("chat-hit"))
+
+        vm.selectSection(HistorySection.AUTOMATIONS)
+        assertEquals("deploy", vm.uiState.value.searchQuery)
+        assertTrue(vm.uiState.value.searchResults.isEmpty())
+        assertTrue(vm.uiState.value.selectedIds.isEmpty())
+        awaitState { vm.uiState.value.searchResults.size == 1 }
+
+        assertEquals("cron-hit", vm.uiState.value.searchResults.single().session_id)
+        coVerify(exactly = 1) { mockApi.searchSessions("deploy", null, null, "cron") }
+        coVerify(exactly = 1) { mockApi.searchSessions("deploy", null, "cron", null) }
+    }
+
+    @Test
+    fun `late conversation load cannot replace automation rows`() {
+        val vm = createViewModel()
+        val stalePage = CompletableDeferred<Response<SessionListResponse>>()
+        coEvery { mockApi.getSessions(50, 0, "recent", null, "cron") } coAnswers { stalePage.await() }
+        coEvery { mockApi.getSessions(50, 0, "recent", "cron", null) } returns
+            Response.success(
+                SessionListResponse(
+                    sessions = listOf(SessionInfo("cron_job_20260905_100000", source = "cron")),
+                    total = 1,
+                ),
+            )
+
+        vm.loadSessions()
+        testDispatcher.scheduler.runCurrent()
+        vm.selectSection(HistorySection.AUTOMATIONS)
+        awaitState { vm.uiState.value.sessions.size == 1 }
+        stalePage.complete(
+            Response.success(SessionListResponse(sessions = listOf(SessionInfo("old-chat")), total = 1)),
+        )
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(HistorySection.AUTOMATIONS, vm.uiState.value.section)
+        assertEquals(listOf("cron_job_20260905_100000"), vm.uiState.value.sessions.map { it.id })
+    }
+
+    @Test
+    fun `deleting a pinned automation run drops its row and pin`() {
+        val pinStore = FakeSessionPinStore(listOf("cron_job_20260905_100000"))
+        val vm = SessionsViewModel(pinStore = pinStore, ioDispatcher = testDispatcher)
+        coEvery { mockApi.getSessions(50, 0, "recent", "cron", null) } returns
+            Response.success(
+                SessionListResponse(
+                    sessions =
+                        listOf(
+                            SessionInfo("cron_job_20260905_100000", source = "cron"),
+                            SessionInfo("cron_job_20260905_110000", source = "cron"),
+                        ),
+                    total = 2,
+                ),
+            )
+        coEvery { mockApi.deleteSession("cron_job_20260905_100000") } returns Response.success(Unit)
+
+        vm.selectSection(HistorySection.AUTOMATIONS)
+        awaitState { vm.uiState.value.sessions.size == 2 }
+
+        vm.requestDeleteSession("cron_job_20260905_100000")
+        assertEquals("cron_job_20260905_100000", vm.uiState.value.sessionToDeleteConfirm)
+        vm.confirmDeleteSession()
+        awaitState { vm.uiState.value.sessions.size == 1 }
+
+        assertEquals(listOf("cron_job_20260905_110000"), vm.uiState.value.sessions.map { it.id })
+        assertEquals(emptyList<String>(), vm.uiState.value.pinnedSessionIds)
+        assertEquals(emptyList<String>(), pinStore.load())
+        assertEquals(1, vm.uiState.value.total)
+    }
+
+    @Test
+    fun `pins are scoped to the profile that owns the view model`() {
+        every { AuthManager.getPinnedSessionIds("profile-a") } returns listOf("pin-a")
+        every { AuthManager.getPinnedSessionIds("profile-b") } returns listOf("pin-b")
+        every { AuthManager.savePinnedSessionIds(any(), any()) } returns Unit
+
+        val vmA = SessionsViewModel(AuthManagerSessionPinStore("profile-a"), testDispatcher)
+        val vmB = SessionsViewModel(AuthManagerSessionPinStore("profile-b"), testDispatcher)
+
+        assertEquals(listOf("pin-a"), vmA.uiState.value.pinnedSessionIds)
+        assertEquals(listOf("pin-b"), vmB.uiState.value.pinnedSessionIds)
+
+        vmB.toggleSessionPin(SessionInfo("cron_job_20260905_100000", source = "cron"))
+
+        verify {
+            AuthManager.savePinnedSessionIds(
+                listOf("pin-b", "cron_job_20260905_100000"),
+                "profile-b",
+            )
+        }
+        verify(exactly = 0) { AuthManager.savePinnedSessionIds(any(), "profile-a") }
     }
 
     private fun awaitState(predicate: () -> Boolean) {

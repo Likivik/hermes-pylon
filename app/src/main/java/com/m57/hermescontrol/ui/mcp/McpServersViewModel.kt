@@ -7,6 +7,7 @@ import com.m57.hermescontrol.data.model.McpCatalogEntry
 import com.m57.hermescontrol.data.model.McpCatalogInstallRequest
 import com.m57.hermescontrol.data.model.McpOAuthFlowResponse
 import com.m57.hermescontrol.data.model.McpServer
+import com.m57.hermescontrol.data.model.McpServerTestResponse
 import com.m57.hermescontrol.data.model.McpServerToggleRequest
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.NetworkResult
@@ -15,14 +16,22 @@ import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.ui.common.safeLaunchLoad
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+
+private const val MAX_CONCURRENT_SERVER_TESTS = 4
 
 enum class AddServerMode { HTTP, Stdio }
 
@@ -41,6 +50,9 @@ data class McpServersUiState(
     val addServerAuth: String = "none", // "none" | "header" | "oauth"
     val addServerBearerToken: String = "",
     val addingServer: Boolean = false,
+    val serverTestResults: Map<String, McpServerTestResponse> = emptyMap(),
+    val testingServers: Set<String> = emptySet(),
+    val isTestingAll: Boolean = false,
     // Env vars for editing
     val editingEnvFor: String? = null,
     val envKeyInput: String = "",
@@ -55,16 +67,24 @@ data class McpServersUiState(
     val activeOAuthFlow: McpOAuthFlowResponse? = null,
 )
 
-class McpServersViewModel :
+class McpServersViewModel(
+    private val ioDispatcher: kotlinx.coroutines.CoroutineDispatcher = Dispatchers.IO,
+) :
     ViewModel(),
-    ToastHost {
+        ToastHost {
     private val _uiState = MutableStateFlow(McpServersUiState())
     val uiState: StateFlow<McpServersUiState> = _uiState.asStateFlow()
+    private val serverTestMutexes = mutableMapOf<String, Mutex>()
+    private val serverTestConcurrencyLimiter = Semaphore(MAX_CONCURRENT_SERVER_TESTS)
+    private val activeTestOperations = mutableMapOf<String, Long>()
+    private var nextTestOperationId = 0L
+    private var batchTestJob: Job? = null
 
     // ── Data loading ──────────────────────────────────────────
 
     fun loadServers() {
         safeLaunchLoad(
+            ioDispatcher = ioDispatcher,
             apiCall = { safeApiCall { ApiClient.hermesApi.getMcpServers() } },
             onStart = { _uiState.update { it.copy(isLoading = true, errorMessage = null) } },
             onSuccess = { data ->
@@ -72,6 +92,8 @@ class McpServersViewModel :
                     it.copy(
                         isLoading = false,
                         servers = data.servers.orEmpty(),
+                        serverTestResults = emptyMap(),
+                        testingServers = activeTestOperations.keys.toSet(),
                     )
                 }
             },
@@ -130,21 +152,87 @@ class McpServersViewModel :
     fun testServer(name: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(toastMessage = "Testing server '$name'…") }
-            val result =
-                withContext(Dispatchers.IO) {
-                    safeApiCall { ApiClient.hermesApi.testMcpServer(name) }
+            val response = executeServerTest(name)
+            val toastMessage =
+                if (response.ok) {
+                    val overhead =
+                        McpTokenEstimator.formatTokenOverhead(
+                            response.tools.size,
+                            McpTokenEstimator.estimateTokens(response.tools),
+                        )
+                    "Server '$name' tested — OK ($overhead)"
+                } else {
+                    "Server '$name' test failed: ${response.error ?: "unknown error"}"
                 }
-            when (result) {
-                is NetworkResult.Success -> {
-                    _uiState.update { it.copy(toastMessage = "Server '$name' tested — OK") }
-                }
+            _uiState.update { it.copy(toastMessage = toastMessage) }
+        }
+    }
 
-                is NetworkResult.Failure -> {
-                    _uiState.update { it.copy(toastMessage = "Server '$name' test failed: ${result.error.message}") }
+    fun testAllServers() {
+        if (batchTestJob?.isActive == true) return
+        val enabledServers = _uiState.value.servers.filter { it.enabled }
+        if (enabledServers.isEmpty()) {
+            _uiState.update { it.copy(toastMessage = "No enabled servers to test") }
+            return
+        }
+        batchTestJob =
+            viewModelScope.launch {
+                _uiState.update {
+                    it.copy(
+                        isTestingAll = true,
+                        toastMessage = "Testing ${enabledServers.size} servers…",
+                    )
+                }
+                val results =
+                    enabledServers
+                        .map { server ->
+                            async {
+                                server.name to executeServerTest(server.name)
+                            }
+                        }.awaitAll()
+                        .toMap()
+                val passed = results.values.count { it.ok }
+                _uiState.update {
+                    it.copy(
+                        isTestingAll = false,
+                        toastMessage =
+                            "Tested ${enabledServers.size} servers: $passed passed, " +
+                                "${enabledServers.size - passed} failed",
+                    )
+                }
+            }
+    }
+
+    private suspend fun executeServerTest(name: String): McpServerTestResponse =
+        serverTestMutexes.getOrPut(name) { Mutex() }.withLock {
+            val operationId = ++nextTestOperationId
+            activeTestOperations[name] = operationId
+            _uiState.update { it.copy(testingServers = it.testingServers + name) }
+            try {
+                val result =
+                    serverTestConcurrencyLimiter.withPermit {
+                        withContext(ioDispatcher) {
+                            safeApiCall { ApiClient.hermesApi.testMcpServer(name) }
+                        }
+                    }
+                val response =
+                    when (result) {
+                        is NetworkResult.Success -> result.data
+                        is NetworkResult.Failure -> McpServerTestResponse(error = result.error.message)
+                    }
+                if (activeTestOperations[name] == operationId) {
+                    _uiState.update {
+                        it.copy(serverTestResults = it.serverTestResults + (name to response))
+                    }
+                }
+                response
+            } finally {
+                if (activeTestOperations[name] == operationId) {
+                    activeTestOperations.remove(name)
+                    _uiState.update { it.copy(testingServers = it.testingServers - name) }
                 }
             }
         }
-    }
 
     fun deleteServer(name: String) {
         viewModelScope.launch {

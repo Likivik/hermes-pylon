@@ -25,6 +25,12 @@ class LocaleContextWrapperTest {
     }
 
     @Test
+    fun arabicLanguageTagIsExplicit() {
+        assertEquals("ar", LocaleContextWrapper.localeForCode("ar").toLanguageTag())
+        assertTrue(LocaleContextWrapper.shouldWrap("ar"))
+    }
+
+    @Test
     fun japaneseLanguageTag() {
         assertEquals("ja", LocaleContextWrapper.localeForCode("ja").toLanguageTag())
     }

@@ -123,6 +123,10 @@ class AuthManagerTest {
 
     @After
     fun tearDown() {
+        // Stop the process-global DataStore collector before another test resets
+        // Dispatchers.Main. Otherwise its IO continuation can publish into a
+        // StateFlow after resetMain() and surface in an unrelated runTest.
+        AuthManager.resetAuthStateForTest()
         CookieManager.resetForTest()
         val tempDir = java.io.File(System.getProperty("java.io.tmpdir") ?: "/tmp")
         val tempFile = java.io.File(tempDir, "server_store.json")

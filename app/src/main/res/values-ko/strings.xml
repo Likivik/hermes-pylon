@@ -149,6 +149,7 @@
     <string name="chat_input_placeholder_type_message">메시지 입력…</string>
     <string name="chat_tool_execution_error">실행 오류: %1$s</string>
     <string name="chat_tool_exit_code">종료 코드: %1$d</string>
+    <string name="chat_tool_output_omitted">프로세스 출력에서 %1$d자 생략됨</string>
     <string name="chat_tool_fallback">도구</string>
     <string name="chat_tool_show_raw">Raw JSON 보기</string>
     <string name="chat_tool_show_parsed">파싱된 결과 보기</string>
@@ -246,6 +247,7 @@
     <string name="settings_item_language">언어</string>
     <string name="language_system">시스템</string>
     <string name="language_english">영어</string>
+    <string name="language_arabic">العربية</string>
     <string name="language_chinese">중국어</string>
     <string name="language_japanese">일본어</string>
     <string name="language_korean">한국어</string>
@@ -521,6 +523,8 @@
     <string name="sessions_search_played_at">%1$s에 재생됨</string>
     <string name="sessions_search_match_label">일치 항목</string>
     <string name="sessions_search_model_label">모델</string>
+    <string name="sessions_live_status_working">작업 중</string>
+    <string name="sessions_live_status_waiting">대기 중</string>
     <string name="sessions_stat_total">전체</string>
     <string name="sessions_stat_messages">메시지</string>
     <string name="sessions_action_prune">정리</string>
@@ -720,6 +724,11 @@
     <string name="mcp_servers_label_transport">전송: %1$s</string>
     <string name="mcp_servers_label_command">명령어:</string>
     <string name="mcp_servers_action_test">테스트</string>
+    <string name="mcp_servers_action_test_all">모두 테스트</string>
+    <string name="mcp_servers_status_healthy">정상</string>
+    <string name="mcp_servers_status_needs_auth">인증 필요</string>
+    <string name="mcp_servers_status_error">오류</string>
+    <string name="mcp_servers_status_testing">테스트 중…</string>
     <string name="mcp_servers_add_server">서버 추가</string>
     <string name="mcp_servers_add_http">HTTP URL</string>
     <string name="mcp_servers_empty_title">MCP 서버 없음</string>

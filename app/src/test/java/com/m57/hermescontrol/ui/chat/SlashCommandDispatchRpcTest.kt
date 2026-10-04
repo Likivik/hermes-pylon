@@ -91,6 +91,8 @@ class SlashCommandDispatchRpcTest {
         every { AuthManager.isAutoReconnect() } returns false
         every { HermesWsClient.events } returns mockEventsFlow
         every { HermesWsClient.connectionStatus } returns mockConnectionStatus
+        every { HermesWsClient.connectionBinding("profile-test") } returns mockk()
+        every { HermesWsClient.isConnectionBindingCurrent(any()) } returns true
         every { HermesWsClient.connect() } answers {
             mockConnectionStatus.value = ConnectionStatus.CONNECTING
         }

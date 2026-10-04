@@ -44,6 +44,7 @@ import com.m57.hermescontrol.data.model.McpCatalogInstallRequest
 import com.m57.hermescontrol.data.model.McpCatalogResponse
 import com.m57.hermescontrol.data.model.McpOAuthFlowResponse
 import com.m57.hermescontrol.data.model.McpServer
+import com.m57.hermescontrol.data.model.McpServerTestResponse
 import com.m57.hermescontrol.data.model.McpServerToggleRequest
 import com.m57.hermescontrol.data.model.McpServersResponse
 import com.m57.hermescontrol.data.model.MemoryResetRequest
@@ -144,6 +145,8 @@ interface HermesApiService {
         @Query("limit") limit: Int = 20,
         @Query("offset") offset: Int = 0,
         @Query("order") order: String = "recent",
+        @Query("source") source: String? = null,
+        @Query("exclude_sources") excludeSources: String? = null,
     ): Response<SessionListResponse>
 
     @GET("api/sessions/{id}")
@@ -160,6 +163,8 @@ interface HermesApiService {
     suspend fun searchSessions(
         @Query("q") q: String,
         @Query("profile") profile: String? = null,
+        @Query("source") source: String? = null,
+        @Query("exclude_sources") excludeSources: String? = null,
     ): Response<SessionSearchResponse>
 
     @GET("api/sessions/{id}/messages")
@@ -399,7 +404,7 @@ interface HermesApiService {
     @POST("api/mcp/servers/{name}/test")
     suspend fun testMcpServer(
         @Path("name") name: String,
-    ): Response<Unit>
+    ): Response<McpServerTestResponse>
 
     @DELETE("api/mcp/servers/{name}")
     suspend fun deleteMcpServer(

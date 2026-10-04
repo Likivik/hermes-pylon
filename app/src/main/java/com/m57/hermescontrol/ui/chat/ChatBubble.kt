@@ -47,7 +47,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -63,6 +65,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -72,6 +75,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -79,6 +83,7 @@ import androidx.compose.ui.unit.sp
 import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.Attachment
 import com.m57.hermescontrol.data.remote.OkHttpProvider
+import com.m57.hermescontrol.data.ws.PrivilegedRequestBinding
 import com.m57.hermescontrol.theme.ChatFontScale
 import com.m57.hermescontrol.theme.HermesStatusColors
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
@@ -87,6 +92,7 @@ import com.m57.hermescontrol.theme.onColorFor
 import com.m57.hermescontrol.ui.chat.components.DiffViewCard
 import com.m57.hermescontrol.ui.chat.components.ReasoningCard
 import com.m57.hermescontrol.ui.chat.components.SystemTimelineMarker
+import com.m57.hermescontrol.util.BidiUtils
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonArray
@@ -107,7 +113,8 @@ fun ChatBubble(
     isDarkTheme: Boolean,
     searchQuery: String = "",
     isCurrentMatch: Boolean = false,
-    onRespondApproval: (String) -> Unit = {},
+    onRespondApproval: (String, PrivilegedRequestBinding, String) -> Unit = { _, _, _ -> },
+    onCancelApproval: (String, PrivilegedRequestBinding) -> Unit = { _, _ -> },
     onOpenAttachment: (Attachment) -> Unit = {},
     openingAttachmentPath: String? = null,
     onImageClick: (ImageViewerModel) -> Unit = {},
@@ -155,6 +162,7 @@ fun ChatBubble(
                     SystemBubble(
                         message = message,
                         onRespondApproval = onRespondApproval,
+                        onCancelApproval = onCancelApproval,
                         modifier = modifier,
                     )
                 }
@@ -250,12 +258,20 @@ private fun UserBubble(
             ) {
                 Column(modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs)) {
                     ChatFontScale {
-                        SelectionContainer {
-                            Text(
-                                text = highlightedText,
-                                color = userBubbleTextColor,
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
+                        val isRtl = remember(message.content) { BidiUtils.isRtlText(message.content) }
+                        val textDirection =
+                            if (isRtl) androidx.compose.ui.unit.LayoutDirection.Rtl else LocalLayoutDirection.current
+                        CompositionLocalProvider(LocalLayoutDirection provides textDirection) {
+                            SelectionContainer {
+                                Text(
+                                    text = highlightedText,
+                                    color = userBubbleTextColor,
+                                    style =
+                                        MaterialTheme.typography.bodyMedium.copy(
+                                            textDirection = if (isRtl) TextDirection.Rtl else TextDirection.Ltr,
+                                        ),
+                                )
+                            }
                         }
                     }
                     // Render inline attachments
@@ -390,6 +406,8 @@ private fun AssistantBubble(
                         ReasoningCard(
                             reasoningText = message.reasoningText,
                             isStreaming = message.isStreaming,
+                            searchQuery = searchQuery,
+                            isCurrentMatch = isCurrentMatch,
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                     }
@@ -539,7 +557,8 @@ private fun SelfImprovementReviewCard(
 @Composable
 private fun SystemBubble(
     message: ChatMessage,
-    onRespondApproval: (String) -> Unit = {},
+    onRespondApproval: (String, PrivilegedRequestBinding, String) -> Unit = { _, _, _ -> },
+    onCancelApproval: (String, PrivilegedRequestBinding) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     if (message.content.contains("Self-improvement review:", ignoreCase = true)) {
@@ -571,14 +590,18 @@ private fun SystemBubble(
             )
         }
 
-        // Approval action buttons
-        if (message.approvalInfo != null) {
+        // Approval action buttons. Approve is a single-use "once" — there is
+        // deliberately no session-wide or permanent allow, because nothing on
+        // this screen shows what a standing allow would later authorize.
+        val approvalInfo = message.approvalInfo
+        if (approvalInfo != null) {
             Spacer(Modifier.height(8.dp))
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 FilledTonalButton(
-                    onClick = { onRespondApproval("approve") },
+                    onClick = { onRespondApproval(message.id, approvalInfo.privilegedBinding, "approve") },
+                    enabled = !approvalInfo.isSubmitting,
                     modifier =
                         Modifier
                             .height(36.dp)
@@ -598,7 +621,8 @@ private fun SystemBubble(
                 }
 
                 FilledTonalButton(
-                    onClick = { onRespondApproval("deny") },
+                    onClick = { onRespondApproval(message.id, approvalInfo.privilegedBinding, "deny") },
+                    enabled = !approvalInfo.isSubmitting,
                     modifier =
                         Modifier
                             .height(36.dp)
@@ -615,6 +639,19 @@ private fun SystemBubble(
                     )
                     Spacer(Modifier.width(4.dp))
                     Text("Deny")
+                }
+
+                // Withdraw the request entirely (typed `approval.cancel`).
+                // Distinct from Deny, which is an answer the agent can adapt to.
+                TextButton(
+                    onClick = { onCancelApproval(message.id, approvalInfo.privilegedBinding) },
+                    enabled = !approvalInfo.isSubmitting,
+                    modifier =
+                        Modifier
+                            .height(36.dp)
+                            .testTag("cancel_approval_button"),
+                ) {
+                    Text(stringResource(R.string.chat_privileged_cancel))
                 }
             }
         }
@@ -637,6 +674,8 @@ data class ParsedToolData(
     val summaryText: String? = null,
     val durationSec: Double? = null,
     val mainOutput: String? = null,
+    /** Positive backend-reported count of omitted process-output characters. */
+    val outputCut: Long? = null,
     val extraFields: Map<String, String> = emptyMap(),
     val isRunning: Boolean = false,
     val diffOutput: String? = null,
@@ -1095,7 +1134,10 @@ fun parseToolOutput(
             val name = argsObj?.get("name")?.takeIf { !it.isJsonNull }?.asString
             val category = argsObj?.get("category")?.takeIf { !it.isJsonNull }?.asString
             val errorMsg = dataSource.get("error")?.takeIf { !it.isJsonNull }?.asString
-            val success = dataSource.get("success")?.takeIf { !it.isJsonNull }?.asBoolean ?: true
+            val success =
+                dataSource.get("success")?.takeIf {
+                    it is JsonPrimitive && !it.isString && it.content in setOf("true", "false")
+                }?.asBoolean == true
             val msg = dataSource.get("message")?.takeIf { !it.isJsonNull }?.asString
 
             val summaryText =
@@ -1114,7 +1156,7 @@ fun parseToolOutput(
             val mainOutput =
                 when {
                     errorMsg != null -> "❌ $errorMsg"
-                    !success -> "❌ Skill operation failed"
+                    !success -> "❌ ${msg ?: "Skill operation failed"}"
                     msg != null -> "✅ $msg"
                     name != null -> "✅ Skill '$name' $action succeeded${category?.let { " [$it]" } ?: ""}"
                     else -> "✅ Skill $action done"
@@ -1324,12 +1366,27 @@ fun parseToolOutput(
         }
 
         // ── Process-specific formatting ──
-        if (resolvedToolName == "process") {
+        if (resolvedToolName == "process" || resolvedToolName == "process_manage") {
             val action = argsObj?.get("action")?.takeIf { !it.isJsonNull }?.asString ?: ""
             val procId = argsObj?.get("session_id")?.takeIf { !it.isJsonNull }?.asString
             val errorMsg = dataSource.get("error")?.takeIf { !it.isJsonNull }?.asString
             val status = dataSource.get("status")?.takeIf { !it.isJsonNull }?.asString
-            val outputText = dataSource.get("output")?.takeIf { !it.isJsonNull }?.asString
+            val outputText =
+                (
+                    dataSource.get(
+                        "output",
+                    )?.takeIf { it.isJsonPrimitive && !it.isJsonNull && it.asString.isNotEmpty() }
+                        ?: dataSource.get("output_preview")?.takeIf { it.isJsonPrimitive && !it.isJsonNull }
+                )?.asString
+            val outputCut =
+                if (isRunning) {
+                    null
+                } else {
+                    dataSource.get("output_cut")?.takeIf {
+                        it is JsonPrimitive && !it.isString && it.content.toLongOrNull() != null
+                    }
+                        ?.asString?.toLongOrNull()?.takeIf { it > 0 }
+                }
             val processesArr = dataSource.get("processes")?.takeIf { !it.isJsonNull && it.isJsonArray }?.asJsonArray
 
             val summaryText = "⚙️ $action${procId?.let { ": $it" } ?: ""}"
@@ -1379,6 +1436,7 @@ fun parseToolOutput(
                 result = dataSource.entrySet().associate { it.key to it.value.toString() },
                 summaryText = summaryText,
                 mainOutput = mainOutput,
+                outputCut = outputCut,
                 durationSec = duration,
                 isRunning = isRunning,
             )
@@ -2084,6 +2142,14 @@ private fun ExpandedToolContent(
                                 fontSize = 12.sp,
                             ),
                     )
+                }
+                if (parsed.toolName == "process" || parsed.toolName == "process_manage") {
+                    parsed.outputCut?.let { omitted ->
+                        Text(
+                            text = stringResource(R.string.chat_tool_output_omitted, omitted),
+                            style = MaterialTheme.typography.labelSmall.copy(color = statusColors.warning),
+                        )
+                    }
                 }
                 parsed.extraFields.forEach { (key, value) ->
                     Row(
