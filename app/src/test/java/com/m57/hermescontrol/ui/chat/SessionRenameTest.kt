@@ -1,21 +1,29 @@
+// Modified from Hy4ri/hermes-mobile for this fork; see NOTICE.
+
 package com.m57.hermescontrol.ui.chat
 
+import android.app.Application
 import android.util.Log
-import androidx.arch.core.executor.testing.InstantTaskExecutorRule
-import com.m57.hermescontrol.ConnectionStatus
 import com.m57.hermescontrol.R
+import com.m57.hermescontrol.data.local.AuthManager
+import com.m57.hermescontrol.data.local.HermesDatabase
+import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.session.ActiveSessionHolder
+import com.m57.hermescontrol.data.ws.ConnectionStatus
 import com.m57.hermescontrol.data.ws.HermesWsClient
+import com.m57.hermescontrol.data.ws.JsonRpcError
 import com.m57.hermescontrol.data.ws.WsEvent
 import com.m57.hermescontrol.data.ws.WsMethods
-import com.m57.hermescontrol.data.remote.ApiClient
-import com.m57.hermescontrol.hermes_database.HermesDatabase
-import hermes_cli.AuthManager
+import com.m57.hermescontrol.ui.chat.fakes.FakeChatPersistenceRepository
+import com.m57.hermescontrol.ui.chat.fakes.FakeSlashUsageStore
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.mockkStatic
 import io.mockk.unmockkAll
+import io.mockk.verify
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -28,46 +36,52 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
-import org.junit.Rule
 import org.junit.Test
 
 /**
- * Rename-path tests (Likivik patch — rail long-press → Edit → Save):
+ * Rename-path tests (Likivik patch — rail long-press → Edit → Save).
  *
- * The rename flows over two RPCs for background sessions:
- *   1. session.resume (with pendingRenameTitle queued on the request)
- *   2. session.title — sent from the resume ack, addressed by the ack's
- *      `session_key` field (stable storage id), NOT the rotated runtime id.
+ * A rename ALWAYS resumes first, then fires `session.title` from the resume
+ * ack. Two things decide how the title is addressed:
+ *  - the ack's `session_key` (stable storage id) wins when present — the
+ *    gateway's session.title resolves via agent.session_id OR session_key;
+ *  - otherwise the runtime id, and for a CURRENT-session rename whose ack is
+ *    the gateway's fast-path payload (already-live session, no session_id /
+ *    session_key reported) that means the runtime id the chat already held.
  *
- * For the CURRENT session it is a single session.title addressed by the
- * runtime id (agent.session_id), because post-compression the stored id no
- * longer matches the gateway's live lookup key.
+ * A BACKGROUND rename must never fall back to the cached runtime id — it
+ * belongs to the session the user is viewing, so doing so would title the
+ * wrong session. With no addressable id in such an ack, no title is sent.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SessionRenameTest {
     private val testDispatcher = StandardTestDispatcher()
     private val mockEventsFlow = MutableSharedFlow<WsEvent>(extraBufferCapacity = 64)
     private val mockConnectionStatus = MutableStateFlow(ConnectionStatus.DISCONNECTED)
-    private lateinit var app: android.content.Context
+    private lateinit var app: Application
     private lateinit var fakeRepo: FakeChatPersistenceRepository
     private lateinit var fakeSlashUsageStore: FakeSlashUsageStore
     private lateinit var mockApi: com.m57.hermescontrol.data.remote.HermesApiService
 
+    /** Counter used to generate unique WS request IDs (mirrors the client). */
     private var reqCount = 0
 
-    @get:Rule
-    val instantExecutorRule = InstantTaskExecutorRule()
+    /** Request id of the most recent session.resume send. */
+    private var resumeRequestId = ""
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         val testMainDispatcher = Dispatchers.Main
         reqCount = 0
+        resumeRequestId = ""
 
         mockkStatic(Log::class)
         every { Log.d(any(), any()) } returns 0
+        every { Log.i(any(), any()) } returns 0
+        every { Log.w(any(), any<String>()) } returns 0
         every { Log.e(any(), any()) } returns 0
 
         mockkStatic(Dispatchers::class)
@@ -102,7 +116,7 @@ class SessionRenameTest {
         }
         every { HermesWsClient.disconnect() } returns Unit
 
-        // Default send stub: unique IDs + onSent callback.
+        // Default send stub: unique ids + onSent callback.
         every { HermesWsClient.send(any(), any(), any()) } answers {
             reqCount++
             val id = "req-id-$reqCount"
@@ -115,6 +129,14 @@ class SessionRenameTest {
             arg<((String) -> Unit)?>(2)?.invoke(id)
             id
         }
+        every { HermesWsClient.sendRedirect(any(), any(), any()) } answers {
+            reqCount++
+            val id = "req-redirect-$reqCount"
+            arg<((String) -> Unit)?>(2)?.invoke(id)
+            id
+        }
+        every { HermesWsClient.request(WsMethods.CONFIG_SET, any(), any()) } returns
+            CompletableDeferred<Any?>(mapOf("ok" to true))
 
         mockApi = mockk(relaxed = true)
         every { ApiClient.hermesApi } returns mockApi
@@ -126,57 +148,86 @@ class SessionRenameTest {
                     effectiveContextLength = 272_000L,
                 ),
             )
+        coEvery { mockApi.getModelOptions(any(), any()) } returns
+            retrofit2.Response.success(
+                com.m57.hermescontrol.data.model.ModelOptionsResponse(
+                    providers =
+                        listOf(
+                            com.m57.hermescontrol.data.model.ModelProvider(
+                                slug = "openai",
+                                name = "OpenAI",
+                                models = listOf("gpt-4o", "gpt-4o-mini"),
+                            ),
+                        ),
+                ),
+            )
     }
 
     @After
     fun tearDown() {
         Dispatchers.resetMain()
         ActiveSessionHolder.clear()
-        io.mockk.unmockkAll()
+        unmockkAll()
     }
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
 
     private fun createViewModel(): ChatViewModel =
         ChatViewModel(app, false, fakeRepo, fakeSlashUsageStore, testDispatcher)
 
-    private suspend fun TestScope.bootConnected(): ChatViewModel {
+    /**
+     * Create the ViewModel, emit GatewayReady, then create one session
+     * explicitly (auto-create on launch is disabled — the user picks a rail
+     * row). Returns the ViewModel; the live session id is "session-123".
+     */
+    private suspend fun TestScope.createViewModelWithSession(): ChatViewModel {
         val viewModel = createViewModel()
         advanceUntilIdle()
+
         mockConnectionStatus.value = ConnectionStatus.CONNECTED
         mockEventsFlow.emit(WsEvent.GatewayReady(null))
         advanceUntilIdle()
-        // session.create for the initial session (req-id-3).
+
+        viewModel.createNewSession()
+        advanceUntilIdle()
+
+        // The create is the last send, so reqCount points at it.
+        val createId = "req-id-$reqCount"
         mockEventsFlow.emit(
-            WsEvent.RpcResult("req-id-3", mapOf("session_id" to "session-123")),
+            WsEvent.RpcResult(createId, mapOf("session_id" to "session-123")),
         )
         advanceUntilIdle()
+
+        check(viewModel.uiState.value.currentSessionId == "session-123") {
+            "createViewModelWithSession: live session was not installed",
+        }
         return viewModel
     }
 
-    private fun stubResumeAck(storageId: String, runtimeId: String) {
-        every {
-            HermesWsClient.send(WsMethods.SESSION_RESUME, any(), any())
-        } answers {
+    /** Capture the id of the next session.resume send so the ack can match it. */
+    private fun captureResumeRequestId() {
+        every { HermesWsClient.send(WsMethods.SESSION_RESUME, any(), any()) } answers {
             reqCount++
             val id = "req-resume-$reqCount"
+            resumeRequestId = id
             arg<((String) -> Unit)?>(2)?.invoke(id)
             id
         }
-        // Any RpcResult with id starting req-resume carries the resume payload.
-        // Emitted explicitly by the tests after the rename call.
     }
 
-    @Test
-    fun backgroundRename_resumesFirst_thenTitlesBySessionKey() =
-        runTest {
-            val viewModel = bootConnected()
-            stubResumeAck("stored-bg", "runtime-8hex")
+    // ── Tests ────────────────────────────────────────────────────────────────
 
-            // Background rename (different id from the current session).
+    @Test
+    fun backgroundRename_resumesFirst_thenTitlesByStorageKey() =
+        runTest {
+            val viewModel = createViewModelWithSession()
+            captureResumeRequestId()
+
             viewModel.renameSession("stored-bg", "New Test Name", "🧪")
             advanceUntilIdle()
 
-            // First RPC = session.resume with the queued rename.
-            io.mockk.verify {
+            // 1. Resume carries the queued rename.
+            verify {
                 HermesWsClient.send(
                     WsMethods.SESSION_RESUME,
                     mapOf("session_id" to "stored-bg", "omit_messages" to true),
@@ -184,10 +235,10 @@ class SessionRenameTest {
                 )
             }
 
-            // Resume ack: runtime id rotates, session_key stays the storage id.
+            // 2. Ack rotates the runtime id but keeps session_key = storage id.
             mockEventsFlow.emit(
                 WsEvent.RpcResult(
-                    "req-resume-2",
+                    resumeRequestId,
                     mapOf(
                         "session_id" to "runtime-8hex",
                         "message_count" to 0.0,
@@ -198,90 +249,71 @@ class SessionRenameTest {
             )
             advanceUntilIdle()
 
-            // session.title must be addressed by the STORAGE id.
-            io.mockk.verify {
+            // 3. Title addressed by the STORAGE id…
+            verify {
                 HermesWsClient.send(
                     WsMethods.SESSION_TITLE,
                     mapOf("session_id" to "stored-bg", "title" to "New Test Name"),
+                    any(),
                 )
             }
             // …and never by the rotated runtime id.
-            io.mockk.verify(exactly = 0) {
+            verify(exactly = 0) {
                 HermesWsClient.send(
                     WsMethods.SESSION_TITLE,
-                    mapOf("session_id" to "runtime-8hex", any()),
+                    mapOf("session_id" to "runtime-8hex", "title" to "New Test Name"),
+                    any(),
                 )
             }
-            // The rail reflects the new title immediately (optimistic).
+            // 4. The rail reflects the new title immediately (optimistic).
             assertEquals(
                 "New Test Name",
-                viewModel.uiState.value.sessions.first { it.id == "stored-bg" }.title,
+                viewModel.uiState.value.sessions.firstOrNull { it.id == "stored-bg" }?.title,
             )
         }
 
     @Test
-    fun backgroundRename_resumeFailure_surfacesError_andDoesNotSendTitle() =
+    fun backgroundRename_ackWithoutAddressableId_sendsNoTitle() =
         runTest {
-            val viewModel = bootConnected()
+            val viewModel = createViewModelWithSession()
+            captureResumeRequestId()
 
-            every {
-                HermesWsClient.send(WsMethods.SESSION_RESUME, any(), any())
-            } answers {
-                reqCount++
-                val id = "req-resume-fail-$reqCount"
-                arg<((String) -> Unit)?>(2)?.invoke(id)
-                id
-            }
-
-            viewModel.renameSession("stored-dead", "Never Persists", null)
+            viewModel.renameSession("stored-bg", "New Test Name", null)
             advanceUntilIdle()
 
-            // Resume fails server-side.
-            mockEventsFlow.emit(
-                WsEvent.RpcError(
-                    "req-resume-fail-3",
-                    com.m57.hermescontrol.data.ws.JsonRpcError(
-                        code = 5000,
-                        message = "resume failed: agent build exploded",
-                    ),
-                ),
-            )
+            // Ack carries NO session_id / session_key (nothing addressable).
+            mockEventsFlow.emit(WsEvent.RpcResult(resumeRequestId, emptyMap<String, Any?>()))
             advanceUntilIdle()
 
-            // No session.title may be sent after a failed resume.
-            io.mockk.verify(exactly = 0) {
-                HermesWsClient.send(eq(WsMethods.SESSION_TITLE), any(), any())
+            // No title: the cached runtime id belongs to the CURRENT session
+            // ("session-123"), so falling back to it would rename the wrong one.
+            verify(exactly = 0) {
+                HermesWsClient.send(WsMethods.SESSION_TITLE, any(), any())
             }
-            // The failure is surfaced, not silently dropped.
-            assertEquals(
-                true,
-                viewModel.uiState.value.errorMessage?.contains("session.resume") ?: false,
-            )
         }
 
     @Test
-    fun currentSessionRename_alsoResumesFirst_thenTitlesBySessionKey() =
+    fun currentSessionRename_titlesByStorageKeyFromAck() =
         runTest {
-            val viewModel = bootConnected()
-            // Current session (storage id session-123). Even the current
-            // session goes through resume: the gateway may have reaped its
-            // detached runtime, so a bare session.title 4001s.
+            val viewModel = createViewModelWithSession()
+            captureResumeRequestId()
 
             viewModel.renameSession("session-123", "Live Rename", null)
             advanceUntilIdle()
 
-            // Resume first.
-            io.mockk.verify {
+            // Even the CURRENT session resumes first — the gateway may have
+            // reaped its detached runtime, and a bare session.title would 4001.
+            verify {
                 HermesWsClient.send(
                     WsMethods.SESSION_RESUME,
                     mapOf("session_id" to "session-123", "omit_messages" to true),
                     any(),
                 )
             }
-            // Ack (live fast-path payload: session_key = session-123).
+
             mockEventsFlow.emit(
                 WsEvent.RpcResult(
-                    "req-resume-2",
+                    resumeRequestId,
                     mapOf(
                         "session_id" to "runtime-live-8hex",
                         "message_count" to 0.0,
@@ -292,26 +324,83 @@ class SessionRenameTest {
             )
             advanceUntilIdle()
 
-            // Title addressed by session_key (storage id).
-            io.mockk.verify {
+            verify {
                 HermesWsClient.send(
                     WsMethods.SESSION_TITLE,
                     mapOf("session_id" to "session-123", "title" to "Live Rename"),
+                    any(),
                 )
             }
         }
 
     @Test
+    fun currentSessionRename_fastPathAckWithoutSessionId_titlesByCachedRuntimeId() =
+        runTest {
+            val viewModel = createViewModelWithSession()
+            captureResumeRequestId()
+
+            viewModel.renameSession("session-123", "Live Rename", null)
+            advanceUntilIdle()
+
+            // Gateway fast-path payload for an already-live session: reports
+            // nothing, so neither session_id nor session_key is present. This
+            // used to silently drop the rename altogether.
+            mockEventsFlow.emit(WsEvent.RpcResult(resumeRequestId, emptyMap<String, Any?>()))
+            advanceUntilIdle()
+
+            verify {
+                HermesWsClient.send(
+                    WsMethods.SESSION_TITLE,
+                    mapOf("session_id" to "session-123", "title" to "Live Rename"),
+                    any(),
+                )
+            }
+        }
+
+    @Test
+    fun renameResumeFailure_surfacesError_andSendsNoTitle() =
+        runTest {
+            val viewModel = createViewModelWithSession()
+            captureResumeRequestId()
+
+            viewModel.renameSession("stored-dead", "Never Persists", null)
+            advanceUntilIdle()
+
+            mockEventsFlow.emit(
+                WsEvent.RpcError(
+                    resumeRequestId,
+                    JsonRpcError(
+                        code = 5000,
+                        message = "resume failed: agent build exploded",
+                    ),
+                ),
+            )
+            advanceUntilIdle()
+
+            // No title may be sent after a failed resume…
+            verify(exactly = 0) {
+                HermesWsClient.send(WsMethods.SESSION_TITLE, any(), any())
+            }
+            // …and the failure is surfaced, not silently dropped.
+            assertTrue(
+                "expected the resume failure in errorMessage, got " +
+                    viewModel.uiState.value.errorMessage,
+                viewModel.uiState.value.errorMessage?.contains("session.resume") == true,
+            )
+        }
+
+    @Test
     fun backgroundRename_doesNotHijackCurrentSession() =
         runTest {
-            val viewModel = bootConnected()
-            stubResumeAck("stored-bg", "runtime-8hex")
+            val viewModel = createViewModelWithSession()
+            captureResumeRequestId()
 
             viewModel.renameSession("stored-bg", "New Test Name", null)
             advanceUntilIdle()
+
             mockEventsFlow.emit(
                 WsEvent.RpcResult(
-                    "req-resume-2",
+                    resumeRequestId,
                     mapOf(
                         "session_id" to "runtime-8hex",
                         "session_key" to "stored-bg",
@@ -321,7 +410,7 @@ class SessionRenameTest {
             )
             advanceUntilIdle()
 
-            // The current chat must NOT be switched to the renamed session.
+            // The active chat must NOT be switched onto the renamed session.
             assertEquals("session-123", viewModel.uiState.value.currentSessionId)
         }
 }

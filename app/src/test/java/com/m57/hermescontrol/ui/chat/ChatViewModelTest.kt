@@ -1999,45 +1999,8 @@ class ChatViewModelTest {
             )
         }
 
-    @Test
-    fun testCurrentSessionRename_resumeFastPath_ackWithoutSessionId_stillFiresTitle() =
-        runTest {
-            val (viewModel, sessionId) = createViewModelWithSession()
-            // The current session has a cached runtime id.
-            viewModel.uiState.value.currentSessionId == sessionId
-            // Make every SESSION_RESUME send record its request id.
-            var resumeRequestId = ""
-            every {
-                HermesWsClient.send(WsMethods.SESSION_RESUME, any(), any())
-            } answers {
-                resumeRequestId = "resume-cached"
-                arg<((String) -> Unit)?>(2)?.invoke("resume-cached")
-                "resume-cached"
-            }
-
-            // Rename the CURRENT session.
-            viewModel.renameSession(sessionId, "Renamed Current", null)
-            advanceUntilIdle()
-
-            // The resume ack comes back with NO session_id (fast-path).
-            mockEventsFlow.emit(
-                WsEvent.RpcResult(
-                    "resume-cached",
-                    mapOf("resumed" to sessionId), // no session_key, no session_id
-                ),
-            )
-            advanceUntilIdle()
-
-            // The title must STILL fire — the fix falls back to the cached
-            // runtime id when the ack lacks one.
-            verify {
-                HermesWsClient.send(
-                    WsMethods.SESSION_TITLE,
-                    any(),
-                    any(),
-                )
-            }
-        }
+    // Rename-path coverage lives in SessionRenameTest (addressing by
+    // session_key vs cached runtime id, background-vs-current, resume failure).
 
     @Test
     fun testStaleSessionResumeRpcResult_isIgnored() =

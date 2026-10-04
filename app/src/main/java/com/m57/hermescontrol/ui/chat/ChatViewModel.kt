@@ -960,7 +960,21 @@ class ChatViewModel(
                 // just clobbered runtimeSessionId to null above — fall back to
                 // the runtime id the app already held for the current chat.
                 val ackRuntimeId = runtimeSessionId
-                val liveRuntimeId = ackRuntimeId ?: preAckRuntimeId
+                // Fallback to the cached runtime id ONLY for a current-session
+                // rename (renameOnly == false). For a BACKGROUND rename the
+                // cached id belongs to the session the user is viewing — using
+                // it would title the WRONG session. If such an ack carries no
+                // addressable id we send nothing (and log it) rather than
+                // mis-address.
+                val fallbackRuntimeId = if (!renameOnly) preAckRuntimeId else null
+                val liveRuntimeId = ackRuntimeId ?: fallbackRuntimeId
+                if (liveRuntimeId == null) {
+                    Log.w(
+                        TAG,
+                        "rename-resume ack carried no session_id/session_key for " +
+                            "requested=$requestedSessionId (renameOnly=$renameOnly) — title not sent",
+                    )
+                }
                 val renameTarget = (resultMap?.get("session_key") as? String)
                     ?: liveRuntimeId
                 if (liveRuntimeId != null && request.pendingRenameTitle != null) {
