@@ -470,7 +470,10 @@ fun ChatScreen(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AutoScrollingTitleText(
                     text = state.chatTitle,
-                    modifier = Modifier.weight(1f),
+                    // Tagged: the top bar title is the only semantics-readable
+                    // signal of which session is active (the rail's active tint
+                    // is not exposed), so the switch E2E can assert on it.
+                    modifier = Modifier.weight(1f).testTag("chat_title"),
                     style =
                         MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,

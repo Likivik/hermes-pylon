@@ -75,10 +75,23 @@ class DeleteE2eTest {
         composeRule.onNodeWithText("Delete").performClick()
         composeRule.waitForIdle()
 
-        // Rail no longer shows the deleted row.
+        // Rail no longer shows the deleted row. On its own this proves NOTHING:
+        // `deleteRailSession` drops the row locally BEFORE the gateway answers,
+        // so a refused delete (4007 unknown id / 4023 still-live with a failed
+        // close-retry) passes here too.
         composeRule.waitUntil(10_000) {
             composeRule.onAllNodesWithText("Background chat")
                 .fetchSemanticsNodes().isEmpty()
         }
+
+        // SERVER TRUTH: re-list from the gateway. A refused delete comes
+        // straight back, which is the assertion that can actually fail.
+        E2eHarness.refreshSessions(composeRule)
+        composeRule.waitUntil(15_000) {
+            composeRule.onAllNodesWithText("Background chat")
+                .fetchSemanticsNodes().isEmpty()
+        }
+        composeRule.onNodeWithText("Delete failed", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("Error (session", substring = true).assertDoesNotExist()
     }
 }

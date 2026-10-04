@@ -117,8 +117,7 @@ class RenameE2eTest {
 
         // 7. SERVER TRUTH #1: the rail refresh re-lists sessions straight from
         //    the gateway, replacing the optimistic row with the server's view.
-        composeRule.onNodeWithTag("refresh_button").performClick()
-        composeRule.waitForIdle()
+        E2eHarness.refreshSessions(composeRule)
 
         // 8. SERVER TRUTH #2: a full app restart re-reads session.list from
         //    scratch. If the title had only ever been applied optimistically,

@@ -174,5 +174,27 @@ class RailReorderE2eTest {
             composeRule.onAllNodesWithTag(lowerTag)
                 .fetchSemanticsNodes().isNotEmpty()
         }
+
+        // 8. RE-APPLY: step 6 proves the PREF was written; this proves the rail
+        //    RENDERS from it. A recreate re-reads home_order off disk, so the
+        //    order must survive outside the in-memory drag state.
+        scenario.recreate()
+        composeRule.waitUntilAtLeastOneExists(hasTestTag(lowerTag), timeoutMillis = 30_000)
+        composeRule.waitUntilAtLeastOneExists(hasTestTag(upperTag), timeoutMillis = 30_000)
+        composeRule.waitUntil(15_000) {
+            val lowY =
+                runCatching { composeRule.onNodeWithTag(lowerTag).fetchSemanticsNode().positionInRoot.y }
+                    .getOrDefault(Float.MAX_VALUE)
+            val topY =
+                runCatching { composeRule.onNodeWithTag(upperTag).fetchSemanticsNode().positionInRoot.y }
+                    .getOrDefault(Float.MIN_VALUE)
+            lowY < topY
+        }
+        val lowYAfter = composeRule.onNodeWithTag(lowerTag).fetchSemanticsNode().positionInRoot.y
+        val topYAfter = composeRule.onNodeWithTag(upperTag).fetchSemanticsNode().positionInRoot.y
+        check(lowYAfter < topYAfter) {
+            "home_order was not re-applied on the rail after recreate: " +
+                "item-low@$lowYAfter item-top@$topYAfter (expected item-low above)"
+        }
     }
 }

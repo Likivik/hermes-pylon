@@ -347,7 +347,10 @@ private fun ReorderableCollectionItemScope.RailItem(
                     Modifier
                         .size(4.dp)
                         .clip(RoundedCornerShape(2.dp))
-                        .background(MaterialTheme.colorScheme.primary),
+                        .background(MaterialTheme.colorScheme.primary)
+                        // Tagged so the pin contract (dot present ⇔ pinned) is
+                        // assertable — the E2E used to only check the popup label.
+                        .testTag("pinned_dot"),
                 )
             }
             Spacer(Modifier.height(1.dp))

@@ -283,6 +283,33 @@ object E2eHarness {
         return tag
     }
 
+    /**
+     * Tap the top-bar session refresh — the only way a test can force a
+     * session.list re-list from the gateway — and wait a BOUNDED time for that
+     * round trip to land.
+     *
+     * `waitForIdle()` drains the UI, not the socket, so a refresh-then-assert
+     * test can otherwise read the PRE-refresh rail and pass for the wrong
+     * reason (that is exactly how RenameE2eTest stayed green while every rename
+     * was rejected with a 4001 server-side). The gateway under test sits on the
+     * runner's loopback, so a short, documented settle is enough.
+     *
+     * The button is inside a merged node, so it is only reachable through the
+     * unmerged tree.
+     */
+    fun refreshSessions(
+        composeRule: ComposeTestRule,
+        settleMillis: Long = 1_500,
+    ) {
+        composeRule.onNodeWithTag("refresh_button", useUnmergedTree = true).performClick()
+        composeRule.waitForIdle()
+        val deadline = System.currentTimeMillis() + settleMillis
+        while (System.currentTimeMillis() < deadline) {
+            composeRule.waitForIdle()
+            Thread.sleep(50)
+        }
+    }
+
     private fun railItemMatcher() =
         SemanticsMatcher("rail item") { node ->
             node.config.getOrElse(SemanticsProperties.TestTag) { "" }
