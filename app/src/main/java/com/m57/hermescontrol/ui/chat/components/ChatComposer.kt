@@ -1,6 +1,5 @@
 package com.m57.hermescontrol.ui.chat.components
 
-import com.m57.hermescontrol.theme.Spacing
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -65,6 +64,7 @@ import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.Attachment
 import com.m57.hermescontrol.data.ws.CommandBlocklist
 import com.m57.hermescontrol.data.ws.CommandCatalog
+import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.chat.ChatInputPolicy
 
 /**
@@ -279,7 +279,12 @@ fun ChatInputBar(
                                 Row(
                                     modifier =
                                         Modifier
-                                            .padding(start = 12.dp, end = Spacing.xs, top = Spacing.sm, bottom = Spacing.sm)
+                                            .padding(
+                                                start = 12.dp,
+                                                end = Spacing.xs,
+                                                top = Spacing.sm,
+                                                bottom = Spacing.sm,
+                                            )
                                             .fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {

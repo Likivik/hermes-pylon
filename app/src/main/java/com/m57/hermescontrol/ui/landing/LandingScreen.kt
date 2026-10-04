@@ -1,7 +1,5 @@
 package com.m57.hermescontrol.ui.landing
 
-import com.m57.hermescontrol.theme.Spacing
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.m57.hermescontrol.R
+import com.m57.hermescontrol.theme.Spacing
 
 @Composable
 fun LandingScreen(

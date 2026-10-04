@@ -1,7 +1,5 @@
 package com.m57.hermescontrol.ui.chat.components
 
-import com.m57.hermescontrol.theme.Spacing
-
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -23,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.m57.hermescontrol.R
+import com.m57.hermescontrol.theme.Spacing
 
 /** Full-screen semi-transparent overlay shown during initial session load. */
 @Composable

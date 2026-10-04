@@ -15,8 +15,9 @@ import com.m57.hermescontrol.MainActivity
  * (`androidx.compose.ui.test.junit4.AndroidComposeTestRule.android.kt:131`).
  */
 @Suppress("DEPRECATION")
-fun e2eAndroidComposeRule(seed: () -> Unit = { E2eHarness.seedServerProfile() }):
-    AndroidComposeTestRule<E2eScenarioRule, MainActivity> {
+fun e2eAndroidComposeRule(
+    seed: () -> Unit = { E2eHarness.seedServerProfile() },
+): AndroidComposeTestRule<E2eScenarioRule, MainActivity> {
     val scenarioRule = E2eScenarioRule(seed)
     return AndroidComposeTestRule(
         activityRule = scenarioRule,

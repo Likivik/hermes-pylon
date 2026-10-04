@@ -213,8 +213,9 @@ data class SessionUi(
      * sessions; real server feeds can also emit 0).
      */
     val isStale: Boolean
-        get() = lastActive > 0 &&
-            lastActive * 1000 < System.currentTimeMillis() - STALE_THRESHOLD_MS
+        get() =
+            lastActive > 0 &&
+                lastActive * 1000 < System.currentTimeMillis() - STALE_THRESHOLD_MS
 
     companion object {
         private const val STALE_THRESHOLD_MS = 7L * 24 * 60 * 60 * 1000
@@ -864,7 +865,10 @@ class ChatViewModel(
                             lastActive = (s["started_at"] as? Double)?.toLong() ?: 0L,
                         )
                     }
-                android.util.Log.i("ChatVM", "session.list result processed: ${sessions.size} sessions: ${sessions.map { it.id }}")
+                android.util.Log.i(
+                    "ChatVM",
+                    "session.list result processed: ${sessions.size} sessions: ${sessions.map { it.id }}",
+                )
                 _uiState.update { state ->
                     val newTitle = sessions.find { s -> s.id == state.currentSessionId }?.title
                     state.copy(
@@ -936,9 +940,10 @@ class ChatViewModel(
                 // Likivik patch: a rename-resume (pendingRenameTitle != null)
                 // MUST NOT hijack the UI onto the renamed background session —
                 // it only exists to obtain a runtime id. Keep the current view.
-                val renameOnly = request.pendingRenameTitle != null &&
-                    requestedSessionId != null &&
-                    selectedSessionId != requestedSessionId
+                val renameOnly =
+                    request.pendingRenameTitle != null &&
+                        requestedSessionId != null &&
+                        selectedSessionId != requestedSessionId
                 if (!renameOnly) {
                     _uiState.update {
                         it.copy(
@@ -1660,9 +1665,10 @@ class ChatViewModel(
     // Eagerly initialize this before init{} can receive a fast gateway.ready.
     // A lazy delegate here can be observed as unassigned during construction.
     private val railPrefs = application.applicationContext.getSharedPreferences("hermes_rail", 0)
-    private val _pinnedSessionIds = MutableStateFlow(
-        railPrefs.getStringSet("pinned", emptySet())?.toSet() ?: emptySet(),
-    )
+    private val _pinnedSessionIds =
+        MutableStateFlow(
+            railPrefs.getStringSet("pinned", emptySet())?.toSet() ?: emptySet(),
+        )
     val pinnedSessionIds: StateFlow<Set<String>> = _pinnedSessionIds.asStateFlow()
 
     // ── Likivik patch: persisted rail order (drag-to-reorder). Stored as a
@@ -1673,8 +1679,10 @@ class ChatViewModel(
     val homeOrder: StateFlow<List<String>> = _homeOrder.asStateFlow()
 
     private fun loadHomeOrder(): List<String> =
-        (railPrefs.getString("home_order", null)?.takeIf { it.isNotBlank() }
-            ?.split(',')?.filter { it.isNotEmpty() }) ?: emptyList()
+        (
+            railPrefs.getString("home_order", null)?.takeIf { it.isNotBlank() }
+                ?.split(',')?.filter { it.isNotEmpty() }
+        ) ?: emptyList()
 
     /** Persist the rail's full displayed order (pinned + fresh + stale). */
     fun setRailOrder(order: List<String>) {
@@ -1683,23 +1691,22 @@ class ChatViewModel(
         _homeOrder.value = clean
     }
 
-
     // ── Likivik patch: remember the last-open session so a fresh app launch
     // resumes it instead of blindly creating a new one each time. ──
     private fun persistLastSession(id: String) {
         railPrefs.edit().putString("last_session", id).apply()
     }
 
-    private fun lastSession(): String? =
-        railPrefs.getString("last_session", null)?.takeIf { it.isNotBlank() }
+    private fun lastSession(): String? = railPrefs.getString("last_session", null)?.takeIf { it.isNotBlank() }
 
     // ── Likivik patch: per-session rail customization (icon emoji only; the
     // name shown equals the real session title, renamed via session.title) ──
     // RailMeta is a top-level model in ui/chat/RailMeta.kt.
 
-    private val _railMeta = MutableStateFlow(
-        loadRailMeta(),
-    )
+    private val _railMeta =
+        MutableStateFlow(
+            loadRailMeta(),
+        )
     val railMeta: StateFlow<Map<String, RailMeta>> = _railMeta.asStateFlow()
 
     private fun loadRailMeta(): Map<String, RailMeta> {
@@ -1713,7 +1720,10 @@ class ChatViewModel(
         return map
     }
 
-    fun saveRailMeta(sessionId: String, icon: String?) {
+    fun saveRailMeta(
+        sessionId: String,
+        icon: String?,
+    ) {
         val cleanIcon = icon?.takeIf { it.isNotEmpty() }
         if (cleanIcon == null) {
             railPrefs.edit().remove("icon_$sessionId").apply()
@@ -1729,7 +1739,11 @@ class ChatViewModel(
      * updates the header and every surface, not just the rail. Optionally sets
      * a rail icon (local decoration) in the same go.
      */
-    fun renameSession(sessionId: String, newTitle: String, icon: String?) {
+    fun renameSession(
+        sessionId: String,
+        newTitle: String,
+        icon: String?,
+    ) {
         saveRailMeta(sessionId, icon)
         // Icon-only edit (empty title = keep current): no server round-trip.
         val title = newTitle.trim().takeIf { it.isNotEmpty() }
@@ -1747,26 +1761,31 @@ class ChatViewModel(
             WsMethods.SESSION_RESUME,
             mapOf("session_id" to sessionId, "omit_messages" to true),
             onSent = { id ->
-                pendingRequests[id] = PendingRpcRequest(
-                    method = WsMethods.SESSION_RESUME,
-                    resumeSessionId = sessionId,
-                    pendingRenameTitle = title,
-                    pendingRenameIcon = icon,
-                )
+                pendingRequests[id] =
+                    PendingRpcRequest(
+                        method = WsMethods.SESSION_RESUME,
+                        resumeSessionId = sessionId,
+                        pendingRenameTitle = title,
+                        pendingRenameIcon = icon,
+                    )
             },
         )
         // Reflect immediately in the local session list.
         _uiState.update { state ->
             state.copy(
-                sessions = state.sessions.map {
-                    if (it.id == sessionId) it.copy(title = title) else it
-                },
+                sessions =
+                    state.sessions.map {
+                        if (it.id == sessionId) it.copy(title = title) else it
+                    },
                 chatTitle = if (state.currentSessionId == sessionId) title else state.chatTitle,
             )
         }
     }
 
-    private fun sendSessionTitle(runtimeSessionId: String, title: String) {
+    private fun sendSessionTitle(
+        runtimeSessionId: String,
+        title: String,
+    ) {
         viewModelScope.launch(Dispatchers.IO) {
             wsClient.send(
                 WsMethods.SESSION_TITLE,
@@ -1809,7 +1828,10 @@ class ChatViewModel(
         )
     }
 
-    private fun sendCloseSession(runtimeSessionId: String, storedId: String) {
+    private fun sendCloseSession(
+        runtimeSessionId: String,
+        storedId: String,
+    ) {
         wsClient.send(
             WsMethods.SESSION_CLOSE,
             mapOf("session_id" to runtimeSessionId),
@@ -1823,7 +1845,10 @@ class ChatViewModel(
         )
     }
 
-    private fun sendDeleteSession(storedId: String, retried: Boolean = false) {
+    private fun sendDeleteSession(
+        storedId: String,
+        retried: Boolean = false,
+    ) {
         wsClient.send(
             WsMethods.SESSION_DELETE,
             mapOf("session_id" to storedId),
@@ -1839,11 +1864,12 @@ class ChatViewModel(
     }
 
     fun togglePinSession(sessionId: String) {
-        val next = if (sessionId in _pinnedSessionIds.value) {
-            _pinnedSessionIds.value - sessionId
-        } else {
-            _pinnedSessionIds.value + sessionId
-        }
+        val next =
+            if (sessionId in _pinnedSessionIds.value) {
+                _pinnedSessionIds.value - sessionId
+            } else {
+                _pinnedSessionIds.value + sessionId
+            }
         railPrefs.edit().putStringSet("pinned", next).apply()
         _pinnedSessionIds.value = next
     }
@@ -3531,10 +3557,11 @@ class ChatViewModel(
         if (transient) {
             _uiState.update { it.copy(statusPill = text) }
             statusPillJob?.cancel()
-            statusPillJob = viewModelScope.launch {
-                kotlinx.coroutines.delay(2500)
-                _uiState.update { it.copy(statusPill = null) }
-            }
+            statusPillJob =
+                viewModelScope.launch {
+                    kotlinx.coroutines.delay(2500)
+                    _uiState.update { it.copy(statusPill = null) }
+                }
             return
         }
         val msg = ChatMessage(role = MessageRole.SYSTEM, content = text)

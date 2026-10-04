@@ -1,7 +1,5 @@
 package com.m57.hermescontrol.ui.chat.components
 
-import com.m57.hermescontrol.theme.Spacing
-
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.m57.hermescontrol.theme.Spacing
 
 /**
  * Bottom toolbar row for the chat composer.

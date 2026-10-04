@@ -1,7 +1,5 @@
 package com.m57.hermescontrol.ui.chat
 
-import com.m57.hermescontrol.theme.Spacing
-
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -47,6 +45,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.m57.hermescontrol.R
+import com.m57.hermescontrol.theme.Spacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext

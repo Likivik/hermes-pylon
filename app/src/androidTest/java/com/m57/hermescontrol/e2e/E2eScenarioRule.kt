@@ -78,7 +78,10 @@ class E2eScenarioRule(
     /** Exposed for `AndroidComposeTestRule.activityProvider`. */
     val scenario: androidx.test.core.app.ActivityScenario<MainActivity> get() = delegate.scenario
 
-    override fun apply(base: Statement, description: Description): Statement =
+    override fun apply(
+        base: Statement,
+        description: Description,
+    ): Statement =
         object : Statement() {
             override fun evaluate() {
                 // Seed BEFORE the delegate launches the activity. Both the

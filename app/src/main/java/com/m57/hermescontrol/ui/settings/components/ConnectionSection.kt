@@ -2,8 +2,6 @@
 
 package com.m57.hermescontrol.ui.settings.components
 
-import com.m57.hermescontrol.theme.Spacing
-
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -41,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.config.resolveBaseUrl
+import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.settings.SectionCard
 import com.m57.hermescontrol.ui.settings.SettingsUiState
 import com.m57.hermescontrol.ui.settings.SettingsViewModel

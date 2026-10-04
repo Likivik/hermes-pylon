@@ -2,8 +2,6 @@
 
 package com.m57.hermescontrol.ui.chat.components
 
-import com.m57.hermescontrol.theme.Spacing
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +24,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.m57.hermescontrol.R
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
+import com.m57.hermescontrol.theme.Spacing
 import java.util.Locale
 import kotlin.math.min
 

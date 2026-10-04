@@ -1,7 +1,5 @@
 package com.m57.hermescontrol.ui.chat.components
 
-import com.m57.hermescontrol.theme.Spacing
-
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,6 +15,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.m57.hermescontrol.R
+import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.chat.SystemTimelineEvent
 
 @StringRes

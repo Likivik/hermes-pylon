@@ -2,8 +2,6 @@
 
 package com.m57.hermescontrol.ui.connect
 
-import com.m57.hermescontrol.theme.Spacing
-
 import android.app.Application
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -61,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.m57.hermescontrol.R
+import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.PressureBanner
 
 @Composable

@@ -1,7 +1,5 @@
 package com.m57.hermescontrol.ui.profiles.components
 
-import com.m57.hermescontrol.theme.Spacing
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -52,6 +50,7 @@ import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.CreateProfileRequest
 import com.m57.hermescontrol.data.model.McpServerConfigInput
 import com.m57.hermescontrol.data.model.ModelProvider
+import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.profiles.ProfilesUiState
 import com.m57.hermescontrol.ui.profiles.ProfilesViewModel
 

@@ -67,7 +67,6 @@ internal data class SourcedWsEvent(
  * as well as direct callbacks.
  */
 object HermesWsClient {
-
     /** E2E: when non-blank, WS connects here instead of AuthManager.wsUrl(). */
     @Volatile
     var e2eWsOverride: String? = null
@@ -676,7 +675,11 @@ object HermesWsClient {
                     Log.d(TAG, "send direct ok id=$id method=$method")
                 } else {
                     if (webSocket !== ws || !acceptQueuedMessages.get()) {
-                        Log.w(TAG, "send identity-change drop id=$id method=$method wsMatches=${webSocket === ws} accept=${acceptQueuedMessages.get()}")
+                        Log.w(
+                            TAG,
+                            "send identity-change drop id=$id method=$method " +
+                                "wsMatches=${webSocket === ws} accept=${acceptQueuedMessages.get()}",
+                        )
                     } else if (isRetryableMessage(json)) {
                         Log.w(TAG, "WS rejected outgoing message — queuing for reconnect")
                         messageQueue.add(json)
@@ -892,8 +895,10 @@ object HermesWsClient {
                     } else {
                         base
                     }
-                } ?: (ticketResult.ticket?.let(AuthManager::wsUrlWithCredential)
-                    ?: AuthManager.wsUrl())
+                } ?: (
+                    ticketResult.ticket?.let(AuthManager::wsUrlWithCredential)
+                        ?: AuthManager.wsUrl()
+                )
             } catch (e: IllegalArgumentException) {
                 Log.w(TAG, "WebSocket blocked by transport policy")
                 synchronized(connectionLock) {
@@ -902,7 +907,12 @@ object HermesWsClient {
                 }
                 return
             }
-        if (BuildConfig.DEBUG) Log.d(TAG, "Connecting to WebSocket endpoint: $url override=${!e2eWsOverride.isNullOrBlank()}")
+        if (BuildConfig.DEBUG) {
+            Log.d(
+                TAG,
+                "Connecting to WebSocket endpoint: $url override=${!e2eWsOverride.isNullOrBlank()}",
+            )
+        }
 
         val request = Request.Builder().url(url).build()
         var restartForProfileChange = false

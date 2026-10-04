@@ -14,14 +14,14 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 
 /**
  * Server-side log filters, mirroring the desktop dashboard's LogsPage
@@ -128,8 +128,9 @@ class LogsViewModel(
             var failed = false
             withContext(ioDispatcher) {
                 val dir = CrashLogger.getLogDirectory()
-                val files = dir?.listFiles()?.filter { it.isFile }?.sortedBy { it.lastModified() }
-                    ?: emptyList()
+                val files =
+                    dir?.listFiles()?.filter { it.isFile }?.sortedBy { it.lastModified() }
+                        ?: emptyList()
                 if (files.isEmpty()) {
                     failed = true
                 } else {
@@ -138,14 +139,19 @@ class LogsViewModel(
                             safeApiCall {
                                 val pathBody = "logs/${file.name}".toRequestBody("text/plain".toMediaTypeOrNull())
                                 val overwriteBody = "true".toRequestBody("text/plain".toMediaTypeOrNull())
-                                val part = MultipartBody.Part.createFormData(
-                                    "file",
-                                    file.name,
-                                    file.asRequestBody("text/plain".toMediaTypeOrNull()),
-                                )
+                                val part =
+                                    MultipartBody.Part.createFormData(
+                                        "file",
+                                        file.name,
+                                        file.asRequestBody("text/plain".toMediaTypeOrNull()),
+                                    )
                                 ApiClient.hermesApi.uploadManagedFileStream(pathBody, overwriteBody, part)
                             }
-                        if (result is com.m57.hermescontrol.data.remote.NetworkResult.Success) uploaded++ else failed = true
+                        if (result is com.m57.hermescontrol.data.remote.NetworkResult.Success) {
+                            uploaded++
+                        } else {
+                            failed = true
+                        }
                     }
                 }
             }

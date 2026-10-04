@@ -74,16 +74,17 @@ object E2eHarness {
         // URL before launch, so no placeholder is needed here — a placeholder to
         // 9119 caused a doomed first connect (e2e-37 log: ConnectException to
         // ws://127.0.0.1:9119/ws before the real socket opened).
-        val profile = ConnectionProfile(
-            id = AuthManager.DEFAULT_PROFILE_ID,
-            name = "E2E",
-            baseUrl = baseUrl,
-            // "token", NOT "ticket": a ticket profile puts openSocket into gated mode,
-            // which POSTs api/auth/ws-ticket to a server that does not exist in the
-            // test env, yielding TRANSIENT_FAILURE and a deferred socket — the WS
-            // override is never reached. "token" takes the non-gated path where
-            // the offline refresh is best-effort, so the override URL wins.
-        )
+        val profile =
+            ConnectionProfile(
+                id = AuthManager.DEFAULT_PROFILE_ID,
+                name = "E2E",
+                baseUrl = baseUrl,
+                // "token", NOT "ticket": a ticket profile puts openSocket into gated mode,
+                // which POSTs api/auth/ws-ticket to a server that does not exist in the
+                // test env, yielding TRANSIENT_FAILURE and a deferred socket — the WS
+                // override is never reached. "token" takes the non-gated path where
+                // the offline refresh is best-effort, so the override URL wins.
+            )
         AuthManager.saveConnectionProfilesAndSelect(
             profiles = listOf(profile),
             profileId = AuthManager.DEFAULT_PROFILE_ID,
@@ -120,9 +121,9 @@ object E2eHarness {
      *     `HermesWsClient.openSocket()` mints a ws-ticket via
      *     `POST /api/auth/ws-ticket` (carrying the session cookie from step 1).
      *     3. Set `HermesWsClient.e2eWsOverride = baseUrl + "/api/ws"`. The override
-         *        is a BASE url — `openSocket()` appends `?ticket=<minted>` when a
-         *        ticket was just minted in gated mode, so the real `/api/ws` rejects
-         *        unauthenticated handshakes.
+     *        is a BASE url — `openSocket()` appends `?ticket=<minted>` when a
+     *        ticket was just minted in gated mode, so the real `/api/ws` rejects
+     *        unauthenticated handshakes.
      */
     fun seedRealGatewayProfile(
         baseUrl: String = "http://10.0.2.2:8642/",
@@ -240,11 +241,12 @@ object E2eHarness {
     fun waitForFirstRailItemOrNull(
         composeRule: ComposeTestRule,
         timeoutMillis: Long = 15_000,
-    ): String? = try {
-        waitForRailItemAt(composeRule, 0, timeoutMillis)
-    } catch (t: Throwable) {
-        null
-    }
+    ): String? =
+        try {
+            waitForRailItemAt(composeRule, 0, timeoutMillis)
+        } catch (t: Throwable) {
+            null
+        }
 
     /**
      * Number of currently rendered rail_item_ nodes. Used by

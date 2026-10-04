@@ -2,7 +2,6 @@
 
 package com.m57.hermescontrol.ui.chat
 
-import com.m57.hermescontrol.theme.Spacing
 import android.Manifest
 import android.app.Activity
 import android.content.Intent
@@ -22,16 +21,15 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -47,18 +45,18 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -70,9 +68,9 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -91,6 +89,7 @@ import com.m57.hermescontrol.data.model.capabilitiesFor
 import com.m57.hermescontrol.data.ws.ConnectionStatus
 import com.m57.hermescontrol.data.ws.HermesWsClient
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
+import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.chat.components.ChatConnectionBanner
 import com.m57.hermescontrol.ui.chat.components.ChatInputBar
 import com.m57.hermescontrol.ui.chat.components.ChatLifecycleEffects
@@ -100,9 +99,6 @@ import com.m57.hermescontrol.ui.chat.components.ChatScrollToBottomFab
 import com.m57.hermescontrol.ui.chat.components.ChatTimelineNoPrefetchStrategy
 import com.m57.hermescontrol.ui.chat.components.ContextUsageChip
 import com.m57.hermescontrol.ui.chat.components.ContextUsageDialog
-import com.m57.hermescontrol.ui.chat.rail.RailEvent
-import com.m57.hermescontrol.ui.chat.rail.RailUiModel
-import com.m57.hermescontrol.ui.chat.rail.SessionRail
 import com.m57.hermescontrol.ui.chat.components.ReactionHeartsOverlay
 import com.m57.hermescontrol.ui.chat.components.ReloginDialog
 import com.m57.hermescontrol.ui.chat.components.SearchBarRow
@@ -111,6 +107,9 @@ import com.m57.hermescontrol.ui.chat.components.SubagentInspectionSheet
 import com.m57.hermescontrol.ui.chat.components.chatListItemCount
 import com.m57.hermescontrol.ui.chat.components.rememberChatScrollController
 import com.m57.hermescontrol.ui.chat.components.tailContentKey
+import com.m57.hermescontrol.ui.chat.rail.RailEvent
+import com.m57.hermescontrol.ui.chat.rail.RailUiModel
+import com.m57.hermescontrol.ui.chat.rail.SessionRail
 import com.m57.hermescontrol.ui.common.AutoScrollingTitleText
 import com.m57.hermescontrol.ui.common.CredentialWarningBanner
 import com.m57.hermescontrol.ui.common.HermesScaffold
@@ -562,15 +561,16 @@ fun ChatScreen(
         var reordering by rememberSaveable { mutableStateOf(false) }
         Row(modifier = Modifier.fillMaxSize()) {
             SessionRail(
-                state = RailUiModel(
-                    sessions = state.sessions,
-                    currentSessionId = state.currentSessionId,
-                    pinnedSessionIds = pinnedIds,
-                    railMeta = railMeta,
-                    order = homeOrder,
-                    archiveOpen = archiveOpen,
-                    reordering = reordering,
-                ),
+                state =
+                    RailUiModel(
+                        sessions = state.sessions,
+                        currentSessionId = state.currentSessionId,
+                        pinnedSessionIds = pinnedIds,
+                        railMeta = railMeta,
+                        order = homeOrder,
+                        archiveOpen = archiveOpen,
+                        reordering = reordering,
+                    ),
                 onEvent = { event ->
                     when (event) {
                         is RailEvent.Switch -> viewModel.switchSession(event.sessionId)
@@ -587,259 +587,259 @@ fun ChatScreen(
                     }
                 },
             )
-        Column(
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .fillMaxSize()
-                    .background(backgroundGradient)
-                    .imePadding(),
-        ) {
-            // Brand accent: thin Hermes-purple gradient hairline under the TopBar.
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(2.dp)
-                    .background(
-                        androidx.compose.ui.graphics.Brush.horizontalGradient(
-                            listOf(
-                                com.m57.hermescontrol.theme.HermesPurple,
-                                com.m57.hermescontrol.theme.HermesPurpleLight,
-                                com.m57.hermescontrol.theme.HermesPurple,
-                            ),
-                        ),
-                    ),
-            )
-            ChatConnectionBanner(
-                connectionStatus = state.connectionStatus,
-                onReconnect = viewModel::reconnect,
-                onReloginClick = { showReloginDialog = true },
-            )
-
-            visibleCredentialWarning?.let { warning ->
-                CredentialWarningBanner(
-                    warning = warning,
-                    onFix = { NavigationController.navigateTo(com.m57.hermescontrol.ProvidersScreen) },
-                    onDismiss = { HermesWsClient.clearCredentialWarning() },
-                )
-            }
-
-            AnimatedVisibility(
-                visible = state.isSearchActive,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut(),
-            ) {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    tonalElevation = 2.dp,
-                    border =
-                        BorderStroke(
-                            width = 1.dp,
-                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
-                        ),
-                ) {
-                    Box(modifier = Modifier.padding(horizontal = 12.dp, vertical = Spacing.sm)) {
-                        SearchBarRow(
-                            searchQuery = state.searchQuery,
-                            onQueryChange = { viewModel.setSearchQuery(it) },
-                            searchMatchCount = state.searchMatchIndices.size,
-                            currentMatchIndex = state.currentSearchMatchIndex,
-                            onNavigateUp = { viewModel.navigateSearchMatch(-1) },
-                            onNavigateDown = { viewModel.navigateSearchMatch(1) },
-                            onClose = { viewModel.clearSearch() },
-                        )
-                    }
-                }
-            }
-
-            StickySubagentBar(
-                indicators = state.subagentIndicators,
-                todos = state.todos,
-                onClick = {
-                    showSubagentInspectionSheet = true
-                    scrollController.resumeFollowing()
-                },
-            )
-
-            Box(
+            Column(
                 modifier =
                     Modifier
                         .weight(1f)
-                        .fillMaxWidth(),
+                        .fillMaxSize()
+                        .background(backgroundGradient)
+                        .imePadding(),
             ) {
-                // Likivik patch: status pill as an overlay on the message list,
-                // NOT in the column flow — so it floats over the messages and
-                // never reflows/bumps the list when it appears or dismisses.
-                androidx.compose.runtime.remember(state.statusPill) {
-                    state.statusPill
-                }?.let { pill ->
-                    Box(
-                        modifier =
-                            Modifier
-                                .align(Alignment.TopCenter)
-                                .fillMaxWidth()
-                                .padding(horizontal = Spacing.md, vertical = Spacing.xs),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Surface(
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
-                            tonalElevation = 1.dp,
-                        ) {
-                            Text(
-                                text = pill,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = Spacing.xs),
-                            )
-                        }
-                    }
-                }
-                ChatMessageList(
-                    messages = state.messages,
-                    streamingMessage = streamingState.streamingMessage,
-                    isThinking = streamingState.isThinking,
-                    thinkingText = streamingState.thinkingText,
-                    isSearchActive = state.isSearchActive,
-                    searchQuery = state.searchQuery,
-                    currentSearchMatchIndex = state.currentSearchMatchIndex,
-                    searchMatchIndices = state.searchMatchIndices,
-                    typingEffectEnabled = state.typingEffectEnabled,
-                    typingEffectDelayMs = state.typingEffectDelayMs,
-                    isLoading = state.isLoading,
-                    isLoadingOlder = state.isLoadingOlder,
-                    isDark = isDark,
-                    listState = listState,
-                    lastAnimatedMessageId = lastAnimatedMessageId,
-                    onLastAnimatedMessageIdChange = { lastAnimatedMessageId = it },
-                    onRespondApproval = viewModel::respondToApproval,
-                    onOpenAttachment = viewModel::openAttachment,
-                    openingAttachmentPath = state.openingAttachmentPath,
-                    clarifyRequest = state.clarifyRequest,
-                    onRespondClarify = viewModel::respondToClarify,
-                    onDismissClarify = viewModel::dismissClarify,
-                    onImageClick = { viewingImage = it },
+                // Brand accent: thin Hermes-purple gradient hairline under the TopBar.
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(2.dp)
+                        .background(
+                            androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                listOf(
+                                    com.m57.hermescontrol.theme.HermesPurple,
+                                    com.m57.hermescontrol.theme.HermesPurpleLight,
+                                    com.m57.hermescontrol.theme.HermesPurple,
+                                ),
+                            ),
+                        ),
+                )
+                ChatConnectionBanner(
+                    connectionStatus = state.connectionStatus,
+                    onReconnect = viewModel::reconnect,
+                    onReloginClick = { showReloginDialog = true },
                 )
 
-                // Loading overlay
-                ChatLoadingOverlay(isLoading = state.isLoading)
-
-                // Scroll-to-bottom FAB (issue #682): shows while follow is
-                // paused and renders the unseen-message badge.
-                ChatScrollToBottomFab(
-                    show = showScrollToBottom,
-                    pendingCount = scrollController.pendingCount,
-                    onScrollToBottom = scrollController::resumeFollowing,
-                )
-
-                // Reaction heartsanimation (purely cosmetic — fades out
-                // automatically after the ViewModel clears the state)
-                key(state.reactionTriggerId) {
-                    ReactionHeartsOverlay(
-                        reactionKind = state.reactionKind,
+                visibleCredentialWarning?.let { warning ->
+                    CredentialWarningBanner(
+                        warning = warning,
+                        onFix = { NavigationController.navigateTo(com.m57.hermescontrol.ProvidersScreen) },
+                        onDismiss = { HermesWsClient.clearCredentialWarning() },
                     )
                 }
-            }
 
-            val contextWindow = state.contextWindowTokens()
-            ContextUsageChip(
-                usedTokens = state.contextUsage?.usedTokens,
-                fullTokens = contextWindow,
-                onClick = viewModel::openContextDetail,
-            )
-
-            ChatInputBar(
-                inputFieldValue = inputFieldValue,
-                onInputChange = { inputFieldValue = it },
-                onSend = {
-                    if (viewModel.sendMessage(inputFieldValue.text)) {
-                        inputFieldValue = TextFieldValue("")
-                        // Jump to bottom after send (serialized through the controller).
-                        scrollController.jumpToBottom(animated = true)
-                    }
-                },
-                onMicTap = {
-                    if (isListening) {
-                        isListening = false
-                    } else if (
-                        ContextCompat.checkSelfPermission(
-                            context,
-                            Manifest.permission.RECORD_AUDIO,
-                        ) == PackageManager.PERMISSION_GRANTED
+                AnimatedVisibility(
+                    visible = state.isSearchActive,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut(),
+                ) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        tonalElevation = 2.dp,
+                        border =
+                            BorderStroke(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
+                            ),
                     ) {
-                        if (SpeechRecognizer.isRecognitionAvailable(context)) {
-                            val intent =
-                                Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                                    putExtra(
-                                        RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                                        RecognizerIntent.LANGUAGE_MODEL_FREE_FORM,
-                                    )
-                                    putExtra(
-                                        RecognizerIntent.EXTRA_PROMPT,
-                                        micListeningPrompt,
-                                    )
-                                }
-                            isListening = true
-                            speechLauncher.launch(intent)
-                        } else {
-                            scrollScope.launch {
-                                snackbarHostState.showSnackbar(sttNotAvailableMsg)
+                        Box(modifier = Modifier.padding(horizontal = 12.dp, vertical = Spacing.sm)) {
+                            SearchBarRow(
+                                searchQuery = state.searchQuery,
+                                onQueryChange = { viewModel.setSearchQuery(it) },
+                                searchMatchCount = state.searchMatchIndices.size,
+                                currentMatchIndex = state.currentSearchMatchIndex,
+                                onNavigateUp = { viewModel.navigateSearchMatch(-1) },
+                                onNavigateDown = { viewModel.navigateSearchMatch(1) },
+                                onClose = { viewModel.clearSearch() },
+                            )
+                        }
+                    }
+                }
+
+                StickySubagentBar(
+                    indicators = state.subagentIndicators,
+                    todos = state.todos,
+                    onClick = {
+                        showSubagentInspectionSheet = true
+                        scrollController.resumeFollowing()
+                    },
+                )
+
+                Box(
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                ) {
+                    // Likivik patch: status pill as an overlay on the message list,
+                    // NOT in the column flow — so it floats over the messages and
+                    // never reflows/bumps the list when it appears or dismisses.
+                    androidx.compose.runtime.remember(state.statusPill) {
+                        state.statusPill
+                    }?.let { pill ->
+                        Box(
+                            modifier =
+                                Modifier
+                                    .align(Alignment.TopCenter)
+                                    .fillMaxWidth()
+                                    .padding(horizontal = Spacing.md, vertical = Spacing.xs),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Surface(
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
+                                tonalElevation = 1.dp,
+                            ) {
+                                Text(
+                                    text = pill,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = Spacing.xs),
+                                )
                             }
                         }
-                    } else {
-                        micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                     }
-                },
-                isListening = isListening,
-                isAgentTyping = state.isAgentTyping,
-                isConnected = state.isConnected,
-                isSessionReady = state.isSessionReady,
-                commandCatalog = state.commandCatalog,
-                slashUsageCounts = state.slashUsageCounts,
-                pendingAttachments = state.pendingAttachments,
-                onCameraTap = {
-                    try {
-                        val timeStamp =
-                            SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-                        val photoFile =
-                            File.createTempFile("camera_${timeStamp}_", ".jpg", context.cacheDir)
-                        val uri =
-                            FileProvider.getUriForFile(
+                    ChatMessageList(
+                        messages = state.messages,
+                        streamingMessage = streamingState.streamingMessage,
+                        isThinking = streamingState.isThinking,
+                        thinkingText = streamingState.thinkingText,
+                        isSearchActive = state.isSearchActive,
+                        searchQuery = state.searchQuery,
+                        currentSearchMatchIndex = state.currentSearchMatchIndex,
+                        searchMatchIndices = state.searchMatchIndices,
+                        typingEffectEnabled = state.typingEffectEnabled,
+                        typingEffectDelayMs = state.typingEffectDelayMs,
+                        isLoading = state.isLoading,
+                        isLoadingOlder = state.isLoadingOlder,
+                        isDark = isDark,
+                        listState = listState,
+                        lastAnimatedMessageId = lastAnimatedMessageId,
+                        onLastAnimatedMessageIdChange = { lastAnimatedMessageId = it },
+                        onRespondApproval = viewModel::respondToApproval,
+                        onOpenAttachment = viewModel::openAttachment,
+                        openingAttachmentPath = state.openingAttachmentPath,
+                        clarifyRequest = state.clarifyRequest,
+                        onRespondClarify = viewModel::respondToClarify,
+                        onDismissClarify = viewModel::dismissClarify,
+                        onImageClick = { viewingImage = it },
+                    )
+
+                    // Loading overlay
+                    ChatLoadingOverlay(isLoading = state.isLoading)
+
+                    // Scroll-to-bottom FAB (issue #682): shows while follow is
+                    // paused and renders the unseen-message badge.
+                    ChatScrollToBottomFab(
+                        show = showScrollToBottom,
+                        pendingCount = scrollController.pendingCount,
+                        onScrollToBottom = scrollController::resumeFollowing,
+                    )
+
+                    // Reaction heartsanimation (purely cosmetic — fades out
+                    // automatically after the ViewModel clears the state)
+                    key(state.reactionTriggerId) {
+                        ReactionHeartsOverlay(
+                            reactionKind = state.reactionKind,
+                        )
+                    }
+                }
+
+                val contextWindow = state.contextWindowTokens()
+                ContextUsageChip(
+                    usedTokens = state.contextUsage?.usedTokens,
+                    fullTokens = contextWindow,
+                    onClick = viewModel::openContextDetail,
+                )
+
+                ChatInputBar(
+                    inputFieldValue = inputFieldValue,
+                    onInputChange = { inputFieldValue = it },
+                    onSend = {
+                        if (viewModel.sendMessage(inputFieldValue.text)) {
+                            inputFieldValue = TextFieldValue("")
+                            // Jump to bottom after send (serialized through the controller).
+                            scrollController.jumpToBottom(animated = true)
+                        }
+                    },
+                    onMicTap = {
+                        if (isListening) {
+                            isListening = false
+                        } else if (
+                            ContextCompat.checkSelfPermission(
                                 context,
-                                "${context.packageName}.fileprovider",
-                                photoFile,
+                                Manifest.permission.RECORD_AUDIO,
+                            ) == PackageManager.PERMISSION_GRANTED
+                        ) {
+                            if (SpeechRecognizer.isRecognitionAvailable(context)) {
+                                val intent =
+                                    Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                        putExtra(
+                                            RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                                            RecognizerIntent.LANGUAGE_MODEL_FREE_FORM,
+                                        )
+                                        putExtra(
+                                            RecognizerIntent.EXTRA_PROMPT,
+                                            micListeningPrompt,
+                                        )
+                                    }
+                                isListening = true
+                                speechLauncher.launch(intent)
+                            } else {
+                                scrollScope.launch {
+                                    snackbarHostState.showSnackbar(sttNotAvailableMsg)
+                                }
+                            }
+                        } else {
+                            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        }
+                    },
+                    isListening = isListening,
+                    isAgentTyping = state.isAgentTyping,
+                    isConnected = state.isConnected,
+                    isSessionReady = state.isSessionReady,
+                    commandCatalog = state.commandCatalog,
+                    slashUsageCounts = state.slashUsageCounts,
+                    pendingAttachments = state.pendingAttachments,
+                    onCameraTap = {
+                        try {
+                            val timeStamp =
+                                SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+                            val photoFile =
+                                File.createTempFile("camera_${timeStamp}_", ".jpg", context.cacheDir)
+                            val uri =
+                                FileProvider.getUriForFile(
+                                    context,
+                                    "${context.packageName}.fileprovider",
+                                    photoFile,
+                                )
+                            pendingCameraUri = uri
+                            cameraLauncher.launch(uri)
+                        } catch (e: Exception) {
+                            Log.e(
+                                "ChatScreen",
+                                "Camera launch failed (${e.javaClass.simpleName})",
                             )
-                        pendingCameraUri = uri
-                        cameraLauncher.launch(uri)
-                    } catch (e: Exception) {
-                        Log.e(
-                            "ChatScreen",
-                            "Camera launch failed (${e.javaClass.simpleName})",
-                        )
-                    }
-                },
-                onImageTap = { filePickerLauncher.launch("image/*") },
-                onFileTap = { filePickerLauncher.launch("*/*") },
-                onRemoveAttachment = viewModel::removeAttachment,
-                onPreviewAttachment = { attachment ->
-                    viewingImage =
-                        ImageViewerModel(
-                            model = attachment.uri,
-                            name = attachment.name,
-                            mimeType = attachment.mimeType,
-                        )
-                },
-                // Composer toolbar wiring (PR 1)
-                currentSessionModel = state.currentSessionModel,
-                reasoningLevel = state.reasoningLevel,
-                canDisableReasoning =
-                    currentModelCapabilities?.can_disable_reasoning,
-                supportsReasoning = currentModelCapabilities?.reasoning,
-                onModelTap = { viewModel.openModelPicker() },
-                onReasoningTap = { level -> viewModel.setReasoningLevel(level) },
-            )
-        }
+                        }
+                    },
+                    onImageTap = { filePickerLauncher.launch("image/*") },
+                    onFileTap = { filePickerLauncher.launch("*/*") },
+                    onRemoveAttachment = viewModel::removeAttachment,
+                    onPreviewAttachment = { attachment ->
+                        viewingImage =
+                            ImageViewerModel(
+                                model = attachment.uri,
+                                name = attachment.name,
+                                mimeType = attachment.mimeType,
+                            )
+                    },
+                    // Composer toolbar wiring (PR 1)
+                    currentSessionModel = state.currentSessionModel,
+                    reasoningLevel = state.reasoningLevel,
+                    canDisableReasoning =
+                        currentModelCapabilities?.can_disable_reasoning,
+                    supportsReasoning = currentModelCapabilities?.reasoning,
+                    onModelTap = { viewModel.openModelPicker() },
+                    onReasoningTap = { level -> viewModel.setReasoningLevel(level) },
+                )
+            }
         } // Likivik patch: close the rail Row
 
         if (showReloginDialog) {

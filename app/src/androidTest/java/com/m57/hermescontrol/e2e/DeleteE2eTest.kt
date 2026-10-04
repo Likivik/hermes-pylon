@@ -36,7 +36,6 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 @OptIn(ExperimentalTestApi::class)
 class DeleteE2eTest {
-
     @get:Rule(order = 0)
     val permissionRule: GrantPermissionRule =
         GrantPermissionRule.grant(android.Manifest.permission.POST_NOTIFICATIONS)
@@ -57,8 +56,12 @@ class DeleteE2eTest {
 
     @Test
     fun deleteBackgroundSession_removesFromRail() {
-        val password = E2eHarness.realGatewayPasswordFromArgs()
-            ?: error("e2ePassword not set — CI must pass -Pandroid.testInstrumentationRunnerArguments.e2ePassword=${'$'}E2E_PASS")
+        val password =
+            E2eHarness.realGatewayPasswordFromArgs()
+                ?: error(
+                    "e2ePassword not set — CI must pass " +
+                        "-Pandroid.testInstrumentationRunnerArguments.e2ePassword=${'$'}E2E_PASS",
+                )
 
         E2eHarness.resetStateForTest()
         E2eHarness.seedRealGatewayProfile(password = password)
@@ -99,6 +102,5 @@ class DeleteE2eTest {
     }
 
     /** Rows currently rendered under [tag] (0 = the row is gone). */
-    private fun railRowCount(tag: String): Int =
-        composeRule.onAllNodesWithTag(tag).fetchSemanticsNodes().size
+    private fun railRowCount(tag: String): Int = composeRule.onAllNodesWithTag(tag).fetchSemanticsNodes().size
 }

@@ -1,75 +1,76 @@
 package com.m57.hermescontrol
 
-import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import com.android.tools.screenshot.PreviewTest
-import androidx.compose.ui.tooling.preview.Preview
-import com.m57.hermescontrol.theme.HermesControlTheme
-import com.m57.hermescontrol.theme.ThemePreset
-import com.m57.hermescontrol.theme.ThemePreference
-import com.m57.hermescontrol.ui.chat.SessionUi
-import com.m57.hermescontrol.ui.chat.RailMeta
-import com.m57.hermescontrol.ui.chat.rail.RailUiModel
-import com.m57.hermescontrol.ui.chat.rail.SessionRail as RailComposable
-
-import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import com.android.tools.screenshot.PreviewTest
 import com.m57.hermescontrol.data.ws.CommandCatalog
+import com.m57.hermescontrol.theme.HermesControlTheme
+import com.m57.hermescontrol.theme.ThemePreference
+import com.m57.hermescontrol.theme.ThemePreset
 import com.m57.hermescontrol.ui.chat.ChatMessage
 import com.m57.hermescontrol.ui.chat.MessageRole
-import com.m57.hermescontrol.ui.chat.components.ChatMessageList
+import com.m57.hermescontrol.ui.chat.RailMeta
+import com.m57.hermescontrol.ui.chat.SessionUi
 import com.m57.hermescontrol.ui.chat.components.ChatInputBar
+import com.m57.hermescontrol.ui.chat.components.ChatMessageList
+import com.m57.hermescontrol.ui.chat.rail.RailUiModel
+import com.m57.hermescontrol.ui.chat.rail.SessionRail as RailComposable
 
-private val FakeSessions = listOf(
-    SessionUi(id = "s1", title = "ADHD support", messageCount = 4),
-    SessionUi(id = "s2", title = "RP app", messageCount = 1),
-    SessionUi(id = "s3", title = "Hermes", messageCount = 2),
-    SessionUi(id = "s4", title = "memory", messageCount = 2),
-    SessionUi(id = "s5", title = "serenity", messageCount = 0),
-    SessionUi(id = "s6", title = "Plan SillyTavern alternative with research", messageCount = 0),
-    SessionUi(id = "s7", title = "Design aspect ADHD support", messageCount = 12),
-    SessionUi(id = "s8", title = "Move Erebus backup", messageCount = 8),
-    SessionUi(id = "s9", title = "Передать Кириллу ключи", messageCount = 3),
-    SessionUi(id = "s10", title = "Test drag reorder", messageCount = 1),
-    SessionUi(id = "s11", title = "Check LLM call stack", messageCount = 6),
-    SessionUi(id = "s12", title = "Rental listing photos", messageCount = 9),
-    SessionUi(id = "s13", title = "Find similar papers", messageCount = 4),
-    SessionUi(id = "s14", title = "Zimniy period notes", messageCount = 15),
-    SessionUi(id = "s15", title = "Casual friday thread", messageCount = 2),
-)
+private val FakeSessions =
+    listOf(
+        SessionUi(id = "s1", title = "ADHD support", messageCount = 4),
+        SessionUi(id = "s2", title = "RP app", messageCount = 1),
+        SessionUi(id = "s3", title = "Hermes", messageCount = 2),
+        SessionUi(id = "s4", title = "memory", messageCount = 2),
+        SessionUi(id = "s5", title = "serenity", messageCount = 0),
+        SessionUi(id = "s6", title = "Plan SillyTavern alternative with research", messageCount = 0),
+        SessionUi(id = "s7", title = "Design aspect ADHD support", messageCount = 12),
+        SessionUi(id = "s8", title = "Move Erebus backup", messageCount = 8),
+        SessionUi(id = "s9", title = "Передать Кириллу ключи", messageCount = 3),
+        SessionUi(id = "s10", title = "Test drag reorder", messageCount = 1),
+        SessionUi(id = "s11", title = "Check LLM call stack", messageCount = 6),
+        SessionUi(id = "s12", title = "Rental listing photos", messageCount = 9),
+        SessionUi(id = "s13", title = "Find similar papers", messageCount = 4),
+        SessionUi(id = "s14", title = "Zimniy period notes", messageCount = 15),
+        SessionUi(id = "s15", title = "Casual friday thread", messageCount = 2),
+    )
 
-private val FakeRailMeta = mapOf(
-    "s1" to RailMeta("🧠"),
-    "s2" to RailMeta("🦄"),
-    "s3" to RailMeta("💎"),
-    "s4" to RailMeta("🧠"),
-    "s5" to RailMeta("💻"),
-    "s6" to RailMeta("🚂"),
-    "s7" to RailMeta("🎨"),
-    "s8" to RailMeta("📦"),
-    "s9" to RailMeta("🔑"),
-    "s10" to RailMeta("🧪"),
-    "s11" to RailMeta("📚"),
-    "s12" to RailMeta("🏠"),
-    "s13" to RailMeta("🔍"),
-    "s14" to RailMeta("❄️"),
-    "s15" to RailMeta("🎉"),
-)
+private val FakeRailMeta =
+    mapOf(
+        "s1" to RailMeta("🧠"),
+        "s2" to RailMeta("🦄"),
+        "s3" to RailMeta("💎"),
+        "s4" to RailMeta("🧠"),
+        "s5" to RailMeta("💻"),
+        "s6" to RailMeta("🚂"),
+        "s7" to RailMeta("🎨"),
+        "s8" to RailMeta("📦"),
+        "s9" to RailMeta("🔑"),
+        "s10" to RailMeta("🧪"),
+        "s11" to RailMeta("📚"),
+        "s12" to RailMeta("🏠"),
+        "s13" to RailMeta("🔍"),
+        "s14" to RailMeta("❄️"),
+        "s15" to RailMeta("🎉"),
+    )
 
 @PreviewTest
 @Preview(
@@ -125,26 +126,29 @@ fun FullScreenC7Amoled() {
 @Composable
 private fun FullScreenRailBody(dark: Boolean) {
     Row(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(chatGradient(dark)),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(chatGradient(dark)),
     ) {
         RailComposable(
-            state = RailUiModel(
-                sessions = FakeSessions,
-                currentSessionId = "s3",
-                pinnedSessionIds = emptySet(),
-                railMeta = FakeRailMeta,
-                order = FakeSessions.map { it.id },
-                archiveOpen = false,
-            ),
+            state =
+                RailUiModel(
+                    sessions = FakeSessions,
+                    currentSessionId = "s3",
+                    pinnedSessionIds = emptySet(),
+                    railMeta = FakeRailMeta,
+                    order = FakeSessions.map { it.id },
+                    archiveOpen = false,
+                ),
             onEvent = {},
         )
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight()
-                .padding(8.dp),
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .padding(8.dp),
         ) {
             Surface(
                 color = MaterialTheme.colorScheme.surface,
@@ -160,11 +164,15 @@ private fun FullScreenRailBody(dark: Boolean) {
             Spacer(Modifier.height(8.dp))
             Box(modifier = Modifier.weight(1f)) {
                 ChatMessageList(
-                    messages = listOf(
-                        ChatMessage(role = MessageRole.ASSISTANT, content = "👋 ready when you are"),
-                        ChatMessage(role = MessageRole.USER, content = "can we make the rail floating?"),
-                        ChatMessage(role = MessageRole.ASSISTANT, content = "Yep — here's the C7 design composed with the real message list."),
-                    ),
+                    messages =
+                        listOf(
+                            ChatMessage(role = MessageRole.ASSISTANT, content = "👋 ready when you are"),
+                            ChatMessage(role = MessageRole.USER, content = "can we make the rail floating?"),
+                            ChatMessage(
+                                role = MessageRole.ASSISTANT,
+                                content = "Yep — here's the C7 design composed with the real message list.",
+                            ),
+                        ),
                     streamingMessage = null,
                     isThinking = false,
                     thinkingText = "",
@@ -180,7 +188,7 @@ private fun FullScreenRailBody(dark: Boolean) {
                     listState = rememberLazyListState(),
                     lastAnimatedMessageId = null,
                     onLastAnimatedMessageIdChange = {},
-                  openingAttachmentPath = null,
+                    openingAttachmentPath = null,
                 )
             }
             ChatInputBar(
@@ -205,10 +213,11 @@ private fun FullScreenRailBody(dark: Boolean) {
 private fun chatGradient(dark: Boolean): androidx.compose.ui.graphics.Brush {
     if (!dark) {
         return androidx.compose.ui.graphics.Brush.verticalGradient(
-            colors = listOf(
-                androidx.compose.ui.graphics.Color(0xFFF6F1FF),
-                androidx.compose.ui.graphics.Color(0xFFFFFFFF),
-            ),
+            colors =
+                listOf(
+                    androidx.compose.ui.graphics.Color(0xFFF6F1FF),
+                    androidx.compose.ui.graphics.Color(0xFFFFFFFF),
+                ),
         )
     }
     val top = MaterialTheme.colorScheme.background

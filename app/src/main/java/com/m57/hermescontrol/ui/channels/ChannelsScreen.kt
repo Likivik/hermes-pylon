@@ -1,7 +1,5 @@
 package com.m57.hermescontrol.ui.channels
 
-import com.m57.hermescontrol.theme.Spacing
-
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,7 +12,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Warning
@@ -47,6 +44,7 @@ import com.m57.hermescontrol.data.model.EnvVarField
 import com.m57.hermescontrol.data.model.MessagingPlatform
 import com.m57.hermescontrol.data.model.MessagingPlatformUpdate
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
+import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.channels.components.PlatformCard
 import com.m57.hermescontrol.ui.channels.components.TelegramOnboardingDialog
 import com.m57.hermescontrol.ui.common.EmptyState

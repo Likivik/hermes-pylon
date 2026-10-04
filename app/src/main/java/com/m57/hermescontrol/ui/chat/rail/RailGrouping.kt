@@ -22,12 +22,19 @@ data class RailGroups(
     val isEmpty: Boolean get() = all.isEmpty()
 }
 
-private fun byOrder(group: List<SessionUi>, order: List<String>): List<SessionUi> {
+private fun byOrder(
+    group: List<SessionUi>,
+    order: List<String>,
+): List<SessionUi> {
     val idx = order.withIndex().associate { it.value to it.index }
     return group.sortedWith(compareBy({ idx[it.id] ?: Int.MAX_VALUE }))
 }
 
-fun groupRail(sessions: List<SessionUi>, pinnedIds: Set<String>, order: List<String>): RailGroups {
+fun groupRail(
+    sessions: List<SessionUi>,
+    pinnedIds: Set<String>,
+    order: List<String>,
+): RailGroups {
     val pinned = byOrder(sessions.filter { it.id in pinnedIds }, order)
     val unpinned = sessions.filter { it.id !in pinnedIds }
     val fresh = byOrder(unpinned.filter { !it.isStale }, order)
@@ -41,7 +48,10 @@ fun groupRail(sessions: List<SessionUi>, pinnedIds: Set<String>, order: List<Str
  * Guards: drags can only move ids that exist; unknown/reordered-into-wrong-
  * group ids are ignored and each group's canonical membership wins.
  */
-fun mergeArrangement(groups: RailGroups, arrangedIds: List<String>): List<String> {
+fun mergeArrangement(
+    groups: RailGroups,
+    arrangedIds: List<String>,
+): List<String> {
     val arrangeWithin = { group: List<SessionUi> ->
         val memberIds = group.map { it.id }.toSet()
         val arranged = arrangedIds.filter { it in memberIds }

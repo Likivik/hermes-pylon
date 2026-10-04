@@ -53,7 +53,6 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 @OptIn(ExperimentalTestApi::class)
 class RailReorderE2eTest {
-
     /**
      * Pre-grant runtime permissions the app requests on first launch. Without
      * this, the system permission dialog covers MainActivity on Android 13+
@@ -81,8 +80,12 @@ class RailReorderE2eTest {
 
     @Test
     fun dragOurNewerBelow_persistsHomeOrderAboveOurOlder() {
-        val password = E2eHarness.realGatewayPasswordFromArgs()
-            ?: error("e2ePassword not set — CI must pass -Pandroid.testInstrumentationRunnerArguments.e2ePassword=\$E2E_PASS")
+        val password =
+            E2eHarness.realGatewayPasswordFromArgs()
+                ?: error(
+                    "e2ePassword not set — CI must pass " +
+                        "-Pandroid.testInstrumentationRunnerArguments.e2ePassword=${'$'}E2E_PASS",
+                )
 
         // 1. Reset state and seed the real-gateway profile (ticket mode).
         E2eHarness.resetStateForTest()
@@ -160,11 +163,13 @@ class RailReorderE2eTest {
                 persisted ?: ""
             }
 
-        check(homeOrder.split(',').let { ids ->
-            ids.contains("item-low") &&
-                ids.contains("item-top") &&
-                ids.indexOf("item-low") < ids.indexOf("item-top")
-        }) {
+        check(
+            homeOrder.split(',').let { ids ->
+                ids.contains("item-low") &&
+                    ids.contains("item-top") &&
+                    ids.indexOf("item-low") < ids.indexOf("item-top")
+            },
+        ) {
             "rail home_order did not reflect the drag: $homeOrder (expected item-low before item-top)"
         }
 

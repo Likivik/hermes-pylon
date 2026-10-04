@@ -1,28 +1,28 @@
 package com.m57.hermescontrol.ui.chat.rail
 
-import com.m57.hermescontrol.theme.HermesAvatarPalette
-import com.m57.hermescontrol.ui.chat.RailMeta
-import com.m57.hermescontrol.ui.chat.SessionUi
 import androidx.compose.ui.graphics.Color
+import com.m57.hermescontrol.theme.HermesAvatarPalette
+import com.m57.hermescontrol.ui.chat.SessionUi
 
 /** Title→emoji heuristic (auto-icon when no explicitly assigned icon). */
-private val EmojiGroups = listOf<Pair<Regex, String>>(
-    Regex("[аа]dhd|ади|внимание|фокус|focus") to "🧠",
-    Regex("игра|рол|rp|roleplay|tavern|silly|персонаж|сцена") to "🎲",
-    Regex("hermes|агент|agent|бот|bot") to "🤖",
-    Regex("диза[iяй]|design|ui|ux|макет|лого") to "🎨",
-    Regex("код|code|dev|разработ|программ|билд|build|github|git|репо") to "💻",
-    Regex("план|plan|roadmap|дорожная|задач|todo") to "📋",
-    Regex("заметк|note|идея|idea|мозг|мысл") to "💡",
-    Regex("сервер|server|хост|deploy|инфра|nix") to "🛠️",
-    Regex("деньг|деньги|money|бизнес|работ|ваканс|зарплат") to "💰",
-    Regex("напомин|remind|позво|провер") to "⏰",
-    Regex("рус|ru |язык|перевод") to "🌐",
-    Regex("купл|покуп|shopp|магаз|авито|заказ") to "🛒",
-    Regex("медиц|врач|health|здоров") to "🩺",
-    Regex("музык|music|песн|плейлист") to "🎵",
-    Regex("фото|аниме|изображ|картин|image|art|рисун") to "🖼️",
-)
+private val EmojiGroups =
+    listOf<Pair<Regex, String>>(
+        Regex("[аа]dhd|ади|внимание|фокус|focus") to "🧠",
+        Regex("игра|рол|rp|roleplay|tavern|silly|персонаж|сцена") to "🎲",
+        Regex("hermes|агент|agent|бот|bot") to "🤖",
+        Regex("диза[iяй]|design|ui|ux|макет|лого") to "🎨",
+        Regex("код|code|dev|разработ|программ|билд|build|github|git|репо") to "💻",
+        Regex("план|plan|roadmap|дорожная|задач|todo") to "📋",
+        Regex("заметк|note|идея|idea|мозг|мысл") to "💡",
+        Regex("сервер|server|хост|deploy|инфра|nix") to "🛠️",
+        Regex("деньг|деньги|money|бизнес|работ|ваканс|зарплат") to "💰",
+        Regex("напомин|remind|позво|провер") to "⏰",
+        Regex("рус|ru |язык|перевод") to "🌐",
+        Regex("купл|покуп|shopp|магаз|авито|заказ") to "🛒",
+        Regex("медиц|врач|health|здоров") to "🩺",
+        Regex("музык|music|песн|плейлист") to "🎵",
+        Regex("фото|аниме|изображ|картин|image|art|рисун") to "🖼️",
+    )
 
 internal fun heuristicEmoji(title: String): String {
     val t = title.lowercase()

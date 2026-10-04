@@ -1,6 +1,5 @@
 package com.m57.hermescontrol.ui.analytics
 
-import com.m57.hermescontrol.theme.Spacing
 import android.app.Application
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -48,6 +47,7 @@ import com.m57.hermescontrol.SkillsScreen
 import com.m57.hermescontrol.data.model.AnalyticsDailyEntry
 import com.m57.hermescontrol.data.model.ModelsAnalyticsModelEntry
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
+import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.EmptyState
 import com.m57.hermescontrol.ui.common.ErrorState
 import com.m57.hermescontrol.ui.common.HermesScaffold

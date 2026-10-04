@@ -2,7 +2,6 @@ package com.m57.hermescontrol.e2e
 
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithText
@@ -41,7 +40,6 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 @OptIn(ExperimentalTestApi::class)
 class RenameE2eTest {
-
     @get:Rule(order = 0)
     val permissionRule: GrantPermissionRule =
         GrantPermissionRule.grant(android.Manifest.permission.POST_NOTIFICATIONS)
@@ -71,8 +69,12 @@ class RenameE2eTest {
 
     @Test
     fun renameBackgroundSession_thenTitleSurvivesServerRelist() {
-        val password = E2eHarness.realGatewayPasswordFromArgs()
-            ?: error("e2ePassword not set — CI must pass -Pandroid.testInstrumentationRunnerArguments.e2ePassword=\$E2E_PASS")
+        val password =
+            E2eHarness.realGatewayPasswordFromArgs()
+                ?: error(
+                    "e2ePassword not set — CI must pass " +
+                        "-Pandroid.testInstrumentationRunnerArguments.e2ePassword=${'$'}E2E_PASS",
+                )
 
         // 1. Wipe process-wide state + log into the real gateway.
         E2eHarness.resetStateForTest()

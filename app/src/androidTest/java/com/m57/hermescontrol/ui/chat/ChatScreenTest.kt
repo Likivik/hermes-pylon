@@ -65,7 +65,9 @@ class ChatScreenTest {
         every { mockViewModel.uiState } returns MutableStateFlow(uiState).asStateFlow()
         every { mockViewModel.streamingState } returns MutableStateFlow(StreamingState()).asStateFlow()
         every { mockViewModel.pinnedSessionIds } returns MutableStateFlow(emptySet<String>()).asStateFlow()
-        every { mockViewModel.railMeta } returns MutableStateFlow(emptyMap<String, com.m57.hermescontrol.ui.chat.RailMeta>()).asStateFlow()
+        every {
+            mockViewModel.railMeta
+        } returns MutableStateFlow(emptyMap<String, com.m57.hermescontrol.ui.chat.RailMeta>()).asStateFlow()
         every { mockViewModel.homeOrder } returns MutableStateFlow(emptyList<String>()).asStateFlow()
 
         composeTestRule.setContent {
@@ -106,7 +108,9 @@ class ChatScreenTest {
         every { mockViewModel.uiState } returns MutableStateFlow(uiState).asStateFlow()
         every { mockViewModel.streamingState } returns MutableStateFlow(StreamingState()).asStateFlow()
         every { mockViewModel.pinnedSessionIds } returns MutableStateFlow(emptySet<String>()).asStateFlow()
-        every { mockViewModel.railMeta } returns MutableStateFlow(emptyMap<String, com.m57.hermescontrol.ui.chat.RailMeta>()).asStateFlow()
+        every {
+            mockViewModel.railMeta
+        } returns MutableStateFlow(emptyMap<String, com.m57.hermescontrol.ui.chat.RailMeta>()).asStateFlow()
         every { mockViewModel.homeOrder } returns MutableStateFlow(emptyList<String>()).asStateFlow()
 
         composeTestRule.setContent {
@@ -132,7 +136,9 @@ class ChatScreenTest {
         every { mockViewModel.uiState } returns MutableStateFlow(uiState).asStateFlow()
         every { mockViewModel.streamingState } returns MutableStateFlow(StreamingState()).asStateFlow()
         every { mockViewModel.pinnedSessionIds } returns MutableStateFlow(emptySet<String>()).asStateFlow()
-        every { mockViewModel.railMeta } returns MutableStateFlow(emptyMap<String, com.m57.hermescontrol.ui.chat.RailMeta>()).asStateFlow()
+        every {
+            mockViewModel.railMeta
+        } returns MutableStateFlow(emptyMap<String, com.m57.hermescontrol.ui.chat.RailMeta>()).asStateFlow()
         every { mockViewModel.homeOrder } returns MutableStateFlow(emptyList<String>()).asStateFlow()
 
         composeTestRule.setContent {
@@ -174,7 +180,9 @@ class ChatScreenTest {
         every { mockViewModel.uiState } returns MutableStateFlow(uiState).asStateFlow()
         every { mockViewModel.streamingState } returns MutableStateFlow(StreamingState()).asStateFlow()
         every { mockViewModel.pinnedSessionIds } returns MutableStateFlow(emptySet<String>()).asStateFlow()
-        every { mockViewModel.railMeta } returns MutableStateFlow(emptyMap<String, com.m57.hermescontrol.ui.chat.RailMeta>()).asStateFlow()
+        every {
+            mockViewModel.railMeta
+        } returns MutableStateFlow(emptyMap<String, com.m57.hermescontrol.ui.chat.RailMeta>()).asStateFlow()
         every { mockViewModel.homeOrder } returns MutableStateFlow(emptyList<String>()).asStateFlow()
 
         composeTestRule.setContent {
@@ -197,7 +205,9 @@ class ChatScreenTest {
         every { mockViewModel.uiState } returns MutableStateFlow(uiState).asStateFlow()
         every { mockViewModel.streamingState } returns MutableStateFlow(StreamingState()).asStateFlow()
         every { mockViewModel.pinnedSessionIds } returns MutableStateFlow(emptySet<String>()).asStateFlow()
-        every { mockViewModel.railMeta } returns MutableStateFlow(emptyMap<String, com.m57.hermescontrol.ui.chat.RailMeta>()).asStateFlow()
+        every {
+            mockViewModel.railMeta
+        } returns MutableStateFlow(emptyMap<String, com.m57.hermescontrol.ui.chat.RailMeta>()).asStateFlow()
         every { mockViewModel.homeOrder } returns MutableStateFlow(emptyList<String>()).asStateFlow()
 
         composeTestRule.setContent {
@@ -240,7 +250,9 @@ class ChatScreenTest {
         every { mockViewModel.uiState } returns state.asStateFlow()
         every { mockViewModel.streamingState } returns MutableStateFlow(StreamingState()).asStateFlow()
         every { mockViewModel.pinnedSessionIds } returns MutableStateFlow(emptySet<String>()).asStateFlow()
-        every { mockViewModel.railMeta } returns MutableStateFlow(emptyMap<String, com.m57.hermescontrol.ui.chat.RailMeta>()).asStateFlow()
+        every {
+            mockViewModel.railMeta
+        } returns MutableStateFlow(emptyMap<String, com.m57.hermescontrol.ui.chat.RailMeta>()).asStateFlow()
         every { mockViewModel.homeOrder } returns MutableStateFlow(emptyList<String>()).asStateFlow()
 
         composeTestRule.setContent {
@@ -267,7 +279,9 @@ class ChatScreenTest {
         every { mockViewModel.uiState } returns MutableStateFlow(uiState).asStateFlow()
         every { mockViewModel.streamingState } returns MutableStateFlow(StreamingState()).asStateFlow()
         every { mockViewModel.pinnedSessionIds } returns MutableStateFlow(emptySet<String>()).asStateFlow()
-        every { mockViewModel.railMeta } returns MutableStateFlow(emptyMap<String, com.m57.hermescontrol.ui.chat.RailMeta>()).asStateFlow()
+        every {
+            mockViewModel.railMeta
+        } returns MutableStateFlow(emptyMap<String, com.m57.hermescontrol.ui.chat.RailMeta>()).asStateFlow()
         every { mockViewModel.homeOrder } returns MutableStateFlow(emptyList<String>()).asStateFlow()
 
         composeTestRule.setContent {

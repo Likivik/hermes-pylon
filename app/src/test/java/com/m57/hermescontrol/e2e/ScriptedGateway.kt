@@ -1,7 +1,7 @@
 package com.m57.hermescontrol.e2e
 
-import java.util.concurrent.ConcurrentLinkedQueue
 import kotlinx.coroutines.channels.Channel
+import java.util.concurrent.ConcurrentLinkedQueue
 
 /**
  * Scripted JSON-RPC WebSocket gateway — the single source of truth for the
@@ -26,7 +26,6 @@ import kotlinx.coroutines.channels.Channel
  * Usage (Espresso): same, served over MockWebServer's WebSocket upgrade.
  */
 class ScriptedGateway {
-
     data class ClientCall(
         val method: String,
         val params: Map<String, Any?>,
@@ -74,13 +73,17 @@ class ScriptedGateway {
                     }
                     step.paramsSubset.forEach { (k, v) ->
                         require(call.params[k] == v) {
-                            "Script mismatch on ${k}: expected ${v}, got ${call.params[k]}"
+                            "Script mismatch on $k: expected $v, got ${call.params[k]}"
                         }
                     }
                 }
-                is Step.Reply -> { reply = step.json; break }
+                is Step.Reply -> {
+                    reply = step.json
+                    break
+                }
                 is Step.Fail -> {
-                    reply = errorEnvelope(call.id, step.code, step.message); break
+                    reply = errorEnvelope(call.id, step.code, step.message)
+                    break
                 }
                 is Step.Push -> {
                     // Unsolicited: deliver out-of-band, keep scripting.
@@ -98,51 +101,69 @@ class ScriptedGateway {
 
     fun assertAllConsumed() {
         val remaining = steps.toList()
-        check(remaining.isEmpty()) { "Unconsumed scripted steps: ${remaining}" }
+        check(remaining.isEmpty()) { "Unconsumed scripted steps: $remaining" }
     }
 
-    fun assertSent(method: String, paramsSubset: Map<String, Any?>) {
-        val match = received.any { call ->
-            call.method == method && paramsSubset.all { (k, v) -> call.params[k] == v }
-        }
+    fun assertSent(
+        method: String,
+        paramsSubset: Map<String, Any?>,
+    ) {
+        val match =
+            received.any { call ->
+                call.method == method && paramsSubset.all { (k, v) -> call.params[k] == v }
+            }
         check(match) {
-            "No ${method} call with ${paramsSubset}; got: ${received.toList()}"
+            "No $method call with $paramsSubset; got: ${received.toList()}"
         }
     }
 
-    fun assertNeverSent(method: String, paramsSubset: Map<String, Any?> = emptyMap()) {
-        val bad = received.any { call ->
-            call.method == method && paramsSubset.all { (k, v) -> call.params[k] == v }
-        }
-        check(!bad) { "${method} WAS sent with ${paramsSubset}: ${received.toList()}" }
+    fun assertNeverSent(
+        method: String,
+        paramsSubset: Map<String, Any?> = emptyMap(),
+    ) {
+        val bad =
+            received.any { call ->
+                call.method == method && paramsSubset.all { (k, v) -> call.params[k] == v }
+            }
+        check(!bad) { "$method WAS sent with $paramsSubset: ${received.toList()}" }
     }
 
-    private fun parseCall(frame: String): ClientCall? = runCatching {
-        val o = org.json.JSONObject(frame)
-        ClientCall(
-            method = o.getString("method"),
-            params = o.getJSONObject("params").let { jo ->
-                buildMap { for (k in jo.keys()) put(k, jo.opt(k)) }
-            },
-            id = o.optString("id", ""),
-        )
-    }.getOrNull()
+    private fun parseCall(frame: String): ClientCall? =
+        runCatching {
+            val o = org.json.JSONObject(frame)
+            ClientCall(
+                method = o.getString("method"),
+                params =
+                    o.getJSONObject("params").let { jo ->
+                        buildMap { for (k in jo.keys()) put(k, jo.opt(k)) }
+                    },
+                id = o.optString("id", ""),
+            )
+        }.getOrNull()
 
     companion object {
-        fun errorEnvelope(id: String, code: Int, message: String) =
-            """{"jsonrpc":"2.0","id":"${id}","error":{"code":${code},"message":"${message}"}}"""
+        fun errorEnvelope(
+            id: String,
+            code: Int,
+            message: String,
+        ) = """{"jsonrpc":"2.0","id":"$id","error":{"code":$code,"message":"$message"}}"""
 
-        fun resultEnvelope(id: String, resultJson: String) =
-            """{"jsonrpc":"2.0","id":"${id}","result":${resultJson}}"""
+        fun resultEnvelope(
+            id: String,
+            resultJson: String,
+        ) = """{"jsonrpc":"2.0","id":"$id","result":$resultJson}"""
 
         // ── Choreography builders (the field-bug sequences) ─────────────────
 
-        /** Resume fast-path ack for a live session. */
         /** Resume fast-path ack — keys match the real gateway's _live_session_payload
          * (info/message_count/messages/running/session_id/session_key/started_at/status).
          * The real gateway has NO "resumed" key; the app falls back to the
          * requested id, so fidelity wins over the convenience key. */
-        fun resumeAck(id: String, storageId: String, runtimeId: String) = Step.Reply(
+        fun resumeAck(
+            id: String,
+            storageId: String,
+            runtimeId: String,
+        ) = Step.Reply(
             resultEnvelope(
                 id,
                 """{"info":{"cwd":"/tmp","lazy":true,"skills":{},"tools":{}},""" +
@@ -153,14 +174,20 @@ class ScriptedGateway {
         )
 
         /** Bare session.title with a storage id → the gateway 4001s (reaped). */
-        fun titleRejectStorageId(id: String, storageId: String) = Step.Fail(
+        fun titleRejectStorageId(
+            id: String,
+            storageId: String,
+        ) = Step.Fail(
             code = 4001,
             message = "session not found",
         ).let { it } // envelope built by Fail handling; id carried via call
 
         /** session.title by runtime/session_key → accepted. */
-        fun titleAccept(id: String, title: String) = Step.Reply(
-            resultEnvelope(id, """{"pending":false,"title":"${title}"}"""),
+        fun titleAccept(
+            id: String,
+            title: String,
+        ) = Step.Reply(
+            resultEnvelope(id, """{"pending":false,"title":"$title"}"""),
         )
     }
 }

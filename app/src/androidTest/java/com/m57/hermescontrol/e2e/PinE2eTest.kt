@@ -32,7 +32,6 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 @OptIn(ExperimentalTestApi::class)
 class PinE2eTest {
-
     @get:Rule(order = 0)
     val permissionRule: GrantPermissionRule =
         GrantPermissionRule.grant(android.Manifest.permission.POST_NOTIFICATIONS)
@@ -58,8 +57,12 @@ class PinE2eTest {
 
     @Test
     fun pinThenUnpin_togglesPinnedMarker() {
-        val password = E2eHarness.realGatewayPasswordFromArgs()
-            ?: error("e2ePassword not set — CI must pass -Pandroid.testInstrumentationRunnerArguments.e2ePassword=${'$'}E2E_PASS")
+        val password =
+            E2eHarness.realGatewayPasswordFromArgs()
+                ?: error(
+                    "e2ePassword not set — CI must pass " +
+                        "-Pandroid.testInstrumentationRunnerArguments.e2ePassword=${'$'}E2E_PASS",
+                )
 
         E2eHarness.resetStateForTest()
         E2eHarness.seedRealGatewayProfile(password = password)

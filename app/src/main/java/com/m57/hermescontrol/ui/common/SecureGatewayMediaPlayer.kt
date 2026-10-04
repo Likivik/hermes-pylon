@@ -1,7 +1,5 @@
 package com.m57.hermescontrol.ui.common
 
-import com.m57.hermescontrol.theme.Spacing
-
 import android.media.MediaPlayer
 import android.view.SurfaceHolder
 import android.view.SurfaceView
@@ -46,6 +44,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.remote.GatewayFileClient
+import com.m57.hermescontrol.theme.Spacing
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation

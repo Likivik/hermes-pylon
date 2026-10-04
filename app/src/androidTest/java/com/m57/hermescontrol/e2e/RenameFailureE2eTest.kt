@@ -2,7 +2,6 @@ package com.m57.hermescontrol.e2e
 
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithText
@@ -47,7 +46,6 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 @OptIn(ExperimentalTestApi::class)
 class RenameFailureE2eTest {
-
     /**
      * Pre-grant runtime permissions the app requests on first launch. Without
      * this, the system permission dialog covers MainActivity on Android 13+
@@ -75,8 +73,12 @@ class RenameFailureE2eTest {
 
     @Test
     fun renameOwnSession_afterDeleteResumeReturns4007_surfacesError() {
-        val password = E2eHarness.realGatewayPasswordFromArgs()
-            ?: error("e2ePassword not set — CI must pass -Pandroid.testInstrumentationRunnerArguments.e2ePassword=\$E2E_PASS")
+        val password =
+            E2eHarness.realGatewayPasswordFromArgs()
+                ?: error(
+                    "e2ePassword not set — CI must pass " +
+                        "-Pandroid.testInstrumentationRunnerArguments.e2ePassword=${'$'}E2E_PASS",
+                )
 
         // 1. Reset state and seed the real-gateway profile (ticket mode).
         E2eHarness.resetStateForTest()

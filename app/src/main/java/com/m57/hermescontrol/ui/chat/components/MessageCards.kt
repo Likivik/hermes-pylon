@@ -1,7 +1,5 @@
 package com.m57.hermescontrol.ui.chat.components
 
-import com.m57.hermescontrol.theme.Spacing
-
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -30,7 +28,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
@@ -80,6 +77,7 @@ import com.m57.hermescontrol.theme.CodeTerminalBg
 import com.m57.hermescontrol.theme.CodeTerminalBorder
 import com.m57.hermescontrol.theme.CodeTerminalMuted
 import com.m57.hermescontrol.theme.CodeTerminalText
+import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.chat.SubagentIndicator
 
 // ── ReasoningCard ─────────────────────────────────────────────────────────

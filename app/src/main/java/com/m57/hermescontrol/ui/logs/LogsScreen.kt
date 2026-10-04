@@ -1,7 +1,5 @@
 package com.m57.hermescontrol.ui.logs
 
-import com.m57.hermescontrol.theme.Spacing
-
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context

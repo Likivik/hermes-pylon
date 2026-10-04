@@ -1,7 +1,5 @@
 package com.m57.hermescontrol.ui.common
 
-import com.m57.hermescontrol.theme.Spacing
-
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,6 +26,7 @@ import com.m57.hermescontrol.data.model.MemoryPressureStatus
 import com.m57.hermescontrol.data.model.StatusResponse
 import com.m57.hermescontrol.data.model.normalizePressureValue
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
+import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.theme.onColorFor
 
 /**

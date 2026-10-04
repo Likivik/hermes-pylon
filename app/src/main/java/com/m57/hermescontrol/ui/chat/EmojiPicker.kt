@@ -13,10 +13,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -86,16 +86,22 @@ fun EmojiPickerSection(
                 Surface(
                     shape = RoundedCornerShape(50),
                     color =
-                        if (active) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.surfaceVariant,
+                        if (active) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant
+                        },
                     modifier = Modifier.clickable { group = g },
                 ) {
                     Text(
                         text = g,
                         style = MaterialTheme.typography.labelSmall,
                         color =
-                            if (active) MaterialTheme.colorScheme.onPrimary
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                            if (active) {
+                                MaterialTheme.colorScheme.onPrimary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                     )
                 }
@@ -127,29 +133,39 @@ fun EmojiPickerSection(
 }
 
 @Composable
-private fun EmojiTile(emoji: String, active: Boolean, onClick: (String) -> Unit) {
+private fun EmojiTile(
+    emoji: String,
+    active: Boolean,
+    onClick: (String) -> Unit,
+) {
     Box(
         contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .size(38.dp)
-            .clip(CircleShape)
-            .background(
-                if (active) MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
-                else MaterialTheme.colorScheme.surfaceVariant,
-            )
-            .clickable { onClick(emoji) },
+        modifier =
+            Modifier
+                .size(38.dp)
+                .clip(CircleShape)
+                .background(
+                    if (active) {
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant
+                    },
+                )
+                .clickable { onClick(emoji) },
     ) {
         Text(emoji, style = MaterialTheme.typography.titleMedium)
     }
 }
 
-private fun recentsPrefs(context: Context) =
-    context.getSharedPreferences("hermes_rail", 0)
+private fun recentsPrefs(context: Context) = context.getSharedPreferences("hermes_rail", 0)
 
 private fun readRecents(context: Context): List<String> =
     recentsPrefs(context).getStringSet("icon_recents", emptySet())?.toList() ?: emptyList()
 
-internal fun storeRecentIcon(context: Context, emoji: String) {
+internal fun storeRecentIcon(
+    context: Context,
+    emoji: String,
+) {
     val prefs = recentsPrefs(context)
     val cur = (prefs.getStringSet("icon_recents", emptySet()) ?: emptySet()).toMutableSet()
     cur.add(emoji)

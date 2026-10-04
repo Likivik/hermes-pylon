@@ -1,7 +1,5 @@
 package com.m57.hermescontrol.ui.chat
 
-import com.m57.hermescontrol.theme.Spacing
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
@@ -56,6 +54,7 @@ import com.hrm.latex.renderer.model.LatexTheme
 import com.m57.hermescontrol.data.remote.GatewayFileClient
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.theme.SearchHighlightColors
+import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.theme.WithoutChatFontScale
 import com.m57.hermescontrol.theme.searchHighlightColors
 

@@ -23,12 +23,18 @@ data class RailUiModel(
 /** Sealed rail events — one callback, scales without signature churn. */
 sealed interface RailEvent {
     data class Switch(val sessionId: String) : RailEvent
+
     data class TogglePin(val sessionId: String) : RailEvent
+
     data class Delete(val sessionId: String) : RailEvent
+
     data class Edit(val sessionId: String) : RailEvent
+
     /** Emitted on drop with the full desired order (pinned + fresh + stale). */
     data class Reorder(val order: List<String>) : RailEvent
+
     /** Enter/exit reorder mode (long-press-drag grab instead of the menu). */
     data object ToggleReorder : RailEvent
+
     data class ArchiveToggle(val open: Boolean) : RailEvent
 }

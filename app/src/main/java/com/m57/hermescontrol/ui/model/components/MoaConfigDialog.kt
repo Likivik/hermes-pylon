@@ -1,7 +1,5 @@
 package com.m57.hermescontrol.ui.model.components
 
-import com.m57.hermescontrol.theme.Spacing
-
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -40,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.m57.hermescontrol.data.model.MoaConfigPreset
 import com.m57.hermescontrol.data.model.MoaModelSlot
+import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.SearchBar
 
 @Composable

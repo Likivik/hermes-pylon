@@ -30,8 +30,10 @@ import org.robolectric.annotation.Config
 // provide ("AndroidKeyStore not found"). This test only needs an app Context.
 @Config(sdk = [34], application = android.app.Application::class)
 class RailOrderPersistenceTest {
-
-    private fun session(id: String, lastActive: Long = nowSeconds() - 60): SessionUi =
+    private fun session(
+        id: String,
+        lastActive: Long = nowSeconds() - 60,
+    ): SessionUi =
         SessionUi(
             id = id,
             title = id,
@@ -55,12 +57,13 @@ class RailOrderPersistenceTest {
 
         // Next launch: rail loads all fresh sessions and applies the order.
         val now = nowSeconds()
-        val sessions = listOf(
-            session("stored-current", now - 2000),
-            session("stored-bg", now - 3000),
-            session("item-top", now - 1000),   // newest — would sort first w/o order
-            session("item-low", now - 5000),
-        )
+        val sessions =
+            listOf(
+                session("stored-current", now - 2000),
+                session("stored-bg", now - 3000),
+                session("item-top", now - 1000), // newest — would sort first w/o order
+                session("item-low", now - 5000),
+            )
         val groups = groupRail(sessions, pinnedIds = emptySet(), order = seedOrderFromPrefs())
         val displayed = groups.fresh.map { it.id }
 
@@ -73,12 +76,13 @@ class RailOrderPersistenceTest {
 
     @Test
     fun `mergeArrangement round-trips the persisted order`() {
-        val sessions = listOf(
-            session("item-top"),
-            session("item-low"),
-            session("stored-bg"),
-            session("stored-current"),
-        )
+        val sessions =
+            listOf(
+                session("item-top"),
+                session("item-low"),
+                session("stored-bg"),
+                session("stored-current"),
+            )
         val groups = groupRail(sessions, pinnedIds = emptySet(), order = emptyList())
 
         // The drag moved item-low above item-top -> mergeArrangement persists it.
@@ -91,14 +95,17 @@ class RailOrderPersistenceTest {
     @Test
     fun `missing home_order falls back to default sort`() {
         val now = nowSeconds()
-        val sessions = listOf(
-            session("item-top", now - 1000), // older
-            session("item-low", now - 5000), // older still
-        )
+        val sessions =
+            listOf(
+                session("item-top", now - 1000), // older
+                session("item-low", now - 5000), // older still
+            )
         val groups = groupRail(sessions, pinnedIds = emptySet(), order = emptyList())
         // No persisted order: newest-first (default) -> item-top above item-low.
-        assertTrue(groups.fresh.map { it.id }.indexOf("item-top") <
-            groups.fresh.map { it.id }.indexOf("item-low"))
+        assertTrue(
+            groups.fresh.map { it.id }.indexOf("item-top") <
+                groups.fresh.map { it.id }.indexOf("item-low"),
+        )
     }
 
     private fun seedOrderFromPrefs(): List<String> =
