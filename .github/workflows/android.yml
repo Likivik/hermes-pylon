@@ -292,9 +292,13 @@ jobs:
           disable-animations: true
           force-avd-creation: false
           emulator-options: -no-window -no-audio -no-boot-anim -camera-back none -memory 2048
+          # `com.m57.hermescontrol.e2e` is excluded on purpose: those 8 classes drive a
+          # REAL Hermes gateway and get an ephemeral password from e2e.yml's setup.
+          # Without it they throw "e2ePassword not set", which is the correct loud
+          # failure for "E2E executed without a gateway".
           script: |
-            ./gradlew connectedHermesDebugAndroidTest
-            ./gradlew connectedIrisDebugAndroidTest
+            ./gradlew connectedHermesDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.notPackage=com.m57.hermescontrol.e2e
+            ./gradlew connectedIrisDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.notPackage=com.m57.hermescontrol.e2e
 
       - name: Upload instrumented test reports
         if: always()
