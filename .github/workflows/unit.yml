@@ -1,41 +1,67 @@
-# Unit tests run on EVERY push (all branches and tags) — not just gated behind
-# the emulator E2E suite. They cover the data/logic layer (ChatViewModel
-# reducers, rail grouping + order persistence, rename fast-path) and are
-# JVM-fast, so they give a verdict in ~4 min instead of ~11.
+# This workflow is the SINGLE owner of unit tests — android.yml no longer runs any.
+#
+# SCOPE — the IRIS flavor only (`sh.slb.irismobile`). Iris is the flavor this fork
+# ships: apk.yml defaults to it, the E2E suite drives it, and every APK delivered to
+# the device has been an iris build. `hermes` is the upstream identity
+# (`sh.slb.hermesmobile`) and is deliberately NOT tested — Likivik, 2026-10-05:
+# "for now we only ever want to test our own flavor and nothing else."
+# So there is exactly one variant under test here: irisDebug. No variant matrix, no
+# scheduled all-variants sweep — add one back deliberately if that ever changes.
+#
+# TRIGGERS — why push is limited to main:
+#   * pull_request  — the only event that fires for a PR from a FORK (a fork push
+#     happens in the fork, so this repo never sees a push event for it). Fork PR
+#     runs get a read-only token and no secrets, which is the safe model. Do not
+#     move this to pull_request_target.
+#   * push: [main]  — post-merge verification of what actually landed. Limiting it
+#     to main means a same-repo branch push does NOT also produce a push run next
+#     to its pull_request run: one commit, one run.
 #
 # Modified from Hy4ri/hermes-mobile for this fork; see NOTICE.
 name: Unit tests
 
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
-# Supersede in-flight unit runs for the same ref — only the newest matters.
+# Keyed on the BRANCH NAME, not github.ref: github.ref is refs/pull/N/merge on a
+# pull_request event and refs/heads/X on a push, so a ref-keyed group puts the same
+# commit in two lanes and both runs proceed. head_ref is set only on pull_request
+# events, hence the ref_name fallback. The workflow name is prefixed because group
+# names are repository-wide — without it, this workflow and ktlint on the same
+# branch would cancel each other.
+#
+# main is exempt from cancellation: a post-merge verification must not be killed by
+# a faster second merge. (android.yml gets the same effect by keying main runs on
+# the sha.)
 concurrency:
-  group: unit-${{ github.ref }}
-  cancel-in-progress: true
+  group: unit-${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
 
 jobs:
   unit-tests:
+    name: Unit tests (iris debug)
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v5
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
 
       - uses: gradle/actions/setup-gradle@v4
 
-      # Iris is the consumer flavor used by the E2E suite; its unit tests
-      # (JUnit + Robolectric) cover the shared app logic under test.
-      - name: Run unit tests (Iris debug)
+      # The shared data/logic layer: ChatViewModel reducers, rail grouping + order
+      # persistence, rename fast-path. JUnit + Robolectric, ~7 min.
+      - name: Run unit tests (iris debug)
         run: ./gradlew testIrisDebugUnitTest --no-daemon -Dorg.gradle.workers.max=2
 
       - name: Upload unit test reports

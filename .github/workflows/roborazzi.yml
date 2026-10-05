@@ -20,10 +20,16 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      # Record fresh goldens for both flavors; verify-gate comes after baselines settle.
-      - name: Record Roborazzi captures (hermes + iris)
+      # Record fresh goldens for the iris flavor only — the one this fork ships;
+      # verify-gate comes after baselines settle.
+      #
+      # This used to record hermes FIRST. hermes is the upstream identity, not a
+      # flavor we support, and the most likely reason this workflow has been failing
+      # since 2026-09-14 is that `recordRoborazziHermesDebug` aborted the step before
+      # iris ever ran. If a robo-* tag run still fails on iris alone, this workflow
+      # is stale and should be deleted rather than kept red.
+      - name: Record Roborazzi captures (iris)
         run: |
-          ./gradlew recordRoborazziHermesDebug --stacktrace
           ./gradlew recordRoborazziIrisDebug --stacktrace
 
       - name: Upload renders
