@@ -27,3 +27,5 @@ __pycache__/
 hermes-chat-redesign.html
 gradle.properties.local
 result
+.gradle-home/
+.android-sdk/

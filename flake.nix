@@ -79,9 +79,6 @@
           ANDROID_SDK_ROOT = "${androidSdk}/libexec/android-sdk";
           JAVA_HOME = "${pkgs.jdk21}";
 
-          # Gradle needs a writable home
-          GRADLE_USER_HOME = "$PWD/.gradle-home";
-
           shellHook = ''
             echo " HermesControl Android dev shell"
             echo "   Java:              $(java -version 2>&1 | head -1)"
@@ -93,7 +90,11 @@
             # Make sure the android CLI from ~/.local/bin is on PATH
             export PATH="$HOME/.local/bin:$PATH"
 
-            # Writable gradle home
+            # Writable, repo-local gradle home. This MUST be exported from the
+            # shellHook: as a plain mkShell attribute the value stays the literal
+            # string "$PWD/.gradle-home" and gradle creates a directory named
+            # '$PWD' in the repo root.
+            export GRADLE_USER_HOME="$PWD/.gradle-home"
             mkdir -p "$GRADLE_USER_HOME"
           '';
         };
