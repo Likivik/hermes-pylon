@@ -55,10 +55,12 @@ jobs:
           languages: java-kotlin
           build-mode: manual
 
-      - name: Compile both debug flavors
+      - name: Compile the iris debug sources
         run: |
+          # iris only: it is the flavor this fork ships (sh.slb.irismobile). The
+          # analyzed source set is shared, so hermes added a second compile of the
+          # same code under a different applicationId and nothing else.
           ./gradlew \
-            compileHermesDebugSources \
             compileIrisDebugSources \
             --no-daemon \
             --max-workers=1 \
