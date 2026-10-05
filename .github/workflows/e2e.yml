@@ -5,6 +5,22 @@ on:
     tags:
       - 'e2e-*'
   workflow_dispatch:
+    inputs:
+      classes:
+        description: >-
+          Which E2E classes to run: "all" (default — all 8) or a comma-separated list
+          of short names (rename, renamefail, reorder, pin, delete, archive, switch,
+          noautocreate). A targeted run takes ~5 min instead of ~8.
+        required: false
+        default: 'all'
+        type: string
+
+# This workflow had no concurrency group at all: each e2e-* tag pushed while an
+# earlier run was still booting the emulator started a SECOND full 8-class run, and
+# nothing cancelled the first. One lane per ref, newest wins.
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   rename-e2e:
@@ -199,6 +215,41 @@ jobs:
           print(f"seeded {len(rows)} sessions")
           PY
 
+      # Resolve the class list BEFORE the emulator boots.
+      # Tag runs keep the old behaviour exactly (all 8 classes). A manual dispatch
+      # may name a subset, so a targeted verification pass costs ~5 min not ~8.
+      # The dispatch input travels through env — never inlined into the script — and
+      # every token must match the allowlist; anything else fails the run rather than
+      # reaching gradle.
+      - name: Resolve E2E class list
+        env:
+          INPUT_CLASSES: ${{ github.event.inputs.classes || 'all' }}
+        run: |
+          resolve() {
+            case "$1" in
+              rename)       echo com.m57.hermescontrol.e2e.RenameE2eTest ;;
+              renamefail)   echo com.m57.hermescontrol.e2e.RenameFailureE2eTest ;;
+              reorder)      echo com.m57.hermescontrol.e2e.RailReorderE2eTest ;;
+              pin)          echo com.m57.hermescontrol.e2e.PinE2eTest ;;
+              delete)       echo com.m57.hermescontrol.e2e.DeleteE2eTest ;;
+              archive)      echo com.m57.hermescontrol.e2e.ArchiveE2eTest ;;
+              switch)       echo com.m57.hermescontrol.e2e.SwitchE2eTest ;;
+              noautocreate) echo com.m57.hermescontrol.e2e.NoAutoCreateE2eTest ;;
+              *)            return 1 ;;
+            esac
+          }
+          ALL="rename,renamefail,reorder,pin,delete,archive,switch,noautocreate"
+          if [ -z "$INPUT_CLASSES" ] || [ "$INPUT_CLASSES" = "all" ]; then
+            INPUT_CLASSES="$ALL"
+          fi
+          out=""
+          for name in $(printf '%s' "$INPUT_CLASSES" | tr ',' ' '); do
+            fqn=$(resolve "$name") || { echo "unknown E2E class: $name"; exit 1; }
+            out="${out:+$out,}$fqn"
+          done
+          echo "E2E classes: $out"
+          echo "E2E_CLASSES=$out" >> "$GITHUB_ENV"
+
       # GMD: AGP provisions, boots, installs, runs, tears down the emulator.
       # The app under test talks to the REAL gateway at 127.0.0.1:8642.
       # Tests run with the ephemeral password via a system property.
@@ -210,7 +261,7 @@ jobs:
           ./gradlew e2eApi34IrisDebugAndroidTest --no-daemon
           -Dorg.gradle.workers.max=2
           -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
-          -Pandroid.testInstrumentationRunnerArguments.class=com.m57.hermescontrol.e2e.RenameE2eTest,com.m57.hermescontrol.e2e.RenameFailureE2eTest,com.m57.hermescontrol.e2e.RailReorderE2eTest,com.m57.hermescontrol.e2e.PinE2eTest,com.m57.hermescontrol.e2e.DeleteE2eTest,com.m57.hermescontrol.e2e.ArchiveE2eTest,com.m57.hermescontrol.e2e.SwitchE2eTest,com.m57.hermescontrol.e2e.NoAutoCreateE2eTest
+          -Pandroid.testInstrumentationRunnerArguments.class=$E2E_CLASSES
           -Pandroid.testInstrumentationRunnerArguments.e2ePassword=${{ env.E2E_PASS }}
 
       - name: Upload instrumented results on failure
