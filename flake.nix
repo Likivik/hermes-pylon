@@ -64,14 +64,17 @@
             # Android SDK (platforms, build-tools, platform-tools, emulator, system-images)
             androidSdk
 
-            # Kotlin compiler
-            kotlin
+            # NOTE: no kotlin/gradle/ktlint here on purpose (see README/toolchain
+            # note below). Their versions belong to the build, not to this shell:
+            #   - Gradle  -> gradle/wrapper/gradle-wrapper.properties (./gradlew)
+            #   - Kotlin  -> libs.versions.toml (Gradle plugin)
+            #   - ktlint  -> libs.versions.toml (org.jlleitschuh.gradle.ktlint)
+            # Shipping a second copy of any of them is how a local run ends up
+            # disagreeing with CI.
 
-            # Gradle
-            gradle
-
-            # Useful utilities
-            ktlint # Kotlin linter
+            # The local test toolchain (scripts/local-tests.sh, e2e_gateway.py)
+            python3
+            uv
           ];
 
           # Point everything at the Nix-managed SDK
@@ -82,8 +85,6 @@
           shellHook = ''
             echo " HermesControl Android dev shell"
             echo "   Java:              $(java -version 2>&1 | head -1)"
-            echo "   Kotlin:            $(kotlin -version 2>&1)"
-            echo "   Gradle:            $(gradle --version 2>&1 | grep '^Gradle' || echo 'available')"
             echo "   ANDROID_HOME: $ANDROID_HOME"
             echo ""
 
