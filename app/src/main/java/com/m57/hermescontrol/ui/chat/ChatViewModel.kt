@@ -224,10 +224,23 @@ data class SessionUi(
     val messageCount: Int = 0,
     val parentSessionId: String? = null,
     val depth: Int = 0,
+    // Unix seconds of last activity (from session.list "started_at"); 0 = unknown
     val lastActive: Long = 0L,
-    val isStale: Boolean = false,
 ) {
+    /**
+     * Stale = known activity and idle for 7+ days. lastActive == 0 means
+     * UNKNOWN, not old — unknown-activity sessions must render as fresh
+     * (this exact rule previously emptied the rail for all mock/pipeline
+     * sessions; real server feeds can also emit 0).
+     */
+    val isStale: Boolean
+        get() =
+            lastActive > 0 &&
+                lastActive * 1000 < System.currentTimeMillis() - STALE_THRESHOLD_MS
+
     companion object {
+        private const val STALE_THRESHOLD_MS = 7L * 24 * 60 * 60 * 1000
+
         /**
          * Likivik patch: sort the rail newest-first, with pinned sessions lifted
          * to the top. Stable for ids equal on every axis so the rail keeps a

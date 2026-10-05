@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.m57.hermescontrol.R
+import com.m57.hermescontrol.data.model.Attachment
 import com.m57.hermescontrol.data.ws.PrivilegedRequestBinding
 import com.m57.hermescontrol.ui.chat.ChatBubble
 import com.m57.hermescontrol.ui.chat.ChatMessage
@@ -67,6 +68,9 @@ fun ChatMessageList(
     onLastAnimatedMessageIdChange: (String?) -> Unit,
     onRespondApproval: (String, PrivilegedRequestBinding, String) -> Unit,
     onCancelApproval: (String, PrivilegedRequestBinding) -> Unit,
+    // Fork: the caller supplies attachment opening; upstream routed it through a
+    // ChatViewModel parameter instead (removed here to keep the call sites simple).
+    onOpenAttachment: (Attachment) -> Unit = {},
     openingAttachmentPath: String? = null,
     clarifyRequest: ClarifyUi? = null,
     onRespondClarify: ((ClarifyUi, Map<String, String>) -> Unit)? = null,
