@@ -117,14 +117,17 @@ flavor-qualified tasks:
 ./gradlew ktlintCheck checkColorLiterals
 ```
 
-**ktlint standalone** (no SDK needed):
+**ktlint** (no binary, no SDK needed — the Gradle plugin brings the pinned engine):
 ```bash
-# Download the matching binary
-curl -sSLO https://github.com/pinterest/ktlint/releases/download/1.2.1/ktlint
-chmod +x ktlint
-./ktlint <file>                             # check one file
-./ktlint --format <file>                    # auto-fix
+./gradlew ktlintCheck                  # whole project
+./gradlew ktlintFormat                 # auto-fix
+./gradlew ktlintCheck --rerun-tasks    # force a real run
 ```
+Do **not** install a standalone `ktlint` binary. The engine version is pinned in
+`gradle/libs.versions.toml` (`ktlintEngine`) and the plugin version alongside it
+(`ktlintPlugin`); a binary on `PATH` would silently disagree with both CI and the
+build. Plain `--rerun` is a no-op on `ktlintCheck` — it is an aggregate task with
+no actions of its own, so only `--rerun-tasks` forces the checks to execute.
 
 **No SDK? CI handles everything** — push small and watch the checks below.
 

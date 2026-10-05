@@ -57,12 +57,17 @@ If you use AI coding tools (including agents) to contribute:
 We enforce Kotlin coding conventions and Jetpack Compose best practices.
 
 ### Kotlin Formatting
-- Code formatting is checked and enforced by **ktlint 1.2.1**.
-- Run formatting check locally before committing:
+- Code formatting is checked and enforced by **ktlint**, driven by the Gradle
+  plugin (`org.jlleitschuh.gradle.ktlint`) with the engine version pinned in
+  `gradle/libs.versions.toml` (currently `ktlintEngine = "1.2.1"`).
+- Run it through the wrapper. Do **not** install a standalone `ktlint` binary —
+  its version would silently differ from the one CI gates on:
   ```bash
-  ./ktlint <file>            # Check one file
-  ./ktlint --format <file>   # Auto-fix formatting issues
+  ./gradlew ktlintCheck                  # whole project
+  ./gradlew ktlintFormat                 # auto-fix
+  ./gradlew ktlintCheck --rerun-tasks    # force a real run (plain --rerun is a no-op)
   ```
+- The plugin also lints `.kts` build scripts, so `build.gradle.kts` files are in scope.
 - Import ordering is strictly ASCII-lexicographic (uppercase before lowercase: e.g., `LaunchedEffect` before `collectAsState`).
 
 ### Compose Guidelines
@@ -83,7 +88,7 @@ We enforce Kotlin coding conventions and Jetpack Compose best practices.
 Before submitting your PR, please verify:
 
 - [ ] Your branch is up-to-date with `main`.
-- [ ] Local build and `ktlint` checks pass successfully.
+- [ ] `./gradlew ktlintCheck` and `./gradlew checkColorLiterals` pass.
 - [ ] `checkColorLiterals` passes (no hardcoded Color literals outside theme/).
 - [ ] No unused imports, unused parameters, or dead code.
 - [ ] Every `Image` and `Icon` element has a descriptive `contentDescription` for accessibility.
