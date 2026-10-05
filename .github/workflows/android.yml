@@ -1,4 +1,13 @@
 # Modified from Hy4ri/hermes-mobile for this fork; see NOTICE.
+#
+# SCOPE — the IRIS flavor only (`sh.slb.irismobile`).
+# Iris is the flavor this fork ships: apk.yml defaults to it, the E2E suite drives
+# it, and every APK delivered to the device has been an iris build. `hermes` is the
+# upstream identity (`sh.slb.hermesmobile`) and is deliberately NOT built or tested
+# here — Likivik, 2026-10-05: "for now we only ever want to test our own flavor and
+# nothing else." The hermes flavor still EXISTS in app/build.gradle.kts so upstream
+# merges keep applying; it is simply not part of CI. Add a variant back deliberately
+# if that changes.
 
 name: Android CI/CD
 
@@ -114,33 +123,33 @@ jobs:
       - name: Grant Execute Permission for Gradlew
         run: chmod +x gradlew
 
+      # iris only, per the SCOPE note at the top — this was lintHermesDebug
+      # lintIrisDebug, i.e. two near-identical lint passes in one 6.2 min step.
       - name: Run debug lint
-        run: ./gradlew lintHermesDebug lintIrisDebug
+        run: ./gradlew lintIrisDebug
 
       - name: Upload lint reports
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: lint-reports
-          # Flavor-qualified since the hermes/iris split:
-          # lint-results-hermesDebug.*, lint-results-irisDebug.*
+          # Flavor-qualified since the hermes/iris split: lint-results-irisDebug.*
           path: app/build/reports/lint-results-*
           if-no-files-found: error
           retention-days: 7
 
-  # Unit tests are deliberately NOT run here. `unit.yml` owns them and already runs
-  # on every push and PR — including every PR into main, so a job here duplicated
-  # its Iris-debug run on the same commits.
+  # Unit tests are deliberately NOT run here: unit.yml owns them, runs on every
+  # push and every PR (including PRs into main), and covers the same irisDebug
+  # variant this job used to duplicate.
   #
   # What this job used to do: `./gradlew test` — the same 1,025 tests for all four
   # variants (hermes/iris × debug/release) in ~16 min, which made it the critical
-  # path of this ~21 min workflow. The flavours differ only by `applicationId` and
-  # the build types only by `ALLOW_CLEARTEXT` + minify, so three of the four
-  # variants re-ran the same suite for near-zero extra signal. Variant coverage is
-  # preserved by unit.yml's weekly all-variants job.
+  # path of this ~21 min workflow. Three of those four variants were near-copies
+  # (the flavours differ only by applicationId), and none of them is the iris
+  # flavour we ship.
 
   # ─────────────────────────────────────────────────────────────────────
-  # Job 4: Build Debug APK — depends on all three above passing.
+  # Job 4: Build Debug APK — depends on ktlint + lint passing.
   # ─────────────────────────────────────────────────────────────────────
   build:
     name: Build Debug APK
@@ -166,20 +175,20 @@ jobs:
       - name: Grant Execute Permission for Gradlew
         run: chmod +x gradlew
 
-      - name: Build debug APKs
-        run: ./gradlew assembleHermesDebug assembleIrisDebug
+      - name: Build debug APK (iris)
+        run: ./gradlew assembleIrisDebug
 
       - name: Upload Debug APK Artifact
         if: success()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: hermescontrol-debug-apk
-          path: app/build/outputs/apk/*/debug/*.apk
+          path: app/build/outputs/apk/iris/debug/*.apk
           if-no-files-found: error
           retention-days: 7
 
   # ─────────────────────────────────────────────────────────────────────
-  # Job 5: Release Compile — verifies release variant compiles.
+  # Job 5: Release Compile — verifies the iris release variant compiles.
   # Catches issues like debugImplementation-scoped dependencies that
   # main source code depends on (e.g. okhttp3.logging.HttpLoggingInterceptor).
   # debug-only CI jobs (ktlint, lint, tests) won't catch these.
@@ -208,12 +217,12 @@ jobs:
       - name: Grant Execute Permission for Gradlew
         run: chmod +x gradlew
 
-      - name: Compile release Kotlin
+      - name: Compile release Kotlin (iris)
         run: |
-          ./gradlew compileHermesReleaseKotlin compileIrisReleaseKotlin
+          ./gradlew compileIrisReleaseKotlin
 
   # ─────────────────────────────────────────────────────────────────────
-  # Job 6: Instrumented tests — runs on Android emulator.
+  # Job 6: Instrumented tests — runs on Android emulator, iris only.
   # Required for Compose UI tests (TEST-09, TEST-14) and Navigation3 tests
   # that need a real Activity lifecycle. Cannot run on JVM.
   # ─────────────────────────────────────────────────────────────────────
@@ -257,7 +266,7 @@ jobs:
             ~/.android/adb*
           key: avd-api34-atd-x86_64
 
-      - name: Run connectedDebugAndroidTest
+      - name: Run connectedIrisDebugAndroidTest
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
           api-level: 34
@@ -266,12 +275,14 @@ jobs:
           disable-animations: true
           force-avd-creation: false
           emulator-options: -no-window -no-audio -no-boot-anim -camera-back none -memory 2048
+          # iris only (see the SCOPE note at the top): this used to run the hermes
+          # variant first, which is the upstream identity and not what we ship.
+          #
           # `com.m57.hermescontrol.e2e` is excluded on purpose: those 8 classes drive a
           # REAL Hermes gateway and get an ephemeral password from e2e.yml's setup.
           # Without it they throw "e2ePassword not set", which is the correct loud
           # failure for "E2E executed without a gateway".
           script: |
-            ./gradlew connectedHermesDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.notPackage=com.m57.hermescontrol.e2e
             ./gradlew connectedIrisDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.notPackage=com.m57.hermescontrol.e2e
 
       - name: Upload instrumented test reports

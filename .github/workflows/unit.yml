@@ -1,25 +1,21 @@
-# This workflow is the SINGLE owner of unit tests — android.yml no longer runs any
-# (its "Run test" job ran `./gradlew test`, i.e. the same suite for all four
-# variants, duplicating the Iris-debug run below on every PR into main).
+# This workflow is the SINGLE owner of unit tests — android.yml no longer runs any.
 #
-# TRIGGERS — why `push` is limited to main:
+# SCOPE — the IRIS flavor only (`sh.slb.irismobile`). Iris is the flavor this fork
+# ships: apk.yml defaults to it, the E2E suite drives it, and every APK delivered to
+# the device has been an iris build. `hermes` is the upstream identity
+# (`sh.slb.hermesmobile`) and is deliberately NOT tested — Likivik, 2026-10-05:
+# "for now we only ever want to test our own flavor and nothing else."
+# So there is exactly one variant under test here: irisDebug. No variant matrix, no
+# scheduled all-variants sweep — add one back deliberately if that ever changes.
+#
+# TRIGGERS — why push is limited to main:
 #   * pull_request  — the only event that fires for a PR from a FORK (a fork push
-#     happens in the fork, so this repo never sees a push event for it), and fork
-#     PR runs get a read-only token with no secrets, which is the safe model.
-#     Do not move this to pull_request_target to "fix" that.
+#     happens in the fork, so this repo never sees a push event for it). Fork PR
+#     runs get a read-only token and no secrets, which is the safe model. Do not
+#     move this to pull_request_target.
 #   * push: [main]  — post-merge verification of what actually landed. Limiting it
-#     to main means a same-repo branch push does NOT also produce a push run
-#     alongside its pull_request run: one commit, one run.
-#
-# SCOPE — read before adding a variant or another trigger:
-#   * push / pull_request → ONE variant (Iris debug): the shared data/logic layer
-#     (ChatViewModel reducers, rail grouping + order persistence, rename
-#     fast-path) in ~7 min. The flavours differ only by `applicationId` and the
-#     build types only by `ALLOW_CLEARTEXT` + minify, so the other three variants
-#     re-run the same 1,025 tests for near-zero extra signal.
-#   * schedule (weekly) / workflow_dispatch → ALL FOUR variants, so anything
-#     genuinely variant-specific still surfaces without paying for it every push.
-#     Deliberately weekly, not nightly: a nightly all-variants run is ~16 min/day.
+#     to main means a same-repo branch push does NOT also produce a push run next
+#     to its pull_request run: one commit, one run.
 #
 # Modified from Hy4ri/hermes-mobile for this fork; see NOTICE.
 name: Unit tests
@@ -29,20 +25,17 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
-  schedule:
-    # Weekly all-variants sweep — Monday 03:00 UTC.
-    - cron: '0 3 * * 1'
 
-# Keyed on the BRANCH NAME, not on github.ref: github.ref is `refs/pull/N/merge`
-# on a pull_request event and `refs/heads/X` on a push, so a ref-keyed group puts
-# one commit into two lanes and both runs proceed. `github.head_ref` is set only
-# on pull_request events, hence the `ref_name` fallback. The workflow name is
-# prefixed because group names are repository-wide and case-insensitive —
-# without it this workflow and ktlint on the same branch would cancel each other.
+# Keyed on the BRANCH NAME, not github.ref: github.ref is refs/pull/N/merge on a
+# pull_request event and refs/heads/X on a push, so a ref-keyed group puts the same
+# commit in two lanes and both runs proceed. head_ref is set only on pull_request
+# events, hence the ref_name fallback. The workflow name is prefixed because group
+# names are repository-wide — without it, this workflow and ktlint on the same
+# branch would cancel each other.
 #
-# main is exempt from cancellation: a post-merge verification must not be killed
-# by a faster second merge. (android.yml gets the same effect by keying main runs
-# on the sha.)
+# main is exempt from cancellation: a post-merge verification must not be killed by
+# a faster second merge. (android.yml gets the same effect by keying main runs on
+# the sha.)
 concurrency:
   group: unit-${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
@@ -51,26 +44,24 @@ permissions:
   contents: read
 
 jobs:
-  # ─────────────────────────────────────────────────────────────────────
-  # Fast gate: one variant, every push to main and every PR.
-  # ─────────────────────────────────────────────────────────────────────
   unit-tests:
-    name: Unit tests (Iris debug)
+    name: Unit tests (iris debug)
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v5
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
 
       - uses: gradle/actions/setup-gradle@v4
 
-      # Iris is the consumer flavor used by the E2E suite; its unit tests
-      # (JUnit + Robolectric) cover the shared app logic under test.
-      - name: Run unit tests (Iris debug)
+      # The shared data/logic layer: ChatViewModel reducers, rail grouping + order
+      # persistence, rename fast-path. JUnit + Robolectric, ~7 min.
+      - name: Run unit tests (iris debug)
         run: ./gradlew testIrisDebugUnitTest --no-daemon -Dorg.gradle.workers.max=2
 
       - name: Upload unit test reports
@@ -78,36 +69,5 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: unit-test-reports
-          path: app/build/reports/tests/
-          retention-days: 14
-
-  # ─────────────────────────────────────────────────────────────────────
-  # Variant sweep: all four variants (hermes/iris × debug/release).
-  # Weekly schedule and manual dispatch only — this is the check that says
-  # "nothing variant-specific broke", not a per-push gate.
-  # ─────────────────────────────────────────────────────────────────────
-  unit-tests-all-variants:
-    name: Unit tests (all 4 variants)
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: 21
-
-      - uses: gradle/actions/setup-gradle@v4
-
-      - name: Run unit tests (all variants)
-        run: ./gradlew test --no-daemon -Dorg.gradle.workers.max=2
-
-      - name: Upload unit test reports
-        if: failure()
-        uses: actions/upload-artifact@v5
-        with:
-          name: unit-test-reports-all-variants
           path: app/build/reports/tests/
           retention-days: 14
