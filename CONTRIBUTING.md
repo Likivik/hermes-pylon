@@ -83,6 +83,22 @@ We enforce Kotlin coding conventions and Jetpack Compose best practices.
 
 ---
 
+## Testing Locally
+
+CI is the referee, but you do not have to push to find out:
+
+```bash
+nix develop -c bash scripts/local-tests.sh unit           # 1028 unit tests
+nix develop -c bash scripts/local-tests.sh instrumented   # 89 on-device UI tests
+nix develop -c bash scripts/local-tests.sh e2e            # 8 E2E classes, real gateway
+```
+
+While iterating on a PR, unit tests are enough. Before merging to `main`, run all
+three tiers. Two host requirements and the E2E port caveat are documented in
+`AGENTS.md` → "Local test toolchain".
+
+---
+
 ## PR Checklist
 
 Before submitting your PR, please verify:
