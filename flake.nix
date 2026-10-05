@@ -64,14 +64,17 @@
             # Android SDK (platforms, build-tools, platform-tools, emulator, system-images)
             androidSdk
 
-            # Kotlin compiler
-            kotlin
+            # NOTE: no kotlin/gradle/ktlint here on purpose (see README/toolchain
+            # note below). Their versions belong to the build, not to this shell:
+            #   - Gradle  -> gradle/wrapper/gradle-wrapper.properties (./gradlew)
+            #   - Kotlin  -> libs.versions.toml (Gradle plugin)
+            #   - ktlint  -> libs.versions.toml (org.jlleitschuh.gradle.ktlint)
+            # Shipping a second copy of any of them is how a local run ends up
+            # disagreeing with CI.
 
-            # Gradle
-            gradle
-
-            # Useful utilities
-            ktlint # Kotlin linter
+            # The local test toolchain (scripts/local-tests.sh, e2e_gateway.py)
+            python3
+            uv
           ];
 
           # Point everything at the Nix-managed SDK
@@ -79,21 +82,20 @@
           ANDROID_SDK_ROOT = "${androidSdk}/libexec/android-sdk";
           JAVA_HOME = "${pkgs.jdk21}";
 
-          # Gradle needs a writable home
-          GRADLE_USER_HOME = "$PWD/.gradle-home";
-
           shellHook = ''
             echo " HermesControl Android dev shell"
             echo "   Java:              $(java -version 2>&1 | head -1)"
-            echo "   Kotlin:            $(kotlin -version 2>&1)"
-            echo "   Gradle:            $(gradle --version 2>&1 | grep '^Gradle' || echo 'available')"
             echo "   ANDROID_HOME: $ANDROID_HOME"
             echo ""
 
             # Make sure the android CLI from ~/.local/bin is on PATH
             export PATH="$HOME/.local/bin:$PATH"
 
-            # Writable gradle home
+            # Writable, repo-local gradle home. This MUST be exported from the
+            # shellHook: as a plain mkShell attribute the value stays the literal
+            # string "$PWD/.gradle-home" and gradle creates a directory named
+            # '$PWD' in the repo root.
+            export GRADLE_USER_HOME="$PWD/.gradle-home"
             mkdir -p "$GRADLE_USER_HOME"
           '';
         };

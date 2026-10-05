@@ -117,16 +117,68 @@ flavor-qualified tasks:
 ./gradlew ktlintCheck checkColorLiterals
 ```
 
-**ktlint standalone** (no SDK needed):
+**ktlint** (no binary, no SDK needed — the Gradle plugin brings the pinned engine):
 ```bash
-# Download the matching binary
-curl -sSLO https://github.com/pinterest/ktlint/releases/download/1.2.1/ktlint
-chmod +x ktlint
-./ktlint <file>                             # check one file
-./ktlint --format <file>                    # auto-fix
+./gradlew ktlintCheck                  # whole project
+./gradlew ktlintFormat                 # auto-fix
+./gradlew ktlintCheck --rerun-tasks    # force a real run
 ```
+Do **not** install a standalone `ktlint` binary. The engine version is pinned in
+`gradle/libs.versions.toml` (`ktlintEngine`) and the plugin version alongside it
+(`ktlintPlugin`); a binary on `PATH` would silently disagree with both CI and the
+build. Plain `--rerun` is a no-op on `ktlintCheck` — it is an aggregate task with
+no actions of its own, so only `--rerun-tasks` forces the checks to execute.
 
 **No SDK? CI handles everything** — push small and watch the checks below.
+
+### ✅ Local test toolchain (all three tiers, no CI)
+
+`scripts/local-tests.sh` drives the same Gradle tasks and the same Gradle Managed
+Device CI uses, so a local verdict comes from the same mechanism rather than a
+lookalike.
+
+```bash
+nix develop -c bash scripts/local-tests.sh sdk            # GMD system image (once, 8.2 GB)
+nix develop -c bash scripts/local-tests.sh unit           # 1028 unit tests
+nix develop -c bash scripts/local-tests.sh instrumented   # 89 on-device UI tests
+nix develop -c bash scripts/local-tests.sh e2e            # 8 E2E classes vs a real gateway
+nix develop -c bash scripts/local-tests.sh gateway start  # leave the fixture gateway up
+```
+
+Two host requirements, both non-obvious:
+
+1. **The repo tree must be on an `exec` mount.** Under `noexec`, `./gradlew` fails
+   with `Permission denied` (exit 126) while `sh gradlew` still works.
+2. **The Android SDK root must be writable** for Gradle Managed Device. The Nix SDK
+   is read-only, so `.android-sdk/` (gitignored) is a symlink farm over it with a
+   real `system-images/` directory.
+
+E2E specifics:
+
+- `scripts/e2e_gateway.py` boots a **real** Hermes gateway with ephemeral password
+  auth and seeds sessions, mirroring CI's fixture. It needs a gateway checkout and
+  a venv; the script header has the recipe.
+- It runs on port **18642** with its own `HERMES_HOME=/tmp/e2e-home`. **Never** point
+  a local E2E run at 8642–8645 — those belong to the live gateway, and these tests
+  rename / delete / archive / pin sessions. The harness takes the base URL as a
+  runner arg (`e2eBaseUrl`) for exactly this reason; CI keeps its default.
+- `e2e` **resets** the fixture before every run: drop `state.db`, restart, seed.
+  Without it, run 2 starts from run 1's deletions and fails for reasons that have
+  nothing to do with the code under test.
+- Seed **after** the gateway is healthy. Seeding first wins the
+  `CREATE TABLE IF NOT EXISTS` race with a wrong table shape, every session query
+  then 500s, and the rail renders empty.
+
+**Gradle's UP-TO-DATE trap.** A cached task can report success having executed
+nothing, so the runner forces execution. For an aggregate task such as
+`ktlintCheck`, even `--rerun` is a no-op — use `--rerun-tasks`:
+
+```bash
+nix develop -c ./gradlew ktlintCheck --rerun-tasks
+```
+
+Scope note: iterate on a PR with unit tests; run all three tiers before merging to
+`main`.
 
 ### CI pipeline (`.github/workflows/android.yml`)
 

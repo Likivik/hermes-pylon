@@ -3,6 +3,7 @@
 import org.gradle.api.tasks.testing.Test
 
 plugins {
+    alias(libs.plugins.ktlint)
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlin.serialization)
@@ -263,17 +264,16 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.navigation3)
 }
 
-tasks.register<Exec>("ktlintCheck") {
-    group = "verification"
-    description = "Runs ktlint check."
-    workingDir = rootProject.projectDir
-    commandLine("sh", "-c", "ktlint \"app/src/**/*.kt\"")
-}
-tasks.register<Exec>("ktlintFormat") {
-    group = "formatting"
-    description = "Runs ktlint format."
-    workingDir = rootProject.projectDir
-    commandLine("sh", "-c", "ktlint -F \"app/src/**/*.kt\"")
+// ── ktlint ───────────────────────────────────────────────────────────────
+// Provided by the org.jlleitschuh.gradle.ktlint plugin; the engine version is
+// pinned in gradle/libs.versions.toml. This replaced two Exec tasks that shelled
+// out to whatever `ktlint` happened to be on PATH -- so CI (a downloaded 1.2.1)
+// and a local devshell (nix's 1.8.0) could disagree about a required check.
+//
+// Tasks: ./gradlew ktlintCheck   (add --rerun to force a non-cached run)
+//        ./gradlew ktlintFormat
+ktlint {
+    version.set(libs.versions.ktlintEngine.get())
 }
 
 // ── Hardcoded Color Guard (issue #622) ────────────────────────────────────
@@ -289,16 +289,19 @@ tasks.register<Exec>("ktlintFormat") {
 //   - Color.Transparent / Color.Unspecified (intentional)
 
 // Resolve paths at configuration time (config-cache compatible).
-val colorGuardSrcDir = layout.projectDirectory
-    .dir("src/main/java/com/m57/hermescontrol")
-val colorGuardExemptions = listOf(
-    "/theme/",
-    "PairingScreen.kt",
-    "AuthLoginScreen.kt",
-    "Preview.kt",
-)
+val colorGuardSrcDir =
+    layout.projectDirectory
+        .dir("src/main/java/com/m57/hermescontrol")
+val colorGuardExemptions =
+    listOf(
+        "/theme/",
+        "PairingScreen.kt",
+        "AuthLoginScreen.kt",
+        "Preview.kt",
+    )
 val colorGuardHexPattern = Regex("""Color\(\s*0x[0-9A-Fa-f]{6,8}\s*\)""")
-val colorGuardNamedPattern = Regex("""Color\.(White|Black|Red|Green|Gray|LightGray|DarkGray|Yellow|Blue|Cyan|Magenta)\b""")
+val colorGuardNamedPattern =
+    Regex("""Color\.(White|Black|Red|Green|Gray|LightGray|DarkGray|Yellow|Blue|Cyan|Magenta)\b""")
 
 tasks.register("checkColorLiterals") {
     group = "verification"
@@ -326,9 +329,10 @@ tasks.register("checkColorLiterals") {
         }
 
         if (offenders.isNotEmpty()) {
-            val report = offenders.joinToString("\n") { (path, line) ->
-                "  - $path:$line"
-            }
+            val report =
+                offenders.joinToString("\n") { (path, line) ->
+                    "  - $path:$line"
+                }
             throw GradleException(
                 "Hardcoded Color literals found outside theme/ + *Preview.kt + _test:\n$report\n\n" +
                     "Replace with MaterialTheme.colorScheme.<token>, " +
