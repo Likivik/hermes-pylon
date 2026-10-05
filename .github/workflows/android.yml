@@ -128,54 +128,23 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  # ─────────────────────────────────────────────────────────────────────
-  # Job 3: Unit tests — runs in parallel with ktlint & android-lint.
-  # ─────────────────────────────────────────────────────────────────────
-  unit-tests:
-    name: Unit & Integration Tests
-    runs-on: ubuntu-latest
-    # `./gradlew test` runs the suite for EVERY variant (hermes/iris × debug/release),
-    # so it needs roughly twice the budget of unit.yml's single-variant run — which
-    # takes ~8-10 min and gets 25. At 10 min this job was cancelled mid-run at
-    # exactly 10:00, which then showed up as a failed CI Summary and skipped the
-    # two `if: success()` jobs below.
-    timeout-minutes: 30
-    steps:
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6
-        with:
-          distribution: temurin
-          java-version: '21'
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6
-        with:
-          validate-wrappers: true
-          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTED_KEY }}
-
-      - name: Grant Execute Permission for Gradlew
-        run: chmod +x gradlew
-
-      - name: Run test
-        run: ./gradlew test
-
-      - name: Upload test reports
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: test-reports
-          path: app/build/reports/tests/
-          retention-days: 7
+  # Unit tests are deliberately NOT run here. `unit.yml` owns them and already runs
+  # on every push and PR — including every PR into main, so a job here duplicated
+  # its Iris-debug run on the same commits.
+  #
+  # What this job used to do: `./gradlew test` — the same 1,025 tests for all four
+  # variants (hermes/iris × debug/release) in ~16 min, which made it the critical
+  # path of this ~21 min workflow. The flavours differ only by `applicationId` and
+  # the build types only by `ALLOW_CLEARTEXT` + minify, so three of the four
+  # variants re-ran the same suite for near-zero extra signal. Variant coverage is
+  # preserved by unit.yml's weekly all-variants job.
 
   # ─────────────────────────────────────────────────────────────────────
   # Job 4: Build Debug APK — depends on all three above passing.
   # ─────────────────────────────────────────────────────────────────────
   build:
     name: Build Debug APK
-    needs: [ktlint, android-lint, unit-tests]
+    needs: [ktlint, android-lint]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -217,7 +186,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────
   release-compile:
     name: Release Compile Check
-    needs: [ktlint, android-lint, unit-tests]
+    needs: [ktlint, android-lint]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -322,7 +291,6 @@ jobs:
     needs:
       - ktlint
       - android-lint
-      - unit-tests
       - build
       - release-compile
       - instrumented-tests
@@ -334,7 +302,6 @@ jobs:
         env:
           KTLINT_RESULT: ${{ needs.ktlint.result }}
           LINT_RESULT: ${{ needs.android-lint.result }}
-          TEST_RESULT: ${{ needs.unit-tests.result }}
           BUILD_RESULT: ${{ needs.build.result }}
           RELEASE_COMPILE_RESULT: ${{ needs.release-compile.result }}
           INSTRUMENTED_RESULT: ${{ needs.instrumented-tests.result }}
@@ -343,7 +310,6 @@ jobs:
           for entry in \
             "ktlint:$KTLINT_RESULT" \
             "android-lint:$LINT_RESULT" \
-            "unit-tests:$TEST_RESULT" \
             "build:$BUILD_RESULT" \
             "release-compile:$RELEASE_COMPILE_RESULT" \
             "instrumented-tests:$INSTRUMENTED_RESULT"; do
