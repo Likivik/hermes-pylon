@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.Autorenew
@@ -43,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.m57.hermescontrol.R
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
+import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.chat.SubagentIndicator
 import com.m57.hermescontrol.ui.chat.TodoItem
 
@@ -69,7 +69,7 @@ fun SubagentInspectionSheet(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = Spacing.md)
                     .padding(bottom = 24.dp),
         ) {
             // Header
@@ -119,7 +119,7 @@ fun SubagentInspectionSheet(
                         item(key = "todos_header") {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(vertical = 4.dp),
+                                modifier = Modifier.padding(vertical = Spacing.xs),
                             ) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.FormatListBulleted,
@@ -149,7 +149,7 @@ fun SubagentInspectionSheet(
                             item(key = "subagents_header") {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+                                    modifier = Modifier.padding(top = Spacing.sm, bottom = Spacing.xs),
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Groups,
@@ -189,7 +189,7 @@ internal fun TodoInspectionCard(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth().padding(start = (depth.coerceIn(0, MAX_TODO_DEPTH) * 12).dp),
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Row(
@@ -256,7 +256,7 @@ internal fun TodoInspectionCard(
 internal fun InspectionItemCard(indicator: SubagentIndicator) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
@@ -315,7 +315,7 @@ internal fun InspectionItemCard(indicator: SubagentIndicator) {
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
+                            .clip(MaterialTheme.shapes.small)
                             .background(MaterialTheme.colorScheme.surfaceContainerLowest)
                             .padding(8.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp),

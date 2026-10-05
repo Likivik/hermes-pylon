@@ -19,7 +19,6 @@ import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.ws.PrivilegedRequestBinding
 import com.m57.hermescontrol.ui.chat.ChatBubble
 import com.m57.hermescontrol.ui.chat.ChatMessage
-import com.m57.hermescontrol.ui.chat.ChatViewModel
 import com.m57.hermescontrol.ui.chat.ClarifyUi
 import com.m57.hermescontrol.ui.chat.ImageViewerModel
 import com.m57.hermescontrol.ui.chat.MessageRole
@@ -66,7 +65,6 @@ fun ChatMessageList(
     listState: androidx.compose.foundation.lazy.LazyListState,
     lastAnimatedMessageId: String?,
     onLastAnimatedMessageIdChange: (String?) -> Unit,
-    viewModel: ChatViewModel,
     onRespondApproval: (String, PrivilegedRequestBinding, String) -> Unit,
     onCancelApproval: (String, PrivilegedRequestBinding) -> Unit,
     openingAttachmentPath: String? = null,
@@ -134,7 +132,7 @@ fun ChatMessageList(
                         isCurrentMatch = isCurrentMatch,
                         onRespondApproval = onRespondApproval,
                         onCancelApproval = onCancelApproval,
-                        onOpenAttachment = viewModel::openAttachment,
+                        onOpenAttachment = onOpenAttachment,
                         openingAttachmentPath = openingAttachmentPath,
                         onImageClick = onImageClick,
                     )
@@ -156,7 +154,7 @@ fun ChatMessageList(
                             isDarkTheme = isDark,
                             searchQuery = "",
                             isCurrentMatch = false,
-                            onOpenAttachment = viewModel::openAttachment,
+                            onOpenAttachment = onOpenAttachment,
                             openingAttachmentPath = openingAttachmentPath,
                             onImageClick = onImageClick,
                         )

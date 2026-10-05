@@ -4,12 +4,12 @@ package com.m57.hermescontrol.ui.chat
 
 import android.Manifest
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.speech.RecognizerIntent
-import android.speech.SpeechRecognizer
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -264,6 +264,12 @@ fun ChatScreen(
     var inputFieldValue by rememberSaveable(stateSaver = TextFieldValue.Saver) {
         mutableStateOf(TextFieldValue(""))
     }
+    LaunchedEffect(state.pendingPrefillText) {
+        state.pendingPrefillText?.let { prefill ->
+            inputFieldValue = ChatInputPolicy.commandFieldValue(prefill)
+            viewModel.consumePendingPrefill()
+        }
+    }
     var isListening by rememberSaveable { mutableStateOf(false) }
     var lastAnimatedMessageId by rememberSaveable { mutableStateOf<String?>(null) }
     var showReloginDialog by rememberSaveable { mutableStateOf(false) }
@@ -314,7 +320,7 @@ fun ChatScreen(
             ActivityResultContracts.RequestPermission(),
         ) { granted ->
             if (granted) {
-                if (SpeechRecognizer.isRecognitionAvailable(context)) {
+                if (SpeechInputHelper.isSpeechInputAvailable(context)) {
                     val intent =
                         Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                             putExtra(
@@ -327,7 +333,14 @@ fun ChatScreen(
                             )
                         }
                     isListening = true
-                    speechLauncher.launch(intent)
+                    try {
+                        speechLauncher.launch(intent)
+                    } catch (_: ActivityNotFoundException) {
+                        isListening = false
+                        scrollScope.launch {
+                            snackbarHostState.showSnackbar(sttNotAvailableMsg)
+                        }
+                    }
                 } else {
                     scrollScope.launch {
                         snackbarHostState.showSnackbar(sttNotAvailableMsg)
@@ -441,6 +454,7 @@ fun ChatScreen(
         clarifyRequest = state.clarifyRequest,
         sudoPrompt = state.sudoPrompt,
         secretPrompt = state.secretPrompt,
+        vaultPrompt = state.vaultPrompt,
         listState = listState,
         scrollController = scrollController,
         snackbarHostState = snackbarHostState,
@@ -714,10 +728,11 @@ fun ChatScreen(
                         lastAnimatedMessageId = lastAnimatedMessageId,
                         onLastAnimatedMessageIdChange = { lastAnimatedMessageId = it },
                         onRespondApproval = viewModel::respondToApproval,
+                        onCancelApproval = viewModel::cancelApproval,
                         onOpenAttachment = viewModel::openAttachment,
                         openingAttachmentPath = state.openingAttachmentPath,
                         clarifyRequest = state.clarifyRequest,
-                        onRespondClarify = viewModel::respondToClarify,
+                        onRespondClarify = viewModel::respondToClarifyBatch,
                         onDismissClarify = viewModel::dismissClarify,
                         onImageClick = { viewingImage = it },
                     )
@@ -768,7 +783,7 @@ fun ChatScreen(
                                 Manifest.permission.RECORD_AUDIO,
                             ) == PackageManager.PERMISSION_GRANTED
                         ) {
-                            if (SpeechRecognizer.isRecognitionAvailable(context)) {
+                            if (SpeechInputHelper.isSpeechInputAvailable(context)) {
                                 val intent =
                                     Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                                         putExtra(
@@ -781,7 +796,14 @@ fun ChatScreen(
                                         )
                                     }
                                 isListening = true
-                                speechLauncher.launch(intent)
+                                try {
+                                    speechLauncher.launch(intent)
+                                } catch (_: ActivityNotFoundException) {
+                                    isListening = false
+                                    scrollScope.launch {
+                                        snackbarHostState.showSnackbar(sttNotAvailableMsg)
+                                    }
+                                }
                             } else {
                                 scrollScope.launch {
                                     snackbarHostState.showSnackbar(sttNotAvailableMsg)
