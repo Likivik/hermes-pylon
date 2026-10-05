@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Enable KVM group perms
         run: |
@@ -72,7 +72,7 @@ jobs:
       # token needed. (hermes-agent checkout must be FIRST so the cache glob
       # can resolve uv.lock.)
       - name: Checkout hermes-agent (gateway source)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           # Public repo — clones without a token.
           repository: Likivik/hermes-agent
