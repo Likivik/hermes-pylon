@@ -8,6 +8,15 @@
 # nothing else." The hermes flavor still EXISTS in app/build.gradle.kts so upstream
 # merges keep applying; it is simply not part of CI. Add a variant back deliberately
 # if that changes.
+#
+# COST — what runs when:
+#   every PR   : ktlint, Android Lint, Build Debug APK, Release Compile (all iris)
+#   PR + label : add the `full-ci` label to also run Instrumented Tests
+#   push main  : everything, including Instrumented Tests (post-merge verification)
+#   tags       : everything (apk-*/e2e-*/robo-*/render-* workflows are separate)
+# Instrumented Tests are the slowest job (emulator boot dominates: 6.7 min of a
+# 7.3 min job) and were the whole critical path of this workflow, so they are
+# opt-in on PRs rather than always-on. Unit tests are owned by unit.yml.
 
 name: Android CI/CD
 
@@ -222,7 +231,7 @@ jobs:
           ./gradlew compileIrisReleaseKotlin
 
   # ─────────────────────────────────────────────────────────────────────
-  # Job 6: Instrumented tests — runs on Android emulator, iris only.
+  # Job 6: Instrumented tests — Android emulator, iris only, OPT-IN on PRs.
   # Required for Compose UI tests (TEST-09, TEST-14) and Navigation3 tests
   # that need a real Activity lifecycle. Cannot run on JVM.
   # ─────────────────────────────────────────────────────────────────────
@@ -230,6 +239,16 @@ jobs:
     name: Instrumented Tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # The emulator is the slowest thing in this repo's CI — boot dominates the job
+    # (6.7 min of 7.3), and it was therefore the entire critical path of the PR
+    # gate. So it does not run on every PR any more; it runs:
+    #   * post-merge, on push to main (that is what verifies what actually landed),
+    #   * on tags and on manual dispatch,
+    #   * and on a PR that carries the `full-ci` label, when you want the UI
+    #     coverage before merging.
+    # A skipped job here is fine: ci-summary knows to ignore `skipped` for exactly
+    # this job, so skipping cannot turn the gate red.
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-ci')
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -327,6 +346,11 @@ jobs:
             name="${entry%%:*}"
             result="${entry#*:}"
             echo "::notice::$name = $result"
+            # instrumented-tests is skipped by design on PRs without the full-ci
+            # label. Every other job must have actually passed.
+            if [[ "$name" == "instrumented-tests" && "$result" == "skipped" ]]; then
+              continue
+            fi
             if [[ "$result" != "success" ]]; then
               FAILED=1
             fi
