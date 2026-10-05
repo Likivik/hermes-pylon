@@ -1,0 +1,88 @@
+name: Build signed APK
+
+on:
+  push:
+    tags: ['apk-*']
+  workflow_dispatch:
+    inputs:
+      flavor:
+        description: 'Flavor to build (iris = default | hermes | all)'
+        required: false
+        default: 'iris'
+        type: choice
+        options: [iris, hermes, all]
+      variant:
+        description: 'Variant (release = default | debug)'
+        required: false
+        default: 'release'
+        type: choice
+        options: [release, debug]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Gradle (cached)
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build APK
+        env:
+          FLAVOR: ${{ github.event.inputs.flavor || 'iris' }}
+          VARIANT: ${{ github.event.inputs.variant || 'release' }}
+        # FLAVOR/VARIANT are workflow-input enums (all|hermes|iris / release|debug), never free text — no injection risk
+        run: |
+          case "$FLAVOR" in
+            hermes) F="Hermes" ;;
+            iris)   F="Iris" ;;
+            *)      F="" ;;
+          esac
+          V=$(echo "$VARIANT" | sed 's/^./\U&/')
+          # Version bumps every build so Android treats it as a real upgrade:
+          # versionCode = tag number (apk-7 -> 7); versionName = full tag.
+          REF="${GITHUB_REF_NAME:-}"
+          VCODE="${REF#apk-}"; VCODE="${VCODE%%-*}"
+          [ "$VCODE" = "$REF" ] && VCODE=""
+          ./gradlew "assemble${F}${V}" --no-daemon -Dorg.gradle.workers.max=2 \
+            ${VCODE:+-PversionCode=$VCODE -PversionName=$REF}
+
+      - name: Sign APKs (release only)
+        if: ${{ github.event.inputs.variant != 'debug' }}
+        env:
+          KS_BASE64: ${{ secrets.APK_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.APK_KEYSTORE_PASSWORD }}
+        run: |
+          echo "$KS_BASE64" | base64 -d > /tmp/keystore.jks
+          for apk in app/build/outputs/apk/*/release/*-unsigned.apk; do
+            aligned="${apk%-unsigned.apk}-aligned.apk"
+            signed="${apk%-unsigned.apk}-signed.apk"
+            $ANDROID_HOME/build-tools/36.0.0/zipalign -f 4 "$apk" "$aligned"
+            $ANDROID_HOME/build-tools/36.0.0/apksigner sign \
+              --ks /tmp/keystore.jks --ks-pass pass:"$KS_PASS" \
+              --out "$signed" "$aligned"
+          done
+          rm -f /tmp/keystore.jks
+
+      - name: Upload artifacts (release)
+        if: ${{ github.event.inputs.variant != 'debug' }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: hermes-pylon-apks
+          path: app/build/outputs/apk/*/release/*-signed.apk
+          retention-days: 90
+
+      - name: Upload artifacts (debug)
+        if: ${{ github.event.inputs.variant == 'debug' }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: hermes-pylon-apks-debug
+          path: app/build/outputs/apk/*/debug/*.apk
+          retention-days: 14

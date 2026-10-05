@@ -48,6 +48,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.PluginInfo
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
+import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.DetailDialog
 import com.m57.hermescontrol.ui.common.EmptyState
 import com.m57.hermescontrol.ui.common.ErrorState
@@ -189,7 +190,7 @@ fun PluginsScreen(
                                 text = stringResource(R.string.plugins_orphan_heading),
                                 style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(vertical = 8.dp),
+                                modifier = Modifier.padding(vertical = Spacing.sm),
                             )
                         }
                         items(state.orphanPlugins, key = { "orphan-${it.name}" }) { plugin ->
@@ -235,7 +236,7 @@ private fun ProviderSelectionSection(
     val providerDefaultsLabel = stringResource(R.string.plugins_provider_defaults)
 
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(Spacing.md)) {
             Text(
                 text = stringResource(R.string.plugins_providers_heading),
                 style = MaterialTheme.typography.titleMedium,
@@ -316,7 +317,7 @@ private fun InstallSection(
     viewModel: PluginsViewModel,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(Spacing.md)) {
             Text(
                 text = stringResource(R.string.plugins_install_heading),
                 style = MaterialTheme.typography.titleMedium,
@@ -408,7 +409,7 @@ private fun PluginCard(
     val statusColors = LocalHermesStatusColors.current
 
     Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(Spacing.md)) {
             // Header row: name + toggle
             Row(
                 modifier = Modifier.fillMaxWidth(),

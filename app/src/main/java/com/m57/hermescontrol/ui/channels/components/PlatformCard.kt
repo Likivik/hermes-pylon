@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
@@ -45,6 +44,7 @@ import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.MessagingPlatform
 import com.m57.hermescontrol.data.model.MessagingPlatformUpdate
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
+import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.channels.ConfigureForm
 
 private enum class StatusRole { SUCCESS, WARNING, ERROR, NEUTRAL }
@@ -84,14 +84,14 @@ private fun platformStateStyle(state: String): StateStyle {
 private fun StateBadge(state: String) {
     val style = platformStateStyle(state)
     Surface(
-        shape = RoundedCornerShape(4.dp),
+        shape = MaterialTheme.shapes.extraSmall,
         color = style.color.copy(alpha = 0.15f),
     ) {
         Text(
             text = style.label,
             color = style.color,
             style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = 2.dp),
         )
     }
 }
@@ -113,7 +113,7 @@ internal fun PlatformCard(
     val style = platformStateStyle(platform.state)
 
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(Spacing.md)) {
             // ── Top row: icon + name + badge + switch ──
             Row(
                 modifier = Modifier.fillMaxWidth(),

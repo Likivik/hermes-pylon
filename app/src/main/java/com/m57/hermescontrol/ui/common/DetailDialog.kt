@@ -17,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
+import com.m57.hermescontrol.theme.Spacing
 
 /**
  * Semantic tone for a detail row's value text.
@@ -81,7 +82,7 @@ fun DetailDialog(
                             .padding(padding)
                             .fillMaxWidth()
                             .verticalScroll(rememberScrollState())
-                            .padding(16.dp),
+                            .padding(Spacing.md),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     visibleRows.forEachIndexed { index, (label, value, tone) ->

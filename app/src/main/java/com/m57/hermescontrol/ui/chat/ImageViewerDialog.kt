@@ -45,6 +45,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.m57.hermescontrol.R
+import com.m57.hermescontrol.theme.Spacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -199,7 +200,7 @@ fun ImageViewerDialog(
                         Text(
                             text = String.format(loadFailedFmt, resolved.message),
                             color = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                            modifier = Modifier.align(Alignment.Center).padding(Spacing.lg),
                         )
 
                     is ImageBytesResolver.Result.Bytes ->
@@ -238,7 +239,7 @@ fun ImageViewerDialog(
                         Modifier
                             .fillMaxWidth()
                             .statusBarsPadding()
-                            .padding(8.dp),
+                            .padding(Spacing.sm),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -252,7 +253,7 @@ fun ImageViewerDialog(
                     Row {
                         if (isBusy) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp).padding(horizontal = 8.dp),
+                                modifier = Modifier.size(24.dp).padding(horizontal = Spacing.sm),
                                 strokeWidth = 2.dp,
                                 color = MaterialTheme.colorScheme.onSurface,
                             )

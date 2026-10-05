@@ -21,6 +21,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.CredentialPoolEntry
+import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.StatusBadge
 import com.m57.hermescontrol.ui.common.StatusBadgeType
 
@@ -32,16 +33,16 @@ internal fun CredentialEntryRow(
     spacing: com.m57.hermescontrol.theme.Spacing,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = spacing.xs),
+        modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = entry.label ?: "(${stringResource(R.string.system_credentials_api_key)} ${entry.index ?: 0})",
                 style = MaterialTheme.typography.bodyMedium,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                 entry.token_preview?.let { preview ->
                     Text(
                         text = preview,

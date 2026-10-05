@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.m57.hermescontrol.R
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
+import com.m57.hermescontrol.theme.Spacing
 import java.util.Locale
 import kotlin.math.min
 
@@ -89,7 +90,7 @@ fun ContextUsageChip(
                     } else {
                         Modifier
                     },
-                ).padding(horizontal = 12.dp, vertical = 4.dp),
+                ).padding(horizontal = 12.dp, vertical = Spacing.xs),
         verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         Row(

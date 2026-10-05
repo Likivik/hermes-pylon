@@ -8,10 +8,37 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.room)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.screenshot)
+    alias(libs.plugins.roborazzi)
 }
 
 android {
     namespace = "com.m57.hermescontrol"
+    // Enable the screenshotTest source set (compose screenshot plugin).
+    experimentalProperties["android.experimental.enableScreenshotTest"] = true
+
+    testOptions {
+        unitTests {
+            // Roborazzi needs includeAndroidResources to resolve themed resources.
+            isIncludeAndroidResources = true
+            all { it.jvmArgs("-Xmx2g") }
+        }
+        // Gradle Managed Devices: AGP provisions + drives the emulator itself,
+        // so the CI workflow is one gradle task and test failures set the
+        // Gradle exit code (no am-instrument exit-0-on-failure trap).
+        managedDevices {
+            localDevices {
+                create("e2eApi34") {
+                    device = "Pixel 5"
+                    apiLevel = 34
+                    // ATD (test-only, headless, no GMS) boots much faster than
+                    // "google" and is what the GMD docs recommend for tests.
+                    // aosp-atd 34 exists on modern SDK images.
+                    systemImageSource = "aosp-atd"
+                }
+            }
+        }
+    }
 
     lint {
         disable += "MissingTranslation"
@@ -138,6 +165,15 @@ room {
 }
 
 dependencies {
+    // @PreviewTest annotation + validation for the screenshotTest source set.
+    "screenshotTestImplementation"(libs.screenshot.validation.api)
+
+    // Roborazzi: JVM (Robolectric) screenshot capture/verify for Compose UI.
+    "testImplementation"(libs.roborazzi.core)
+    "testImplementation"(libs.roborazzi.rule)
+    "testImplementation"(libs.robolectric)
+    "testImplementation"(libs.androidx.compose.ui.test.junit4)
+
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
     androidTestImplementation(composeBom)
@@ -170,6 +206,10 @@ dependencies {
     implementation(libs.retrofit)
     implementation(libs.retrofit.converter.kotlinx.serialization)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.emoji.kt)
+    implementation(libs.emoji.compose)
+    implementation(libs.reorderable)
+    implementation(libs.crashwatcher)
 
     // Native Compose LaTeX rendering
     implementation(libs.latex.base)
@@ -198,12 +238,19 @@ dependencies {
     testRuntimeOnly(libs.junit.vintage.engine)
     testRuntimeOnly(libs.junit.platform.launcher)
     testImplementation(libs.okhttp.mockwebserver)
+    androidTestImplementation(libs.okhttp.mockwebserver)
+    androidTestImplementation(composeBom)
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.espresso.core)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
     testImplementation(libs.turbine)
 
     // Instrumented tests: jUnit rules and runners
     androidTestImplementation(libs.androidx.test.core)
+    androidTestImplementation(libs.androidx.test.rules)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.espresso.core)

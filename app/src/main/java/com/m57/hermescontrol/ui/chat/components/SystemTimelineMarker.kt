@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.m57.hermescontrol.R
+import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.chat.SystemTimelineEvent
 
 @StringRes
@@ -42,7 +43,7 @@ internal fun SystemTimelineMarker(
             stringResource(timelineEventLabel(event.kind))
         }
     Box(
-        modifier = modifier.fillMaxWidth().padding(vertical = 4.dp).testTag("system_timeline_event"),
+        modifier = modifier.fillMaxWidth().padding(vertical = Spacing.xs).testTag("system_timeline_event"),
         contentAlignment = Alignment.Center,
     ) {
         Surface(
@@ -53,7 +54,7 @@ internal fun SystemTimelineMarker(
                 text = text,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = Spacing.xs),
             )
         }
     }

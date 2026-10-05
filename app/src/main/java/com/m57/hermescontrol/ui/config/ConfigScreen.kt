@@ -63,6 +63,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.ConfigSchemaResponse
+import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.ErrorState
 import com.m57.hermescontrol.ui.common.ExposedDropdownField
 import com.m57.hermescontrol.ui.common.HermesScaffold
@@ -166,8 +167,8 @@ private fun ConfigContent(
         Column(
             modifier =
                 Modifier
-                    .padding(horizontal = 16.dp)
-                    .padding(top = 8.dp),
+                    .padding(horizontal = Spacing.md)
+                    .padding(top = Spacing.sm),
         ) {
             // Path display
             state.path?.let { path ->
@@ -175,7 +176,7 @@ private fun ConfigContent(
                     text = stringResource(R.string.config_path, path),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 8.dp),
+                    modifier = Modifier.padding(bottom = Spacing.sm),
                 )
             }
 
@@ -192,7 +193,7 @@ private fun ConfigContent(
                     Icon(
                         imageVector = if (state.yamlMode) Icons.Filled.Tune else Icons.Filled.Code,
                         contentDescription = null,
-                        modifier = Modifier.padding(end = 4.dp),
+                        modifier = Modifier.padding(end = Spacing.xs),
                     )
                     Text(
                         stringResource(if (state.yamlMode) R.string.config_mode_form else R.string.config_mode_yaml),
@@ -224,7 +225,7 @@ private fun ConfigContent(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                                .padding(horizontal = 12.dp, vertical = Spacing.sm),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -325,7 +326,7 @@ private fun YAMLEditor(
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = Spacing.md),
     ) {
         OutlinedTextField(
             value = loadedYaml,
@@ -355,7 +356,7 @@ private fun YAMLEditor(
                 Icon(
                     imageVector = Icons.Filled.Save,
                     contentDescription = null,
-                    modifier = Modifier.padding(end = 4.dp),
+                    modifier = Modifier.padding(end = Spacing.xs),
                 )
                 Text(
                     stringResource(R.string.config_action_save_yaml),
@@ -459,7 +460,7 @@ private fun FormEditor(
                     text = stringResource(R.string.config_search_results, count),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 4.dp),
+                    modifier = Modifier.padding(vertical = Spacing.xs),
                 )
             }
         }
@@ -471,7 +472,7 @@ private fun FormEditor(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp),
+                            .padding(vertical = Spacing.xs),
                     colors =
                         CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -519,7 +520,7 @@ private fun FormEditor(
                             },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(vertical = 24.dp),
+                        modifier = Modifier.padding(vertical = Spacing.lg),
                     )
                 }
             }
@@ -546,7 +547,7 @@ private fun FormEditor(
                         Icon(
                             imageVector = Icons.Filled.Save,
                             contentDescription = null,
-                            modifier = Modifier.padding(end = 4.dp),
+                            modifier = Modifier.padding(end = Spacing.xs),
                         )
                         Text(stringResource(R.string.config_action_save))
                     }
@@ -561,7 +562,7 @@ private fun FormEditor(
                         Icon(
                             imageVector = Icons.Filled.Refresh,
                             contentDescription = null,
-                            modifier = Modifier.padding(end = 4.dp),
+                            modifier = Modifier.padding(end = Spacing.xs),
                         )
                         Text(stringResource(R.string.config_action_reset))
                     }
@@ -633,7 +634,7 @@ private fun ConfigFieldCard(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(vertical = 4.dp),
+                .padding(vertical = Spacing.xs),
         colors =
             CardDefaults.cardColors(
                 containerColor =
@@ -688,7 +689,7 @@ private fun ConfigFieldCard(
                     ) {
                         Surface(
                             modifier = Modifier.fillMaxSize(),
-                            shape = RoundedCornerShape(4.dp),
+                            shape = MaterialTheme.shapes.extraSmall,
                             color = MaterialTheme.colorScheme.primary,
                         ) {}
                     }
@@ -717,7 +718,7 @@ private fun ConfigFieldCard(
                     text = row.valueText,
                     style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp),
+                    modifier = Modifier.padding(top = Spacing.xs),
                 )
                 return@Column
             }
@@ -774,7 +775,7 @@ private fun ConfigFieldCard(
                             text = description,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 4.dp),
+                            modifier = Modifier.padding(top = Spacing.xs),
                         )
                     }
                 }
@@ -810,7 +811,7 @@ private fun ConfigFieldCard(
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text(description) },
                         singleLine = true,
-                        shape = RoundedCornerShape(8.dp),
+                        shape = MaterialTheme.shapes.small,
                     )
                 }
             }
@@ -899,7 +900,7 @@ private fun SearchableSelectField(
             label = { Text(label) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             singleLine = true,
-            shape = RoundedCornerShape(8.dp),
+            shape = MaterialTheme.shapes.small,
         )
 
         ExposedDropdownMenu(
@@ -962,7 +963,7 @@ private fun NumberField(
         label = { Text(label) },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         singleLine = true,
-        shape = RoundedCornerShape(8.dp),
+        shape = MaterialTheme.shapes.small,
     )
 }
 

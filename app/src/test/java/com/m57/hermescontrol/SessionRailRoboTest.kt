@@ -1,0 +1,272 @@
+package com.m57.hermescontrol
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.dp
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.takahirom.roborazzi.captureRoboImage
+import com.m57.hermescontrol.data.ws.CommandCatalog
+import com.m57.hermescontrol.theme.HermesControlTheme
+import com.m57.hermescontrol.theme.ThemePreference
+import com.m57.hermescontrol.theme.ThemePreset
+import com.m57.hermescontrol.ui.chat.ChatMessage
+import com.m57.hermescontrol.ui.chat.MessageRole
+import com.m57.hermescontrol.ui.chat.RailMeta
+import com.m57.hermescontrol.ui.chat.SessionUi
+import com.m57.hermescontrol.ui.chat.components.ChatInputBar
+import com.m57.hermescontrol.ui.chat.components.ChatMessageList
+import com.m57.hermescontrol.ui.chat.rail.RailUiModel
+import org.junit.Before
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+import com.m57.hermescontrol.ui.chat.rail.SessionRail as RailComposable
+
+/**
+ * Roborazzi captures of the C7 rail + chat screen, replacing the layoutlib
+ * @PreviewTest pipeline for pixel-truth renders (layoutlib can't reproduce
+ * runtime elevation/scrollbar/Noto-APNG behavior; Robolectric can).
+ *
+ * Record:  ./gradlew recordRoborazziDebug   (writes goldens into repo)
+ * Verify:  ./gradlew verifyRoborazziDebug   (CI gate; fails on diff)
+ */
+@RunWith(AndroidJUnit4::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+// Plain Application on purpose: HermesControlApp.onCreate initializes
+// AuthManager → SecureBlobStore → AndroidKeyStore, which Robolectric does not
+// provide ("AndroidKeyStore not found"). Rendering needs no app init.
+@Config(
+    sdk = [34],
+    qualifiers = "w460dp-h920dp-420dpi",
+    application = android.app.Application::class,
+)
+class SessionRailRoboTest {
+    @get:Rule
+    val composeRule = createComposeRule()
+
+    @Before
+    fun setUp() {
+        FakeAndroidKeyStore.setup
+    }
+
+    private fun capture(
+        name: String,
+        dark: Boolean,
+        preset: ThemePreset,
+    ) {
+        composeRule.setContent {
+            HermesControlTheme(
+                themePreference = if (dark) ThemePreference.DARK else ThemePreference.LIGHT,
+                useDynamicColors = false,
+                themePreset = preset,
+            ) {
+                FullScreenRailBody(dark = dark)
+            }
+        }
+        composeRule.onRoot()
+            .captureRoboImage("src/test/assets/roborazzi/$name.png")
+    }
+
+    @Test
+    fun c7_light_default() = capture("c7-light-default", dark = false, preset = ThemePreset.DEFAULT)
+
+    @Test
+    fun c7_dark_default() = capture("c7-dark-default", dark = true, preset = ThemePreset.DEFAULT)
+
+    @Test
+    fun c7_dark_amoled() = capture("c7-dark-amoled", dark = true, preset = ThemePreset.AMOLED)
+}
+
+// ── Shared mock body (duplicated from screenshotTest src set, which is not on test/ classpath) ──
+private val FakeSessions =
+    listOf(
+        SessionUi(id = "s1", title = "ADHD support", messageCount = 4),
+        SessionUi(id = "s2", title = "RP app", messageCount = 1),
+        SessionUi(id = "s3", title = "Hermes", messageCount = 2),
+        SessionUi(id = "s4", title = "memory", messageCount = 2),
+        SessionUi(id = "s5", title = "serenity", messageCount = 0),
+        SessionUi(id = "s6", title = "Plan SillyTavern alternative with research", messageCount = 0),
+        SessionUi(id = "s7", title = "Design aspect ADHD support", messageCount = 12),
+        SessionUi(id = "s8", title = "Move Erebus backup", messageCount = 8),
+        SessionUi(id = "s9", title = "Передать Кириллу ключи", messageCount = 3),
+        SessionUi(id = "s10", title = "Test drag reorder", messageCount = 1),
+        SessionUi(id = "s11", title = "Check LLM call stack", messageCount = 6),
+        SessionUi(id = "s12", title = "Rental listing photos", messageCount = 9),
+        SessionUi(id = "s13", title = "Find similar papers", messageCount = 4),
+        SessionUi(id = "s14", title = "Zimniy period notes", messageCount = 15),
+        SessionUi(id = "s15", title = "Casual friday thread", messageCount = 2),
+    )
+
+private val FakeRailMeta =
+    mapOf(
+        "s1" to RailMeta("🧠"),
+        "s2" to RailMeta("🦄"),
+        "s3" to RailMeta("💎"),
+        "s4" to RailMeta("🧠"),
+        "s5" to RailMeta("💻"),
+        "s6" to RailMeta("🚂"),
+        "s7" to RailMeta("🎨"),
+        "s8" to RailMeta("📦"),
+        "s9" to RailMeta("🔑"),
+        "s10" to RailMeta("🧪"),
+        "s11" to RailMeta("📚"),
+        "s12" to RailMeta("🏠"),
+        "s13" to RailMeta("🔍"),
+        "s14" to RailMeta("❄️"),
+        "s15" to RailMeta("🎉"),
+    )
+
+@Composable
+fun FullScreenC7() {
+    HermesControlTheme(
+        themePreference = ThemePreference.LIGHT,
+        useDynamicColors = false,
+        themePreset = ThemePreset.DEFAULT,
+    ) {
+        FullScreenRailBody(dark = false)
+    }
+}
+
+@Composable
+fun FullScreenC7Dark() {
+    HermesControlTheme(
+        themePreference = ThemePreference.DARK,
+        useDynamicColors = false,
+        themePreset = ThemePreset.DEFAULT,
+    ) {
+        FullScreenRailBody(dark = true)
+    }
+}
+
+@Composable
+fun FullScreenC7Amoled() {
+    HermesControlTheme(
+        themePreference = ThemePreference.DARK,
+        useDynamicColors = false,
+        themePreset = ThemePreset.AMOLED,
+    ) {
+        FullScreenRailBody(dark = true)
+    }
+}
+
+@Composable
+private fun FullScreenRailBody(dark: Boolean) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(chatGradient(dark)),
+    ) {
+        RailComposable(
+            state =
+                RailUiModel(
+                    sessions = FakeSessions,
+                    currentSessionId = "s3",
+                    pinnedSessionIds = emptySet(),
+                    railMeta = FakeRailMeta,
+                    order = FakeSessions.map { it.id },
+                    archiveOpen = false,
+                ),
+            onEvent = {},
+        )
+        Column(
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .padding(8.dp),
+        ) {
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = "Hermes",
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Box(modifier = Modifier.weight(1f)) {
+                ChatMessageList(
+                    messages =
+                        listOf(
+                            ChatMessage(role = MessageRole.ASSISTANT, content = "👋 ready when you are"),
+                            ChatMessage(role = MessageRole.USER, content = "can we make the rail floating?"),
+                            ChatMessage(
+                                role = MessageRole.ASSISTANT,
+                                content = "Yep — here's the C7 design composed with the real message list.",
+                            ),
+                        ),
+                    streamingMessage = null,
+                    isThinking = false,
+                    thinkingText = "",
+                    isSearchActive = false,
+                    searchQuery = "",
+                    currentSearchMatchIndex = 0,
+                    searchMatchIndices = emptyList(),
+                    typingEffectEnabled = true,
+                    typingEffectDelayMs = 20,
+                    isLoading = false,
+                    isLoadingOlder = false,
+                    isDark = dark,
+                    listState = rememberLazyListState(),
+                    lastAnimatedMessageId = null,
+                    onLastAnimatedMessageIdChange = {},
+                    openingAttachmentPath = null,
+                )
+            }
+            ChatInputBar(
+                inputFieldValue = TextFieldValue(""),
+                onInputChange = {},
+                onSend = {},
+                onMicTap = {},
+                isListening = false,
+                isAgentTyping = false,
+                isConnected = true,
+                isSessionReady = true,
+                commandCatalog = CommandCatalog(),
+            )
+        }
+    }
+}
+
+// Cheap decorative gradient used by the rail preview to mimic the chat
+// gradient. Light: the original lavender→white. Dark: theme-aware surface
+// blend (no hardcoded near-black so presets still read through).
+@Composable
+private fun chatGradient(dark: Boolean): androidx.compose.ui.graphics.Brush {
+    if (!dark) {
+        return androidx.compose.ui.graphics.Brush.verticalGradient(
+            colors =
+                listOf(
+                    androidx.compose.ui.graphics.Color(0xFFF6F1FF),
+                    androidx.compose.ui.graphics.Color(0xFFFFFFFF),
+                ),
+        )
+    }
+    val top = MaterialTheme.colorScheme.background
+    val bottom = MaterialTheme.colorScheme.surfaceVariant
+    return androidx.compose.ui.graphics.Brush.verticalGradient(colors = listOf(top, bottom))
+}

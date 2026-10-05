@@ -44,6 +44,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.KanbanTask
+import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.ErrorState
 import com.m57.hermescontrol.ui.common.HermesScaffold
 import com.m57.hermescontrol.ui.common.NavIcon
@@ -123,7 +124,7 @@ fun KanbanScreen(
                                 query = query,
                                 onQueryChange = { query = it },
                                 placeholder = "Filter tasks by title, status, or assignee...",
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
                             )
                             // Board selector tab row
                             if (state.boards.isNotEmpty()) {
@@ -176,7 +177,7 @@ fun KanbanScreen(
                                                 })",
                                                 style = MaterialTheme.typography.titleMedium,
                                                 fontWeight = FontWeight.Bold,
-                                                modifier = Modifier.padding(bottom = 8.dp),
+                                                modifier = Modifier.padding(bottom = Spacing.sm),
                                             )
 
                                             LazyColumn(

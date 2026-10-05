@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.m57.hermescontrol.R
+import com.m57.hermescontrol.theme.Spacing
 
 /** Full-screen semi-transparent overlay shown during initial session load. */
 @Composable
@@ -46,7 +47,7 @@ fun ChatLoadingOverlay(isLoading: Boolean) {
                 elevation = CardDefaults.cardElevation(4.dp),
             ) {
                 Column(
-                    modifier = Modifier.padding(32.dp),
+                    modifier = Modifier.padding(Spacing.xl),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     CircularProgressIndicator(

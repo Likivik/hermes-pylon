@@ -54,6 +54,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.Achievement
 import com.m57.hermescontrol.data.model.RecentUnlock
+import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.EmptyState
 import com.m57.hermescontrol.ui.common.ErrorState
 import com.m57.hermescontrol.ui.common.HermesScaffold
@@ -278,7 +279,7 @@ fun AchievementsScreen(
                                 ),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 4.dp),
+                            modifier = Modifier.padding(top = Spacing.xs),
                         )
                     }
 
@@ -344,7 +345,7 @@ private fun StatPill(
 ) {
     androidx.compose.material3.Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
         color = color.copy(alpha = 0.12f),
     ) {
         Column(
@@ -541,7 +542,7 @@ private fun AchievementCard(
         modifier =
             modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp)),
+                .clip(MaterialTheme.shapes.large),
         colors =
             CardDefaults.cardColors(
                 containerColor =
@@ -565,7 +566,7 @@ private fun AchievementCard(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(Spacing.md),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             // Header row: icon + name + tier badge
@@ -709,7 +710,7 @@ private fun AchievementCard(
                 ) {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp),
+                        shape = MaterialTheme.shapes.small as androidx.compose.foundation.shape.CornerBasedShape,
                         color = MaterialTheme.colorScheme.surfaceContainerHigh,
                     ) {
                         Text(
@@ -728,7 +729,7 @@ private fun AchievementCard(
 @Composable
 private fun Surface(
     modifier: Modifier = Modifier,
-    shape: RoundedCornerShape,
+    shape: androidx.compose.foundation.shape.CornerBasedShape,
     color: Color = MaterialTheme.colorScheme.surface,
     content: @Composable () -> Unit,
 ) {

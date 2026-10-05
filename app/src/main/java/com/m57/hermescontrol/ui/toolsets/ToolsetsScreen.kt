@@ -40,6 +40,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.Toolset
+import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.DetailDialog
 import com.m57.hermescontrol.ui.common.EmptyState
 import com.m57.hermescontrol.ui.common.ErrorState
@@ -114,7 +115,7 @@ fun ToolsetsScreen(
                         CircularProgressIndicator()
                     } else if (state.errorMessage != null && state.toolsets.isEmpty()) {
                         Column(
-                            modifier = Modifier.padding(16.dp),
+                            modifier = Modifier.padding(Spacing.md),
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
                             Text(text = state.errorMessage ?: "", color = MaterialTheme.colorScheme.error)
@@ -156,7 +157,7 @@ fun ToolsetsScreen(
                                         modifier =
                                             Modifier
                                                 .fillMaxWidth()
-                                                .padding(16.dp),
+                                                .padding(Spacing.md),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
@@ -203,7 +204,7 @@ fun ToolsetsScreen(
                                         Switch(
                                             checked = toolset.enabled,
                                             onCheckedChange = { viewModel.toggleToolset(toolset) },
-                                            modifier = Modifier.padding(start = 16.dp),
+                                            modifier = Modifier.padding(start = Spacing.md),
                                         )
                                     }
                                 }

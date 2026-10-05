@@ -134,7 +134,12 @@ jobs:
   unit-tests:
     name: Unit & Integration Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # `./gradlew test` runs the suite for EVERY variant (hermes/iris × debug/release),
+    # so it needs roughly twice the budget of unit.yml's single-variant run — which
+    # takes ~8-10 min and gets 25. At 10 min this job was cancelled mid-run at
+    # exactly 10:00, which then showed up as a failed CI Summary and skipped the
+    # two `if: success()` jobs below.
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -292,9 +297,13 @@ jobs:
           disable-animations: true
           force-avd-creation: false
           emulator-options: -no-window -no-audio -no-boot-anim -camera-back none -memory 2048
+          # `com.m57.hermescontrol.e2e` is excluded on purpose: those 8 classes drive a
+          # REAL Hermes gateway and get an ephemeral password from e2e.yml's setup.
+          # Without it they throw "e2ePassword not set", which is the correct loud
+          # failure for "E2E executed without a gateway".
           script: |
-            ./gradlew connectedHermesDebugAndroidTest
-            ./gradlew connectedIrisDebugAndroidTest
+            ./gradlew connectedHermesDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.notPackage=com.m57.hermescontrol.e2e
+            ./gradlew connectedIrisDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.notPackage=com.m57.hermescontrol.e2e
 
       - name: Upload instrumented test reports
         if: always()

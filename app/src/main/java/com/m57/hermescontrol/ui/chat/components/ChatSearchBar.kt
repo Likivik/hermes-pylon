@@ -29,6 +29,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.m57.hermescontrol.R
+import com.m57.hermescontrol.theme.Spacing
 
 @Composable
 fun CompactSearchInput(
@@ -139,7 +140,7 @@ fun SearchBarRow(
                                 MaterialTheme.colorScheme.onSurfaceVariant
                             },
                     ),
-                modifier = Modifier.padding(horizontal = 4.dp),
+                modifier = Modifier.padding(horizontal = Spacing.xs),
             )
         }
         IconButton(

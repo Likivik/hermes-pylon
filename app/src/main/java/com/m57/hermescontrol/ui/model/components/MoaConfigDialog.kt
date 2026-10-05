@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.m57.hermescontrol.data.model.MoaConfigPreset
 import com.m57.hermescontrol.data.model.MoaModelSlot
+import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.SearchBar
 
 @Composable
@@ -316,7 +317,7 @@ private fun MoaConfigEditor(
             }
         }
 
-        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+        HorizontalDivider(modifier = Modifier.padding(vertical = Spacing.sm))
 
         // Reference models
         Text(
@@ -436,7 +437,7 @@ private fun MoaSlotPicker(
                         text = provider.name,
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(vertical = 4.dp),
+                        modifier = Modifier.padding(vertical = Spacing.xs),
                     )
 
                     models.forEach { model ->

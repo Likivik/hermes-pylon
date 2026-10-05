@@ -47,6 +47,7 @@ import com.m57.hermescontrol.SkillsScreen
 import com.m57.hermescontrol.data.model.AnalyticsDailyEntry
 import com.m57.hermescontrol.data.model.ModelsAnalyticsModelEntry
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
+import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.EmptyState
 import com.m57.hermescontrol.ui.common.ErrorState
 import com.m57.hermescontrol.ui.common.HermesScaffold
@@ -144,7 +145,7 @@ private fun AnalyticsContent(
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = MaterialTheme.shapes.large,
                 ) {
                     Box(
                         modifier =
@@ -168,7 +169,7 @@ private fun AnalyticsContent(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                        .padding(horizontal = Spacing.md, vertical = Spacing.sm),
             ) {
                 Text(
                     text = "Most Used Components",
@@ -222,7 +223,7 @@ private fun AnalyticsContent(
                 item {
                     Text(
                         text = "No model data available",
-                        modifier = Modifier.padding(16.dp),
+                        modifier = Modifier.padding(Spacing.md),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -244,7 +245,7 @@ private fun AnalyticsContent(
                 item {
                     Text(
                         text = "No skill data available",
-                        modifier = Modifier.padding(16.dp),
+                        modifier = Modifier.padding(Spacing.md),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -261,7 +262,7 @@ private fun AnalyticsContent(
                 item {
                     Text(
                         text = "No tool data available",
-                        modifier = Modifier.padding(16.dp),
+                        modifier = Modifier.padding(Spacing.md),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -298,7 +299,7 @@ private fun SectionTitle(text: String) {
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+        modifier = Modifier.padding(top = Spacing.sm, bottom = Spacing.xs),
     )
 }
 
@@ -308,9 +309,9 @@ private fun TotalsCard(totals: com.m57.hermescontrol.data.model.AnalyticsTotals)
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.large,
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(Spacing.md)) {
             Text(
                 text = formatCost(totals.total_estimated_cost),
                 style = MaterialTheme.typography.headlineSmall,
@@ -377,7 +378,7 @@ private fun DailyCostChart(entries: List<AnalyticsDailyEntry>) {
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.large,
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             if (maxCost <= 0.0) {
@@ -440,7 +441,7 @@ private fun ModelRow(model: ModelsAnalyticsModelEntry) {
     val status = LocalHermesStatusColors.current
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
@@ -491,7 +492,7 @@ private fun ModelEntryRow(entry: com.m57.hermescontrol.data.model.AnalyticsModel
     val status = LocalHermesStatusColors.current
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
     ) {
         Row(
             modifier =
@@ -536,7 +537,7 @@ private fun ModelEntryRow(entry: com.m57.hermescontrol.data.model.AnalyticsModel
 private fun SkillRow(skill: com.m57.hermescontrol.data.model.AnalyticsSkillEntry) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
     ) {
         Row(
             modifier =
@@ -573,7 +574,7 @@ private fun SkillRow(skill: com.m57.hermescontrol.data.model.AnalyticsSkillEntry
 private fun ToolRow(tool: com.m57.hermescontrol.data.model.AnalyticsToolUsage) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
     ) {
         Row(
             modifier =

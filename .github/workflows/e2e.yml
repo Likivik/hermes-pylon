@@ -1,0 +1,222 @@
+name: E2E (Espresso + Gradle Managed Device)
+
+on:
+  push:
+    tags:
+      - 'e2e-*'
+  workflow_dispatch:
+
+jobs:
+  rename-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable KVM group perms
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Cache the whole AVD + emulator state: GMD re-downloads the system image
+      # and recreates the AVD every run otherwise (~2-4 min per run). No
+      # untrusted input flows into this — static paths only.
+      - name: Cache AVD + system images
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.android/avd
+            ~/.android/cache
+            ~/.gradle/caches/jars-*
+          key: ${{ runner.os }}-gmd-avd-v1
+
+      # Cache the emulator's snapshot: cold-boot is the biggest recurring cost.
+      - name: Cache emulator snapshot
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/avd/*.avd/snapshots
+          key: ${{ runner.os }}-emulator-snap-v1
+          restore-keys: |
+            ${{ runner.os }}-emulator-snap-v1-
+
+      # Persist the Gradle build cache + Kotlin compile cache between runs.
+      - name: Cache Gradle build outputs
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches/build-cache-1
+            ~/.gradle/caches/modules-2
+            ~/.gradle/caches/kotlin
+          key: ${{ runner.os }}-gradle-build-v1-${{ hashFiles('.github/workflows/e2e.yml', '**/*.gradle*', 'gradle/libs.versions.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-build-v1-
+
+      # Start the REAL Hermes gateway (web_server, not a mock) with a
+      # per-run ephemeral password. Non-loopback bind engages the auth gate;
+      # the bundled basic_auth provider accepts the test credentials.
+      # hermes_cli lives in OUR hermes-agent fork, so check it out first and
+      # run the gateway from there (the app repo doesn't contain it).
+      # Python + package tools: setup-python pins the interpreter from the
+      # runner tool cache; setup-uv installs uv and (per Astral docs) caches
+      # the resolved environment keyed on uv.lock so the gateway deps don't
+      # re-download every run. Anonymous clone of the public repo, so no
+      # token needed. (hermes-agent checkout must be FIRST so the cache glob
+      # can resolve uv.lock.)
+      - name: Checkout hermes-agent (gateway source)
+        uses: actions/checkout@v5
+        with:
+          # Public repo — clones without a token.
+          repository: Likivik/hermes-agent
+          path: hermes-agent
+
+      - name: Set up Python + uv
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: hermes-agent/uv.lock
+
+      - name: Start real Hermes gateway with ephemeral auth
+        run: |
+          # Canonical hermes-agent install (per its README): uv + uv.lock.
+          # Installs the pinned web deps (fastapi/uvicorn/multipart/...) with
+          # exact lock resolution, then the `hermes` console script.
+          cd hermes-agent
+          uv pip install --system -e ".[all]"
+          export HERMES_HOME=/tmp/e2e-home
+          mkdir -p "$HERMES_HOME"   # config.yaml lives here; gateway not up yet
+          python - <<'PY'
+          import os, secrets
+          from pathlib import Path
+          import yaml
+          home = Path(os.environ["HERMES_HOME"]) or Path.home() / ".hermes"
+          cfg_path = home / "config.yaml"
+          cfg = yaml.safe_load(cfg_path.read_text()) if cfg_path.exists() else {}
+          # Reuse the plugin-registered basic provider from the installed env.
+          try:
+              from plugins.dashboard_auth.basic import hash_password
+          except Exception:
+              # Fallback: git-internal scrypt digest so the config is self-contained.
+              import hashlib as _h
+              def hash_password(pw: str) -> str:
+                  return _h.scrypt(pw.encode(), salt=b"hermes-e2e", n=16384, r=8, p=1).hex()
+          cfg.setdefault("dashboard", {})["basic_auth"] = {
+              "username": "admin",
+              "password_hash": hash_password("e2e-pass-123"),
+              "password": "",
+              "secret": secrets.token_urlsafe(32),
+          }
+          cfg_path.write_text(yaml.safe_dump(cfg))
+          print("wrote basic_auth to", cfg_path)
+          PY
+          E2E_PASS="e2e-pass-123"
+          echo "E2E_PASS=$E2E_PASS" >> "$GITHUB_ENV"
+          # `hermes serve` = the headless JSON-RPC/WS gateway (no UI build).
+          nohup hermes serve --skip-build --host 0.0.0.0 --port 8642 > /tmp/gateway.log 2>&1 &
+          echo $! > /tmp/gateway.pid
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:8642/api/health >/dev/null 2>&1; then
+              echo "gateway up after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "gateway failed to start; log:"; cat /tmp/gateway.log; exit 1
+
+      - name: "Seed gateway profile sessions (5 rows: 2 normal + 1 reaped + 2 rail-reorder)"
+        run: |
+          python3 - <<'PY'
+          import os, sqlite3, time
+          home = "/tmp/e2e-home"
+          # profile dir is created by the gateway on first boot
+          os.makedirs(home, exist_ok=True)
+          # locate state.db (created lazily; create if missing)
+          db = os.path.join(home, "state.db")
+          con = sqlite3.connect(db)
+          # Match the real sessions schema (hermes_state_common.SCHEMA_SQL,
+          # CREATE TABLE sessions). The gateway creates its own schema on first
+          # boot — we just INSERT the rows the e2e tests long-press against.
+          # Required NOT NULL: id, source, started_at.
+          now = time.time()
+          con.executescript("""
+          CREATE TABLE IF NOT EXISTS sessions(
+            id TEXT PRIMARY KEY,
+            source TEXT NOT NULL,
+            created_source TEXT,
+            session_key TEXT,
+            model TEXT,
+            started_at REAL NOT NULL,
+            ended_at REAL,
+            end_reason TEXT,
+            message_count INTEGER DEFAULT 0,
+            title TEXT,
+            archived INTEGER NOT NULL DEFAULT 0,
+            pinned INTEGER NOT NULL DEFAULT 0,
+            hidden INTEGER NOT NULL DEFAULT 0
+          );
+          """)
+          rows = [
+            # RenameE2eTest: the active background session the user renames.
+            ("stored-current", "Current chat", 5, now - 7200),
+            ("stored-bg",      "Background chat", 3, now - 3600),
+            # RenameFailureE2eTest: a session whose resume is refused.
+            # message_count above the gateway's max_resume_messages (default
+            # 20_000) trips SessionResumeTooLargeError in _resume_guard,
+            # returning 4130 — the rename flow surfaces the error and never
+            # sends session.title.
+            ("reaped-bg",      "Reaped chat", 99999, now - 86400),
+            # RailReorderE2eTest: two sessions the user drags. item-top is the
+            # NEWEST so it sits above item-low in the rail (newest-first sort
+            # by started_at); the test drags item-low up past item-top.
+            ("item-top",       "Top chat", 5, now - 1800),
+            ("item-low",       "Low chat", 3, now - 5400),
+            # ArchiveE2eTest: an ENDED/old session so it lands in the archive
+            # (stale) group; insert with ended_at set (see second insert below).
+            ("stale-bg",       "Stale chat", 2, now - 7 * 86400),
+          ]
+          con.executemany(
+            "INSERT OR REPLACE INTO sessions(id, source, title, message_count, started_at, ended_at, end_reason) "
+            "VALUES (?, 'telegram', ?, ?, ?, NULL, NULL)",
+            rows,
+          )
+          # stale-bg: ENDED session (ended_at 1 day ago) → archived/stale group.
+          con.execute(
+            "INSERT OR REPLACE INTO sessions(id, source, title, message_count, started_at, ended_at, end_reason) "
+            "VALUES ('stale-bg', 'telegram', 'Stale chat', 2, ?, ?, 'ended')",
+            (now - 7 * 86400, now - 86400),
+          )
+          con.commit(); con.close()
+          print(f"seeded {len(rows)} sessions")
+          PY
+
+      # GMD: AGP provisions, boots, installs, runs, tears down the emulator.
+      # The app under test talks to the REAL gateway at 127.0.0.1:8642.
+      # Tests run with the ephemeral password via a system property.
+      - name: Compile androidTest (fail-fast gate before the slow emulator boot)
+        run: ./gradlew compileIrisDebugAndroidTestKotlin --no-daemon -Dorg.gradle.workers.max=2
+
+      - name: Run E2E on Gradle Managed Device (Pixel 5, API 34)
+        run: >
+          ./gradlew e2eApi34IrisDebugAndroidTest --no-daemon
+          -Dorg.gradle.workers.max=2
+          -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
+          -Pandroid.testInstrumentationRunnerArguments.class=com.m57.hermescontrol.e2e.RenameE2eTest,com.m57.hermescontrol.e2e.RenameFailureE2eTest,com.m57.hermescontrol.e2e.RailReorderE2eTest,com.m57.hermescontrol.e2e.PinE2eTest,com.m57.hermescontrol.e2e.DeleteE2eTest,com.m57.hermescontrol.e2e.ArchiveE2eTest,com.m57.hermescontrol.e2e.SwitchE2eTest,com.m57.hermescontrol.e2e.NoAutoCreateE2eTest
+          -Pandroid.testInstrumentationRunnerArguments.e2ePassword=${{ env.E2E_PASS }}
+
+      - name: Upload instrumented results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: app/build/outputs/androidTest-results/**/*.xml
+          retention-days: 14

@@ -64,6 +64,7 @@ import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.Attachment
 import com.m57.hermescontrol.data.ws.CommandBlocklist
 import com.m57.hermescontrol.data.ws.CommandCatalog
+import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.chat.ChatInputPolicy
 
 /**
@@ -121,8 +122,8 @@ fun ChatInputBar(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 4.dp, vertical = 4.dp),
-            shape = RoundedCornerShape(16.dp),
+                    .padding(horizontal = Spacing.xs, vertical = Spacing.xs),
+            shape = MaterialTheme.shapes.large,
             color = MaterialTheme.colorScheme.surface,
             border =
                 BorderStroke(
@@ -158,8 +159,8 @@ fun ChatInputBar(
                             modifier =
                                 Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 4.dp),
-                            shape = RoundedCornerShape(12.dp),
+                                    .padding(horizontal = 12.dp, vertical = Spacing.xs),
+                            shape = MaterialTheme.shapes.medium,
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                             border =
                                 BorderStroke(
@@ -197,7 +198,7 @@ fun ChatInputBar(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 4.dp),
+                                .padding(horizontal = 12.dp, vertical = Spacing.xs),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         items(
@@ -219,7 +220,7 @@ fun ChatInputBar(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                            .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     val placeholderText =
@@ -248,7 +249,7 @@ fun ChatInputBar(
                             Modifier
                                 .weight(1f)
                                 .heightIn(min = 42.dp, max = 120.dp)
-                                .padding(vertical = 4.dp)
+                                .padding(vertical = Spacing.xs)
                                 .onFocusChanged { isFocused = it.isFocused }
                                 .testTag("chat_input"),
                         enabled = isConnected,
@@ -278,7 +279,12 @@ fun ChatInputBar(
                                 Row(
                                     modifier =
                                         Modifier
-                                            .padding(start = 12.dp, end = 4.dp, top = 9.dp, bottom = 9.dp)
+                                            .padding(
+                                                start = 12.dp,
+                                                end = Spacing.xs,
+                                                top = Spacing.sm,
+                                                bottom = Spacing.sm,
+                                            )
                                             .fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
@@ -405,11 +411,11 @@ fun AttachmentChip(
     val thumbnail = attachment.uri
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(8.dp),
+        shape = MaterialTheme.shapes.small,
         tonalElevation = 2.dp,
     ) {
         Row(
-            modifier = Modifier.padding(4.dp),
+            modifier = Modifier.padding(Spacing.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (attachment.isImage) {
@@ -419,7 +425,7 @@ fun AttachmentChip(
                     modifier =
                         Modifier
                             .size(24.dp)
-                            .clip(RoundedCornerShape(4.dp))
+                            .clip(MaterialTheme.shapes.extraSmall)
                             .clickable(onClick = onPreview),
                     contentScale = ContentScale.Crop,
                 )

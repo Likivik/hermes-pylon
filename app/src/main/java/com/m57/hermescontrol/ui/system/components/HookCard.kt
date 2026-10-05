@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.HookEntry
+import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.StatusBadge
 import com.m57.hermescontrol.ui.common.StatusBadgeType
 
@@ -44,13 +45,13 @@ internal fun HookCard(
             ),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(spacing.md),
+            modifier = Modifier.fillMaxWidth().padding(Spacing.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
                 ) {
                     Icon(
                         Icons.Filled.Terminal,
@@ -64,8 +65,8 @@ internal fun HookCard(
                         fontWeight = FontWeight.Medium,
                     )
                 }
-                Spacer(modifier = Modifier.height(spacing.xs))
-                Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                Spacer(modifier = Modifier.height(Spacing.xs))
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                     Text(
                         text = hook.event ?: "",
                         style = MaterialTheme.typography.labelSmall,
@@ -79,8 +80,8 @@ internal fun HookCard(
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(spacing.xs))
-                Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                Spacer(modifier = Modifier.height(Spacing.xs))
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                     StatusBadge(
                         text =
                             if (hook.executable != false) {

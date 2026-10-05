@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Link
@@ -361,7 +360,7 @@ private fun ExternalFlowContent(provider: OAuthProvider) {
         provider.cliCommand.takeIf { it.isNotBlank() }?.let { cmd ->
             Surface(
                 color = LocalHermesStatusColors.current.infoContainer,
-                shape = RoundedCornerShape(4.dp),
+                shape = MaterialTheme.shapes.extraSmall,
             ) {
                 Text(
                     text = "  $cmd",
@@ -436,7 +435,7 @@ private fun DeviceCodeFlowContent(
         start?.userCode?.let { code ->
             Surface(
                 color = LocalHermesStatusColors.current.infoContainer,
-                shape = RoundedCornerShape(4.dp),
+                shape = MaterialTheme.shapes.extraSmall,
             ) {
                 Text(
                     text = "  $code",

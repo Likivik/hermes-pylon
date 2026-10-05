@@ -44,6 +44,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.remote.GatewayFileClient
+import com.m57.hermescontrol.theme.Spacing
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
@@ -136,9 +137,9 @@ private fun MediaInitializationDialog(
     error: Boolean,
 ) {
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Card(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+        Card(modifier = Modifier.fillMaxWidth().padding(Spacing.md)) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                modifier = Modifier.fillMaxWidth().padding(Spacing.md),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -241,9 +242,9 @@ private fun ReadySecureGatewayMediaPlayer(
         onDismissRequest = onClose,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        Card(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+        Card(modifier = Modifier.fillMaxWidth().padding(Spacing.md)) {
             Column(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                modifier = Modifier.fillMaxWidth().padding(Spacing.md),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {

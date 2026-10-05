@@ -1,0 +1,47 @@
+# Unit tests run on EVERY push (all branches and tags) — not just gated behind
+# the emulator E2E suite. They cover the data/logic layer (ChatViewModel
+# reducers, rail grouping + order persistence, rename fast-path) and are
+# JVM-fast, so they give a verdict in ~4 min instead of ~11.
+#
+# Modified from Hy4ri/hermes-mobile for this fork; see NOTICE.
+name: Unit tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+# Supersede in-flight unit runs for the same ref — only the newest matters.
+concurrency:
+  group: unit-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Iris is the consumer flavor used by the E2E suite; its unit tests
+      # (JUnit + Robolectric) cover the shared app logic under test.
+      - name: Run unit tests (Iris debug)
+        run: ./gradlew testIrisDebugUnitTest --no-daemon -Dorg.gradle.workers.max=2
+
+      - name: Upload unit test reports
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: unit-test-reports
+          path: app/build/reports/tests/
+          retention-days: 14

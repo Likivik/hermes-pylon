@@ -186,7 +186,8 @@ class ChatViewModelTest {
      * and return a Pair(viewModel, sessionId).
      *
      * Request ID sequence: GatewayReady triggers loadSessions (req-id-1),
-     * fetchCommandCatalog (req-id-2), then createNewSession (req-id-3).
+     * fetchCommandCatalog (req-id-2), then the test explicitly calls
+     * createNewSession() (req-id-N, the last send — reqCount points at it).
      */
     private suspend fun TestScope.createViewModelWithSession(
         startCleanup: Boolean = false,
@@ -198,15 +199,24 @@ class ChatViewModelTest {
         mockEventsFlow.emit(WsEvent.GatewayReady(null))
         advanceUntilIdle()
 
-        // Emit SESSION_CREATE result (req-id-3 — after loadSessions and fetchCommandCatalog)
-        mockEventsFlow.emit(WsEvent.RpcResult("req-id-3", mapOf("session_id" to "session-123")))
+        // Auto-create disabled (Likivik): GatewayReady no longer fires
+        // session.create. Tests that need a live session must request one
+        // explicitly — mirror the user tapping a rail row.
+        viewModel.createNewSession()
+        advanceUntilIdle()
+
+        // Emit SESSION_CREATE result for the create we just fired. The mock
+        // assigns ids sequentially (req-id-N); the create is the LAST send, so
+        // reqCount points at it.
+        val createId = "req-id-$reqCount"
+        mockEventsFlow.emit(WsEvent.RpcResult(createId, mapOf("session_id" to "session-123")))
         advanceUntilIdle()
 
         // Sanity check: confirm the session was actually set
         val session = viewModel.uiState.value.currentSessionId
         checkNotNull(session) {
             "createViewModelWithSession: session was not set — " +
-                "req-id-3 did not match SESSION_CREATE. " +
+                "the create result id did not match. " +
                 "If the req sequence changed, update the RpcResult id here."
         }
 
@@ -1051,7 +1061,7 @@ class ChatViewModelTest {
         }
 
     @Test
-    fun testAlreadyConnectedOnLaunch_createsSession() =
+    fun testAlreadyConnectedOnLaunch_doesNotAutoCreate() =
         runTest {
             mockConnectionStatus.value = ConnectionStatus.CONNECTED
 
@@ -1059,11 +1069,12 @@ class ChatViewModelTest {
             advanceUntilIdle()
 
             verify { HermesWsClient.send(WsMethods.SESSION_LIST, any(), any()) }
-            verify { HermesWsClient.send(WsMethods.SESSION_CREATE, any(), any()) }
+            // Auto-create disabled: no session.create on launch.
+            verify(inverse = true) { HermesWsClient.send(WsMethods.SESSION_CREATE, any(), any()) }
         }
 
     @Test
-    fun testGatewayReady_createsSessionIfNoneExists() =
+    fun testGatewayReady_doesNotAutoCreate_keepsEmptyState() =
         runTest {
             val viewModel = createViewModel()
             advanceUntilIdle()
@@ -1072,9 +1083,13 @@ class ChatViewModelTest {
             mockEventsFlow.emit(WsEvent.GatewayReady(null))
             advanceUntilIdle()
 
+            // Auto-create disabled (Likivik): GatewayReady with no last session
+            // must NOT fire session.create — the pane stays empty until the
+            // user picks a rail session.
             verify { HermesWsClient.send(WsMethods.SESSION_LIST, any(), any()) }
-            verify { HermesWsClient.send(WsMethods.SESSION_CREATE, any(), any()) }
+            verify(inverse = true) { HermesWsClient.send(WsMethods.SESSION_CREATE, any(), any()) }
             assertTrue(viewModel.uiState.value.isConnected)
+            assertNull(viewModel.uiState.value.currentSessionId)
         }
 
     @Test
@@ -1115,9 +1130,14 @@ class ChatViewModelTest {
             mockEventsFlow.emit(WsEvent.GatewayReady(null))
             advanceUntilIdle()
 
-            // GatewayReady sends SESSION_LIST (req-id-1), COMMANDS_CATALOG (req-id-2),
-            // then SESSION_CREATE (req-id-3)
-            mockEventsFlow.emit(WsEvent.RpcResult("req-id-3", mapOf("session_id" to "session-123")))
+            // Auto-create disabled: request the session explicitly, then feed
+            // the create's result (the mock assigns ids sequentially, so the
+            // create is the last id sent).
+            viewModel.createNewSession()
+            advanceUntilIdle()
+            mockEventsFlow.emit(
+                WsEvent.RpcResult("req-id-$reqCount", mapOf("session_id" to "session-123")),
+            )
             advanceUntilIdle()
 
             assertEquals("session-123", viewModel.uiState.value.currentSessionId)
@@ -1962,22 +1982,27 @@ class ChatViewModelTest {
             assertEquals("xhigh", viewModel.uiState.value.reasoningLevel)
             assertEquals(44_000L, viewModel.uiState.value.contextUsage?.usedTokens)
             assertEquals(640_000L, viewModel.uiState.value.contextUsage?.inputTokens)
-            assertEquals(3, messages.size)
+            // Only the payload's two messages: "Session resumed" is transient
+            // connection noise and is surfaced as a status pill, never as a
+            // list item (see addSystemMessage(transient = true)).
+            assertEquals(2, messages.size)
             assertEquals("Earlier question", messages[0].content)
             assertEquals(MessageRole.USER, messages[0].role)
             assertEquals("Earlier answer", messages[1].content)
             assertEquals(MessageRole.ASSISTANT, messages[1].role)
             assertEquals("Earlier reasoning", messages[1].reasoningText)
-            assertEquals("Session resumed", messages[2].content)
 
             viewModel.refreshCurrentSession()
             advanceUntilIdle()
 
             assertEquals(
-                listOf("Earlier question", "Earlier answer", "Session resumed"),
+                listOf("Earlier question", "Earlier answer"),
                 viewModel.uiState.value.messages.map { it.content },
             )
         }
+
+    // Rename-path coverage lives in SessionRenameTest (addressing by
+    // session_key vs cached runtime id, background-vs-current, resume failure).
 
     @Test
     fun testStaleSessionResumeRpcResult_isIgnored() =
@@ -2981,6 +3006,10 @@ class ChatViewModelTest {
             mockEventsFlow.emit(WsEvent.GatewayReady(null))
             runCurrent()
 
+            // Auto-create disabled: the user must trigger the create explicitly.
+            viewModel.createNewSession()
+            runCurrent()
+
             // The first attempt went out and nothing acknowledged it.
             verify(exactly = 1) { HermesWsClient.send(WsMethods.SESSION_CREATE, any(), any()) }
             assertFalse(viewModel.uiState.value.isSessionReady)
@@ -3005,6 +3034,10 @@ class ChatViewModelTest {
             mockEventsFlow.emit(WsEvent.GatewayReady(null))
             advanceUntilIdle()
 
+            // Auto-create disabled: trigger the create explicitly.
+            viewModel.createNewSession()
+            advanceUntilIdle()
+
             verify(exactly = createMaxAttempts) {
                 HermesWsClient.send(WsMethods.SESSION_CREATE, any(), any())
             }
@@ -3022,9 +3055,13 @@ class ChatViewModelTest {
             mockEventsFlow.emit(WsEvent.GatewayReady(null))
             runCurrent()
 
-            // req-id-3: loadSessions and fetchCommandCatalog precede the create.
+            // Auto-create disabled: trigger the create explicitly.
+            viewModel.createNewSession()
+            runCurrent()
+
+            // The create is the LAST send, so reqCount points at its id.
             mockEventsFlow.emit(
-                WsEvent.RpcResult("req-id-3", mapOf("session_id" to "session-123")),
+                WsEvent.RpcResult("req-id-$reqCount", mapOf("session_id" to "session-123")),
             )
             advanceUntilIdle()
 

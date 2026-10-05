@@ -20,6 +20,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.m57.hermescontrol.R
+import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.chat.ContextUsage
 import java.text.NumberFormat
 import java.util.Locale
@@ -117,7 +118,7 @@ fun ContextUsageDialog(
                         text = stringResource(R.string.chat_context_detail_footnote),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp),
+                        modifier = Modifier.padding(top = Spacing.xs),
                     )
                 }
             }

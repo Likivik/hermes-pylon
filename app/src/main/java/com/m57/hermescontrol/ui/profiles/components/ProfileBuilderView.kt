@@ -50,6 +50,7 @@ import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.CreateProfileRequest
 import com.m57.hermescontrol.data.model.McpServerConfigInput
 import com.m57.hermescontrol.data.model.ModelProvider
+import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.profiles.ProfilesUiState
 import com.m57.hermescontrol.ui.profiles.ProfilesViewModel
 
@@ -83,7 +84,7 @@ fun ProfileBuilderView(
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(16.dp),
+                .padding(Spacing.md),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         // Step Indicator / Stepper Header
@@ -383,7 +384,7 @@ private fun ModelStep(
                                 modifier =
                                     Modifier
                                         .fillMaxWidth()
-                                        .padding(16.dp),
+                                        .padding(Spacing.md),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
@@ -459,7 +460,7 @@ private fun McpStep(
                             modifier =
                                 Modifier
                                     .fillMaxWidth()
-                                    .padding(16.dp),
+                                    .padding(Spacing.md),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
@@ -664,7 +665,7 @@ private fun ReviewStep(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(Spacing.md)) {
                 Text(
                     text = stringResource(R.string.profiles_builder_review_name),
                     style = MaterialTheme.typography.bodySmall,
@@ -692,7 +693,7 @@ private fun ReviewStep(
         }
 
         Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(Spacing.md)) {
                 Text(
                     text = stringResource(R.string.profiles_builder_review_model_settings),
                     style = MaterialTheme.typography.bodySmall,
@@ -717,7 +718,7 @@ private fun ReviewStep(
         }
 
         Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(Spacing.md)) {
                 Text(
                     text = stringResource(R.string.profiles_builder_review_skills_title),
                     style = MaterialTheme.typography.bodySmall,
@@ -746,7 +747,7 @@ private fun ReviewStep(
         }
 
         Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(Spacing.md)) {
                 Text(
                     text = stringResource(R.string.profiles_builder_review_mcp_title),
                     style = MaterialTheme.typography.bodySmall,

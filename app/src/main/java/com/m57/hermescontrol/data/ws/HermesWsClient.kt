@@ -67,6 +67,9 @@ internal data class SourcedWsEvent(
  * as well as direct callbacks.
  */
 object HermesWsClient {
+    /** E2E: when non-blank, WS connects here instead of AuthManager.wsUrl(). */
+    @Volatile
+    var e2eWsOverride: String? = null
     private const val TAG = "HermesWsClient"
 
     // ── Backoff settings ─────────────────────────────────────────────────
@@ -348,6 +351,28 @@ object HermesWsClient {
             !intentionalClose.get() &&
             !backgroundIdleClosed.get() &&
             autoReconnect
+
+    /**
+     * E2E: reset process-wide request state before each androidTest runs.
+     *
+     * `HermesWsClient` is a Kotlin `object`, so `requestId` (process-scope
+     * `AtomicInteger`) survives across the three E2E classes in the same
+     * instrumentation JVM — without this hook, the 2nd and 3rd tests see
+     * ids > 1 for what used to be the first send, and their hardcoded
+     * scripted `"1"`/`"2"`/`"3"` reply ids never match the outgoing
+     * JSON-RPC frames. ChatViewModel.handleRpcResult (line 750) does
+     * `pendingRequests.remove(id) ?: return`, so an unmatched id silently
+     * drops the `session.list` reply and the rail renders empty —
+     * `waitUntilAtLeastOneExists(rail_item_*)` then times out at 30s.
+     *
+     * @param rejectInflight fail any not-yet-replied pending requests so
+     *   their callers don't hang across the test boundary.
+     */
+    @VisibleForTesting
+    internal fun resetRequestCounterForTest(rejectInflight: Boolean = true) {
+        if (rejectInflight) rejectAllPending()
+        requestId.set(0)
+    }
 
     /** Open a WebSocket connection using settings from [AuthManager]. */
     fun connect() {
@@ -632,6 +657,7 @@ object HermesWsClient {
         onSent?.invoke(id)
         val request = JsonRpcRequest(id = id, method = method, params = params.mapValues { it.value.toJsonElement() })
         val json = OkHttpProvider.json.encodeToString(request)
+        Log.d(TAG, "send method=$method id=$id (${json.length}B) connected=${connected.get()} ws=${webSocket != null}")
         var accepted = false
         synchronized(connectionLock) {
             cancelBackgroundIdleCloseLocked()
@@ -646,13 +672,19 @@ object HermesWsClient {
                 // previous code ignored that and silently dropped the message.
                 if (ws.send(json)) {
                     accepted = true
+                    Log.d(TAG, "send direct ok id=$id method=$method")
                 } else {
                     if (webSocket !== ws || !acceptQueuedMessages.get()) {
-                        Log.w(TAG, "WS identity changed while sending — dropping message")
+                        Log.w(
+                            TAG,
+                            "send identity-change drop id=$id method=$method " +
+                                "wsMatches=${webSocket === ws} accept=${acceptQueuedMessages.get()}",
+                        )
                     } else if (isRetryableMessage(json)) {
                         Log.w(TAG, "WS rejected outgoing message — queuing for reconnect")
                         messageQueue.add(json)
                         accepted = true
+                        Log.d(TAG, "send queued id=$id method=$method queueSize=${messageQueue.size}")
                         recoverRejectedSocket(ws)
                     } else {
                         Log.w(TAG, "WS rejected oversized outgoing message — not retrying")
@@ -663,6 +695,7 @@ object HermesWsClient {
                     Log.d(TAG, "WS disconnected — queuing message")
                     messageQueue.add(json)
                     accepted = true
+                    Log.d(TAG, "send queued (no ws) id=$id method=$method queueSize=${messageQueue.size}")
                 } else {
                     Log.w(TAG, "WS disconnected with oversized outgoing message — not queueing")
                 }
@@ -751,23 +784,24 @@ object HermesWsClient {
      * never succeed, so it is discarded to avoid livelocking the loop.
      */
     private fun drainQueue(ws: WebSocket) {
-        synchronized(connectionLock) {
-            while (true) {
-                val msg = messageQueue.peek() ?: break
-                if (!isRetryableMessage(msg)) {
-                    Log.w(TAG, "Dropping oversized queued message")
-                    messageQueue.poll()
-                    continue
-                }
-                if (!ws.send(msg)) {
-                    Log.w(TAG, "WS rejected queued message — retaining for next connection")
-                    recoverRejectedSocket(ws)
-                    return
-                }
+        // e2e-38: drain OUTSIDE connectionLock so handleGatewayReady's
+        // send()s (which also take the lock) can enqueue while we drain
+        // instead of deadlocking on the lock and dropping the RPCs.
+        while (true) {
+            val msg = messageQueue.peek() ?: break
+            if (!isRetryableMessage(msg)) {
+                Log.w(TAG, "Dropping oversized queued message")
                 messageQueue.poll()
+                continue
             }
-            disconnectIfIdleInBackground()
+            if (!ws.send(msg)) {
+                Log.w(TAG, "WS rejected queued message — retaining for next connection")
+                recoverRejectedSocket(ws)
+                return
+            }
+            messageQueue.poll()
         }
+        disconnectIfIdleInBackground()
     }
 
     /** Convenience: submit a user prompt to an existing session. */
@@ -846,8 +880,25 @@ object HermesWsClient {
         }
         val url =
             try {
-                ticketResult.ticket?.let(AuthManager::wsUrlWithCredential)
-                    ?: AuthManager.wsUrl()
+                // E2E override: androidTest sets e2eWsOverride to the
+                // MockWebServer loopback URL; the scripted gateway replaces
+                // the real dashboard/gateway for the whole test process.
+                // For the REAL-gateway E2E (workflow starts `hermes dashboard`
+                // with basic-auth gated), the override points at the real
+                // `/api/ws`, but `/api/ws` rejects unauthenticated handshakes —
+                // append the just-minted ticket so the gateway accepts us.
+                e2eWsOverride?.takeIf { it.isNotBlank() }?.let { base ->
+                    val minted = ticketResult.ticket
+                    if (minted != null && AuthManager.isGatedMode()) {
+                        val sep = if ('?' in base) "&" else "?"
+                        "$base${sep}ticket=$minted"
+                    } else {
+                        base
+                    }
+                } ?: (
+                    ticketResult.ticket?.let(AuthManager::wsUrlWithCredential)
+                        ?: AuthManager.wsUrl()
+                )
             } catch (e: IllegalArgumentException) {
                 Log.w(TAG, "WebSocket blocked by transport policy")
                 synchronized(connectionLock) {
@@ -856,7 +907,12 @@ object HermesWsClient {
                 }
                 return
             }
-        if (BuildConfig.DEBUG) Log.d(TAG, "Connecting to WebSocket endpoint")
+        if (BuildConfig.DEBUG) {
+            Log.d(
+                TAG,
+                "Connecting to WebSocket endpoint: $url override=${!e2eWsOverride.isNullOrBlank()}",
+            )
+        }
 
         val request = Request.Builder().url(url).build()
         var restartForProfileChange = false
@@ -996,8 +1052,13 @@ object HermesWsClient {
                 _connectionStatus.value = ConnectionStatus.CONNECTED
                 currentBackoff = INITIAL_BACKOFF_MS
                 startHealthTracking()
-                drainQueue(webSocket)
             }
+            // Drain the queue OUTSIDE connectionLock: the ViewModel's
+            // loadSessions()/fetchCommandCatalog() take connectionLock inside
+            // send(), so draining inside the lock would deadlock the enqueue of
+            // the RPCs issued right after gateway.ready — they'd allocate an id
+            // but never reach the wire (the e2e-37 "ids 1-2 vanish" symptom).
+            drainQueue(webSocket)
         }
 
         override fun onMessage(

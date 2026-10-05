@@ -54,6 +54,7 @@ import com.hrm.latex.renderer.model.LatexTheme
 import com.m57.hermescontrol.data.remote.GatewayFileClient
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.theme.SearchHighlightColors
+import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.theme.WithoutChatFontScale
 import com.m57.hermescontrol.theme.searchHighlightColors
 
@@ -143,7 +144,7 @@ fun MarkdownText(
 
                 is MdBlock.Hr -> {
                     HorizontalDivider(
-                        modifier = Modifier.padding(vertical = 8.dp),
+                        modifier = Modifier.padding(vertical = Spacing.sm),
                         color = textColor.copy(alpha = 0.25f),
                     )
                 }
@@ -320,7 +321,7 @@ fun MarkdownText(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 4.dp),
+                                .padding(vertical = Spacing.xs),
                     ) {
                         com.m57.hermescontrol.ui.chat.components.GifImageThumbnail(
                             model = source.model,
@@ -354,7 +355,7 @@ fun MarkdownText(
                                     text = def,
                                     color = textColor,
                                     style = MaterialTheme.typography.bodyMedium,
-                                    modifier = Modifier.padding(start = 16.dp, bottom = 2.dp),
+                                    modifier = Modifier.padding(start = Spacing.md, bottom = 2.dp),
                                 )
                             }
                             Spacer(modifier = Modifier.height(2.dp))
@@ -530,7 +531,7 @@ private fun MarkdownTable(
             Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState())
-                .padding(vertical = 4.dp),
+                .padding(vertical = Spacing.xs),
     ) {
         // Header row
         Row(modifier = Modifier.background(headerBg)) {

@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Warning
@@ -45,6 +44,7 @@ import com.m57.hermescontrol.data.model.EnvVarField
 import com.m57.hermescontrol.data.model.MessagingPlatform
 import com.m57.hermescontrol.data.model.MessagingPlatformUpdate
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
+import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.channels.components.PlatformCard
 import com.m57.hermescontrol.ui.channels.components.TelegramOnboardingDialog
 import com.m57.hermescontrol.ui.common.EmptyState
@@ -223,7 +223,7 @@ private fun RestartBanner(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
+        shape = MaterialTheme.shapes.small,
     ) {
         Row(
             modifier =
@@ -266,7 +266,7 @@ private fun RestartBanner(
 private fun GatewayOfflineBanner(gatewayCommand: String) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
+        shape = MaterialTheme.shapes.small,
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(12.dp),
@@ -288,7 +288,7 @@ private fun GatewayOfflineBanner(gatewayCommand: String) {
             Spacer(modifier = Modifier.height(8.dp))
             Surface(
                 color = LocalHermesStatusColors.current.warningContainer,
-                shape = RoundedCornerShape(4.dp),
+                shape = MaterialTheme.shapes.extraSmall,
             ) {
                 Text(
                     text = "  $gatewayCommand",
@@ -419,10 +419,10 @@ internal fun ConfigureForm(
 private fun AdminSection(envPath: String) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
+        shape = MaterialTheme.shapes.small,
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(Spacing.md),
         ) {
             Text(
                 text = "Admin",

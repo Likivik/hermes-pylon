@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.m57.hermescontrol.R
+import com.m57.hermescontrol.theme.Spacing
 
 /**
  * Floating action button shown when the message list is not following the
@@ -47,7 +48,7 @@ fun BoxScope.ChatScrollToBottomFab(
         modifier =
             Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 16.dp, bottom = 16.dp),
+                .padding(end = Spacing.md, bottom = Spacing.md),
     ) {
         BadgedBox(
             badge = {

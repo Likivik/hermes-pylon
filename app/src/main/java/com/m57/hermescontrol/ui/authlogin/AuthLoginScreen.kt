@@ -41,8 +41,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentType
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -51,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.m57.hermescontrol.R
+import com.m57.hermescontrol.theme.Spacing
 
 @Composable
 fun AuthLoginScreen(
@@ -96,7 +100,7 @@ fun AuthLoginScreen(
                 Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 24.dp, vertical = 32.dp),
+                    .padding(horizontal = Spacing.lg, vertical = Spacing.xl),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -135,7 +139,7 @@ fun AuthLoginScreen(
                 Text(
                     text = stringResource(R.string.auth_login_existing_profiles_title),
                     style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.padding(top = 8.dp),
+                    modifier = Modifier.padding(top = Spacing.sm),
                 )
                 state.loggedInProfiles.forEach { profile ->
                     androidx.compose.material3.OutlinedButton(
@@ -242,7 +246,10 @@ fun AuthLoginScreen(
                     onValueChange = viewModel::onUsernameChange,
                     label = { Text(stringResource(R.string.auth_login_username_label)) },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, autoCorrectEnabled = false),
+                    modifier =
+                        Modifier.fillMaxWidth()
+                            .semantics { contentType = ContentType.Username },
                 )
             }
 
@@ -259,9 +266,11 @@ fun AuthLoginScreen(
                     onValueChange = viewModel::onPasswordChange,
                     label = { Text(stringResource(R.string.auth_login_password_label)) },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    modifier =
+                        Modifier.fillMaxWidth()
+                            .semantics { contentType = ContentType.Password },
                 )
             }
 

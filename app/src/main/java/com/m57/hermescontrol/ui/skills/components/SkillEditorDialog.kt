@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.m57.hermescontrol.R
+import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.HermesScaffold
 import com.m57.hermescontrol.ui.common.LoadingState
 import com.m57.hermescontrol.ui.common.NavIcon
@@ -74,7 +75,7 @@ internal fun SkillEditorDialog(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .padding(16.dp),
+                    .padding(Spacing.md),
             colors =
                 CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface,
@@ -131,7 +132,7 @@ internal fun SkillEditorDialog(
                                 modifier =
                                     Modifier
                                         .fillMaxSize()
-                                        .padding(16.dp),
+                                        .padding(Spacing.md),
                                 textStyle =
                                     TextStyle(
                                         fontFamily = FontFamily.Monospace,

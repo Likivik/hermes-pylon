@@ -59,7 +59,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
@@ -71,7 +70,6 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -82,10 +80,9 @@ import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.Attachment
 import com.m57.hermescontrol.data.remote.OkHttpProvider
 import com.m57.hermescontrol.theme.ChatFontScale
-import com.m57.hermescontrol.theme.DarkOnSurface
 import com.m57.hermescontrol.theme.HermesStatusColors
-import com.m57.hermescontrol.theme.LightOnSurface
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
+import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.theme.onColorFor
 import com.m57.hermescontrol.ui.chat.components.DiffViewCard
 import com.m57.hermescontrol.ui.chat.components.ReasoningCard
@@ -211,34 +208,23 @@ private fun UserBubble(
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 2.dp),
+                .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
         contentAlignment = Alignment.CenterEnd,
     ) {
+        // Likivik patch: user bubble follows the theme's *own* container color
+        // (primaryContainer) instead of a primary→secondary gradient, so it
+        // adapts to every preset (incl. AMOLED) instead of fighting it.
         val gradientBrush =
             Brush.linearGradient(
                 colors =
                     listOf(
-                        MaterialTheme.colorScheme.primary,
-                        MaterialTheme.colorScheme.secondary,
+                        MaterialTheme.colorScheme.primaryContainer,
+                        MaterialTheme.colorScheme.primaryContainer,
                     ),
             )
-        val primary = MaterialTheme.colorScheme.primary
-        val secondary = MaterialTheme.colorScheme.secondary
-        val avgLuminance = (primary.luminance() + secondary.luminance()) / 2f
-        val userBubbleTextColor =
-            if (avgLuminance > 0.5f) {
-                if (MaterialTheme.colorScheme.onPrimary.luminance() < 0.5f) {
-                    MaterialTheme.colorScheme.onPrimary
-                } else {
-                    LightOnSurface
-                }
-            } else {
-                if (MaterialTheme.colorScheme.onPrimary.luminance() > 0.5f) {
-                    MaterialTheme.colorScheme.onPrimary
-                } else {
-                    DarkOnSurface
-                }
-            }
+        // On-color: the scheme's own onPrimaryContainer — no guessing. Verified
+        // pairs: Default dark 9.58:1, light 6.36:1; follows presets/dynamic.
+        val userBubbleTextColor = MaterialTheme.colorScheme.onPrimaryContainer
         Box {
             Surface(
                 modifier =
@@ -262,7 +248,7 @@ private fun UserBubble(
                 color = Color.Transparent,
                 tonalElevation = 0.dp,
             ) {
-                Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+                Column(modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs)) {
                     ChatFontScale {
                         SelectionContainer {
                             Text(
@@ -294,7 +280,7 @@ private fun UserBubble(
                             modifier =
                                 Modifier
                                     .align(Alignment.End)
-                                    .padding(top = 4.dp),
+                                    .padding(top = Spacing.xs),
                         )
                     }
                 }
@@ -366,14 +352,16 @@ private fun AssistantBubble(
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 2.dp),
+                .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
         contentAlignment = Alignment.CenterStart,
     ) {
         Box {
             Surface(
                 modifier =
                     Modifier
-                        .bubbleMaxWidth()
+                        // Likivik patch: stretch assistant responses to full width
+                        // (readability for long/markdown answers). User bubbles stay 80%.
+                        .bubbleMaxWidth(fraction = 1f)
                         .animateContentSize()
                         .clip(
                             RoundedCornerShape(
@@ -397,7 +385,7 @@ private fun AssistantBubble(
                     ),
                 tonalElevation = 1.dp,
             ) {
-                Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+                Column(modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs)) {
                     if (message.reasoningText.isNotBlank()) {
                         ReasoningCard(
                             reasoningText = message.reasoningText,
@@ -442,7 +430,7 @@ private fun AssistantBubble(
                             modifier =
                                 Modifier
                                     .align(Alignment.End)
-                                    .padding(top = 4.dp),
+                                    .padding(top = Spacing.xs),
                         )
                     }
                 }
@@ -515,7 +503,7 @@ private fun SelfImprovementReviewCard(
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 4.dp)
+                .padding(horizontal = 12.dp, vertical = Spacing.xs)
                 .testTag("self_improvement_review_card"),
         shape = RoundedCornerShape(10.dp),
         colors =
@@ -523,7 +511,7 @@ private fun SelfImprovementReviewCard(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             ),
     ) {
-        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = Spacing.sm)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = icon,
@@ -563,17 +551,25 @@ private fun SystemBubble(
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp),
+                .padding(horizontal = Spacing.lg, vertical = Spacing.xs),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            text = message.content,
-            style =
-                MaterialTheme.typography.bodySmall.copy(
-                    fontStyle = FontStyle.Italic,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-        )
+        // Likivik patch: system status lines render as Telegram-style center
+        // pills (compact, single-line, muted) instead of full-width text rows.
+        Surface(
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+            tonalElevation = 0.dp,
+        ) {
+            Text(
+                text = message.content,
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = Spacing.xs),
+            )
+        }
 
         // Approval action buttons
         if (message.approvalInfo != null) {
@@ -2161,19 +2157,19 @@ private fun ToolBubble(
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 1.dp),
+                .padding(horizontal = Spacing.sm, vertical = 1.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
         Card(
             onClick = { expanded = !expanded },
             colors = CardDefaults.cardColors(containerColor = chipColor),
-            shape = RoundedCornerShape(8.dp),
+            shape = MaterialTheme.shapes.small,
         ) {
             Column(
                 modifier =
                     Modifier
                         .animateContentSize()
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                        .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
             ) {
                 // ── Header row: icon + tool name ──
                 HeaderRow(message, config, contentColor, statusColors)
@@ -2190,7 +2186,7 @@ private fun ToolBubble(
                             ),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 4.dp, start = 22.dp),
+                        modifier = Modifier.padding(top = Spacing.xs, start = Spacing.lg),
                     )
                 }
 
@@ -2204,7 +2200,7 @@ private fun ToolBubble(
                 if (!expanded && parsed?.summaryText != null) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(top = 4.dp, start = 22.dp),
+                        modifier = Modifier.padding(top = Spacing.xs, start = Spacing.lg),
                     ) {
                         Icon(
                             imageVector = config.icon,
@@ -2331,7 +2327,7 @@ private fun ToolBubble(
                     text = formatTimestamp(message.timestamp, DateFormat.is24HourFormat(LocalContext.current)),
                     color = contentColor.copy(alpha = 0.5f),
                     style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.align(Alignment.End).padding(top = 4.dp),
+                    modifier = Modifier.align(Alignment.End).padding(top = Spacing.xs),
                 )
             }
         }
@@ -2411,7 +2407,7 @@ private fun SecurityRiskChip(
     Row(
         modifier =
             modifier
-                .padding(top = 4.dp, start = 22.dp),
+                .padding(top = Spacing.xs, start = Spacing.lg),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
@@ -2563,13 +2559,13 @@ private fun InlineAttachment(
         // Non-image file — show a card with file icon and name. Tapping fetches
         // the bytes (gateway-sourced) or opens the local URI.
         Surface(
-            shape = RoundedCornerShape(8.dp),
+            shape = MaterialTheme.shapes.small,
             color = textColor.copy(alpha = 0.1f),
             border = BorderStroke(1.dp, textColor.copy(alpha = 0.2f)),
             modifier = clickable,
         ) {
             Row(
-                modifier = Modifier.padding(8.dp),
+                modifier = Modifier.padding(Spacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (isOpening) {

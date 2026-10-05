@@ -94,6 +94,21 @@ private data class PendingRpcRequest(
     val redirectText: String? = null,
     /** Attempt generation for a session.create, used to fence retried answers. */
     val createGeneration: Long? = null,
+    /**
+     * Rename waiting on this resume: once the ack installs a live runtime
+     * session, `session.title` succeeds (the gateway resolves titles through
+     * the LIVE session map — storage ids 404 with 4001).
+     */
+    val pendingRenameTitle: String? = null,
+    val pendingRenameIcon: String? = null,
+    /** Runtime id a session.title was addressed to (error attribution). */
+    val titleTargetId: String? = null,
+    /** Stored id a session.delete is working on; also drives close-then-delete. */
+    val deleteSessionId: String? = null,
+    /** True when this resume exists only to learn a runtime sid for a refused delete. */
+    val closeAfterResume: Boolean = false,
+    /** True once a delete has been retried after closing — stops the recovery looping. */
+    val deleteRetried: Boolean = false,
 )
 
 data class ChatUiState(
@@ -101,8 +116,11 @@ data class ChatUiState(
     val currentSessionId: String? = null,
     val isSessionReady: Boolean = false,
     val sessions: List<SessionUi> = emptyList(),
+    /** True while a user-triggered session.list refresh is in flight (rail pull-to-refresh). */
+    val railRefreshing: Boolean = false,
     val chatTitle: String = "Hermes",
     val connectionStatus: ConnectionStatus = ConnectionStatus.DISCONNECTED,
+    val statusPill: String? = null,
     val isAgentTyping: Boolean = false,
     val isThinking: Boolean = false,
     val thinkingText: String = "",
@@ -185,7 +203,24 @@ data class SessionUi(
     val messageCount: Int = 0,
     val parentSessionId: String? = null,
     val depth: Int = 0,
-)
+    // Unix seconds of last activity (from session.list "started_at"); 0 = unknown
+    val lastActive: Long = 0,
+) {
+    /**
+     * Stale = known activity and idle for 7+ days. lastActive == 0 means
+     * UNKNOWN, not old — unknown-activity sessions must render as fresh
+     * (this exact rule previously emptied the rail for all mock/pipeline
+     * sessions; real server feeds can also emit 0).
+     */
+    val isStale: Boolean
+        get() =
+            lastActive > 0 &&
+                lastActive * 1000 < System.currentTimeMillis() - STALE_THRESHOLD_MS
+
+    companion object {
+        private const val STALE_THRESHOLD_MS = 7L * 24 * 60 * 60 * 1000
+    }
+}
 
 data class ClarifyUi(
     val text: String,
@@ -367,7 +402,22 @@ class ChatViewModel(
             }
         }
         if (wsClient.connectionStatus.value == ConnectionStatus.CONNECTED) {
-            handleGatewayReady()
+            // Deferred: when the WS is already CONNECTED mid-construction (fast
+            // e2e mock retry), handleGatewayReady would run before later-declared
+            // property initializers (railPrefs lazy delegate at ~1552) execute —
+            // the lazy delegate is still null → NPE. Posting to viewModelScope
+            // runs it after construction completes, matching the async
+            // gateway.ready arrival in production.
+            // `launch` may run immediately on the main dispatcher while the
+            // constructor is still initializing later properties. Post one
+            // message-loop turn so all property initializers have completed.
+            // Dispatchers.Main (NOT viewModelScope's Main.immediate) so the body
+            // really is deferred one queue turn. Using the dispatcher instead of
+            // a Looper Handler keeps the ViewModel free of an android.os.Looper
+            // dependency, which a plain JVM unit test can then drive.
+            viewModelScope.launch(Dispatchers.Main) {
+                handleGatewayReady()
+            }
         }
     }
 
@@ -425,7 +475,7 @@ class ChatViewModel(
 
     private fun handleGatewayReady() {
         _uiState.update { it.copy(isLoading = false) }
-        addSystemMessage("Connected to Hermes")
+        addSystemMessage("Connected to Hermes", transient = true)
         loadSessions()
         fetchCommandCatalog()
         fetchModelContextLength()
@@ -446,7 +496,18 @@ class ChatViewModel(
                 initialSessionId = null
                 switchSession(initial)
             } else {
-                createNewSession(setLoading = false)
+                // Likivik patch: resume the last-open session across launches
+                // instead of creating a new one every cold open. If there is
+                // no last session, do NOT auto-create — leave the chat pane
+                // empty and let the user pick from the rail (which
+                // loadSessions() above populates). The send path is guarded
+                // on currentSessionId != null, so a null selection safely
+                // disables input until a session is chosen.
+                val last = lastSession()
+                if (!last.isNullOrBlank()) {
+                    switchSession(last)
+                }
+                // else: no auto-create. Stay on the empty state.
             }
         }
     }
@@ -742,6 +803,8 @@ class ChatViewModel(
                 // drawer screens (e.g. Processes, issue #532) can issue
                 // session-scoped RPCs. See ActiveSessionHolder.
                 ActiveSessionHolder.set(runtimeId, storageId)
+                // Likivik patch: remember the freshly created session too.
+                persistLastSession(storageId)
                 _streamingState.update { StreamingState() }
                 addSystemMessage("Session created", persist = true)
                 loadSessions()
@@ -799,13 +862,19 @@ class ChatViewModel(
                             id = s["id"] as? String ?: "",
                             title = s["title"] as? String ?: "Untitled",
                             messageCount = (s["message_count"] as? Double)?.toInt() ?: 0,
+                            lastActive = (s["started_at"] as? Double)?.toLong() ?: 0L,
                         )
                     }
+                android.util.Log.i(
+                    "ChatVM",
+                    "session.list result processed: ${sessions.size} sessions: ${sessions.map { it.id }}",
+                )
                 _uiState.update { state ->
                     val newTitle = sessions.find { s -> s.id == state.currentSessionId }?.title
                     state.copy(
                         sessions = sessions,
                         chatTitle = newTitle ?: state.chatTitle,
+                        railRefreshing = false,
                     )
                 }
             }
@@ -814,9 +883,32 @@ class ChatViewModel(
                 val resultMap = result as? Map<String, Any?>
                 val requestedSessionId = request.resumeSessionId
                 val selectedSessionId = _uiState.value.currentSessionId
+                // Delete recovery: session.delete was refused (4023) because the
+                // target is still LIVE server-side. This resume exists only to
+                // learn its runtime sid so we can close it, then retry the
+                // stored delete. Never touches the visible chat.
+                if (request.closeAfterResume) {
+                    val runtimeToClose = resultMap?.get("session_id") as? String
+                    val stored = request.deleteSessionId
+                    if (runtimeToClose != null && stored != null) {
+                        sendCloseSession(runtimeToClose, stored)
+                    } else {
+                        Log.w(
+                            TAG,
+                            "delete recovery: resume ack gave no runtime id for stored=$stored",
+                        )
+                    }
+                    return
+                }
                 if (
                     requestedSessionId != null &&
-                    selectedSessionId != requestedSessionId
+                    selectedSessionId != requestedSessionId &&
+                    // Likivik patch: a rename-resume targets a rail item the
+                    // user ISN'T currently viewing. Never replace the active
+                    // chat for it, but do NOT drop it — the ack handler below
+                    // fires the queued session.title via the runtime id this
+                    // response carries (storage ids 4001 on session.title).
+                    request.pendingRenameTitle == null
                 ) {
                     return
                 }
@@ -824,6 +916,11 @@ class ChatViewModel(
                     (resultMap?.get("resumed") as? String)
                         ?: requestedSessionId
                         ?: selectedSessionId
+                // Capture the PREVIOUS runtime id BEFORE the ack clobbers
+                // runtimeSessionId below. A current-session rename (resume
+                // fast-path) may ack WITHOUT session_id — we need the id the
+                // chat already holds to fire session.title on it.
+                val preAckRuntimeId = runtimeSessionId
                 runtimeSessionId = resultMap?.get("session_id") as? String
 
                 // Parse the session-scoped snapshot returned by the backend.
@@ -839,30 +936,40 @@ class ChatViewModel(
                 // the WS round-trip. Calling loadCachedMessages() here would
                 // overwrite any message the user sent between switchSession() and
                 // the server ack, making the chat appear to go blank.
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        currentSessionId = sessionId,
-                        isSessionReady = runtimeSessionId != null,
-                        currentSessionModel =
-                            if (model != null && provider != null) {
-                                "$provider/$model"
-                            } else {
-                                model ?: it.currentSessionModel
-                            },
-                        reasoningLevel =
-                            if (reasoningEffort.isNullOrEmpty()) {
-                                null
-                            } else {
-                                reasoningEffort
-                            },
-                        terminalBackend = terminalBackend?.trim()?.takeIf { it.isNotEmpty() },
-                        // `switchSession()` cleared the previous session's
-                        // reading. Hydrate only from this resume response.
-                        contextUsage = parseContextUsage(usage, previous = null),
-                    )
+                //
+                // Likivik patch: a rename-resume (pendingRenameTitle != null)
+                // MUST NOT hijack the UI onto the renamed background session —
+                // it only exists to obtain a runtime id. Keep the current view.
+                val renameOnly =
+                    request.pendingRenameTitle != null &&
+                        requestedSessionId != null &&
+                        selectedSessionId != requestedSessionId
+                if (!renameOnly) {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            currentSessionId = sessionId,
+                            isSessionReady = runtimeSessionId != null,
+                            currentSessionModel =
+                                if (model != null && provider != null) {
+                                    "$provider/$model"
+                                } else {
+                                    model ?: it.currentSessionModel
+                                },
+                            reasoningLevel =
+                                if (reasoningEffort.isNullOrEmpty()) {
+                                    null
+                                } else {
+                                    reasoningEffort
+                                },
+                            terminalBackend = terminalBackend?.trim()?.takeIf { it.isNotEmpty() },
+                            // `switchSession()` cleared the previous session's
+                            // reading. Hydrate only from this resume response.
+                            contextUsage = parseContextUsage(usage, previous = null),
+                        )
+                    }
                 }
-                if (sessionId != null) {
+                if (sessionId != null && !renameOnly) {
                     hydrateResumeMessages(
                         sessionId = sessionId,
                         payload = resultMap?.get("messages"),
@@ -871,9 +978,55 @@ class ChatViewModel(
                                 requestedSessionId != sessionId,
                     )
                 }
-                // Mirror the active runtime session id app-wide (issue #532).
-                ActiveSessionHolder.set(runtimeSessionId ?: sessionId, sessionId)
-                addSystemMessage("Session resumed")
+                if (!renameOnly) {
+                    // Mirror the active runtime session id app-wide (issue #532).
+                    ActiveSessionHolder.set(runtimeSessionId ?: sessionId, sessionId)
+                    addSystemMessage("Session resumed", transient = true)
+                }
+                // A rename queued on this resume fires now that the runtime
+                // session is live.
+                //
+                // ADDRESSING (root-caused against the gateway source,
+                // tui_gateway/server.py `_sess_nowait`): `session.title` is a
+                // SESSION-SCOPED RPC — it resolves params["session_id"] as an
+                // EXACT key in the live `_sessions` map. That key is the RUNTIME
+                // sid (the ack's "session_id"), never the stored id. The ack's
+                // "session_key" is `_session_lookup_key` = agent.session_id =
+                // the STORED key, so addressing the title with it always missed
+                // and returned 4001 "session not found" — the rename silently
+                // never applied. Always address the RUNTIME sid.
+                //
+                // Fast-path acks (already-live session) may omit session_id;
+                // fall back to the cached runtime id ONLY for a current-session
+                // rename — for a background rename that id belongs to the
+                // session the user is viewing and would title the WRONG one.
+                val ackRuntimeId = runtimeSessionId
+                // Fallback to the cached runtime id ONLY for a current-session
+                // rename (renameOnly == false). For a BACKGROUND rename the
+                // cached id belongs to the session the user is viewing — using
+                // it would title the WRONG session. If such an ack carries no
+                // addressable id we send nothing (and log it) rather than
+                // mis-address.
+                val fallbackRuntimeId = if (!renameOnly) preAckRuntimeId else null
+                val liveRuntimeId = ackRuntimeId ?: fallbackRuntimeId
+                if (liveRuntimeId == null) {
+                    Log.w(
+                        TAG,
+                        "rename-resume ack carried no session_id/session_key for " +
+                            "requested=$requestedSessionId (renameOnly=$renameOnly) — title not sent",
+                    )
+                }
+                val renameTarget = liveRuntimeId
+                if (renameTarget != null && request.pendingRenameTitle != null) {
+                    sendSessionTitle(renameTarget, request.pendingRenameTitle)
+                }
+            }
+
+            WsMethods.SESSION_CLOSE -> {
+                // Close-then-delete recovery: the runtime is down, so the stored
+                // delete can now succeed. Marked retried so a second refusal
+                // surfaces instead of looping.
+                request.deleteSessionId?.let { sendDeleteSession(it, retried = true) }
             }
 
             WsMethods.SESSION_INTERRUPT -> {
@@ -988,6 +1141,40 @@ class ChatViewModel(
                 }
                 return
             }
+        }
+
+        // 4023: the gateway refuses to delete a session whose runtime is still
+        // live. Close that runtime (learned via a resume) and retry the delete
+        // exactly once — `deleteRetried` stops this from looping.
+        if (method == WsMethods.SESSION_DELETE && errorCode == 4023) {
+            val stored = request.deleteSessionId
+            if (stored != null && !request.deleteRetried) {
+                Log.i(TAG, "session.delete refused (still active) — closing runtime, then retrying: $stored")
+                _uiState.update { it.copy(errorMessage = null) }
+                startCloseThenDelete(stored)
+                return
+            }
+        }
+
+        // Failures of the rename/delete RPCs get an action-shaped message: the
+        // optimistic rail state reverts on the next session.list refresh, so the
+        // user has to know the server refused, and why.
+        if (method == WsMethods.SESSION_TITLE) {
+            Log.e(TAG, "session.title failed ($errorCode): $errorMsg target=${request.titleTargetId}")
+            _uiState.update { it.copy(isLoading = false, errorMessage = "Rename failed: $errorMsg") }
+            return
+        }
+        if (method == WsMethods.SESSION_DELETE) {
+            Log.e(TAG, "session.delete failed ($errorCode): $errorMsg target=${request.deleteSessionId}")
+            _uiState.update { it.copy(isLoading = false, errorMessage = "Delete failed: $errorMsg") }
+            return
+        }
+
+        // Likivik patch: a failed rename-resume means the rename is LOST —
+        // surface it (the optimistic rail title reverts on the next
+        // session.list refresh, so the user must know why).
+        if (request.pendingRenameTitle != null && method == WsMethods.SESSION_RESUME) {
+            Log.e(TAG, "rename-resume failed ($errorCode): $errorMsg")
         }
 
         // Surface error in UI (these are server-pushed RpcError for
@@ -1472,6 +1659,239 @@ class ChatViewModel(
 
     /** Liveness timer for the newest unacknowledged `session.create`. */
     private var sessionCreateJob: Job? = null
+    private var statusPillJob: Job? = null
+
+    // ── Likivik patch: pinned sessions for the rail ──
+    // Eagerly initialize this before init{} can receive a fast gateway.ready.
+    // A lazy delegate here can be observed as unassigned during construction.
+    private val railPrefs = application.applicationContext.getSharedPreferences("hermes_rail", 0)
+    private val _pinnedSessionIds =
+        MutableStateFlow(
+            railPrefs.getStringSet("pinned", emptySet())?.toSet() ?: emptySet(),
+        )
+    val pinnedSessionIds: StateFlow<Set<String>> = _pinnedSessionIds.asStateFlow()
+
+    // ── Likivik patch: persisted rail order (drag-to-reorder). Stored as a
+    // comma-joined id string because SharedPreferences StringSet ordering is
+    // not guaranteed. homeOrder holds the full displayed order (pinned +
+    // fresh + stale, as last set by the rail). ──
+    private val _homeOrder = MutableStateFlow(loadHomeOrder())
+    val homeOrder: StateFlow<List<String>> = _homeOrder.asStateFlow()
+
+    private fun loadHomeOrder(): List<String> =
+        (
+            railPrefs.getString("home_order", null)?.takeIf { it.isNotBlank() }
+                ?.split(',')?.filter { it.isNotEmpty() }
+        ) ?: emptyList()
+
+    /** Persist the rail's full displayed order (pinned + fresh + stale). */
+    fun setRailOrder(order: List<String>) {
+        val clean = order.filter { it.isNotBlank() }
+        railPrefs.edit().putString("home_order", clean.joinToString(",")).apply()
+        _homeOrder.value = clean
+    }
+
+    // ── Likivik patch: remember the last-open session so a fresh app launch
+    // resumes it instead of blindly creating a new one each time. ──
+    private fun persistLastSession(id: String) {
+        railPrefs.edit().putString("last_session", id).apply()
+    }
+
+    private fun lastSession(): String? = railPrefs.getString("last_session", null)?.takeIf { it.isNotBlank() }
+
+    // ── Likivik patch: per-session rail customization (icon emoji only; the
+    // name shown equals the real session title, renamed via session.title) ──
+    // RailMeta is a top-level model in ui/chat/RailMeta.kt.
+
+    private val _railMeta =
+        MutableStateFlow(
+            loadRailMeta(),
+        )
+    val railMeta: StateFlow<Map<String, RailMeta>> = _railMeta.asStateFlow()
+
+    private fun loadRailMeta(): Map<String, RailMeta> {
+        val all = railPrefs.all
+        val map = mutableMapOf<String, RailMeta>()
+        for ((key, value) in all) {
+            if (key.startsWith("icon_") && value is String) {
+                map[key.removePrefix("icon_")] = RailMeta(value.takeIf { it.isNotEmpty() })
+            }
+        }
+        return map
+    }
+
+    fun saveRailMeta(
+        sessionId: String,
+        icon: String?,
+    ) {
+        val cleanIcon = icon?.takeIf { it.isNotEmpty() }
+        if (cleanIcon == null) {
+            railPrefs.edit().remove("icon_$sessionId").apply()
+        } else {
+            railPrefs.edit().putString("icon_$sessionId", cleanIcon).apply()
+        }
+        _railMeta.value = _railMeta.value + (sessionId to RailMeta(cleanIcon))
+    }
+
+    /**
+     * Likivik patch: rename the session's real title on the server
+     * (`session.title`). The rail name equals the actual session name — this
+     * updates the header and every surface, not just the rail. Optionally sets
+     * a rail icon (local decoration) in the same go.
+     */
+    fun renameSession(
+        sessionId: String,
+        newTitle: String,
+        icon: String?,
+    ) {
+        saveRailMeta(sessionId, icon)
+        // Icon-only edit (empty title = keep current): no server round-trip.
+        val title = newTitle.trim().takeIf { it.isNotEmpty() }
+        if (title == null) return
+        // ALWAYS resume first — single deterministic path. The gateway reaps
+        // detached runtimes (WS grace reaper), so a session the app still
+        // considers "live" (cached runtime id) can already be reaped
+        // server-side: even CURRENT-session renames 4001 with a bare
+        // session.title ("detached/reaped runtime; client should resume the
+        // stored session" — the gateway's own guidance). Resume is idempotent:
+        // live sessions return the fast-path payload, detached ones are
+        // re-registered; the ack then fires the title by the stable
+        // session_key (storage id).
+        wsClient.send(
+            WsMethods.SESSION_RESUME,
+            mapOf("session_id" to sessionId, "omit_messages" to true),
+            onSent = { id ->
+                pendingRequests[id] =
+                    PendingRpcRequest(
+                        method = WsMethods.SESSION_RESUME,
+                        resumeSessionId = sessionId,
+                        pendingRenameTitle = title,
+                        pendingRenameIcon = icon,
+                    )
+            },
+        )
+        // Reflect immediately in the local session list.
+        _uiState.update { state ->
+            state.copy(
+                sessions =
+                    state.sessions.map {
+                        if (it.id == sessionId) it.copy(title = title) else it
+                    },
+                chatTitle = if (state.currentSessionId == sessionId) title else state.chatTitle,
+            )
+        }
+    }
+
+    private fun sendSessionTitle(
+        runtimeSessionId: String,
+        title: String,
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            wsClient.send(
+                WsMethods.SESSION_TITLE,
+                mapOf("session_id" to runtimeSessionId, "title" to title),
+                // Tracked so a rejection is attributed to session.title and
+                // handled here instead of falling through to the reducer's raw
+                // JsonRpcError banner.
+                onSent = { id ->
+                    pendingRequests[id] =
+                        PendingRpcRequest(
+                            method = WsMethods.SESSION_TITLE,
+                            titleTargetId = runtimeSessionId,
+                        )
+                },
+            )
+        }
+    }
+
+    /**
+     * `session.delete` is refused with 4023 while the target is LIVE on the
+     * gateway (the agent's next flush would trip a foreign key), and
+     * `session.close` — like every session-scoped RPC — resolves an EXACT live
+     * runtime id (`_pop_session_by_id` pops the `_sessions` key). The stored id
+     * the rail holds is not that key, so resume it once to learn the runtime
+     * sid, close it, then retry the stored delete.
+     */
+    private fun startCloseThenDelete(storedId: String) {
+        wsClient.send(
+            WsMethods.SESSION_RESUME,
+            mapOf("session_id" to storedId, "omit_messages" to true),
+            onSent = { id ->
+                pendingRequests[id] =
+                    PendingRpcRequest(
+                        method = WsMethods.SESSION_RESUME,
+                        resumeSessionId = storedId,
+                        deleteSessionId = storedId,
+                        closeAfterResume = true,
+                    )
+            },
+        )
+    }
+
+    private fun sendCloseSession(
+        runtimeSessionId: String,
+        storedId: String,
+    ) {
+        wsClient.send(
+            WsMethods.SESSION_CLOSE,
+            mapOf("session_id" to runtimeSessionId),
+            onSent = { id ->
+                pendingRequests[id] =
+                    PendingRpcRequest(
+                        method = WsMethods.SESSION_CLOSE,
+                        deleteSessionId = storedId,
+                    )
+            },
+        )
+    }
+
+    private fun sendDeleteSession(
+        storedId: String,
+        retried: Boolean = false,
+    ) {
+        wsClient.send(
+            WsMethods.SESSION_DELETE,
+            mapOf("session_id" to storedId),
+            onSent = { id ->
+                pendingRequests[id] =
+                    PendingRpcRequest(
+                        method = WsMethods.SESSION_DELETE,
+                        deleteSessionId = storedId,
+                        deleteRetried = retried,
+                    )
+            },
+        )
+    }
+
+    fun togglePinSession(sessionId: String) {
+        val next =
+            if (sessionId in _pinnedSessionIds.value) {
+                _pinnedSessionIds.value - sessionId
+            } else {
+                _pinnedSessionIds.value + sessionId
+            }
+        railPrefs.edit().putStringSet("pinned", next).apply()
+        _pinnedSessionIds.value = next
+    }
+
+    /**
+     * Likivik patch: delete a session from the rail's long-press menu.
+     * Fire-and-forget over the WS socket, then drop it from the local list
+     * (and pins) immediately so the rail reflects reality without waiting
+     * for the next session.list round-trip.
+     */
+    fun deleteRailSession(sessionId: String) {
+        // session.delete takes the STORED id (it deletes the DB row and refuses
+        // only when that id belongs to a live runtime, 4023) — which is exactly
+        // what the rail holds from session.list.
+        sendDeleteSession(sessionId)
+        _pinnedSessionIds.value.let { pins ->
+            if (sessionId in pins) togglePinSession(sessionId)
+        }
+        _uiState.update { state ->
+            state.copy(sessions = state.sessions.filter { it.id != sessionId })
+        }
+    }
 
     /**
      * Ask the gateway for a fresh conversation.
@@ -1579,6 +1999,17 @@ class ChatViewModel(
                 onSent = { id -> trackRequest(id, WsMethods.SESSION_LIST) },
             )
         }
+    }
+
+    /**
+     * User-triggered rail refresh (pull-to-refresh / the top-bar refresh icon).
+     * Re-lists sessions so the rail reflects SERVER truth — titles, deletions
+     * and ordering are all owned by the gateway, and the rename/delete paths
+     * update the rail optimistically.
+     */
+    fun refreshSessions() {
+        _uiState.update { it.copy(railRefreshing = true) }
+        loadSessions()
     }
 
     private fun fetchCommandCatalog() {
@@ -1957,12 +2388,15 @@ class ChatViewModel(
         _uiState.update {
             val title = it.sessions.find { s -> s.id == sessionId }?.title ?: "Hermes"
             it.copy(
-                isLoading = true,
+                isLoading = false,
                 isSessionReady = false,
                 isLoadingOlder = false,
                 hasOlderMessages = false,
                 currentSessionId = sessionId,
-                messages = emptyList(),
+                // Likivik patch: don't wipe to emptyList — keep whatever is on
+                // screen until loadCachedMessages(sessionId) swaps in the cached
+                // transcript. Prevents the blank-flash on every switch.
+                messages = it.messages,
                 subagentIndicators = emptyList(),
                 todos = emptyList(),
                 chatTitle = title,
@@ -1980,7 +2414,13 @@ class ChatViewModel(
         }
         // Mirror the active session id app-wide (issue #532).
         ActiveSessionHolder.set(sessionId)
+        // Likivik patch: remember this as the last-open session for next launch.
+        persistLastSession(sessionId)
         _streamingState.update { StreamingState() }
+        // Likivik patch: paint from Room cache immediately instead of staring at
+        // a blank loading screen while the network round-trip completes. The
+        // authoritative refresh below (loadSessionMessages) converges the view.
+        loadCachedMessages(sessionId)
         viewModelScope.launch {
             // Resume the selected desktop session, then load its complete transcript.
             launch(Dispatchers.IO) {
@@ -2004,7 +2444,11 @@ class ChatViewModel(
                     state.copy(
                         messages = cachedMessages,
                         todos = restoredTodos(state.todos, cachedMessages),
-                        isLoading = false,
+                        // Likivik patch v2: do NOT clear isLoading here — the
+                        // network fetch (loadSessionMessages) owns the loading
+                        // state. Clearing it raced the fetch completion and
+                        // left freshly-switched sessions stuck on "empty chat".
+                        isLoading = state.isLoading,
                     )
                 } else {
                     state
@@ -3104,7 +3548,22 @@ class ChatViewModel(
     private fun addSystemMessage(
         text: String,
         persist: Boolean = false,
+        transient: Boolean = false,
     ) {
+        // Likivik patch: connection/resume noise ("Session resumed", "Connected
+        // to Hermes") used to be appended as list items, which bumped the whole
+        // chat via tail-follow scrolling. These are surfaced as a transient
+        // status pill instead and never enter the message list.
+        if (transient) {
+            _uiState.update { it.copy(statusPill = text) }
+            statusPillJob?.cancel()
+            statusPillJob =
+                viewModelScope.launch {
+                    kotlinx.coroutines.delay(2500)
+                    _uiState.update { it.copy(statusPill = null) }
+                }
+            return
+        }
         val msg = ChatMessage(role = MessageRole.SYSTEM, content = text)
         val sessionId = _uiState.value.currentSessionId
 

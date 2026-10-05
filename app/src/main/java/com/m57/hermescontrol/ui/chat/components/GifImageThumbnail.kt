@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -37,6 +36,7 @@ import coil.compose.AsyncImage
 import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.remote.GatewayFileClient
 import com.m57.hermescontrol.data.remote.GatewayFileResult
+import com.m57.hermescontrol.theme.Spacing
 
 @Composable
 fun GifImageThumbnail(
@@ -90,7 +90,7 @@ fun GifImageThumbnail(
         modifier =
             modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(MaterialTheme.shapes.medium)
                 .clickable { onClick() },
     ) {
         AsyncImage(
@@ -110,7 +110,7 @@ fun GifImageThumbnail(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp)),
+                    .clip(MaterialTheme.shapes.medium),
             contentScale = ContentScale.FillWidth,
         )
 
@@ -130,13 +130,13 @@ fun GifImageThumbnail(
                 modifier =
                     Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(8.dp)
+                        .padding(Spacing.sm)
                         .minimumInteractiveComponentSize()
                         .background(
                             color = MaterialTheme.colorScheme.scrim.copy(alpha = 0.6f),
-                            shape = RoundedCornerShape(16.dp),
+                            shape = MaterialTheme.shapes.large,
                         ).clickable { togglePlayPause() }
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                        .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,

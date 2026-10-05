@@ -403,6 +403,32 @@ gh pr create --title "fix(#N): description" --body "Closes #N"
   A notification from another profile may open the app, but must never switch
   profiles or route its session ID through the active profile.
 
+## Verifying State-Changing RPCs (the Optimistic-UI trap)
+
+Rail/session mutations are applied **locally the moment you tap** (rename, delete, pin,
+reorder). That is deliberate — it makes the app feel instant — and it is the largest source
+of "green but broken" in this repo: a write the gateway **rejects** still LOOKS applied, so
+the UI and any test that reads only the UI both agree it worked.
+
+- **A test that asserts local state after a mutation asserts nothing.** After a rename or
+  delete, re-read from the server (`E2eHarness.refreshSessions`) or from a fresh process
+  (`scenario.recreate()`), and require the change to still be there. A green test that only
+  reads the optimistic view is a false alibi — worse than no test.
+- **Pick the truth source per datum.** Titles/icons are NOT persisted client-side; pins and
+  `home_order` ARE (in `hermes_rail` prefs). Server state → server re-list. Client pref →
+  a recreate (or read the pref).
+- **A failed write must be visible.** A fire-and-forget `wsClient.send(...)` with no `onSent`
+  is untracked, so `handleRpcError` bails out and the banner paints a raw `JsonRpcError(...)`
+  dump. Track it (`trackRequest`) and surface a human message — otherwise silent failure is
+  indistinguishable from success.
+- **Assert the contract, not the symptom.** Check the installed gateway source
+  (`tui_gateway/methods_session.py`, `server.py`) for what each id must be. Ids are NOT
+  interchangeable: session-scoped RPCs (`session.title`) resolve `params["session_id"]` as an
+  exact key in the live `_sessions` map (a stored id gets 4001 "session not found"), while
+  `session.delete` deletes by the STORED id and refuses (4023) while a live runtime owns it.
+- **Never derive an expectation from the implementation.** A test asserting the exact id the
+  code happens to send cannot catch a wrong-address bug — it just re-states the bug.
+
 ## Things to Avoid
 
 - Don't run `./gradlew` tasks without an Android SDK — CI handles compilation, lint, and tests.

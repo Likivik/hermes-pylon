@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.config.resolveBaseUrl
+import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.settings.SectionCard
 import com.m57.hermescontrol.ui.settings.SettingsUiState
 import com.m57.hermescontrol.ui.settings.SettingsViewModel
@@ -86,7 +87,7 @@ internal fun ConnectionSection(
                     elevation = CardDefaults.cardElevation(0.dp),
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = Spacing.sm),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
@@ -212,7 +213,7 @@ internal fun TestResultCard(testResult: String?) {
             ) {
                 Text(
                     text = result,
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier.padding(Spacing.md),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }

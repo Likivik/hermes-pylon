@@ -1,0 +1,63 @@
+name: Sync upstream (saralilyb daily)
+
+on:
+  schedule:
+    - cron: '0 6 * * *'  # 06:00 UTC daily
+  workflow_dispatch:
+
+# This job merges upstream into our branches and PUSHES them back, so it needs
+# explicit write access. Without it the default token is read-only and the push
+# step 403s (the run then reports success anyway, because the push error was
+# swallowed by `|| echo`).
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "pylon-sync-bot"
+          git config user.email "noreply@github.com"
+
+      - name: Fetch upstream
+        run: git remote add upstream https://github.com/saralilyb/hermes-mobile.git && git fetch upstream main
+
+      - name: Merge upstream/main into our branches
+        run: |
+          # Create each local branch from ORIGIN explicitly. A bare
+          # `git checkout main` aborts the whole run with
+          #   fatal: 'main' matched multiple (2) remote tracking branches
+          # because BOTH remotes (origin + upstream) have a `main` and the job
+          # never materialises a local branch first. `-B <br> origin/<br>`
+          # removes the ambiguity and starts from the pushed tip.
+          for BR in main likivik/rail-instantswitch; do
+            git checkout -B "$BR" "origin/$BR"
+            if git merge --no-edit upstream/main; then
+              echo "$BR: merged clean"
+            else
+              echo "$BR: CONFLICT — leaving unmerged, PR needed"
+              git merge --abort
+            fi
+          done
+
+      - name: Push clean merges
+        run: |
+          # A conflicted branch was aborted back to its origin tip, so it has
+          # nothing to push. Skipping is explicit here instead of swallowing a
+          # real push failure with `|| echo`.
+          for BR in main likivik/rail-instantswitch; do
+            if git diff --quiet "origin/$BR" "$BR"; then
+              echo "$BR: no-op (nothing to push)"
+            else
+              git push origin "$BR"
+              echo "$BR: pushed"
+            fi
+          done

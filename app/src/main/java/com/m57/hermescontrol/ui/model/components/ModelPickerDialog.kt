@@ -42,6 +42,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.m57.hermescontrol.data.model.ModelCapabilities
 import com.m57.hermescontrol.data.model.ModelProvider
 import com.m57.hermescontrol.data.model.PinnedModel
+import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.LoadingState
 import com.m57.hermescontrol.ui.common.SearchBar
 
@@ -175,7 +176,7 @@ fun ModelPickerDialog(
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    modifier = Modifier.padding(top = 4.dp, bottom = 6.dp),
+                                    modifier = Modifier.padding(top = Spacing.xs, bottom = 6.dp),
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.PushPin,
@@ -278,9 +279,9 @@ private fun ModelItemCard(
             modifier
                 .fillMaxWidth()
                 .padding(vertical = 2.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(MaterialTheme.shapes.medium)
                 .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         border =
             BorderStroke(
@@ -289,7 +290,7 @@ private fun ModelItemCard(
             ),
     ) {
         Row(
-            modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+            modifier = Modifier.padding(start = 12.dp, end = Spacing.xs, top = Spacing.xs, bottom = Spacing.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(

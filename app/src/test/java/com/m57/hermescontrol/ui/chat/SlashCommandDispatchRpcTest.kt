@@ -129,9 +129,18 @@ class SlashCommandDispatchRpcTest {
         mockConnectionStatus.value = ConnectionStatus.CONNECTED
         mockEventsFlow.emit(WsEvent.GatewayReady(null))
         advanceUntilIdle()
-        // req-id-3 = session.create (after loadSessions + fetchCommandCatalog)
-        mockEventsFlow.emit(WsEvent.RpcResult("req-id-3", mapOf("session_id" to "session-xyz")))
+        // Auto-create on launch is disabled (Likivik): the ViewModel no longer
+        // fires session.create on GatewayReady, so the test must request the
+        // session explicitly — mirroring the user tapping a rail row — and then
+        // answer the create that was actually sent (the last send wins).
+        vm.createNewSession()
         advanceUntilIdle()
+        val createId = "req-id-$reqCount"
+        mockEventsFlow.emit(WsEvent.RpcResult(createId, mapOf("session_id" to "session-xyz")))
+        advanceUntilIdle()
+        check(vm.uiState.value.currentSessionId == "session-xyz") {
+            "createViewModelWithSession: session was not installed"
+        }
         return Pair(vm, "session-xyz")
     }
 

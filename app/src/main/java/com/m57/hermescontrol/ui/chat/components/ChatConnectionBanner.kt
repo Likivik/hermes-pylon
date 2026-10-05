@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.ws.ConnectionStatus
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
+import com.m57.hermescontrol.theme.Spacing
 
 internal enum class ConnectionBannerAction {
     NONE,
@@ -75,7 +76,7 @@ fun ChatConnectionBanner(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                        .padding(horizontal = Spacing.md, vertical = Spacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
@@ -85,7 +86,7 @@ fun ChatConnectionBanner(
                 ) {
                     if (connectionStatus == ConnectionStatus.RECONNECTING) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp).padding(end = 8.dp),
+                            modifier = Modifier.size(16.dp).padding(end = Spacing.sm),
                             strokeWidth = 2.dp,
                             color = LocalHermesStatusColors.current.error,
                         )

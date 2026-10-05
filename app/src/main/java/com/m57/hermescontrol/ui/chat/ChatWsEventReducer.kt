@@ -558,7 +558,12 @@ object ChatWsEventReducer {
             state =
                 state.copy(
                     isLoading = false,
-                    errorMessage = "Error: ${event.error}",
+                    // Readable form. The raw data-class dump
+                    // ("JsonRpcError(code=4001, message=session not found,
+                    // data=null)") told the user nothing and hid which RPC failed.
+                    errorMessage =
+                        "Error: " +
+                            event.error.message.ifBlank { "code ${event.error.code}" },
                 ),
             streamingState = streamingState,
         )
