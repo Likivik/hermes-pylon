@@ -234,6 +234,9 @@ private fun FullScreenRailBody(dark: Boolean) {
                     listState = rememberLazyListState(),
                     lastAnimatedMessageId = null,
                     onLastAnimatedMessageIdChange = {},
+                    // Upstream made these two required (they were defaulted here before).
+                    onRespondApproval = { _, _, _ -> },
+                    onCancelApproval = { _, _ -> },
                     openingAttachmentPath = null,
                 )
             }

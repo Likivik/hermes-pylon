@@ -1085,8 +1085,23 @@ class ChatViewModel(
             }
 
             WsMethods.SESSION_RESUME -> {
-                val resumeFence = request.resumeFence ?: return
-                if (!isResumeFenceCurrent(resumeFence)) return
+                // Upstream fences resume acks so a stale answer cannot paint
+                // over a session the user has since left. The fork's two UTILITY
+                // resumes are a different shape: `renameSession` resumes purely
+                // to learn a live runtime sid so it can address session.title,
+                // and `startCloseThenDelete` does the same to close a runtime
+                // before retrying a refused delete. Both legitimately target a
+                // session that is NOT the selected one (a background rename), so
+                // the fence's session axis is relaxed for them — and an absent
+                // fence is tolerated, because such a request was just sent by an
+                // explicit user action rather than restored from a previous life.
+                val utilityResume = request.pendingRenameTitle != null || request.closeAfterResume
+                val resumeFence = request.resumeFence
+                if (resumeFence != null) {
+                    if (!isResumeFenceCurrent(resumeFence, allowSessionChange = utilityResume)) return
+                } else if (!utilityResume) {
+                    return
+                }
                 val resultMap = result as? Map<String, Any?>
                 val requestedSessionId = request.resumeSessionId
                 val selectedSessionId = _uiState.value.currentSessionId
@@ -2200,6 +2215,7 @@ class ChatViewModel(
         // live sessions return the fast-path payload, detached ones are
         // re-registered; the ack then fires the title by the stable
         // session_key (storage id).
+        val renameResumeFence = captureResumeFence(sessionId)
         wsClient.send(
             WsMethods.SESSION_RESUME,
             mapOf("session_id" to sessionId, "omit_messages" to true),
@@ -2208,6 +2224,7 @@ class ChatViewModel(
                     PendingRpcRequest(
                         method = WsMethods.SESSION_RESUME,
                         resumeSessionId = sessionId,
+                        resumeFence = renameResumeFence,
                         pendingRenameTitle = title,
                         pendingRenameIcon = icon,
                     )
@@ -2256,6 +2273,7 @@ class ChatViewModel(
      * sid, close it, then retry the stored delete.
      */
     private fun startCloseThenDelete(storedId: String) {
+        val closeResumeFence = captureResumeFence(storedId)
         wsClient.send(
             WsMethods.SESSION_RESUME,
             mapOf("session_id" to storedId, "omit_messages" to true),
@@ -2264,6 +2282,7 @@ class ChatViewModel(
                     PendingRpcRequest(
                         method = WsMethods.SESSION_RESUME,
                         resumeSessionId = storedId,
+                        resumeFence = closeResumeFence,
                         deleteSessionId = storedId,
                         closeAfterResume = true,
                     )
