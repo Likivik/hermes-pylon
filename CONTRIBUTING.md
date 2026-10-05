@@ -57,12 +57,17 @@ If you use AI coding tools (including agents) to contribute:
 We enforce Kotlin coding conventions and Jetpack Compose best practices.
 
 ### Kotlin Formatting
-- Code formatting is checked and enforced by **ktlint 1.2.1**.
-- Run formatting check locally before committing:
+- Code formatting is checked and enforced by **ktlint**, driven by the Gradle
+  plugin (`org.jlleitschuh.gradle.ktlint`) with the engine version pinned in
+  `gradle/libs.versions.toml` (currently `ktlintEngine = "1.2.1"`).
+- Run it through the wrapper. Do **not** install a standalone `ktlint` binary —
+  its version would silently differ from the one CI gates on:
   ```bash
-  ./ktlint <file>            # Check one file
-  ./ktlint --format <file>   # Auto-fix formatting issues
+  ./gradlew ktlintCheck                  # whole project
+  ./gradlew ktlintFormat                 # auto-fix
+  ./gradlew ktlintCheck --rerun-tasks    # force a real run (plain --rerun is a no-op)
   ```
+- The plugin also lints `.kts` build scripts, so `build.gradle.kts` files are in scope.
 - Import ordering is strictly ASCII-lexicographic (uppercase before lowercase: e.g., `LaunchedEffect` before `collectAsState`).
 
 ### Compose Guidelines
@@ -78,12 +83,28 @@ We enforce Kotlin coding conventions and Jetpack Compose best practices.
 
 ---
 
+## Testing Locally
+
+CI is the referee, but you do not have to push to find out:
+
+```bash
+nix develop -c bash scripts/local-tests.sh unit           # 1028 unit tests
+nix develop -c bash scripts/local-tests.sh instrumented   # 89 on-device UI tests
+nix develop -c bash scripts/local-tests.sh e2e            # 8 E2E classes, real gateway
+```
+
+While iterating on a PR, unit tests are enough. Before merging to `main`, run all
+three tiers. Two host requirements and the E2E port caveat are documented in
+`AGENTS.md` → "Local test toolchain".
+
+---
+
 ## PR Checklist
 
 Before submitting your PR, please verify:
 
 - [ ] Your branch is up-to-date with `main`.
-- [ ] Local build and `ktlint` checks pass successfully.
+- [ ] `./gradlew ktlintCheck` and `./gradlew checkColorLiterals` pass.
 - [ ] `checkColorLiterals` passes (no hardcoded Color literals outside theme/).
 - [ ] No unused imports, unused parameters, or dead code.
 - [ ] Every `Image` and `Icon` element has a descriptive `contentDescription` for accessibility.

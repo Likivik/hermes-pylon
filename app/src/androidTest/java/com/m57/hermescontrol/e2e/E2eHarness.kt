@@ -107,6 +107,22 @@ object E2eHarness {
     }
 
     /**
+     * Base URL of the real gateway under test.
+     *
+     * CI passes nothing and gets 10.0.2.2:8642 (the workflow's gateway port).
+     * A developer box generally CANNOT use 8642: the live Hermes gateway owns
+     * that port (and 8643-8645), and pointing the E2E classes at it would
+     * rename/delete/archive *real* sessions. So a local run starts its own
+     * fixture on a free port (scripts/e2e_gateway.py) and passes
+     * `-Pandroid.testInstrumentationRunnerArguments.e2eBaseUrl=http://10.0.2.2:<port>/`.
+     */
+    fun realGatewayBaseUrlFromArgs(default: String = "http://10.0.2.2:8642/"): String {
+        val args = androidx.test.platform.app.InstrumentationRegistry.getArguments()
+        val url = args.getString("e2eBaseUrl")?.takeIf { it.isNotBlank() }
+        return url?.let { if (it.endsWith("/")) it else "$it/" } ?: default
+    }
+
+    /**
      * Seed the profile against the REAL gateway (the workflow-started
      * `hermes dashboard` on 127.0.0.1:8642) using the ephemeral CI password.
      *
@@ -126,7 +142,7 @@ object E2eHarness {
      *        unauthenticated handshakes.
      */
     fun seedRealGatewayProfile(
-        baseUrl: String = "http://10.0.2.2:8642/",
+        baseUrl: String = realGatewayBaseUrlFromArgs(),
         password: String,
     ) {
         require(password.isNotBlank()) {

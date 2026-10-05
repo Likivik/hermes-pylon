@@ -64,29 +64,10 @@ jobs:
       - name: Grant Execute Permission for Gradlew
         run: chmod +x gradlew
 
-      - name: Cache ktlint
-        id: cache-ktlint
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
-        with:
-          path: ~/.local/bin/ktlint
-          key: ktlint-1.2.1
-
-      - name: Install ktlint
-        if: steps.cache-ktlint.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p ~/.local/bin
-          curl -fsSL \
-            https://github.com/pinterest/ktlint/releases/download/1.2.1/ktlint \
-            -o ~/.local/bin/ktlint
-          chmod 0755 ~/.local/bin/ktlint
-
-      - name: Verify ktlint checksum
-        run: |
-          echo "2e28cf46c27d38076bf63beeba0bdef6a845688d6c5dccd26505ce876094eb92  $HOME/.local/bin/ktlint" |
-            sha256sum -c -
-
-      - name: Add local bin to PATH
-        run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      # ktlint is NOT installed here any more. It comes from the Gradle plugin
+      # with the engine version pinned in gradle/libs.versions.toml, so the CI
+      # verdict and a local ./gradlew ktlintCheck use the same engine rather
+      # than "whatever ktlint is on PATH".
 
       - name: Run ktlintCheck
         run: ./gradlew ktlintCheck

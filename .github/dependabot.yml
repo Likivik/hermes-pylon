@@ -1,3 +1,15 @@
+# Dependabot config.
+#
+# The runs that show up as "gradle in / for <dep> — Update #…" and
+# "github_actions in / for <dep> — Update #…" (event: dynamic) are Dependabot's own
+# update jobs — one per dependency it inspects, created by GitHub, not by a workflow
+# in this repo. On a public repository those runs are free and gate nothing, so this
+# is not a cost problem; what grouping fixes is PR churn.
+#
+# groups: batch all minor and patch bumps for an ecosystem into ONE PR, so the weekly
+# sweep opens ~1-2 PRs per ecosystem instead of up to open-pull-requests-limit. Major
+# bumps are deliberately left out of the groups — they stay individual so a breaking
+# change is reviewed on its own.
 version: 2
 updates:
   - package-ecosystem: "gradle"
@@ -9,6 +21,13 @@ updates:
       - "dependencies"
     commit-message:
       prefix: "chore"
+    groups:
+      gradle-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -18,3 +37,10 @@ updates:
       - "dependencies"
     commit-message:
       prefix: "chore"
+    groups:
+      github-actions-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"

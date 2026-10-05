@@ -158,6 +158,9 @@ Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for ou
 
 For developer-specific details, code conventions, and project architecture notes, refer to [AGENTS.md](AGENTS.md).
 
+To run the test suite locally — unit, on-device UI, and E2E against a real
+gateway — see [CONTRIBUTING.md](CONTRIBUTING.md#testing-locally).
+
 ---
 
 ## License
