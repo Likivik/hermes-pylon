@@ -1,63 +1,116 @@
-name: Sync upstream (saralilyb daily)
+name: Upstream monitor (saralilyb)
 
 on:
   schedule:
-    - cron: '0 6 * * *'  # 06:00 UTC daily
+    - cron: '0 6 * * *' # 06:00 UTC daily
   workflow_dispatch:
 
-# This job merges upstream into our branches and PUSHES them back, so it needs
-# explicit write access. Without it the default token is read-only and the push
-# step 403s (the run then reports success anyway, because the push error was
-# swallowed by `|| echo`).
+# READ-ONLY on purpose. This job never pushes:
+#   * GITHUB_TOKEN cannot push changes to .github/workflows/*, and upstream's
+#     commits modify android.yml — so the merge commit is unpushable no matter
+#     what `permissions:` says ("refusing to allow a GitHub App to create or
+#     update workflow .github/workflows/android.yml without workflows permission").
+#   * A PAT parked in repo secrets would fix that, but a long-lived broad token
+#     readable by every workflow is a bigger risk than the convenience is worth.
+# So: report the delta, open ONE tracking issue, and do the merge from a
+# workstation as a PR that CI verifies (PR-Always). We only ever PULL from
+# saralilyb; nothing is ever pushed back upstream.
 permissions:
-  contents: write
+  contents: read
+  issues: write
 
 jobs:
-  sync:
+  check:
+    name: Is upstream ahead?
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Configure git
+      - name: Fetch upstream main
         run: |
-          git config user.name "pylon-sync-bot"
-          git config user.email "noreply@github.com"
+          git remote add upstream https://github.com/saralilyb/hermes-mobile.git
+          git fetch --no-tags upstream main
 
-      - name: Fetch upstream
-        run: git remote add upstream https://github.com/saralilyb/hermes-mobile.git && git fetch upstream main
-
-      - name: Merge upstream/main into our branches
+      - name: Compute the delta
+        id: delta
         run: |
-          # Create each local branch from ORIGIN explicitly. A bare
-          # `git checkout main` aborts the whole run with
-          #   fatal: 'main' matched multiple (2) remote tracking branches
-          # because BOTH remotes (origin + upstream) have a `main` and the job
-          # never materialises a local branch first. `-B <br> origin/<br>`
-          # removes the ambiguity and starts from the pushed tip.
-          for BR in main likivik/rail-instantswitch; do
-            git checkout -B "$BR" "origin/$BR"
-            if git merge --no-edit upstream/main; then
-              echo "$BR: merged clean"
-            else
-              echo "$BR: CONFLICT — leaving unmerged, PR needed"
-              git merge --abort
+          BEHIND=$(git rev-list --count HEAD..upstream/main)
+          AHEAD=$(git rev-list --count upstream/main..HEAD)
+          echo "behind=$BEHIND" >> "$GITHUB_OUTPUT"
+
+          # Dry-run the merge (no worktree touched) to learn whether it is clean
+          # and, if not, exactly which files fight. merge-tree exits non-zero on
+          # conflicts.
+          set +e
+          git merge-tree --write-tree HEAD upstream/main > /tmp/merge-tree.txt 2>&1
+          STATUS=$?
+          set -e
+          CONFLICTS=$(grep -E '^(  )?CONFLICT' /tmp/merge-tree.txt | sed 's/^ *//' || true)
+          if [ "$STATUS" -eq 0 ]; then
+            echo "clean=yes" >> "$GITHUB_OUTPUT"
+            CONFLICTS=""
+          else
+            echo "clean=no" >> "$GITHUB_OUTPUT"
+          fi
+          {
+            echo "conflicts<<CONFLICTS_EOF"
+            echo "$CONFLICTS"
+            echo "CONFLICTS_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### Upstream delta"
+            echo ""
+            echo "- saralilyb/main is **$BEHIND** commit(s) ahead, we are $AHEAD ahead"
+            echo "- dry-run merge: **$([ "$STATUS" -eq 0 ] && echo clean || echo conflicts)**"
+            echo ""
+            if [ -n "$CONFLICTS" ]; then
+              echo '```'
+              echo "$CONFLICTS"
+              echo '```'
             fi
-          done
+          } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Push clean merges
-        run: |
-          # A conflicted branch was aborted back to its origin tip, so it has
-          # nothing to push. Skipping is explicit here instead of swallowing a
-          # real push failure with `|| echo`.
-          for BR in main likivik/rail-instantswitch; do
-            if git diff --quiet "origin/$BR" "$BR"; then
-              echo "$BR: no-op (nothing to push)"
-            else
-              git push origin "$BR"
-              echo "$BR: pushed"
-            fi
-          done
+          echo "upstream/main = $(git rev-parse --short upstream/main)"
+
+      - name: Open or update the tracking issue
+        if: steps.delta.outputs.behind != '0'
+        uses: actions/github-script@v7
+        env:
+          BEHIND: ${{ steps.delta.outputs.behind }}
+          CLEAN: ${{ steps.delta.outputs.clean }}
+          CONFLICTS: ${{ steps.delta.outputs.conflicts }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const marker = '[upstream-sync]';
+            const body = [
+              `saralilyb/hermes-mobile moved. **This job merges nothing** — it only reports.`,
+              ``,
+              `- behind: **${process.env.BEHIND}** commit(s)`,
+              `- dry-run merge: **${process.env.CLEAN === 'yes' ? 'clean' : 'conflicts'}**`,
+              process.env.CONFLICTS ? '\n```\n' + process.env.CONFLICTS + '\n```' : '',
+              ``,
+              `To merge: fetch upstream/main, merge onto a branch, resolve, then open a PR into \`main\` and let CI verify.`,
+            ].join('\n');
+
+            const { data: open } = await github.rest.issues.listForRepo({
+              owner, repo, state: 'open', per_page: 100,
+            });
+            const existing = open.find((i) => i.title.includes(marker));
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: existing.number, body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner,
+                repo,
+                title: `${marker} saralilyb is ${process.env.BEHIND} commit(s) ahead`,
+                body,
+              });
+            }
