@@ -439,6 +439,15 @@ class ChatScreenTest {
         mockk<ChatViewModel>(relaxed = true).also { viewModel ->
             every { viewModel.uiState } returns state.asStateFlow()
             every { viewModel.streamingState } returns MutableStateFlow(StreamingState()).asStateFlow()
+            // ChatScreen also reads the rail's own flows (fork's Telegram-style
+            // rail patch). A relaxed mock would hand back a MockK proxy here, and
+            // collectAsState() then fails with
+            // "ClassCastException: Object_1_Proxy cannot be cast to java.util.Set".
+            // Stub them explicitly, as chatScreen_renders_and_acceptsInput does.
+            every { viewModel.pinnedSessionIds } returns MutableStateFlow(emptySet<String>()).asStateFlow()
+            every { viewModel.railMeta } returns
+                MutableStateFlow(emptyMap<String, RailMeta>()).asStateFlow()
+            every { viewModel.homeOrder } returns MutableStateFlow(emptyList<String>()).asStateFlow()
         }
 
     private fun vaultPrompt(

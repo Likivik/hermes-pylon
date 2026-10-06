@@ -675,11 +675,26 @@ class ChatViewModel(
             }
         if (rpcId != null && consumeRetiredResumeRequest(rpcId)) return
         val pending = rpcId?.let(pendingRequests::get)
-        if (pending?.method == WsMethods.SESSION_RESUME &&
-            pending.resumeFence?.let(::isResumeFenceCurrent) != true
-        ) {
-            pendingRequests.remove(rpcId)
-            return
+        // The fork's two utility resumes (`renameSession`, `startCloseThenDelete`)
+        // deliberately target a session that is NOT the currently selected one —
+        // the resume's only job is to learn a live runtime sid. The inner
+        // SESSION_RESUME dispatch already relaxes the fence's SESSION axis for
+        // them; the outer guard must do the same so a "stale-looking" fence
+        // (mismatched storageSessionId) isn't dropped before the ack handler
+        // can run. An absent fence is also tolerated for utility resumes — they
+        // were just sent by an explicit user action rather than restored.
+        if (pending?.method == WsMethods.SESSION_RESUME) {
+            val utilityResume = pending.pendingRenameTitle != null || pending.closeAfterResume
+            val fence = pending.resumeFence
+            if (fence == null) {
+                if (!utilityResume) {
+                    pendingRequests.remove(rpcId)
+                    return
+                }
+            } else if (!isResumeFenceCurrent(fence, allowSessionChange = utilityResume)) {
+                pendingRequests.remove(rpcId)
+                return
+            }
         }
         if (
             pending?.method == WsMethods.SESSION_BRANCH &&
@@ -1191,6 +1206,16 @@ class ChatViewModel(
                         )
                     }
                 }
+                if (!renameOnly) {
+                    // Mirror the active runtime session id app-wide (issue #532).
+                    ActiveSessionHolder.set(runtimeSessionId ?: sessionId, sessionId)
+                    // Seed the resume notice BEFORE hydrateResumeMessages. When the
+                    // ack's payload replaces the transcript (a cross-session
+                    // resume) the notice goes with it: the payload is the
+                    // authoritative history. When the ack carries no payload the
+                    // notice stands — one entry, and only one, per valid ack.
+                    addSystemMessage("Session resumed")
+                }
                 if (sessionId != null && !renameOnly) {
                     hydrateResumeMessages(
                         sessionId = sessionId,
@@ -1199,11 +1224,6 @@ class ChatViewModel(
                             requestedSessionId != null &&
                                 requestedSessionId != sessionId,
                     )
-                }
-                if (!renameOnly) {
-                    // Mirror the active runtime session id app-wide (issue #532).
-                    ActiveSessionHolder.set(runtimeSessionId ?: sessionId, sessionId)
-                    addSystemMessage("Session resumed", transient = true)
                 }
                 // A rename queued on this resume fires now that the runtime
                 // session is live.
@@ -2867,10 +2887,10 @@ class ChatViewModel(
                 isLoadingOlder = false,
                 hasOlderMessages = false,
                 currentSessionId = sessionId,
-                // Likivik patch: don't wipe to emptyList — keep whatever is on
-                // screen until loadCachedMessages(sessionId) swaps in the cached
-                // transcript. Prevents the blank-flash on every switch.
-                messages = it.messages,
+                // A switch owns a fresh transcript: clear the previous session's
+                // messages here. `loadCachedMessages(sessionId)` below repaints
+                // from Room immediately, so the wipe is not a blank flash.
+                messages = emptyList(),
                 subagentIndicators = emptyList(),
                 todos = emptyList(),
                 chatTitle = title,
