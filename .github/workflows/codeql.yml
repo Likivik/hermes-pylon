@@ -43,14 +43,14 @@ jobs:
 
       - name: Setup Gradle
         uses: >-
-          gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92
+          gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6
         with:
           validate-wrappers: true
           cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTED_KEY }}
 
       - name: Initialize CodeQL
         uses: >-
-          github/codeql-action/init@f205ea1c3313d32999d8d6a48b4f6530d4437b38
+          github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2
         with:
           languages: java-kotlin
           build-mode: manual
@@ -68,6 +68,6 @@ jobs:
 
       - name: Perform CodeQL analysis
         uses: >-
-          github/codeql-action/analyze@f205ea1c3313d32999d8d6a48b4f6530d4437b38
+          github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2
         with:
           category: /language:java-kotlin
