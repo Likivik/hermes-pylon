@@ -105,8 +105,11 @@ private fun BillingContent(
         verticalArrangement = listItemSpacing,
     ) {
         val sub = subscription
-        if (sub != null && sub.logged_in == true && sub.current != null) {
-            item { PlanCard(sub.current) }
+        if (sub != null && sub.logged_in == true) {
+            val current = sub.current
+            if (current != null) {
+                item { PlanCard(current) }
+            }
             if (sub.can_change_plan == true) {
                 item {
                     Row(
@@ -185,21 +188,23 @@ private fun PlanCard(subscription: SubscriptionCurrent) {
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
             )
-            if (subscription.credits_remaining != null) {
+            val creditsRemaining = subscription.credits_remaining
+            if (creditsRemaining != null) {
                 Text(
                     text =
                         stringResource(
                             R.string.billing_credits_remaining,
-                            subscription.credits_remaining,
+                            creditsRemaining,
                         ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = Spacing.xs),
                 )
             }
-            if (subscription.cycle_ends_at != null) {
+            val cycleEndsAt = subscription.cycle_ends_at
+            if (cycleEndsAt != null) {
                 Text(
-                    text = stringResource(R.string.billing_renews, subscription.cycle_ends_at),
+                    text = stringResource(R.string.billing_renews, cycleEndsAt),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = Spacing.xs),

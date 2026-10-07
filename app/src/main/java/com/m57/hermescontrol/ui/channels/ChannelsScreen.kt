@@ -341,9 +341,10 @@ internal fun ConfigureForm(
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
-                if (field.help != null && !fieldErrors.containsKey(field.key)) {
+                val help = field.help
+                if (help != null && !fieldErrors.containsKey(field.key)) {
                     Text(
-                        text = field.help,
+                        text = help,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.labelSmall,
                     )

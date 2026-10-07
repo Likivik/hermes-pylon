@@ -23,16 +23,18 @@ object EventParser {
         // JSON-RPC is peer-to-peer: an inbound frame with both `id` and `method`
         // is a request from the gateway, not a response to one of our calls.
         val id = response.id
-        if (response.method != null && id != null) {
+        val method = response.method
+        if (method != null && id != null) {
             @Suppress("UNCHECKED_CAST")
             val requestParams = response.params?.toAny() as? Map<String, Any?> ?: emptyMap()
-            return WsEvent.ServerRequest(id, response.method, requestParams)
+            return WsEvent.ServerRequest(id, method, requestParams)
         }
 
         // A response has no method and carries a result or error member.
-        if (response.method == null && id != null && (response.result != null || response.error != null)) {
-            return if (response.error != null) {
-                WsEvent.RpcError(id, response.error)
+        if (method == null && id != null) {
+            val error = response.error
+            return if (error != null) {
+                WsEvent.RpcError(id, error)
             } else {
                 WsEvent.RpcResult(id, response.result?.toAny())
             }

@@ -1300,10 +1300,11 @@ private fun SessionCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    if (!session.status.isNullOrBlank()) {
+                    val sessionStatus = session.status
+                    if (!sessionStatus.isNullOrBlank()) {
                         Spacer(modifier = Modifier.width(Spacing.sm))
                         StatusBadge(
-                            text = session.status,
+                            text = sessionStatus,
                             status = if (isActive) StatusBadgeType.SUCCESS else StatusBadgeType.NEUTRAL,
                         )
                     }

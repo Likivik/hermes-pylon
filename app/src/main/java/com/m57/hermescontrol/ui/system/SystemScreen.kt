@@ -358,16 +358,17 @@ private fun LazyListScope.hostSection(
                         val updateBadge =
                             state.updateInfo?.let { info ->
                                 when {
-                                    info.update_available == true && info.behind != null && info.behind > 0 -> {
-                                        " (${stringResource(
-                                            R.string.system_version_update_available,
-                                        )}: ${stringResource(R.string.system_version_behind, info.behind)})"
-                                    }
-
                                     info.update_available == true -> {
-                                        " (${stringResource(
-                                            R.string.system_version_update_available,
-                                        )})"
+                                        val behind = info.behind
+                                        if (behind != null && behind > 0) {
+                                            " (${stringResource(
+                                                R.string.system_version_update_available,
+                                            )}: ${stringResource(R.string.system_version_behind, behind)})"
+                                        } else {
+                                            " (${stringResource(
+                                                R.string.system_version_update_available,
+                                            )})"
+                                        }
                                     }
 
                                     else -> {

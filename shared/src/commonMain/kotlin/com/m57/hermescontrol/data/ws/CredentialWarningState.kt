@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * Owns the gateway's credential warning without letting a repeated
  * `session.info` event undo an explicit dismissal.
  */
-internal class CredentialWarningState {
+class CredentialWarningState {
     private val _warning = MutableStateFlow<String?>(null)
     val warning: StateFlow<String?> = _warning.asStateFlow()
 

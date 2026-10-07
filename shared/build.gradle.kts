@@ -1,9 +1,8 @@
 // KMP module: platform-agnostic logic, shared across targets.
 //
-// Phase 1 scope - deliberately minimal. This module exists to prove the Kotlin
-// Multiplatform toolchain works on this repo at all (Kotlin 2.4.10 + AGP
-// 9.1.1), with the Android app building and its test suite unchanged. Exactly
-// one dependency-free file lives here so far; nothing Android-only has moved.
+// Phase 2: protocol/model core moved into commonMain. The :app module still
+// owns Android-only collaborators (OkHttp, Room, the WS client, the theme),
+// so data classes and pure-Kotlin collaborators live here.
 //
 // Since AGP 9.0 the plain `com.android.library` plugin is NOT compatible with
 // the Kotlin Multiplatform plugin. AGP's supported path is the KMP-native
@@ -11,6 +10,7 @@
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.kotlin.multiplatform.library)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 kotlin {
@@ -24,5 +24,16 @@ kotlin {
         namespace = "com.m57.hermescontrol.shared"
         compileSdk = 37
         minSdk = 26
+    }
+
+    sourceSets {
+        commonMain {
+            dependencies {
+                // Data classes use kotlinx.serialization @Serializable.
+                implementation(libs.kotlinx.serialization.json)
+                // Flow / StateFlow / MutableStateFlow — moved from :app.
+                implementation(libs.kotlinx.coroutines.core)
+            }
+        }
     }
 }

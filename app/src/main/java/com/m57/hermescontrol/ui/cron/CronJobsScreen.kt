@@ -301,8 +301,9 @@ fun CronJobsScreen(
                     )
                     job.last_run_at?.let { if (it.isNotBlank()) RunDetailRow("Last run", it) }
                     RunDetailRow("Schedule", CronExpressionFormatter.cronToHumanReadable(job.scheduleText))
-                    if (job.last_error != null && job.last_error.isNotBlank()) {
-                        RunDetailRow("Error", job.last_error)
+                    val lastError = job.last_error
+                    if (lastError != null && lastError.isNotBlank()) {
+                        RunDetailRow("Error", lastError)
                     }
                     job.last_fire_error?.let { fireError ->
                         val detail = fireError.detail?.takeIf { it.isNotBlank() }

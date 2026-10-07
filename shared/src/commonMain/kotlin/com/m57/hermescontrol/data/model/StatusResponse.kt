@@ -60,7 +60,7 @@ data class DiskPressureStatus(
     val used_percent: Double? = null,
 )
 
-internal fun normalizePressureValue(value: String?): String? =
+fun normalizePressureValue(value: String?): String? =
     when (val normalized = value?.trim()?.lowercase()) {
         null -> null
         "ok", "elevated", "critical", "unknown" -> normalized
