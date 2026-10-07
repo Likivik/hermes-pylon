@@ -33,3 +33,4 @@ plugins {
 
 rootProject.name = "HermesControl"
 include(":app")
+include(":shared")

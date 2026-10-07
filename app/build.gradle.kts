@@ -167,6 +167,9 @@ room {
 }
 
 dependencies {
+    // Phase 1 (KMP): platform-agnostic logic lives in :shared.
+    implementation(project(":shared"))
+
     // @PreviewTest annotation + validation for the screenshotTest source set.
     "screenshotTestImplementation"(libs.screenshot.validation.api)
 
