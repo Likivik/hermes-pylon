@@ -14,6 +14,8 @@ import com.m57.hermescontrol.data.local.AuthSessionState
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.AuthPayloads
 import com.m57.hermescontrol.data.remote.ServerEndpoint
+import com.m57.hermescontrol.data.remote.parseForBuild
+import com.m57.hermescontrol.data.remote.resolve
 import com.m57.hermescontrol.data.remote.safeApiCall
 import com.m57.hermescontrol.data.ws.HermesWsClient
 import kotlinx.coroutines.Dispatchers
@@ -23,6 +25,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -226,7 +229,7 @@ class AuthLoginViewModel(
                 val req =
                     Request
                         .Builder()
-                        .url(endpoint.baseUrl)
+                        .url(endpoint.baseUrl.toString().toHttpUrlOrNull()!!)
                         .get()
                         .build()
                 probeClient.newCall(req).execute().use { response ->
@@ -246,7 +249,7 @@ class AuthLoginViewModel(
                 val req =
                     Request
                         .Builder()
-                        .url(endpoint.baseUrl)
+                        .url(endpoint.baseUrl.toString().toHttpUrlOrNull()!!)
                         .get()
                         .build()
                 val body =

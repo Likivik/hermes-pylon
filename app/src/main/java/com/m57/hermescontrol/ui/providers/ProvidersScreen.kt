@@ -314,13 +314,13 @@ private fun OAuthFlowDialog(
                     state.flowPhase == OAuthFlowPhase.WAITING_CODE -> {
                         val startAuthUrl = start?.authUrl
                         if (startAuthUrl != null) {
-                        PkceFlowContent(
-                            authUrl = startAuthUrl,
-                            code = state.flowCodeInput,
-                            onCodeChange = onCodeChange,
-                            onOpenBrowser = onOpenBrowser,
-                            error = state.flowErrorMessage,
-                        )
+                            PkceFlowContent(
+                                authUrl = startAuthUrl,
+                                code = state.flowCodeInput,
+                                onCodeChange = onCodeChange,
+                                onOpenBrowser = onOpenBrowser,
+                                error = state.flowErrorMessage,
+                            )
                         }
                     }
 

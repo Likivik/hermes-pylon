@@ -40,6 +40,7 @@ robolectric = "4.14.1"
 # is how CI and local runs drift apart on a required check.
 ktlintPlugin = "14.2.0"
 ktlintEngine = "1.2.1"
+ktor = "3.6.0"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidxCore" }
@@ -111,6 +112,11 @@ reorderable = { module = "sh.calvin.reorderable:reorderable", version.ref = "reo
 roborazzi-core = { module = "io.github.takahirom.roborazzi:roborazzi", version.ref = "roborazzi" }
 roborazzi-rule = { module = "io.github.takahirom.roborazzi:roborazzi-compose", version.ref = "roborazzi" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+
+# Ktor: multiplatform HTTP primitives (URL parsing, etc.). ktor-http is the
+# common artifact that exposes `io.ktor.http.Url`; the rest of Ktor is not
+# needed by :shared.
+ktor-http = { module = "io.ktor:ktor-http", version.ref = "ktor" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "androidGradlePlugin" }

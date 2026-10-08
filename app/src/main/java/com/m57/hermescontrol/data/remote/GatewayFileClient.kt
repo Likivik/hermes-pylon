@@ -8,6 +8,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.ResponseBody
 import retrofit2.Response
 import java.io.File
@@ -58,7 +59,7 @@ object GatewayFileClient {
             val cookieHeader =
                 if (gated && CookieManager.isInitialized()) {
                     CookieManager.cookieJar.loadForRequest(
-                        endpoint.baseUrl,
+                        endpoint.baseUrl.toString().toHttpUrlOrNull()!!,
                     ).joinToString("; ") { "${it.name}=${it.value}" }
                 } else {
                     ""
@@ -95,7 +96,9 @@ object GatewayFileClient {
                 credentialFingerprint =
                     fingerprint(
                         if (gated && CookieManager.isInitialized()) {
-                            CookieManager.cookieJar.loadForRequest(endpoint.baseUrl)
+                            CookieManager.cookieJar.loadForRequest(
+                                endpoint.baseUrl.toString().toHttpUrlOrNull()!!,
+                            )
                                 .joinToString("; ") { "${it.name}=${it.value}" }
                         } else {
                             boundary.token.orEmpty()

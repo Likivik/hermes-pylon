@@ -5,11 +5,19 @@ package com.m57.hermescontrol.data.config
 import com.m57.hermescontrol.data.remote.CleartextPolicy
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import kotlinx.serialization.Serializable
-import java.util.UUID
+import kotlin.uuid.Uuid
 
+/**
+ * User-configurable connection to a Hermes server.
+ *
+ * `host` / `port` are retained so pre-base-URL profiles can migrate without
+ * a hard cut-over. `baseUrl` is the canonical, normalised form. New code
+ * should always read the resolved form via [resolveBaseUrl] (or the
+ * equivalent `ServerStoreState.resolvedBaseUrl` for store-level queries).
+ */
 @Serializable
 data class ConnectionProfile(
-    val id: String = UUID.randomUUID().toString(),
+    val id: String = Uuid.random().toString(),
     val name: String,
     /** Legacy fields retained only so pre-base-URL profiles can migrate. */
     val host: String = "127.0.0.1",
@@ -19,9 +27,9 @@ data class ConnectionProfile(
     val wsAuthParam: String? = null,
 ) {
     /**
-     * Resolve this profile without store context. Store and UI callers should
-     * prefer [resolveBaseUrl] so an unstamped legacy profile can inherit the
-     * URL used for the most recent successful login.
+     * Resolve this profile without store context. Store and UI callers
+     * should prefer [resolveBaseUrl] so an unstamped legacy profile can
+     * inherit the URL used for the most recent successful login.
      */
     val resolvedBaseUrl: String
         get() = resolveBaseUrl(null)

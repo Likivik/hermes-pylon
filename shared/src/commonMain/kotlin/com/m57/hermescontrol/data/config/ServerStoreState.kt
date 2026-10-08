@@ -3,8 +3,8 @@
 package com.m57.hermescontrol.data.config
 
 import com.m57.hermescontrol.data.model.PinnedModel
-import com.m57.hermescontrol.theme.ThemePreference
-import com.m57.hermescontrol.theme.ThemePreset
+import com.m57.hermescontrol.data.theme.ThemePreference
+import com.m57.hermescontrol.data.theme.ThemePreset
 import kotlinx.serialization.Serializable
 
 @Serializable

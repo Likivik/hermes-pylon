@@ -73,7 +73,7 @@ object ApiClient {
         val tempRetrofit =
             Retrofit
                 .Builder()
-                .baseUrl(endpoint.baseUrl)
+                .baseUrl(endpoint.baseUrl.toString())
                 .client(tempOkHttp)
                 .addConverterFactory(OkHttpProvider.json.asConverterFactory("application/json".toMediaType()))
                 .build()
@@ -120,7 +120,7 @@ object ApiClient {
                 .authenticator(Authenticator.NONE)
                 .build()
         return Retrofit.Builder()
-            .baseUrl(endpoint.baseUrl)
+            .baseUrl(endpoint.baseUrl.toString())
             .client(client)
             .addConverterFactory(OkHttpProvider.json.asConverterFactory("application/json".toMediaType()))
             .build()
@@ -177,7 +177,7 @@ object ApiClient {
         val rf =
             Retrofit
                 .Builder()
-                .baseUrl(AuthManager.endpointForBuild().baseUrl)
+                .baseUrl(AuthManager.endpointForBuild().baseUrl.toString())
                 .client(okHttp)
                 .addConverterFactory(OkHttpProvider.json.asConverterFactory("application/json".toMediaType()))
                 .build()
