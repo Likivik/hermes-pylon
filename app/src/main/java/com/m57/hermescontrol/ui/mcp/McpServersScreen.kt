@@ -518,10 +518,11 @@ private fun ServerCard(
             }
 
             // URL or Command
-            if (server.url != null) {
+            val serverUrl = server.url
+            if (serverUrl != null) {
                 Spacer(modifier = Modifier.height(spacing.sm))
                 Text(
-                    text = server.url,
+                    text = serverUrl,
                     style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
                 )
             } else if (server.command != null) {

@@ -17,10 +17,11 @@ import com.m57.hermescontrol.data.model.PinnedModel
 import com.m57.hermescontrol.data.remote.CleartextPolicy
 import com.m57.hermescontrol.data.remote.CookieManager
 import com.m57.hermescontrol.data.remote.ServerEndpoint
+import com.m57.hermescontrol.data.remote.parseForBuild
 import com.m57.hermescontrol.data.security.SecretStore
 import com.m57.hermescontrol.data.security.SecureStorage
-import com.m57.hermescontrol.theme.ThemePreference
-import com.m57.hermescontrol.theme.ThemePreset
+import com.m57.hermescontrol.data.theme.ThemePreference
+import com.m57.hermescontrol.data.theme.ThemePreset
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel

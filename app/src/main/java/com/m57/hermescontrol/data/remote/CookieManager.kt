@@ -11,6 +11,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import okhttp3.Cookie
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 /**
  * Coordinator for the issue #470 cookie stack.
@@ -100,7 +101,11 @@ object CookieManager {
                 .path(endpoint.baseUrl.encodedPath)
                 .httpOnly()
         if (endpoint.baseUrl.isHttps) builder.secure()
-        j.saveFromResponse(endpoint.baseUrl, listOf(builder.build()))
+        j.saveFromResponse(
+            endpoint.baseUrl.toString().toHttpUrlOrNull()
+                ?: error("Cannot convert endpoint baseUrl to HttpUrl"),
+            listOf(builder.build()),
+        )
     }
 
     /** Evict expired (non-session) cookies for the active scope. */

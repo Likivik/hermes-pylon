@@ -642,10 +642,11 @@ private fun EnvVarCard(
                     )
 
                     // Description
-                    if (!config.description.isNullOrBlank()) {
+                    val description = config.description
+                    if (!description.isNullOrBlank()) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = config.description,
+                            text = description,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                         )

@@ -35,8 +35,8 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.local.AuthManager
-import com.m57.hermescontrol.theme.ThemePreference
-import com.m57.hermescontrol.theme.ThemePreset
+import com.m57.hermescontrol.data.theme.ThemePreference
+import com.m57.hermescontrol.data.theme.ThemePreset
 import com.m57.hermescontrol.ui.settings.SectionCard
 import kotlin.math.roundToInt
 

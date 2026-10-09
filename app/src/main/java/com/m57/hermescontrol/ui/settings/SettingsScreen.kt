@@ -41,8 +41,8 @@ import com.m57.hermescontrol.SettingsBehavior
 import com.m57.hermescontrol.SettingsChat
 import com.m57.hermescontrol.SettingsConnection
 import com.m57.hermescontrol.SettingsLanguage
+import com.m57.hermescontrol.data.theme.ThemePreference
 import com.m57.hermescontrol.theme.Spacing
-import com.m57.hermescontrol.theme.ThemePreference
 import com.m57.hermescontrol.ui.common.HermesScaffold
 import com.m57.hermescontrol.ui.common.NavIcon
 import com.m57.hermescontrol.ui.settings.components.languageLabel

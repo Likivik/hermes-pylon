@@ -574,17 +574,23 @@ object ChatWsEventReducer {
                             sourceProfileId = event.sourceProfileId,
                             connectionGeneration = event.connectionGeneration,
                             serverRequestBinding =
-                                if (event.serverRequestId != null && event.sessionId != null &&
-                                    event.sourceProfileId != null && event.connectionGeneration != null
-                                ) {
-                                    com.m57.hermescontrol.data.ws.ServerRequestBinding(
-                                        event.serverRequestId,
-                                        event.sessionId,
-                                        event.sourceProfileId,
-                                        event.connectionGeneration,
-                                    )
-                                } else {
-                                    null
+                                run {
+                                    val srvReqId = event.serverRequestId
+                                    val sessId = event.sessionId
+                                    val srcProfId = event.sourceProfileId
+                                    val connGen = event.connectionGeneration
+                                    if (srvReqId != null && sessId != null &&
+                                        srcProfId != null && connGen != null
+                                    ) {
+                                        com.m57.hermescontrol.data.ws.ServerRequestBinding(
+                                            srvReqId,
+                                            sessId,
+                                            srcProfId,
+                                            connGen,
+                                        )
+                                    } else {
+                                        null
+                                    }
                                 },
                             lockedAnswers = event.lockedAnswers,
                         ),

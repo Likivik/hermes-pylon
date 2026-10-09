@@ -39,7 +39,8 @@ fun McpServer.toDetailRows(): List<DetailRow> {
     val commandSummary =
         buildString {
             if (command?.isNotBlank() == true) append(command)
-            if (!args.isNullOrEmpty()) append(" " + args.joinToString(" "))
+            val argsList = args
+            if (!argsList.isNullOrEmpty()) append(" " + argsList.joinToString(" "))
         }.trim().ifBlank { null }
 
     return listOf(

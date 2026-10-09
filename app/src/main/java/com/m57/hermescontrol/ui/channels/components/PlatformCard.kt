@@ -157,20 +157,22 @@ internal fun PlatformCard(
             }
 
             // ── Description ──
-            if (!platform.description.isNullOrBlank()) {
+            val description = platform.description
+            if (!description.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = platform.description,
+                    text = description,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
             // ── Error message ──
-            if (!platform.errorMessage.isNullOrBlank()) {
+            val errorMessage = platform.errorMessage
+            if (!errorMessage.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = platform.errorMessage,
+                    text = errorMessage,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                 )

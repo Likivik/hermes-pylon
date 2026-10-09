@@ -11,6 +11,8 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
+import com.m57.hermescontrol.data.theme.ThemePreference
+import com.m57.hermescontrol.data.theme.ThemePreset
 import com.m57.hermescontrol.theme.presets.AmoledDarkColorScheme
 import com.m57.hermescontrol.theme.presets.AmoledDarkStatusColors
 import com.m57.hermescontrol.theme.presets.AmoledLightColorScheme
@@ -35,13 +37,6 @@ import com.m57.hermescontrol.theme.presets.NeonNoirDarkColorScheme
 import com.m57.hermescontrol.theme.presets.NeonNoirDarkStatusColors
 import com.m57.hermescontrol.theme.presets.NeonNoirLightColorScheme
 import com.m57.hermescontrol.theme.presets.NeonNoirLightStatusColors
-import kotlinx.serialization.Serializable
-
-@Serializable
-enum class ThemePreference { SYSTEM, LIGHT, DARK }
-
-@Serializable
-enum class ThemePreset { DEFAULT, MONOCHROME, GRUVBOX, CATPPUCCIN, AMOLED, NEON_NOIR }
 
 val LocalThemePreference = compositionLocalOf { ThemePreference.SYSTEM }
 val LocalThemePreset = compositionLocalOf { ThemePreset.DEFAULT }

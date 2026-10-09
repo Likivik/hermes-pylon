@@ -212,13 +212,14 @@ fun ProfilesScreen(
                                                         style = MaterialTheme.typography.titleLarge,
                                                         fontWeight = FontWeight.Bold,
                                                     )
+                                                    val profileDescription = profile.description
                                                     val descriptionText =
-                                                        if (!profile.description.isNullOrBlank()) {
-                                                            profile.description
+                                                        if (!profileDescription.isNullOrBlank()) {
+                                                            profileDescription.toString()
                                                         } else {
                                                             stringResource(R.string.profiles_description_placeholder)
                                                         }
-                                                    val isPlaceholder = profile.description.isNullOrBlank()
+                                                    val isPlaceholder = profileDescription.isNullOrBlank()
                                                     Spacer(modifier = Modifier.height(4.dp))
                                                     Text(
                                                         text = descriptionText,

@@ -488,10 +488,11 @@ private fun PluginCard(
             }
 
             // Auth command hint
-            if (plugin.authRequired && plugin.authCommand != null) {
+            val authCommand = plugin.authCommand
+            if (plugin.authRequired && authCommand != null) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = stringResource(R.string.plugins_auth_command_hint, plugin.authCommand),
+                    text = stringResource(R.string.plugins_auth_command_hint, authCommand),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
