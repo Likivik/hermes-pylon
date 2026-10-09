@@ -242,7 +242,7 @@ class ApiClientTest {
             ApiClient.rebuild()
             mockWebServer.enqueue(MockResponse().setResponseCode(200).setBody("media"))
 
-            ApiClient.hermesApi.downloadManagedFile("/private/photo.png").body()?.close()
+            ApiClient.hermesApi.downloadManagedFile("/private/photo.png").body()
 
             val request = mockWebServer.takeRequest()
             assertEquals("/api/files/download?path=%2Fprivate%2Fphoto.png", request.path)
@@ -267,7 +267,7 @@ class ApiClientTest {
             ApiClient.rebuild()
             mockWebServer.enqueue(MockResponse().setResponseCode(200).setBody("media"))
 
-            ApiClient.hermesApi.downloadManagedFile("/private/photo.png").body()?.close()
+            ApiClient.hermesApi.downloadManagedFile("/private/photo.png").body()
 
             val request = mockWebServer.takeRequest()
             assertEquals("/api/files/download?path=%2Fprivate%2Fphoto.png", request.path)

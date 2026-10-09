@@ -10,7 +10,7 @@ import com.m57.hermescontrol.data.model.SessionLiveStatus
 import com.m57.hermescontrol.data.model.SessionRenameRequest
 import com.m57.hermescontrol.data.model.SessionSearchResult
 import com.m57.hermescontrol.data.remote.ApiClient
-import com.m57.hermescontrol.data.remote.HermesApiService
+import com.m57.hermescontrol.data.remote.HermesGatewayApi
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
 import com.m57.hermescontrol.data.ws.ConnectionStatus
@@ -337,7 +337,7 @@ class SessionsViewModel(
 
     private var searchJob: Job? = null
     private var searchGeneration = 0L
-    private var searchApi: HermesApiService? = null
+    private var searchApi: HermesGatewayApi? = null
     private var searchProfileId: String? = null
     private val deletedSearchIds = mutableSetOf<String>()
 
@@ -644,7 +644,7 @@ class SessionsViewModel(
             val result =
                 safeApiCall {
                     api.bulkDeleteSessions(
-                        body = BulkDeleteRequest(ids = ids),
+                        request = BulkDeleteRequest(ids = ids),
                     )
                 }
             if (bulkDeleteOperation != operation) return@launch

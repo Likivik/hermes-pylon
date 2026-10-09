@@ -4,7 +4,8 @@ import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.model.SessionInfo
 import com.m57.hermescontrol.data.model.SessionListResponse
 import com.m57.hermescontrol.data.remote.ApiClient
-import com.m57.hermescontrol.data.remote.HermesApiService
+import com.m57.hermescontrol.data.remote.GatewayResponse
+import com.m57.hermescontrol.data.remote.HermesGatewayApi
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -26,12 +27,11 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import retrofit2.Response
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SessionsViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
-    private val mockApi = mockk<HermesApiService>(relaxed = true)
+    private val mockApi = mockk<HermesGatewayApi>(relaxed = true)
 
     private fun createViewModel(): SessionsViewModel {
         val vm = SessionsViewModel(ioDispatcher = testDispatcher)
@@ -107,17 +107,17 @@ class SessionsViewModelTest {
         val pinStore = FakeSessionPinStore(listOf("lineage-pinned"))
         val vm = SessionsViewModel(pinStore = pinStore, ioDispatcher = testDispatcher)
         coEvery { mockApi.getSessions(50, 0, "recent", null, "cron") } returns
-            Response.success(
+            GatewayResponse.success(
                 SessionListResponse(
                     sessions = listOf(SessionInfo("recent-1"), SessionInfo("recent-2")),
                     total = 3,
                 ),
             )
         coEvery { mockApi.getSessionLatestDescendant("lineage-pinned") } returns
-            Response.success(com.m57.hermescontrol.data.model.SessionLatestDescendantResponse("pinned-child"))
-        coEvery { mockApi.getSession("pinned-child") } returns Response.success(SessionInfo("pinned-child"))
+            GatewayResponse.success(com.m57.hermescontrol.data.model.SessionLatestDescendantResponse("pinned-child"))
+        coEvery { mockApi.getSession("pinned-child") } returns GatewayResponse.success(SessionInfo("pinned-child"))
         coEvery { mockApi.getSessions(50, 2, "recent", null, "cron") } returns
-            Response.success(
+            GatewayResponse.success(
                 SessionListResponse(
                     sessions = listOf(SessionInfo("recent-2"), SessionInfo("recent-3")),
                     total = 3,
@@ -147,21 +147,21 @@ class SessionsViewModelTest {
                 ioDispatcher = testDispatcher,
             )
         coEvery { mockApi.getSessions(50, 0, "recent", null, "cron") } returns
-            Response.success(
+            GatewayResponse.success(
                 SessionListResponse(
                     sessions = listOf(SessionInfo("recent-1"), SessionInfo("recent-2")),
                     total = 5,
                 ),
             )
         coEvery { mockApi.getSessions(50, 2, "recent", null, "cron") } returns
-            Response.success(
+            GatewayResponse.success(
                 SessionListResponse(
                     sessions = listOf(SessionInfo("recent-1"), SessionInfo("recent-2")),
                     total = 5,
                 ),
             )
         coEvery { mockApi.getSessions(50, 4, "recent", null, "cron") } returns
-            Response.success(SessionListResponse(sessions = emptyList(), total = 4))
+            GatewayResponse.success(SessionListResponse(sessions = emptyList(), total = 4))
 
         vm.loadSessions()
         awaitState { !vm.uiState.value.isLoading }
@@ -181,16 +181,16 @@ class SessionsViewModelTest {
                 pinStore = FakeSessionPinStore(emptyList()),
                 ioDispatcher = testDispatcher,
             )
-        val stalePage = CompletableDeferred<Response<SessionListResponse>>()
+        val stalePage = CompletableDeferred<GatewayResponse<SessionListResponse>>()
         coEvery { mockApi.getSessions(50, 0, "recent", null, "cron") } returnsMany
             listOf(
-                Response.success(
+                GatewayResponse.success(
                     SessionListResponse(
                         sessions = listOf(SessionInfo("old-1"), SessionInfo("old-2")),
                         total = 4,
                     ),
                 ),
-                Response.success(
+                GatewayResponse.success(
                     SessionListResponse(
                         sessions = listOf(SessionInfo("fresh-1"), SessionInfo("fresh-2")),
                         total = 2,
@@ -206,7 +206,7 @@ class SessionsViewModelTest {
         vm.loadSessions()
         awaitState { vm.uiState.value.sessions.map { it.id } == listOf("fresh-1", "fresh-2") }
         stalePage.complete(
-            Response.success(
+            GatewayResponse.success(
                 SessionListResponse(
                     sessions = listOf(SessionInfo("stale-3"), SessionInfo("stale-4")),
                     total = 4,
@@ -241,20 +241,20 @@ class SessionsViewModelTest {
                 SessionInfo("cron_job-a_20260905_180500", source = "cron"),
             )
         coEvery { mockApi.getSessions(50, 0, "recent", "cron", null) } returns
-            Response.success(SessionListResponse(sessions = firstPage, total = 3))
+            GatewayResponse.success(SessionListResponse(sessions = firstPage, total = 3))
         coEvery { mockApi.getSessions(50, 2, "recent", "cron", null) } returns
-            Response.success(
+            GatewayResponse.success(
                 SessionListResponse(
                     sessions = listOf(SessionInfo("cron_job-a_20260905_190000", source = "cron")),
                     total = 3,
                 ),
             )
         coEvery { mockApi.getSessionLatestDescendant("lineage-pinned") } returns
-            Response.success(
+            GatewayResponse.success(
                 com.m57.hermescontrol.data.model.SessionLatestDescendantResponse("cron_job-b_20260905_120000"),
             )
         coEvery { mockApi.getSession("cron_job-b_20260905_120000") } returns
-            Response.success(SessionInfo("cron_job-b_20260905_120000", source = "cron"))
+            GatewayResponse.success(SessionInfo("cron_job-b_20260905_120000", source = "cron"))
 
         vm.selectSection(HistorySection.AUTOMATIONS)
         awaitState { !vm.uiState.value.isLoading && vm.uiState.value.sessions.size == 3 }
@@ -278,7 +278,7 @@ class SessionsViewModelTest {
     fun `automation pagination honors server offset and limit`() {
         val vm = createViewModel()
         coEvery { mockApi.getSessions(50, 0, "recent", "cron", null) } returns
-            Response.success(
+            GatewayResponse.success(
                 SessionListResponse(
                     sessions = listOf(SessionInfo("cron_job_20260905_100000", source = "cron")),
                     total = 75,
@@ -287,7 +287,7 @@ class SessionsViewModelTest {
                 ),
             )
         coEvery { mockApi.getSessions(50, 35, "recent", "cron", null) } returns
-            Response.success(
+            GatewayResponse.success(
                 SessionListResponse(
                     sessions = listOf(SessionInfo("cron_job_20260905_110000", source = "cron")),
                     total = 36,
@@ -317,23 +317,23 @@ class SessionsViewModelTest {
                 ioDispatcher = testDispatcher,
             )
         coEvery { mockApi.getSessions(50, 0, "recent", null, "cron") } returns
-            Response.success(SessionListResponse(sessions = listOf(SessionInfo("chat-1")), total = 1))
+            GatewayResponse.success(SessionListResponse(sessions = listOf(SessionInfo("chat-1")), total = 1))
         coEvery { mockApi.getSessions(50, 0, "recent", "cron", null) } returns
-            Response.success(
+            GatewayResponse.success(
                 SessionListResponse(
                     sessions = listOf(SessionInfo("cron_job_20260905_100000", source = "cron")),
                     total = 1,
                 ),
             )
         coEvery { mockApi.getSessionLatestDescendant("chat-pin") } returns
-            Response.success(com.m57.hermescontrol.data.model.SessionLatestDescendantResponse("chat-pin"))
-        coEvery { mockApi.getSession("chat-pin") } returns Response.success(SessionInfo("chat-pin"))
+            GatewayResponse.success(com.m57.hermescontrol.data.model.SessionLatestDescendantResponse("chat-pin"))
+        coEvery { mockApi.getSession("chat-pin") } returns GatewayResponse.success(SessionInfo("chat-pin"))
         coEvery { mockApi.getSessionLatestDescendant("cron-pin") } returns
-            Response.success(
+            GatewayResponse.success(
                 com.m57.hermescontrol.data.model.SessionLatestDescendantResponse("cron_job_20260904_100000"),
             )
         coEvery { mockApi.getSession("cron_job_20260904_100000") } returns
-            Response.success(SessionInfo("cron_job_20260904_100000", source = "cron"))
+            GatewayResponse.success(SessionInfo("cron_job_20260904_100000", source = "cron"))
 
         vm.loadSessions()
         awaitState { vm.uiState.value.sessions.size == 2 }
@@ -355,13 +355,13 @@ class SessionsViewModelTest {
     fun `section switch rescopes the active search query`() {
         val vm = createViewModel()
         coEvery { mockApi.searchSessions("deploy", null, null, "cron") } returns
-            Response.success(
+            GatewayResponse.success(
                 com.m57.hermescontrol.data.model.SessionSearchResponse(
                     listOf(com.m57.hermescontrol.data.model.SessionSearchResult(session_id = "chat-hit")),
                 ),
             )
         coEvery { mockApi.searchSessions("deploy", null, "cron", null) } returns
-            Response.success(
+            GatewayResponse.success(
                 com.m57.hermescontrol.data.model.SessionSearchResponse(
                     listOf(
                         com.m57.hermescontrol.data.model.SessionSearchResult(
@@ -391,10 +391,10 @@ class SessionsViewModelTest {
     @Test
     fun `late conversation load cannot replace automation rows`() {
         val vm = createViewModel()
-        val stalePage = CompletableDeferred<Response<SessionListResponse>>()
+        val stalePage = CompletableDeferred<GatewayResponse<SessionListResponse>>()
         coEvery { mockApi.getSessions(50, 0, "recent", null, "cron") } coAnswers { stalePage.await() }
         coEvery { mockApi.getSessions(50, 0, "recent", "cron", null) } returns
-            Response.success(
+            GatewayResponse.success(
                 SessionListResponse(
                     sessions = listOf(SessionInfo("cron_job_20260905_100000", source = "cron")),
                     total = 1,
@@ -406,7 +406,7 @@ class SessionsViewModelTest {
         vm.selectSection(HistorySection.AUTOMATIONS)
         awaitState { vm.uiState.value.sessions.size == 1 }
         stalePage.complete(
-            Response.success(SessionListResponse(sessions = listOf(SessionInfo("old-chat")), total = 1)),
+            GatewayResponse.success(SessionListResponse(sessions = listOf(SessionInfo("old-chat")), total = 1)),
         )
         testDispatcher.scheduler.advanceUntilIdle()
 
@@ -419,7 +419,7 @@ class SessionsViewModelTest {
         val pinStore = FakeSessionPinStore(listOf("cron_job_20260905_100000"))
         val vm = SessionsViewModel(pinStore = pinStore, ioDispatcher = testDispatcher)
         coEvery { mockApi.getSessions(50, 0, "recent", "cron", null) } returns
-            Response.success(
+            GatewayResponse.success(
                 SessionListResponse(
                     sessions =
                         listOf(
@@ -429,7 +429,7 @@ class SessionsViewModelTest {
                     total = 2,
                 ),
             )
-        coEvery { mockApi.deleteSession("cron_job_20260905_100000") } returns Response.success(Unit)
+        coEvery { mockApi.deleteSession("cron_job_20260905_100000") } returns GatewayResponse.success(Unit)
 
         vm.selectSection(HistorySection.AUTOMATIONS)
         awaitState { vm.uiState.value.sessions.size == 2 }

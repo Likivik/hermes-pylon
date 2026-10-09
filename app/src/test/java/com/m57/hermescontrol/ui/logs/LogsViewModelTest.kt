@@ -2,7 +2,8 @@ package com.m57.hermescontrol.ui.logs
 
 import com.m57.hermescontrol.data.model.LogResponse
 import com.m57.hermescontrol.data.remote.ApiClient
-import com.m57.hermescontrol.data.remote.HermesApiService
+import com.m57.hermescontrol.data.remote.GatewayResponse
+import com.m57.hermescontrol.data.remote.HermesGatewayApi
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -23,12 +24,11 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
-import retrofit2.Response
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class LogsViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()
-    private val mockApi = mockk<HermesApiService>()
+    private val mockApi = mockk<HermesGatewayApi>()
 
     @Before
     fun setUp() {
@@ -53,7 +53,7 @@ class LogsViewModelTest {
                     level = "ALL",
                     component = "all",
                 )
-            } returns Response.success(LogResponse(lines = listOf("default")))
+            } returns GatewayResponse.success(LogResponse(lines = listOf("default")))
 
             val viewModel = LogsViewModel(ioDispatcher = testDispatcher)
             viewModel.loadLogs()
@@ -94,7 +94,7 @@ class LogsViewModelTest {
                     level = "DEBUG",
                     component = "all",
                 )
-            } returns Response.success(LogResponse(lines = listOf("filtered")))
+            } returns GatewayResponse.success(LogResponse(lines = listOf("filtered")))
 
             val viewModel = LogsViewModel(ioDispatcher = testDispatcher)
             viewModel.loadLogs()
@@ -122,7 +122,7 @@ class LogsViewModelTest {
     fun `loadLogs accepts the legacy logs response field`() =
         runBlocking {
             coEvery { mockApi.getLogs(any(), any(), any(), any()) } returns
-                Response.success(LogResponse(logs = listOf("legacy")))
+                GatewayResponse.success(LogResponse(logs = listOf("legacy")))
 
             val viewModel = LogsViewModel(ioDispatcher = testDispatcher)
             viewModel.loadLogs()

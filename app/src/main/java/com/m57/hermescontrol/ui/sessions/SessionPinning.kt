@@ -4,7 +4,7 @@ import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.model.SessionInfo
 import com.m57.hermescontrol.data.model.SessionTreeItem
 import com.m57.hermescontrol.data.model.flattenSessionTree
-import com.m57.hermescontrol.data.remote.HermesApiService
+import com.m57.hermescontrol.data.remote.HermesGatewayApi
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
 
@@ -63,7 +63,7 @@ internal fun buildSessionSections(
 }
 
 internal suspend fun hydratePinnedSessions(
-    api: HermesApiService,
+    api: HermesGatewayApi,
     pinIds: List<String>,
 ): List<SessionInfo> =
     pinIds.mapNotNull { pinId ->

@@ -38,7 +38,7 @@ internal fun SystemTimelineMarker(
 ) {
     val text =
         if (event.kind == "model_switch" && event.model != null) {
-            stringResource(R.string.timeline_marker_model_switch_to, event.model)
+            stringResource(R.string.timeline_marker_model_switch_to, requireNotNull(event.model))
         } else {
             stringResource(timelineEventLabel(event.kind))
         }

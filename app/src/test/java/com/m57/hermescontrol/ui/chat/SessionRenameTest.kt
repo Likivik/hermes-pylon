@@ -8,6 +8,7 @@ import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.local.HermesDatabase
 import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayResponse
 import com.m57.hermescontrol.data.session.ActiveSessionHolder
 import com.m57.hermescontrol.data.ws.ConnectionStatus
 import com.m57.hermescontrol.data.ws.HermesWsClient
@@ -64,7 +65,7 @@ class SessionRenameTest {
     private lateinit var app: Application
     private lateinit var fakeRepo: FakeChatPersistenceRepository
     private lateinit var fakeSlashUsageStore: FakeSlashUsageStore
-    private lateinit var mockApi: com.m57.hermescontrol.data.remote.HermesApiService
+    private lateinit var mockApi: com.m57.hermescontrol.data.remote.HermesGatewayApi
 
     /** Counter used to generate unique WS request IDs (mirrors the client). */
     private var reqCount = 0
@@ -142,7 +143,7 @@ class SessionRenameTest {
         mockApi = mockk(relaxed = true)
         every { ApiClient.hermesApi } returns mockApi
         coEvery { mockApi.getModelInfo() } returns
-            retrofit2.Response.success(
+            GatewayResponse.success(
                 com.m57.hermescontrol.data.model.ModelInfoResponse(
                     model = "gpt-5.6-sol",
                     provider = "openai-codex",
@@ -150,7 +151,7 @@ class SessionRenameTest {
                 ),
             )
         coEvery { mockApi.getModelOptions(any(), any()) } returns
-            retrofit2.Response.success(
+            GatewayResponse.success(
                 com.m57.hermescontrol.data.model.ModelOptionsResponse(
                     providers =
                         listOf(

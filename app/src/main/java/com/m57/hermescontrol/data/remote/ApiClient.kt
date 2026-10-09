@@ -4,49 +4,58 @@ package com.m57.hermescontrol.data.remote
 
 import com.m57.hermescontrol.BuildConfig
 import com.m57.hermescontrol.data.local.AuthManager
+import io.ktor.client.HttpClient
 import okhttp3.Authenticator
 import okhttp3.CookieJar
 import okhttp3.Interceptor
-import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
-import retrofit2.Retrofit
-import retrofit2.converter.kotlinx.serialization.asConverterFactory
 
 /**
- * Provides a Retrofit-backed [HermesApiService].
+ * Provides the Ktor-backed [HermesGatewayApi] for the Android app.
  *
- * The client is lazily built using the current [AuthManager] settings and
- * can be rebuilt at any time via [rebuild] (e.g. after the user changes
- * host / port / token).
+ * Unlike the Retrofit client this replaces, no second HTTP stack is created:
+ * the gateway client is built *on top of* the app's [OkHttpProvider] client via
+ * `preconfigured`, so OkHttp keeps owning the connection pool, the persistent
+ * cookie jar, TLS pinning, [TokenRefreshAuthenticator] and the auth interceptor,
+ * and Ktor drives the same objects. That is what lets the REST surface move to
+ * the multiplatform floor without changing session behaviour.
  */
 object ApiClient {
     @Volatile
-    private var retrofit: Retrofit? = null
+    private var client: HttpClient? = null
 
     @Volatile
-    private var service: HermesApiService? = null
+    private var gateway: HermesGatewayApi? = null
 
-    /** The current [HermesApiService] instance. Lazily created on first access. */
-    val hermesApi: HermesApiService
-        get() {
-            return service ?: synchronized(this) {
-                service ?: buildService().also { service = it }
+    /** The current [HermesGatewayApi] instance. Lazily created on first access. */
+    val hermesApi: HermesGatewayApi
+        get() =
+            gateway ?: synchronized(this) {
+                gateway ?: buildGateway().also { gateway = it }
             }
-        }
 
-    /** Force-rebuild the Retrofit client (e.g. after settings change). */
+    /**
+     * Force-rebuild the gateway client (e.g. after settings change).
+     *
+     * Deliberately does NOT close the outgoing [HttpClient]: it is built on the
+     * app's shared [OkHttpProvider] client via `preconfigured`, and Ktor's OkHttp
+     * engine `close()` shuts down that client's dispatcher executor and evicts its
+     * connection pool. Dropping the reference is enough; the underlying stack is
+     * owned by [OkHttpProvider] and is also serving the WebSocket client.
+     */
     fun rebuild() {
         synchronized(this) {
-            retrofit = null
-            service = null
+            client = null
+            gateway = null
         }
     }
 
-    /** Creates a standalone, temporary [HermesApiService] without modifying the global instance. */
+    /** Creates a standalone, temporary gateway without modifying the global instance. */
     fun createTempService(
         baseUrl: String,
         token: String,
-    ): HermesApiService {
+    ): HermesGatewayApi {
         val endpoint = ServerEndpoint.parseForBuild(baseUrl)
         val tempAuthInterceptor =
             Interceptor { chain ->
@@ -70,24 +79,20 @@ object ApiClient {
                 .addInterceptor(tempAuthInterceptor)
                 .build()
 
-        val tempRetrofit =
-            Retrofit
-                .Builder()
-                .baseUrl(endpoint.baseUrl.toString())
-                .client(tempOkHttp)
-                .addConverterFactory(OkHttpProvider.json.asConverterFactory("application/json".toMediaType()))
-                .build()
-
-        return tempRetrofit.create(HermesApiService::class.java)
+        return gatewayOver(endpoint.baseUrl, tempOkHttp)
     }
 
-    /** Build a media service bound to one endpoint/auth-mode/token snapshot. */
-    internal fun createMediaService(
-        endpoint: ServerEndpoint,
+    /**
+     * OkHttp client bound to one endpoint/auth-mode/token snapshot.
+     *
+     * Media and file-range reads stay on the engine here: they need streaming
+     * bodies and `Range` semantics that the JSON floor deliberately does not model.
+     */
+    internal fun createMediaClient(
         gated: Boolean,
         token: String?,
         cookieHeader: String? = null,
-    ): HermesApiService {
+    ): OkHttpClient {
         val auth =
             Interceptor { chain ->
                 val request = chain.request()
@@ -106,30 +111,41 @@ object ApiClient {
                     chain.proceed(request.newBuilder().header("Cookie", cookieHeader).build())
                 }
             }
-        val client =
-            OkHttpProvider.base.newBuilder()
-                // newBuilder retains the base client's live credential behavior;
-                // strip it while preserving dispatcher, TLS and pinning state.
-                .apply {
-                    interceptors().clear()
-                    networkInterceptors().clear()
-                }
-                .cookieJar(CookieJar.NO_COOKIES)
-                .addInterceptor(auth)
-                .addInterceptor(cookie)
-                .authenticator(Authenticator.NONE)
-                .build()
-        return Retrofit.Builder()
-            .baseUrl(endpoint.baseUrl.toString())
-            .client(client)
-            .addConverterFactory(OkHttpProvider.json.asConverterFactory("application/json".toMediaType()))
+        return OkHttpProvider.base.newBuilder()
+            // newBuilder retains the base client's live credential behavior;
+            // strip it while preserving dispatcher, TLS and pinning state.
+            .apply {
+                interceptors().clear()
+                networkInterceptors().clear()
+            }
+            .cookieJar(CookieJar.NO_COOKIES)
+            .addInterceptor(auth)
+            .addInterceptor(cookie)
+            .authenticator(Authenticator.NONE)
             .build()
-            .create(HermesApiService::class.java)
     }
+
+    /** Build a media gateway bound to one endpoint/auth-mode/token snapshot. */
+    internal fun createMediaService(
+        endpoint: ServerEndpoint,
+        gated: Boolean,
+        token: String?,
+        cookieHeader: String? = null,
+    ): HermesGatewayApi = gatewayOver(endpoint.baseUrl, createMediaClient(gated, token, cookieHeader))
 
     // ── Internal ─────────────────────────────────────────────────────────
 
-    private fun buildService(): HermesApiService {
+    private fun gatewayOver(
+        baseUrl: ServerBaseUrl,
+        okHttp: OkHttpClient,
+        config: HermesHttpConfig = HermesHttpConfig.Default,
+    ): HermesGatewayApi {
+        val created = createHermesHttpClient(okHttp, config)
+        client = created
+        return HermesGatewayApi(created, baseUrl)
+    }
+
+    private fun buildGateway(): HermesGatewayApi {
         val logging =
             HttpLoggingInterceptor().apply {
                 level =
@@ -174,15 +190,6 @@ object ApiClient {
                 .authenticator(TokenRefreshAuthenticator)
                 .build()
 
-        val rf =
-            Retrofit
-                .Builder()
-                .baseUrl(AuthManager.endpointForBuild().baseUrl.toString())
-                .client(okHttp)
-                .addConverterFactory(OkHttpProvider.json.asConverterFactory("application/json".toMediaType()))
-                .build()
-                .also { retrofit = it }
-
-        return rf.create(HermesApiService::class.java)
+        return gatewayOver(AuthManager.endpointForBuild().baseUrl, okHttp)
     }
 }

@@ -555,11 +555,16 @@ fun SubagentCard(
                 )
             }
             Spacer(Modifier.width(8.dp))
+            // Locals: SubagentIndicator moved to :shared, and neither
+            // isNullOrBlank()'s contract nor a null check enables a smart cast
+            // on a property owned by another module.
+            val summary = indicator.summary
+            val goal = indicator.goal
             val displayText =
-                if (isComplete && !indicator.summary.isNullOrBlank()) {
-                    indicator.summary
-                } else if (!indicator.goal.isNullOrBlank()) {
-                    indicator.goal
+                if (isComplete && !summary.isNullOrBlank()) {
+                    summary
+                } else if (!goal.isNullOrBlank()) {
+                    goal
                 } else {
                     "Subagent task"
                 }

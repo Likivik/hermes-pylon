@@ -198,7 +198,7 @@ object ChatWsEventReducer {
         var orphan: ChatMessage? = null
         val preState =
             if (streamingState.streamingMessage?.content?.isNotEmpty() == true) {
-                val finalized = streamingState.streamingMessage.copy(isStreaming = false)
+                val finalized = requireNotNull(streamingState.streamingMessage).copy(isStreaming = false)
                 orphan = finalized
                 state.copy(
                     messages = state.messages + finalized,
@@ -396,10 +396,10 @@ object ChatWsEventReducer {
             if (streamingState.streamingMessage?.content?.isNotEmpty() == true) {
                 val reasoning =
                     streamingState.reasoningText.ifBlank {
-                        streamingState.streamingMessage.reasoningText
+                        requireNotNull(streamingState.streamingMessage).reasoningText
                     }
                 val finalized =
-                    streamingState.streamingMessage.copy(
+                    requireNotNull(streamingState.streamingMessage).copy(
                         isStreaming = false,
                         reasoningText = reasoning,
                     )

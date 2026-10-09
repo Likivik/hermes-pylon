@@ -2,7 +2,8 @@ package com.m57.hermescontrol.ui.keys
 
 import com.m57.hermescontrol.data.model.EnvVarConfig
 import com.m57.hermescontrol.data.remote.ApiClient
-import com.m57.hermescontrol.data.remote.HermesApiService
+import com.m57.hermescontrol.data.remote.GatewayResponse
+import com.m57.hermescontrol.data.remote.HermesGatewayApi
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -22,12 +23,11 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import retrofit2.Response
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class KeysViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
-    private val mockApi = mockk<HermesApiService>()
+    private val mockApi = mockk<HermesGatewayApi>()
 
     private fun createViewModel(): KeysViewModel {
         val vm = KeysViewModel(ioDispatcher = testDispatcher)
@@ -41,7 +41,7 @@ class KeysViewModelTest {
 
         mockkObject(ApiClient)
         every { ApiClient.hermesApi } returns mockApi
-        coEvery { mockApi.getEnvVars() } returns Response.success(emptyMap())
+        coEvery { mockApi.getEnvVars() } returns GatewayResponse.success(emptyMap())
     }
 
     @After
@@ -105,7 +105,7 @@ class KeysViewModelTest {
     fun updateKey_clearsPreviouslyRevealedSecret() {
         val viewModel = createViewModel()
         seedRevealedValue(viewModel, "EXAMPLE_API_KEY", "old-secret")
-        coEvery { mockApi.updateEnvVar(any()) } returns Response.success(Unit)
+        coEvery { mockApi.updateEnvVar(any()) } returns GatewayResponse.success(Unit)
 
         viewModel.updateKey("EXAMPLE_API_KEY", "new-secret")
         testDispatcher.scheduler.advanceUntilIdle()
@@ -117,7 +117,7 @@ class KeysViewModelTest {
     fun deleteKey_clearsPreviouslyRevealedSecret() {
         val viewModel = createViewModel()
         seedRevealedValue(viewModel, "EXAMPLE_API_KEY", "old-secret")
-        coEvery { mockApi.deleteEnvVar(any()) } returns Response.success(Unit)
+        coEvery { mockApi.deleteEnvVar(any()) } returns GatewayResponse.success(Unit)
 
         viewModel.requestDeleteKey("EXAMPLE_API_KEY")
         viewModel.confirmDeleteKey()

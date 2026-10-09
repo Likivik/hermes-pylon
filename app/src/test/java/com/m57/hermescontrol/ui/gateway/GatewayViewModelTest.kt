@@ -3,7 +3,8 @@ package com.m57.hermescontrol.ui.gateway
 import com.m57.hermescontrol.data.model.MemoryPressureStatus
 import com.m57.hermescontrol.data.model.StatusResponse
 import com.m57.hermescontrol.data.remote.ApiClient
-import com.m57.hermescontrol.data.remote.HermesApiService
+import com.m57.hermescontrol.data.remote.GatewayResponse
+import com.m57.hermescontrol.data.remote.HermesGatewayApi
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -18,7 +19,6 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -26,12 +26,11 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import retrofit2.Response
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class GatewayViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
-    private lateinit var mockApi: HermesApiService
+    private lateinit var mockApi: HermesGatewayApi
 
     @Before
     fun setUp() {
@@ -52,7 +51,7 @@ class GatewayViewModelTest {
     fun `loadStatus success updates state with status data`() =
         runTest {
             val mockResponse = StatusResponse(version = "test")
-            coEvery { mockApi.getStatus() } returns Response.success(mockResponse)
+            coEvery { mockApi.getStatus() } returns GatewayResponse.success(mockResponse)
 
             val viewModel = GatewayViewModel(ioDispatcher = testDispatcher)
 
@@ -77,7 +76,7 @@ class GatewayViewModelTest {
     @Test
     fun `loadStatus error updates state with error message`() =
         runTest {
-            coEvery { mockApi.getStatus() } returns Response.error(500, "Server Error".toResponseBody(null))
+            coEvery { mockApi.getStatus() } returns GatewayResponse.error(500, "Server Error")
 
             val viewModel = GatewayViewModel(ioDispatcher = testDispatcher)
 
@@ -117,8 +116,8 @@ class GatewayViewModelTest {
     fun `profile change clears stale pressure`() =
         runTest {
             coEvery { mockApi.getStatus() } returns
-                Response.success(StatusResponse(memory = MemoryPressureStatus("critical"))) andThen
-                Response.success(StatusResponse())
+                GatewayResponse.success(StatusResponse(memory = MemoryPressureStatus("critical"))) andThen
+                GatewayResponse.success(StatusResponse())
             val viewModel = GatewayViewModel(ioDispatcher = testDispatcher)
             viewModel.onProfileChanged("old")
             advanceUntilIdle()
@@ -133,7 +132,7 @@ class GatewayViewModelTest {
     fun `newer same-profile refresh wins over older response`() =
         runTest {
             val firstStarted = CompletableDeferred<Unit>()
-            val firstResult = CompletableDeferred<Response<StatusResponse>>()
+            val firstResult = CompletableDeferred<GatewayResponse<StatusResponse>>()
             var callCount = 0
             coEvery { mockApi.getStatus() } coAnswers {
                 callCount += 1
@@ -141,7 +140,7 @@ class GatewayViewModelTest {
                     firstStarted.complete(Unit)
                     firstResult.await()
                 } else {
-                    Response.success(StatusResponse())
+                    GatewayResponse.success(StatusResponse())
                 }
             }
             val viewModel = GatewayViewModel(ioDispatcher = testDispatcher)
@@ -150,7 +149,7 @@ class GatewayViewModelTest {
             firstStarted.await()
             viewModel.loadStatus()
             runCurrent()
-            firstResult.complete(Response.success(StatusResponse(memory = MemoryPressureStatus("critical"))))
+            firstResult.complete(GatewayResponse.success(StatusResponse(memory = MemoryPressureStatus("critical"))))
             advanceUntilIdle()
 
             assertNull(viewModel.uiState.value.status?.memory)
@@ -160,8 +159,8 @@ class GatewayViewModelTest {
     fun `unknown sample preserves previous actionable pressure`() =
         runTest {
             coEvery { mockApi.getStatus() } returns
-                Response.success(StatusResponse(memory = MemoryPressureStatus("critical"))) andThen
-                Response.success(StatusResponse(memory = MemoryPressureStatus("unknown")))
+                GatewayResponse.success(StatusResponse(memory = MemoryPressureStatus("critical"))) andThen
+                GatewayResponse.success(StatusResponse(memory = MemoryPressureStatus("unknown")))
             val viewModel = GatewayViewModel(ioDispatcher = testDispatcher)
             viewModel.onProfileChanged("profile")
             advanceUntilIdle()
@@ -175,18 +174,18 @@ class GatewayViewModelTest {
     fun `profile change fences old action transport and completion`() =
         runTest {
             val oldApi = mockApi
-            val newApi = mockk<HermesApiService>()
+            val newApi = mockk<HermesGatewayApi>()
             val oldActionStarted = CompletableDeferred<Unit>()
-            val oldActionResult = CompletableDeferred<Response<Unit>>()
+            val oldActionResult = CompletableDeferred<GatewayResponse<Unit>>()
             var currentApi = oldApi
             every { ApiClient.hermesApi } answers { currentApi }
-            coEvery { oldApi.getStatus() } returns Response.success(StatusResponse())
+            coEvery { oldApi.getStatus() } returns GatewayResponse.success(StatusResponse())
             coEvery { oldApi.startGateway() } coAnswers {
                 oldActionStarted.complete(Unit)
                 oldActionResult.await()
             }
-            coEvery { newApi.getStatus() } returns Response.success(StatusResponse())
-            coEvery { newApi.startGateway() } returns Response.success(Unit)
+            coEvery { newApi.getStatus() } returns GatewayResponse.success(StatusResponse())
+            coEvery { newApi.startGateway() } returns GatewayResponse.success(Unit)
 
             val viewModel = GatewayViewModel(ioDispatcher = testDispatcher)
             viewModel.onProfileChanged("old")
@@ -199,7 +198,7 @@ class GatewayViewModelTest {
             runCurrent()
             viewModel.startGateway()
             runCurrent()
-            oldActionResult.complete(Response.error(500, "stale".toResponseBody()))
+            oldActionResult.complete(GatewayResponse.error(500, "stale"))
             advanceUntilIdle()
 
             assertNull(viewModel.uiState.value.errorMessage)

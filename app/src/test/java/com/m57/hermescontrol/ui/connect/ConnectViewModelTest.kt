@@ -7,7 +7,8 @@ import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.model.StatusResponse
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.CleartextPolicy
-import com.m57.hermescontrol.data.remote.HermesApiService
+import com.m57.hermescontrol.data.remote.GatewayResponse
+import com.m57.hermescontrol.data.remote.HermesGatewayApi
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import io.mockk.*
 import kotlinx.coroutines.CompletableDeferred
@@ -26,12 +27,11 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import retrofit2.Response
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ConnectViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
-    private lateinit var mockApiService: HermesApiService
+    private lateinit var mockApiService: HermesGatewayApi
     private val mockApp = mockk<Application>(relaxed = true)
 
     @Before
@@ -122,7 +122,7 @@ class ConnectViewModelTest {
             val viewModel = ConnectViewModel(mockApp, testDispatcher)
             viewModel.onTokenChange("valid-token")
             coEvery { mockApiService.getStatus() } returns
-                Response.success(
+                GatewayResponse.success(
                     StatusResponse(
                         memory = com.m57.hermescontrol.data.model.MemoryPressureStatus("critical"),
                     ),
@@ -145,7 +145,7 @@ class ConnectViewModelTest {
                     wsAuthParam = "token",
                 )
             val firstStarted = CompletableDeferred<Unit>()
-            val firstResult = CompletableDeferred<Response<StatusResponse>>()
+            val firstResult = CompletableDeferred<GatewayResponse<StatusResponse>>()
             var callCount = 0
             every { AuthManager.getConnectionProfiles() } returns listOf(profile)
             every { AuthManager.getSelectedProfileId() } returns "profile"
@@ -157,7 +157,7 @@ class ConnectViewModelTest {
                     firstStarted.complete(Unit)
                     firstResult.await()
                 } else {
-                    Response.success(StatusResponse())
+                    GatewayResponse.success(StatusResponse())
                 }
             }
 
@@ -167,7 +167,7 @@ class ConnectViewModelTest {
             viewModel.loadStatus()
             runCurrent()
             firstResult.complete(
-                Response.success(
+                GatewayResponse.success(
                     StatusResponse(
                         memory = com.m57.hermescontrol.data.model.MemoryPressureStatus("critical"),
                     ),
@@ -181,7 +181,7 @@ class ConnectViewModelTest {
     @Test
     fun `credential edit prevents stale connect response from restoring pressure`() =
         runTest {
-            val response = CompletableDeferred<Response<StatusResponse>>()
+            val response = CompletableDeferred<GatewayResponse<StatusResponse>>()
             coEvery { mockApiService.getStatus() } coAnswers { response.await() }
             val viewModel = ConnectViewModel(mockApp, testDispatcher)
             viewModel.onTokenChange("old-token")
@@ -189,7 +189,7 @@ class ConnectViewModelTest {
             runCurrent()
             viewModel.onTokenChange("new-token")
             response.complete(
-                Response.success(
+                GatewayResponse.success(
                     StatusResponse(
                         memory = com.m57.hermescontrol.data.model.MemoryPressureStatus("critical"),
                     ),
@@ -232,7 +232,7 @@ class ConnectViewModelTest {
             viewModel.onTokenChange("valid-token")
             viewModel.onBaseUrlChange("https://127.0.0.1:9119/")
 
-            val mockResponse = mockk<Response<StatusResponse>>()
+            val mockResponse = mockk<GatewayResponse<StatusResponse>>()
             every { mockResponse.isSuccessful } returns true
             every { mockResponse.body() } returns
                 StatusResponse(
@@ -269,9 +269,9 @@ class ConnectViewModelTest {
             viewModel.onTokenChange("invalid-token")
             viewModel.onBaseUrlChange("https://127.0.0.1:9119/")
 
-            val mockResponse = mockk<Response<StatusResponse>>()
+            val mockResponse = mockk<GatewayResponse<StatusResponse>>()
             every { mockResponse.isSuccessful } returns false
-            every { mockResponse.code() } returns 401
+            every { mockResponse.code } returns 401
             coEvery { mockApiService.getStatus() } returns mockResponse
 
             viewModel.connect()
@@ -294,9 +294,9 @@ class ConnectViewModelTest {
             viewModel.onTokenChange("invalid-token")
             viewModel.onBaseUrlChange("https://127.0.0.1:9119/")
 
-            val mockResponse = mockk<Response<StatusResponse>>()
+            val mockResponse = mockk<GatewayResponse<StatusResponse>>()
             every { mockResponse.isSuccessful } returns false
-            every { mockResponse.code() } returns 401
+            every { mockResponse.code } returns 401
             coEvery { mockApiService.getStatus() } returns mockResponse
 
             viewModel.connect()
@@ -318,9 +318,9 @@ class ConnectViewModelTest {
             viewModel.onTokenChange("invalid-token")
             viewModel.onBaseUrlChange("https://127.0.0.1:9119/")
 
-            val mockResponse = mockk<Response<StatusResponse>>()
+            val mockResponse = mockk<GatewayResponse<StatusResponse>>()
             every { mockResponse.isSuccessful } returns false
-            every { mockResponse.code() } returns 403
+            every { mockResponse.code } returns 403
             coEvery { mockApiService.getStatus() } returns mockResponse
 
             viewModel.connect()
@@ -339,9 +339,9 @@ class ConnectViewModelTest {
             viewModel.onTokenChange("token")
             viewModel.onBaseUrlChange("https://127.0.0.1:9119/")
 
-            val mockResponse = mockk<Response<StatusResponse>>()
+            val mockResponse = mockk<GatewayResponse<StatusResponse>>()
             every { mockResponse.isSuccessful } returns false
-            every { mockResponse.code() } returns 500
+            every { mockResponse.code } returns 500
             coEvery { mockApiService.getStatus() } returns mockResponse
 
             viewModel.connect()
@@ -438,7 +438,7 @@ class ConnectViewModelTest {
             viewModel.onProfileNameChange("New Profile")
             viewModel.onSaveProfileChange(true)
 
-            val mockResponse = mockk<Response<StatusResponse>>()
+            val mockResponse = mockk<GatewayResponse<StatusResponse>>()
             every { mockResponse.isSuccessful } returns true
             every { mockResponse.body() } returns
                 StatusResponse(
@@ -542,7 +542,7 @@ class ConnectViewModelTest {
             viewModel.onBaseUrlChange("http://10.0.0.1:9119/")
             viewModel.onSaveProfileChange(false)
 
-            val mockResponse = mockk<Response<StatusResponse>>()
+            val mockResponse = mockk<GatewayResponse<StatusResponse>>()
             every { mockResponse.isSuccessful } returns true
             every { mockResponse.body() } returns
                 StatusResponse(

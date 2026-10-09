@@ -8,7 +8,8 @@ import com.m57.hermescontrol.data.model.ConfigSchemaResponse
 import com.m57.hermescontrol.data.model.RawConfigResponse
 import com.m57.hermescontrol.data.model.SchemaField
 import com.m57.hermescontrol.data.remote.ApiClient
-import com.m57.hermescontrol.data.remote.HermesApiService
+import com.m57.hermescontrol.data.remote.GatewayResponse
+import com.m57.hermescontrol.data.remote.HermesGatewayApi
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -32,21 +33,19 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import retrofit2.Response
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ConfigViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()
-    private val mockApi = mockk<HermesApiService>()
+    private val mockApi = mockk<HermesGatewayApi>()
     private lateinit var viewModelStore: ViewModelStore
     private val viewModelJobs = mutableListOf<Job>()
     private var viewModelKey = 0
@@ -91,7 +90,7 @@ class ConfigViewModelTest {
                     else -> configResponse("later-refresh")
                 }
             }
-            coEvery { mockApi.updateConfig(any()) } returns Response.success(Unit)
+            coEvery { mockApi.updateConfig(any()) } returns GatewayResponse.success(Unit)
 
             val viewModel = createViewModel()
             awaitModel(viewModel, "initial")
@@ -133,7 +132,7 @@ class ConfigViewModelTest {
                     else -> configResponse("later-refresh")
                 }
             }
-            coEvery { mockApi.updateRawConfig(any()) } returns Response.success(Unit)
+            coEvery { mockApi.updateRawConfig(any()) } returns GatewayResponse.success(Unit)
 
             val viewModel = createViewModel()
             awaitModel(viewModel, "initial")
@@ -172,7 +171,7 @@ class ConfigViewModelTest {
                     configResponse("stale")
                 }
             }
-            coEvery { mockApi.updateConfig(any()) } returns Response.error(500, "save failed".toResponseBody())
+            coEvery { mockApi.updateConfig(any()) } returns GatewayResponse.error(500, "save failed")
 
             val viewModel = createViewModel()
             awaitModel(viewModel, "initial")
@@ -206,7 +205,7 @@ class ConfigViewModelTest {
                     configResponse("stale")
                 }
             }
-            coEvery { mockApi.updateRawConfig(any()) } returns Response.error(500, "save failed".toResponseBody())
+            coEvery { mockApi.updateRawConfig(any()) } returns GatewayResponse.error(500, "save failed")
 
             val viewModel = createViewModel()
             awaitModel(viewModel, "initial")
@@ -279,7 +278,7 @@ class ConfigViewModelTest {
             stubStableLoadEndpoints()
             coEvery { mockApi.getConfig() } returns configResponse("initial")
             coEvery { mockApi.getConfigSchema() } coAnswers {
-                Response.success(
+                GatewayResponse.success(
                     if (useRemovedSchema.get()) {
                         ConfigSchemaResponse(fields = emptyMap(), category_order = emptyList())
                     } else {
@@ -309,9 +308,9 @@ class ConfigViewModelTest {
             val objectEditor = AtomicBoolean(false)
             stubStableLoadEndpoints()
             coEvery { mockApi.getConfig() } returns
-                Response.success(mapOf("model" to JsonPrimitive(7)))
+                GatewayResponse.success(mapOf("model" to JsonPrimitive(7)))
             coEvery { mockApi.getConfigSchema() } coAnswers {
-                Response.success(
+                GatewayResponse.success(
                     ConfigSchemaResponse(
                         fields =
                             mapOf(
@@ -449,9 +448,9 @@ class ConfigViewModelTest {
                         ),
                     category_order = listOf("runtime"),
                 )
-            coEvery { mockApi.getConfigSchema() } returns Response.success(schema)
+            coEvery { mockApi.getConfigSchema() } returns GatewayResponse.success(schema)
             coEvery { mockApi.getConfig() } returns
-                Response.success(
+                GatewayResponse.success(
                     mapOf(
                         "terminal" to
                             JsonObject(
@@ -465,14 +464,17 @@ class ConfigViewModelTest {
                     ),
                 )
             coEvery { mockApi.getConfigDefaults() } returns
-                Response.success(
+                GatewayResponse.success(
                     mapOf(
                         "terminal" to JsonObject(mapOf("backend" to JsonPrimitive("local"))),
                         "providers" to providerDefault,
                         "toolsets" to toolsetsDefault,
                     ),
                 )
-            coEvery { mockApi.getRawConfig() } returns Response.success(RawConfigResponse(path = "/tmp/config.yaml"))
+            coEvery { mockApi.getRawConfig() } returns
+                GatewayResponse.success(
+                    RawConfigResponse(path = "/tmp/config.yaml"),
+                )
 
             val viewModel = createViewModel()
             withTimeout(5_000) { viewModel.uiState.first { !it.isLoading && it.defaults != null } }
@@ -494,10 +496,10 @@ class ConfigViewModelTest {
         }
 
     private fun stubStableLoadEndpoints() {
-        coEvery { mockApi.getConfigSchema() } returns Response.success(schema())
+        coEvery { mockApi.getConfigSchema() } returns GatewayResponse.success(schema())
         coEvery { mockApi.getConfigDefaults() } returns configResponse("default")
         coEvery { mockApi.getRawConfig() } returns
-            Response.success(RawConfigResponse(path = "/tmp/config.yaml", yaml = "model: initial"))
+            GatewayResponse.success(RawConfigResponse(path = "/tmp/config.yaml", yaml = "model: initial"))
     }
 
     private fun createViewModel(): ConfigViewModel {
@@ -524,8 +526,8 @@ class ConfigViewModelTest {
 
     private fun ConfigUiState.modelValue(): String? = (values?.get("model") as? JsonPrimitive)?.content
 
-    private fun configResponse(model: String): Response<Map<String, JsonElement>> =
-        Response.success(mapOf("model" to JsonPrimitive(model)))
+    private fun configResponse(model: String): GatewayResponse<Map<String, JsonElement>> =
+        GatewayResponse.success(mapOf("model" to JsonPrimitive(model)))
 
     private fun schema() =
         ConfigSchemaResponse(

@@ -44,44 +44,11 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
-/**
- * Connection status for the WebSocket client.
- */
-enum class ConnectionStatus {
-    DISCONNECTED,
-    CONNECTING,
-    CONNECTED,
-    RECONNECTING,
-    NO_NETWORK,
-    AUTH_EXPIRED,
-}
-
-internal data class SourcedWsEvent(
-    val event: WsEvent,
-    val profileId: String?,
-    val connectionGeneration: Int,
-    val storedSessionId: String? = null,
-)
-
-data class PrivilegedRequestBinding(
-    val requestId: String,
-    val runtimeSessionId: String,
-    val profileId: String,
-    val connectionGeneration: Int,
-)
-
 /** Immutable identity of one live WebSocket connection. */
 class ConnectionBinding internal constructor(
     val profileId: String,
     val generation: Int,
     internal val socket: WebSocket,
-)
-
-data class ServerRequestBinding(
-    val requestId: String,
-    val runtimeSessionId: String,
-    val profileId: String,
-    val connectionGeneration: Int,
 )
 
 /**

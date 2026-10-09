@@ -3,13 +3,10 @@ package com.m57.hermescontrol.data.remote
 import com.m57.hermescontrol.data.local.AuthSessionState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import retrofit2.Response
 import java.io.IOException
 
 class NetworkResultTest {
@@ -76,7 +73,7 @@ class NetworkResultTest {
         runBlocking {
             val result =
                 safeApiCall {
-                    Response.success("Success")
+                    GatewayResponse.success("Success")
                 }
             assertEquals(NetworkResult.Success::class, result::class)
             assertEquals("Success", (result as NetworkResult.Success).data)
@@ -102,7 +99,7 @@ class NetworkResultTest {
         runBlocking {
             val result =
                 safeApiCall<String?> {
-                    Response.success(null)
+                    GatewayResponse.success(null)
                 }
             if (result is NetworkResult.Failure) {
                 println("FAILURE: " + result.error)
@@ -118,7 +115,7 @@ class NetworkResultTest {
             val result =
                 safeApiCall<String> {
                     callCount++
-                    Response.error(404, "Not Found".toResponseBody("text/plain".toMediaTypeOrNull()))
+                    GatewayResponse.error(404, "Not Found")
                 }
             assertTrue(result is NetworkResult.Failure)
             val error = (result as NetworkResult.Failure).error
@@ -134,9 +131,9 @@ class NetworkResultTest {
             try {
                 val result =
                     safeApiCall<String> {
-                        Response.error(
+                        GatewayResponse.error(
                             401,
-                            "Unauthorized".toResponseBody("text/plain".toMediaTypeOrNull()),
+                            "Unauthorized",
                         )
                     }
 
@@ -158,9 +155,9 @@ class NetworkResultTest {
             try {
                 val result =
                     safeApiCall<String>(reportAuthExpiry = false) {
-                        Response.error(
+                        GatewayResponse.error(
                             401,
-                            "Unauthorized".toResponseBody("text/plain".toMediaTypeOrNull()),
+                            "Unauthorized",
                         )
                     }
 
@@ -180,9 +177,9 @@ class NetworkResultTest {
                 safeApiCall<String> {
                     callCount++
                     if (callCount == 1) {
-                        Response.error(500, "Server Error".toResponseBody("text/plain".toMediaTypeOrNull()))
+                        GatewayResponse.error(500, "Server Error")
                     } else {
-                        Response.success("Success on retry")
+                        GatewayResponse.success("Success on retry")
                     }
                 }
             assertEquals(NetworkResult.Success::class, result::class)
@@ -197,7 +194,7 @@ class NetworkResultTest {
             val result =
                 safeApiCall<String>(retries = 2) {
                     callCount++
-                    Response.error(503, "Service Unavailable".toResponseBody("text/plain".toMediaTypeOrNull()))
+                    GatewayResponse.error(503, "Service Unavailable")
                 }
             assertTrue(result is NetworkResult.Failure)
             val error = (result as NetworkResult.Failure).error
@@ -216,7 +213,7 @@ class NetworkResultTest {
                     if (callCount == 1) {
                         throw IOException("Network error")
                     } else {
-                        Response.success("Success on retry")
+                        GatewayResponse.success("Success on retry")
                     }
                 }
             assertEquals(NetworkResult.Success::class, result::class)
@@ -268,7 +265,7 @@ class NetworkResultTest {
 
             val result =
                 safeApiCall<String>(reportAuthExpiry = true) {
-                    Response.error(401, "Unauthorized".toResponseBody("text/plain".toMediaTypeOrNull()))
+                    GatewayResponse.error(401, "Unauthorized")
                 }
 
             assertTrue(result is NetworkResult.Failure)
@@ -284,7 +281,7 @@ class NetworkResultTest {
 
             val result =
                 safeApiCall<String>(reportAuthExpiry = false) {
-                    Response.error(401, "Unauthorized".toResponseBody("text/plain".toMediaTypeOrNull()))
+                    GatewayResponse.error(401, "Unauthorized")
                 }
 
             assertTrue(result is NetworkResult.Failure)

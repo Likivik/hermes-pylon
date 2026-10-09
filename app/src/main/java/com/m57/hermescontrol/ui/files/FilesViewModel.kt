@@ -25,9 +25,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.MultipartBody
-import okhttp3.RequestBody.Companion.toRequestBody
 
 data class FilesUiState(
     val currentPath: String = "",
@@ -167,20 +164,18 @@ class FilesViewModel(
     ) {
         val base = _uiState.value.currentPath
         val target = if (base.isBlank()) fileName else "$base/$fileName"
-        val pathBody = target.toRequestBody("text/plain".toMediaTypeOrNull())
-        val overwriteBody = "true".toRequestBody("text/plain".toMediaTypeOrNull())
-        val part =
-            MultipartBody.Part.createFormData(
-                "file",
-                fileName,
-                bytes.toRequestBody(mimeType.toMediaTypeOrNull()),
-            )
         _uiState.update { it.copy(isUploading = true) }
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
                     safeApiCall {
-                        ApiClient.hermesApi.uploadManagedFileStream(pathBody, overwriteBody, part)
+                        ApiClient.hermesApi.uploadManagedFileStream(
+                            path = target,
+                            overwrite = true,
+                            fileName = fileName,
+                            content = bytes,
+                            mimeType = mimeType,
+                        )
                     }
                 }
             handleActionResult(
