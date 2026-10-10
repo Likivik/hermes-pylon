@@ -2,7 +2,7 @@
 
 package com.m57.hermescontrol.data.ws
 
-import android.util.Log
+import com.m57.hermescontrol.util.PlatformLog
 
 /**
  * Converts raw [JsonRpcResponse] objects into typed [WsEvent] instances.
@@ -281,7 +281,7 @@ object EventParser {
             }
 
             else -> {
-                Log.w(TAG, "Unknown WebSocket event type")
+                PlatformLog.warn(TAG, "Unknown WebSocket event type")
                 WsEvent.Unknown(rawJson)
             }
         }
@@ -329,7 +329,7 @@ object EventParser {
         eventType: String,
         sessionId: String?,
     ): WsEvent {
-        Log.w(TAG, "Rejecting unbindable privileged event: $eventType")
+        PlatformLog.warn(TAG, "Rejecting unbindable privileged event: $eventType")
         return WsEvent.PrivilegedRequestRejected(eventType, sessionId)
     }
 }
