@@ -3,6 +3,7 @@ package com.m57.hermescontrol.ui.logs
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
 import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.ui.common.safeLaunchLoad
@@ -140,7 +141,7 @@ class LogsViewModel(
                                     content = file.readBytes(),
                                 )
                             }
-                        if (result is com.m57.hermescontrol.data.remote.NetworkResult.Success) {
+                        if (result is NetworkResult.Success) {
                             uploaded++
                         } else {
                             failed = true

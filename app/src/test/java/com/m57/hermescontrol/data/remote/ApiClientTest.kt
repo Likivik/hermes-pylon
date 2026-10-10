@@ -4,6 +4,7 @@ package com.m57.hermescontrol.data.remote
 
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.local.AuthSessionState
+import com.m57.hermescontrol.data.model.ConfigUpdateRequest
 import io.mockk.every
 import io.mockk.mockkObject
 import io.mockk.unmockkAll
@@ -123,7 +124,7 @@ class ApiClientTest {
             mockWebServer.enqueue(MockResponse().setResponseCode(204))
 
             ApiClient.hermesApi.updateConfig(
-                com.m57.hermescontrol.data.model.ConfigUpdateRequest(
+                ConfigUpdateRequest(
                     config = emptyMap(),
                 ),
             )

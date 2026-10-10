@@ -30,7 +30,7 @@ internal fun CredentialEntryRow(
     entry: CredentialPoolEntry,
     providerName: String,
     onRemove: () -> Unit,
-    spacing: com.m57.hermescontrol.theme.Spacing,
+    spacing: Spacing,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.xs),

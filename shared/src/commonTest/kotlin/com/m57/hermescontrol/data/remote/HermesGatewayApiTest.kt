@@ -9,10 +9,16 @@ import com.m57.hermescontrol.data.model.CreateWebhookRequest
 import com.m57.hermescontrol.data.model.EnvVarDeleteRequest
 import com.m57.hermescontrol.data.model.EnvVarRevealRequest
 import com.m57.hermescontrol.data.model.EnvVarUpdate
+import com.m57.hermescontrol.data.model.ManagedDirectoryCreate
+import com.m57.hermescontrol.data.model.ManagedFileDelete
+import com.m57.hermescontrol.data.model.ManagedFileUpload
 import com.m57.hermescontrol.data.model.McpCatalogInstallRequest
 import com.m57.hermescontrol.data.model.McpServerToggleRequest
 import com.m57.hermescontrol.data.model.MemoryResetRequest
 import com.m57.hermescontrol.data.model.MessagingPlatformUpdate
+import com.m57.hermescontrol.data.model.MoaConfigResponse
+import com.m57.hermescontrol.data.model.ModelAssignmentRequest
+import com.m57.hermescontrol.data.model.OAuthSubmitRequest
 import com.m57.hermescontrol.data.model.PluginProvidersPutRequest
 import com.m57.hermescontrol.data.model.SessionRenameRequest
 import com.m57.hermescontrol.data.model.SetActiveProfileRequest
@@ -1387,7 +1393,7 @@ class HermesGatewayApiTest {
                     method = m
                 }
 
-            val response = api(engine).saveMoaModels(com.m57.hermescontrol.data.model.MoaConfigResponse())
+            val response = api(engine).saveMoaModels(MoaConfigResponse())
 
             assertEquals("/api/model/moa", pathAndQuery)
             assertEquals("PUT", method)
@@ -1407,7 +1413,7 @@ class HermesGatewayApiTest {
 
             val response =
                 api(engine).setModelAssignment(
-                    com.m57.hermescontrol.data.model.ModelAssignmentRequest(
+                    ModelAssignmentRequest(
                         confirm_expensive_model = false,
                         scope = "global",
                         provider = "openai",
@@ -1838,7 +1844,7 @@ class HermesGatewayApiTest {
             val response =
                 api(engine).submitOAuthCode(
                     "google",
-                    com.m57.hermescontrol.data.model.OAuthSubmitRequest(
+                    OAuthSubmitRequest(
                         sessionId = "s1",
                         code = "abcd",
                     ),
@@ -2297,7 +2303,7 @@ class HermesGatewayApiTest {
 
             val response =
                 api(engine).uploadManagedFile(
-                    com.m57.hermescontrol.data.model.ManagedFileUpload(
+                    ManagedFileUpload(
                         path = "/x",
                         data_url = "data:text/plain,hi",
                     ),
@@ -2324,7 +2330,7 @@ class HermesGatewayApiTest {
 
             val response =
                 api(engine).createManagedDirectory(
-                    com.m57.hermescontrol.data.model.ManagedDirectoryCreate(path = "/d"),
+                    ManagedDirectoryCreate(path = "/d"),
                 )
 
             assertEquals("/api/files/mkdir", pathAndQuery)
@@ -2348,7 +2354,7 @@ class HermesGatewayApiTest {
 
             val response =
                 api(engine).deleteManagedFile(
-                    com.m57.hermescontrol.data.model.ManagedFileDelete(path = "/x"),
+                    ManagedFileDelete(path = "/x"),
                 )
 
             assertEquals("/api/files", pathAndQuery)

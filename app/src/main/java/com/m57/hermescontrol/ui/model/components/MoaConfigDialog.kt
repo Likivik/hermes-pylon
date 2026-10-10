@@ -37,16 +37,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.m57.hermescontrol.data.model.MoaConfigPreset
+import com.m57.hermescontrol.data.model.MoaConfigResponse
 import com.m57.hermescontrol.data.model.MoaModelSlot
+import com.m57.hermescontrol.data.model.ModelProvider
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.SearchBar
 
 @Composable
 internal fun MoaConfigDialog(
-    config: com.m57.hermescontrol.data.model.MoaConfigResponse,
-    providers: List<com.m57.hermescontrol.data.model.ModelProvider>,
+    config: MoaConfigResponse,
+    providers: List<ModelProvider>,
     busy: Boolean,
-    onSave: (com.m57.hermescontrol.data.model.MoaConfigResponse) -> Unit,
+    onSave: (MoaConfigResponse) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var draft by remember(config) { mutableStateOf(config) }
@@ -208,10 +210,10 @@ private sealed class MoaPickerTarget {
 
 @Composable
 private fun MoaConfigEditor(
-    draft: com.m57.hermescontrol.data.model.MoaConfigResponse,
+    draft: MoaConfigResponse,
     presetNames: List<String>,
     selectedPreset: String,
-    effectivePreset: com.m57.hermescontrol.data.model.MoaConfigPreset?,
+    effectivePreset: MoaConfigPreset?,
     newPresetName: String,
     busy: Boolean,
     onSelectPreset: (String) -> Unit,
@@ -219,7 +221,7 @@ private fun MoaConfigEditor(
     onAddPreset: () -> Unit,
     onDeletePreset: () -> Unit,
     onUpdatePreset: (
-        updater: (com.m57.hermescontrol.data.model.MoaConfigPreset) -> com.m57.hermescontrol.data.model.MoaConfigPreset,
+        updater: (MoaConfigPreset) -> MoaConfigPreset,
     ) -> Unit,
     onPickReference: (Int) -> Unit,
     onPickAggregator: () -> Unit,
@@ -387,11 +389,11 @@ private fun MoaConfigEditor(
 
 @Composable
 private fun MoaSlotPicker(
-    providers: List<com.m57.hermescontrol.data.model.ModelProvider>,
-    draft: com.m57.hermescontrol.data.model.MoaConfigResponse,
+    providers: List<ModelProvider>,
+    draft: MoaConfigResponse,
     selectedPreset: String,
     pickerTarget: MoaPickerTarget,
-    onSlotSelected: (com.m57.hermescontrol.data.model.MoaConfigResponse) -> Unit,
+    onSlotSelected: (MoaConfigResponse) -> Unit,
     onCancel: () -> Unit,
 ) {
     var pickerQuery by remember { mutableStateOf("") }
@@ -445,8 +447,8 @@ private fun MoaSlotPicker(
                             onClick = {
                                 val slot = MoaModelSlot(provider.slug, model)
                                 val update: (
-                                    com.m57.hermescontrol.data.model.MoaConfigPreset,
-                                ) -> com.m57.hermescontrol.data.model.MoaConfigPreset = { preset ->
+                                    MoaConfigPreset,
+                                ) -> MoaConfigPreset = { preset ->
                                     when (pickerTarget) {
                                         is MoaPickerTarget.Aggregator -> {
                                             preset.copy(aggregator = slot)

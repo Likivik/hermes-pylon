@@ -57,6 +57,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.m57.hermescontrol.NavigationController
 import com.m57.hermescontrol.R
 import com.m57.hermescontrol.SettingsConnection
+import com.m57.hermescontrol.data.model.AuxiliaryTaskAssignment
+import com.m57.hermescontrol.data.model.ModelProvider
+import com.m57.hermescontrol.data.model.PinnedModel
+import com.m57.hermescontrol.data.model.ProfileInfo
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.EmptyState
 import com.m57.hermescontrol.ui.common.ErrorState
@@ -309,7 +313,7 @@ private fun ModelSettingsSection(
     val auxOverrideCount =
         auxTasks?.let { tasks ->
             tasks
-                .filterIsInstance<com.m57.hermescontrol.data.model.AuxiliaryTaskAssignment>()
+                .filterIsInstance<AuxiliaryTaskAssignment>()
                 .count { a -> a.provider.isNotBlank() && a.provider != "auto" }
         } ?: 0
 
@@ -455,7 +459,7 @@ private fun SettingsRow(
 
 @Composable
 private fun AuxTasksDialog(
-    auxTasks: List<com.m57.hermescontrol.data.model.AuxiliaryTaskAssignment>,
+    auxTasks: List<AuxiliaryTaskAssignment>,
     busy: Boolean,
     onSetTask: (String) -> Unit,
     onResetAll: () -> Unit,
@@ -556,9 +560,9 @@ private fun AuxTasksDialog(
 
 @Composable
 private fun PinnedSectionCard(
-    pinnedModels: List<com.m57.hermescontrol.data.model.PinnedModel>,
+    pinnedModels: List<PinnedModel>,
     isExpanded: Boolean,
-    activeProfile: com.m57.hermescontrol.data.model.ProfileInfo?,
+    activeProfile: ProfileInfo?,
     onToggleExpanded: () -> Unit,
     onModelClick: (String, String) -> Unit,
     onUnpin: (String, String) -> Unit,
@@ -692,12 +696,12 @@ private fun PinnedSectionCard(
 
 @Composable
 private fun ProviderCard(
-    provider: com.m57.hermescontrol.data.model.ModelProvider,
+    provider: ModelProvider,
     isExpanded: Boolean,
     isCurrent: Boolean,
     query: String,
-    activeProfile: com.m57.hermescontrol.data.model.ProfileInfo?,
-    pinnedModels: List<com.m57.hermescontrol.data.model.PinnedModel>,
+    activeProfile: ProfileInfo?,
+    pinnedModels: List<PinnedModel>,
     onToggleExpand: () -> Unit,
     onModelClick: (String, String) -> Unit,
     onPin: (String, String) -> Unit,

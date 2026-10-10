@@ -8,6 +8,7 @@ import com.m57.hermescontrol.data.model.TelegramOnboardingApplyRequest
 import com.m57.hermescontrol.data.model.TelegramOnboardingStartRequest
 import com.m57.hermescontrol.data.model.TelegramOnboardingStartResponse
 import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
 import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.ui.common.safeLaunchLoad
@@ -298,7 +299,7 @@ class ChannelsViewModel(
                 }
             _uiState.update {
                 when (result) {
-                    is com.m57.hermescontrol.data.remote.NetworkResult.Success -> {
+                    is NetworkResult.Success -> {
                         val setup = result.data
                         it.copy(
                             onboardingPhase = OnboardingPhase.WAITING,
@@ -308,7 +309,7 @@ class ChannelsViewModel(
                         )
                     }
 
-                    is com.m57.hermescontrol.data.remote.NetworkResult.Failure -> {
+                    is NetworkResult.Failure -> {
                         it.copy(
                             onboardingPhase = OnboardingPhase.IDLE,
                             onboardingError = result.error.message,
@@ -334,7 +335,7 @@ class ChannelsViewModel(
                             ApiClient.hermesApi.getTelegramOnboardingStatus(pairingId)
                         }
                     when (result) {
-                        is com.m57.hermescontrol.data.remote.NetworkResult.Success -> {
+                        is NetworkResult.Success -> {
                             val status = result.data
                             if (status.status == "ready") {
                                 _uiState.update {
@@ -358,7 +359,7 @@ class ChannelsViewModel(
                             _uiState.update { it.copy(onboardingError = null) }
                         }
 
-                        is com.m57.hermescontrol.data.remote.NetworkResult.Failure -> {
+                        is NetworkResult.Failure -> {
                             val expired = isOnboardingExpired(_uiState.value.onboardingSetup)
                             if (expired) {
                                 _uiState.update {
@@ -464,7 +465,7 @@ class ChannelsViewModel(
                     )
                 }
             when (result) {
-                is com.m57.hermescontrol.data.remote.NetworkResult.Success -> {
+                is NetworkResult.Success -> {
                     val applyResult = result.data
                     _uiState.update {
                         it.copy(
@@ -479,7 +480,7 @@ class ChannelsViewModel(
                     }
                 }
 
-                is com.m57.hermescontrol.data.remote.NetworkResult.Failure -> {
+                is NetworkResult.Failure -> {
                     _uiState.update {
                         it.copy(
                             onboardingPhase = OnboardingPhase.READY,
@@ -539,7 +540,7 @@ private fun formatExpiry(expiresAt: String?): String {
     return "$mins:${secs.toString().padStart(2, '0')}"
 }
 
-private fun isOnboardingExpired(setup: com.m57.hermescontrol.data.model.TelegramOnboardingStartResponse?): Boolean {
+private fun isOnboardingExpired(setup: TelegramOnboardingStartResponse?): Boolean {
     val expiresAt = setup?.expiresAt ?: return false
     val ms =
         try {

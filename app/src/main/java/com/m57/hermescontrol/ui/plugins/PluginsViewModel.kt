@@ -2,6 +2,7 @@ package com.m57.hermescontrol.ui.plugins
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.m57.hermescontrol.data.model.AgentPluginInstallBody
 import com.m57.hermescontrol.data.model.PluginInfo
 import com.m57.hermescontrol.data.model.PluginProvidersPutRequest
 import com.m57.hermescontrol.data.model.ProviderOption
@@ -124,7 +125,7 @@ class PluginsViewModel(
                 withContext(ioDispatcher) {
                     safeApiCall {
                         ApiClient.hermesApi.installPlugin(
-                            com.m57.hermescontrol.data.model.AgentPluginInstallBody(
+                            AgentPluginInstallBody(
                                 identifier = url,
                                 force = _uiState.value.installForce,
                                 enable = _uiState.value.installEnable,

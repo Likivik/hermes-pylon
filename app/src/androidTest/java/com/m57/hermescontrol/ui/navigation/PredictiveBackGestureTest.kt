@@ -3,6 +3,7 @@ package com.m57.hermescontrol.ui.navigation
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.MediumTest
+import com.m57.hermescontrol.MainActivity
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -19,7 +20,7 @@ import org.junit.runner.RunWith
 class PredictiveBackGestureTest {
     @get:Rule
     val composeTestRule =
-        createAndroidComposeRule<com.m57.hermescontrol.MainActivity>()
+        createAndroidComposeRule<MainActivity>()
 
     @Test
     fun predictiveBack_doesNotCrash() {

@@ -3,6 +3,8 @@
 package com.m57.hermescontrol.data.ws
 
 import android.util.Log
+import com.m57.hermescontrol.data.config.ServerStore
+import com.m57.hermescontrol.data.config.ServerStoreState
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.remote.CleartextPolicy
 import com.m57.hermescontrol.data.remote.CookieManager
@@ -76,9 +78,9 @@ class HermesWsClientTest {
         // Non-gated by default (token mode) so the gated ticket path is exercised
         // only by the explicit gated-mode test below.
         every { AuthManager.serverStore } returns
-            mockk<com.m57.hermescontrol.data.config.ServerStore>().also {
+            mockk<ServerStore>().also {
                 every { it.getLatestState() } returns
-                    com.m57.hermescontrol.data.config.ServerStoreState()
+                    ServerStoreState()
             }
 
         // Issue #470: clients are built through OkHttpProvider, which now
@@ -1699,9 +1701,9 @@ class HermesWsClientTest {
 
         try {
             every { AuthManager.serverStore } returns
-                mockk<com.m57.hermescontrol.data.config.ServerStore>().also {
+                mockk<ServerStore>().also {
                     every { it.getLatestState() } returns
-                        com.m57.hermescontrol.data.config.ServerStoreState(
+                        ServerStoreState(
                             wsAuthParam = "ticket",
                         )
                 }
@@ -2104,9 +2106,9 @@ class HermesWsClientTest {
     fun testGatedMode_attemptsTicketFetchWithoutBareCookie() {
         // Force gated mode (ws auth via ticket, not loopback token).
         every { AuthManager.serverStore } returns
-            mockk<com.m57.hermescontrol.data.config.ServerStore>().also {
+            mockk<ServerStore>().also {
                 every { it.getLatestState() } returns
-                    com.m57.hermescontrol.data.config.ServerStoreState(wsAuthParam = "ticket")
+                    ServerStoreState(wsAuthParam = "ticket")
             }
         // No bare-name session cookie present (the prefixed one is server-side).
         every { AuthManager.getSessionCookie() } returns null
@@ -2166,9 +2168,9 @@ class HermesWsClientTest {
     @Test
     fun testGatedMode_transientTicketFailureReconnectsWithoutRelogin() {
         every { AuthManager.serverStore } returns
-            mockk<com.m57.hermescontrol.data.config.ServerStore>().also {
+            mockk<ServerStore>().also {
                 every { it.getLatestState() } returns
-                    com.m57.hermescontrol.data.config.ServerStoreState(wsAuthParam = "ticket")
+                    ServerStoreState(wsAuthParam = "ticket")
             }
         every { AuthManager.isAutoReconnect() } returns true
 
@@ -2209,9 +2211,9 @@ class HermesWsClientTest {
     @Test
     fun testGatedMode_unauthorizedTicketRequiresRelogin() {
         every { AuthManager.serverStore } returns
-            mockk<com.m57.hermescontrol.data.config.ServerStore>().also {
+            mockk<ServerStore>().also {
                 every { it.getLatestState() } returns
-                    com.m57.hermescontrol.data.config.ServerStoreState(wsAuthParam = "ticket")
+                    ServerStoreState(wsAuthParam = "ticket")
             }
         every { AuthManager.isAutoReconnect() } returns true
 
@@ -2242,9 +2244,9 @@ class HermesWsClientTest {
     @Test
     fun testGatedMode_rejectedWebSocketTicketRetriesOnceWithFreshTicket() {
         every { AuthManager.serverStore } returns
-            mockk<com.m57.hermescontrol.data.config.ServerStore>().also {
+            mockk<ServerStore>().also {
                 every { it.getLatestState() } returns
-                    com.m57.hermescontrol.data.config.ServerStoreState(wsAuthParam = "ticket")
+                    ServerStoreState(wsAuthParam = "ticket")
             }
 
         val ticketServer = MockWebServer()
@@ -2285,9 +2287,9 @@ class HermesWsClientTest {
     @Test
     fun testGatedMode_webSocketClose4401RetriesOnceWithFreshTicket() {
         every { AuthManager.serverStore } returns
-            mockk<com.m57.hermescontrol.data.config.ServerStore>().also {
+            mockk<ServerStore>().also {
                 every { it.getLatestState() } returns
-                    com.m57.hermescontrol.data.config.ServerStoreState(wsAuthParam = "ticket")
+                    ServerStoreState(wsAuthParam = "ticket")
             }
 
         val ticketServer = MockWebServer()
@@ -2347,9 +2349,9 @@ class HermesWsClientTest {
     @Test
     fun testGatedMode_secondRejectedWebSocketTicketRequiresRelogin() {
         every { AuthManager.serverStore } returns
-            mockk<com.m57.hermescontrol.data.config.ServerStore>().also {
+            mockk<ServerStore>().also {
                 every { it.getLatestState() } returns
-                    com.m57.hermescontrol.data.config.ServerStoreState(wsAuthParam = "ticket")
+                    ServerStoreState(wsAuthParam = "ticket")
             }
 
         val ticketServer = MockWebServer()

@@ -14,11 +14,20 @@ import com.m57.hermescontrol.data.local.ChatMessageEntity
 import com.m57.hermescontrol.data.local.HermesDatabase
 import com.m57.hermescontrol.data.model.Attachment
 import com.m57.hermescontrol.data.model.AttachmentSource
+import com.m57.hermescontrol.data.model.ModelInfoResponse
+import com.m57.hermescontrol.data.model.ModelOptionsResponse
+import com.m57.hermescontrol.data.model.ModelProvider
+import com.m57.hermescontrol.data.model.SessionInfo
+import com.m57.hermescontrol.data.model.SessionListResponse
+import com.m57.hermescontrol.data.model.SessionMessage
+import com.m57.hermescontrol.data.model.SessionMessagePagination
+import com.m57.hermescontrol.data.model.SessionMessagesResponse
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.GatewayFile
 import com.m57.hermescontrol.data.remote.GatewayFileClient
 import com.m57.hermescontrol.data.remote.GatewayFileResult
 import com.m57.hermescontrol.data.remote.GatewayResponse
+import com.m57.hermescontrol.data.remote.HermesGatewayApi
 import com.m57.hermescontrol.data.session.ActiveSessionHolder
 import com.m57.hermescontrol.data.ws.ConnectionStatus
 import com.m57.hermescontrol.data.ws.HermesWsClient
@@ -82,7 +91,7 @@ class ChatViewModelTest {
     private lateinit var app: Application
     private lateinit var fakeRepo: FakeChatPersistenceRepository
     private lateinit var fakeSlashUsageStore: FakeSlashUsageStore
-    private lateinit var mockApi: com.m57.hermescontrol.data.remote.HermesGatewayApi
+    private lateinit var mockApi: HermesGatewayApi
 
     /** Counter used to generate unique WS request IDs. */
     private var reqCount = 0
@@ -173,7 +182,7 @@ class ChatViewModelTest {
         every { ApiClient.hermesApi } returns mockApi
         coEvery { mockApi.getModelInfo() } returns
             GatewayResponse.success(
-                com.m57.hermescontrol.data.model.ModelInfoResponse(
+                ModelInfoResponse(
                     model = "gpt-5.6-sol",
                     provider = "openai-codex",
                     effectiveContextLength = 272_000L,
@@ -183,15 +192,15 @@ class ChatViewModelTest {
             mockApi.getModelOptions(any(), any())
         } returns
             GatewayResponse.success(
-                com.m57.hermescontrol.data.model.ModelOptionsResponse(
+                ModelOptionsResponse(
                     providers =
                         listOf(
-                            com.m57.hermescontrol.data.model.ModelProvider(
+                            ModelProvider(
                                 slug = "openai",
                                 name = "OpenAI",
                                 models = listOf("gpt-4o", "gpt-4o-mini"),
                             ),
-                            com.m57.hermescontrol.data.model.ModelProvider(
+                            ModelProvider(
                                 slug = "anthropic",
                                 name = "Anthropic",
                                 models = listOf("claude-3-5-sonnet"),
@@ -223,17 +232,17 @@ class ChatViewModelTest {
 
     private fun serverMessages(content: String) =
         GatewayResponse.success(
-            com.m57.hermescontrol.data.model.SessionMessagesResponse(
+            SessionMessagesResponse(
                 messages =
                     listOf(
-                        com.m57.hermescontrol.data.model.SessionMessage(
+                        SessionMessage(
                             id = 1,
                             role = "assistant",
                             content = content,
                         ),
                     ),
                 pagination =
-                    com.m57.hermescontrol.data.model.SessionMessagePagination(
+                    SessionMessagePagination(
                         limit = 150,
                         offset = 0,
                         order = "latest",
@@ -291,23 +300,23 @@ class ChatViewModelTest {
         val (viewModel, _) = createViewModelWithSession()
         coEvery { mockApi.getSessions(any(), any(), any()) } returns
             GatewayResponse.success(
-                com.m57.hermescontrol.data.model.SessionListResponse(
-                    sessions = listOf(com.m57.hermescontrol.data.model.SessionInfo(id = "paged", message_count = 300)),
+                SessionListResponse(
+                    sessions = listOf(SessionInfo(id = "paged", message_count = 300)),
                 ),
             )
         coEvery { mockApi.getSessionMessages("paged", 150, 0, true, "latest") } returns
             GatewayResponse.success(
-                com.m57.hermescontrol.data.model.SessionMessagesResponse(
+                SessionMessagesResponse(
                     messages =
                         listOf(
-                            com.m57.hermescontrol.data.model.SessionMessage(
+                            SessionMessage(
                                 id = 200,
                                 role = "assistant",
                                 content = "recent",
                             ),
                         ),
                     pagination =
-                        com.m57.hermescontrol.data.model.SessionMessagePagination(
+                        SessionMessagePagination(
                             limit = 150,
                             offset = 0,
                             order = "latest",
@@ -344,17 +353,17 @@ class ChatViewModelTest {
                 pageOffsets += offset
                 val content = if (offset == 0) "kept recent" else "kept archived"
                 GatewayResponse.success(
-                    com.m57.hermescontrol.data.model.SessionMessagesResponse(
+                    SessionMessagesResponse(
                         messages =
                             listOf(
-                                com.m57.hermescontrol.data.model.SessionMessage(
+                                SessionMessage(
                                     id = if (offset == 0) 20 else 10,
                                     role = "assistant",
                                     content = content,
                                 ),
                             ),
                         pagination =
-                            com.m57.hermescontrol.data.model.SessionMessagePagination(
+                            SessionMessagePagination(
                                 limit = 150,
                                 offset = offset,
                                 order = "latest",
@@ -401,10 +410,10 @@ class ChatViewModelTest {
             coEvery { mockApi.getSessionMessages(sessionId, any(), any(), true, "latest") } answers {
                 val content = if (++historyCalls == 1) "refresh superseded" else "undo authoritative"
                 GatewayResponse.success(
-                    com.m57.hermescontrol.data.model.SessionMessagesResponse(
+                    SessionMessagesResponse(
                         messages =
                             listOf(
-                                com.m57.hermescontrol.data.model.SessionMessage(
+                                SessionMessage(
                                     id = historyCalls,
                                     role = "assistant",
                                     content = content,
@@ -488,7 +497,7 @@ class ChatViewModelTest {
             coEvery { mockApi.getSessionMessages(any(), any(), any(), any(), any()) } answers {
                 messagePageCalls++
                 GatewayResponse.success(
-                    com.m57.hermescontrol.data.model.SessionMessagesResponse(messages = emptyList()),
+                    SessionMessagesResponse(messages = emptyList()),
                 )
             }
 
@@ -518,17 +527,17 @@ class ChatViewModelTest {
                 messagePageCalls++
                 every { HermesWsClient.isConnectionBindingCurrent(any()) } returns false
                 GatewayResponse.success(
-                    com.m57.hermescontrol.data.model.SessionMessagesResponse(
+                    SessionMessagesResponse(
                         messages =
                             listOf(
-                                com.m57.hermescontrol.data.model.SessionMessage(
+                                SessionMessage(
                                     id = 20,
                                     role = "assistant",
                                     content = "stale page",
                                 ),
                             ),
                         pagination =
-                            com.m57.hermescontrol.data.model.SessionMessagePagination(
+                            SessionMessagePagination(
                                 limit = 150,
                                 offset = 0,
                                 order = "latest",
@@ -564,17 +573,17 @@ class ChatViewModelTest {
                 offset: Int,
                 returned: Int = 1,
                 total: Int = 1,
-            ) = com.m57.hermescontrol.data.model.SessionMessagesResponse(
+            ) = SessionMessagesResponse(
                 messages =
                     listOf(
-                        com.m57.hermescontrol.data.model.SessionMessage(
+                        SessionMessage(
                             id = content.hashCode(),
                             role = "assistant",
                             content = content,
                         ),
                     ),
                 pagination =
-                    com.m57.hermescontrol.data.model.SessionMessagePagination(
+                    SessionMessagePagination(
                         limit = 150,
                         offset = offset,
                         order = "latest",
@@ -2567,7 +2576,7 @@ class ChatViewModelTest {
             coEvery { mockApi.getSessionMessages("paged", 150, 150, true, "latest") } answers {
                 olderCalls++
                 GatewayResponse.success(
-                    com.m57.hermescontrol.data.model.SessionMessagesResponse(messages = emptyList()),
+                    SessionMessagesResponse(messages = emptyList()),
                 )
             }
             every { HermesWsClient.connectionBinding("profile-a") } returns null
@@ -2594,10 +2603,10 @@ class ChatViewModelTest {
             val viewModel = createPaginatedViewModel()
             coEvery { mockApi.getSessionMessages("paged", 150, 150, true, "latest") } returns
                 GatewayResponse.success(
-                    com.m57.hermescontrol.data.model.SessionMessagesResponse(
+                    SessionMessagesResponse(
                         messages =
                             listOf(
-                                com.m57.hermescontrol.data.model.SessionMessage(
+                                SessionMessage(
                                     id = 50,
                                     role = "assistant",
                                     content = "rejected older",
@@ -2621,17 +2630,17 @@ class ChatViewModelTest {
             val viewModel = createPaginatedViewModel()
             coEvery { mockApi.getSessionMessages("paged", 150, 150, true, "latest") } returns
                 GatewayResponse.success(
-                    com.m57.hermescontrol.data.model.SessionMessagesResponse(
+                    SessionMessagesResponse(
                         messages =
                             listOf(
-                                com.m57.hermescontrol.data.model.SessionMessage(
+                                SessionMessage(
                                     id = 50,
                                     role = "assistant",
                                     content = "older",
                                 ),
                             ),
                         pagination =
-                            com.m57.hermescontrol.data.model.SessionMessagePagination(
+                            SessionMessagePagination(
                                 limit = 150,
                                 offset = 150,
                                 order = "latest",
@@ -2672,17 +2681,17 @@ class ChatViewModelTest {
                 }
                 val content = if (call == 1) "stale older" else "fresh older"
                 GatewayResponse.success(
-                    com.m57.hermescontrol.data.model.SessionMessagesResponse(
+                    SessionMessagesResponse(
                         messages =
                             listOf(
-                                com.m57.hermescontrol.data.model.SessionMessage(
+                                SessionMessage(
                                     id = call,
                                     role = "assistant",
                                     content = content,
                                 ),
                             ),
                         pagination =
-                            com.m57.hermescontrol.data.model.SessionMessagePagination(
+                            SessionMessagePagination(
                                 limit = 150,
                                 offset = 150,
                                 order = "latest",
@@ -2694,17 +2703,17 @@ class ChatViewModelTest {
             }
             coEvery { mockApi.getSessionMessages("paged", 150, 0, true, "latest") } returns
                 GatewayResponse.success(
-                    com.m57.hermescontrol.data.model.SessionMessagesResponse(
+                    SessionMessagesResponse(
                         messages =
                             listOf(
-                                com.m57.hermescontrol.data.model.SessionMessage(
+                                SessionMessage(
                                     id = 200,
                                     role = "assistant",
                                     content = "refreshed recent",
                                 ),
                             ),
                         pagination =
-                            com.m57.hermescontrol.data.model.SessionMessagePagination(150, 0, "latest", 150, 300),
+                            SessionMessagePagination(150, 0, "latest", 150, 300),
                     ),
                 )
 
@@ -2750,10 +2759,10 @@ class ChatViewModelTest {
             val viewModel = createPaginatedViewModel()
             coEvery { mockApi.getSessionMessages("paged", 150, 150, true, "latest") } returns
                 GatewayResponse.success(
-                    com.m57.hermescontrol.data.model.SessionMessagesResponse(
+                    SessionMessagesResponse(
                         messages =
                             listOf(
-                                com.m57.hermescontrol.data.model.SessionMessage(
+                                SessionMessage(
                                     id = 50,
                                     role = "assistant",
                                     content = "stale persisted older",
@@ -2799,17 +2808,17 @@ class ChatViewModelTest {
             coEvery { mockApi.getSessionMessages("paged", 150, 0, true, "latest") } answers {
                 refreshFetches++
                 GatewayResponse.success(
-                    com.m57.hermescontrol.data.model.SessionMessagesResponse(
+                    SessionMessagesResponse(
                         messages =
                             listOf(
-                                com.m57.hermescontrol.data.model.SessionMessage(
+                                SessionMessage(
                                     id = 200,
                                     role = "assistant",
                                     content = "atomic refresh",
                                 ),
                             ),
                         pagination =
-                            com.m57.hermescontrol.data.model.SessionMessagePagination(150, 0, "latest", 150, 300),
+                            SessionMessagePagination(150, 0, "latest", 150, 300),
                     ),
                 )
             }
@@ -2887,7 +2896,7 @@ class ChatViewModelTest {
                 )
             } returns
                 GatewayResponse.success(
-                    com.m57.hermescontrol.data.model.SessionMessagesResponse(
+                    SessionMessagesResponse(
                         messages = emptyList(),
                     ),
                 )
@@ -3113,10 +3122,10 @@ class ChatViewModelTest {
             val api = ApiClient.hermesApi
             coEvery { api.getSessions(any(), any(), any()) } returns
                 GatewayResponse.success(
-                    com.m57.hermescontrol.data.model.SessionListResponse(
+                    SessionListResponse(
                         sessions =
                             listOf(
-                                com.m57.hermescontrol.data.model.SessionInfo(
+                                SessionInfo(
                                     id = "session-root",
                                     message_count = 200,
                                 ),
@@ -3127,21 +3136,21 @@ class ChatViewModelTest {
                 api.getSessionMessages("session-root", 150, 0, true, "latest")
             } returns
                 GatewayResponse.success(
-                    com.m57.hermescontrol.data.model.SessionMessagesResponse(
+                    SessionMessagesResponse(
                         messages =
                             listOf(
-                                com.m57.hermescontrol.data.model.SessionMessage(
+                                SessionMessage(
                                     role = "user",
                                     content = "REST question",
                                 ),
-                                com.m57.hermescontrol.data.model.SessionMessage(
+                                SessionMessage(
                                     role = "assistant",
                                     content = "REST answer",
                                     reasoning = "REST reasoning",
                                 ),
                             ),
                         pagination =
-                            com.m57.hermescontrol.data.model.SessionMessagePagination(
+                            SessionMessagePagination(
                                 limit = 150,
                                 offset = 0,
                                 order = "latest",
@@ -3155,7 +3164,7 @@ class ChatViewModelTest {
             } answers {
                 olderPageRequested = true
                 GatewayResponse.success(
-                    com.m57.hermescontrol.data.model.SessionMessagesResponse(
+                    SessionMessagesResponse(
                         messages = emptyList(),
                     ),
                 )
@@ -3225,16 +3234,16 @@ class ChatViewModelTest {
                         1 -> {
                             withContext(NonCancellable) { releaseOlder.await() }
                             GatewayResponse.success(
-                                com.m57.hermescontrol.data.model.SessionMessagesResponse(
+                                SessionMessagesResponse(
                                     messages =
                                         listOf(
-                                            com.m57.hermescontrol.data.model.SessionMessage(
+                                            SessionMessage(
                                                 role = "assistant",
                                                 content = "stale",
                                             ),
                                         ),
                                     pagination =
-                                        com.m57.hermescontrol.data.model.SessionMessagePagination(
+                                        SessionMessagePagination(
                                             150,
                                             250,
                                             null,
@@ -3246,17 +3255,17 @@ class ChatViewModelTest {
                         }
                         2 ->
                             GatewayResponse.success(
-                                com.m57.hermescontrol.data.model.SessionMessagesResponse(
+                                SessionMessagesResponse(
                                     messages =
                                         listOf(
-                                            com.m57.hermescontrol.data.model.SessionMessage(
+                                            SessionMessage(
                                                 id = 9,
                                                 role = "assistant",
                                                 content = "newest",
                                             ),
                                         ),
                                     pagination =
-                                        com.m57.hermescontrol.data.model.SessionMessagePagination(
+                                        SessionMessagePagination(
                                             150,
                                             0,
                                             "latest",
@@ -3267,7 +3276,7 @@ class ChatViewModelTest {
                             )
                         else ->
                             GatewayResponse.success(
-                                com.m57.hermescontrol.data.model.SessionMessagesResponse(messages = emptyList()),
+                                SessionMessagesResponse(messages = emptyList()),
                             )
                     }
                 response
@@ -3307,17 +3316,17 @@ class ChatViewModelTest {
                     GatewayResponse.error(500, "stale failure")
                 } else {
                     GatewayResponse.success(
-                        com.m57.hermescontrol.data.model.SessionMessagesResponse(
+                        SessionMessagesResponse(
                             messages =
                                 listOf(
-                                    com.m57.hermescontrol.data.model.SessionMessage(
+                                    SessionMessage(
                                         id = 2,
                                         role = "assistant",
                                         content = "current",
                                     ),
                                 ),
                             pagination =
-                                com.m57.hermescontrol.data.model.SessionMessagePagination(
+                                SessionMessagePagination(
                                     150,
                                     0,
                                     "latest",
@@ -3370,17 +3379,17 @@ class ChatViewModelTest {
                         else -> "post-refresh sync"
                     }
                 GatewayResponse.success(
-                    com.m57.hermescontrol.data.model.SessionMessagesResponse(
+                    SessionMessagesResponse(
                         messages =
                             listOf(
-                                com.m57.hermescontrol.data.model.SessionMessage(
+                                SessionMessage(
                                     id = calls,
                                     role = "assistant",
                                     content = content,
                                 ),
                             ),
                         pagination =
-                            com.m57.hermescontrol.data.model.SessionMessagePagination(
+                            SessionMessagePagination(
                                 150,
                                 0,
                                 "latest",
@@ -3542,16 +3551,16 @@ class ChatViewModelTest {
             coEvery { mockApi.getSessionMessages(any(), any(), any(), true, "latest") } answers {
                 requests += arg<String>(0) to arg<Int>(2)
                 GatewayResponse.success(
-                    com.m57.hermescontrol.data.model.SessionMessagesResponse(messages = emptyList()),
+                    SessionMessagesResponse(messages = emptyList()),
                 )
             }
             coEvery { mockApi.getSessions(any(), any(), any()) } coAnswers {
                 withContext(NonCancellable) { releaseCount.await() }
                 GatewayResponse.success(
-                    com.m57.hermescontrol.data.model.SessionListResponse(
+                    SessionListResponse(
                         sessions =
                             listOf(
-                                com.m57.hermescontrol.data.model.SessionInfo(id = sessionId, message_count = 400),
+                                SessionInfo(id = sessionId, message_count = 400),
                             ),
                     ),
                 )
@@ -3576,10 +3585,10 @@ class ChatViewModelTest {
             val api = ApiClient.hermesApi
             coEvery { api.getSessions(any(), any(), any()) } returns
                 GatewayResponse.success(
-                    com.m57.hermescontrol.data.model.SessionListResponse(
+                    SessionListResponse(
                         sessions =
                             listOf(
-                                com.m57.hermescontrol.data.model.SessionInfo(
+                                SessionInfo(
                                     id = "session-root",
                                     message_count = 200,
                                 ),
@@ -3608,22 +3617,22 @@ class ChatViewModelTest {
                 pageRequests += request
                 if (request.offset == 0) {
                     GatewayResponse.success(
-                        com.m57.hermescontrol.data.model.SessionMessagesResponse(
+                        SessionMessagesResponse(
                             messages =
                                 listOf(
-                                    com.m57.hermescontrol.data.model.SessionMessage(
+                                    SessionMessage(
                                         id = 2836,
                                         role = "user",
                                         content = "Recent turn",
                                     ),
-                                    com.m57.hermescontrol.data.model.SessionMessage(
+                                    SessionMessage(
                                         id = 2837,
                                         role = "assistant",
                                         content = "Recent reply",
                                     ),
                                 ),
                             pagination =
-                                com.m57.hermescontrol.data.model.SessionMessagePagination(
+                                SessionMessagePagination(
                                     limit = 150,
                                     offset = 0,
                                     order = "latest",
@@ -3633,17 +3642,17 @@ class ChatViewModelTest {
                     )
                 } else {
                     GatewayResponse.success(
-                        com.m57.hermescontrol.data.model.SessionMessagesResponse(
+                        SessionMessagesResponse(
                             messages =
                                 listOf(
-                                    com.m57.hermescontrol.data.model.SessionMessage(
+                                    SessionMessage(
                                         id = 2686,
                                         role = "user",
                                         content = "Archived turn",
                                     ),
                                 ),
                             pagination =
-                                com.m57.hermescontrol.data.model.SessionMessagePagination(
+                                SessionMessagePagination(
                                     limit = 150,
                                     offset = 150,
                                     order = "latest",
@@ -3686,10 +3695,10 @@ class ChatViewModelTest {
             coEvery { api.getSessions(any(), any(), any()) } answers {
                 countRequested = true
                 GatewayResponse.success(
-                    com.m57.hermescontrol.data.model.SessionListResponse(
+                    SessionListResponse(
                         sessions =
                             listOf(
-                                com.m57.hermescontrol.data.model.SessionInfo(
+                                SessionInfo(
                                     id = "session-root",
                                     message_count = 200,
                                 ),
@@ -3703,7 +3712,7 @@ class ChatViewModelTest {
             } answers {
                 pageRequests += Triple(arg(0), arg(1), arg(2))
                 GatewayResponse.success(
-                    com.m57.hermescontrol.data.model.SessionMessagesResponse(
+                    SessionMessagesResponse(
                         messages = emptyList(),
                     ),
                 )

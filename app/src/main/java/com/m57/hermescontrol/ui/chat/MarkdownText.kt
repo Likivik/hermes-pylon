@@ -61,6 +61,8 @@ import com.m57.hermescontrol.theme.SearchHighlightColors
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.theme.WithoutChatFontScale
 import com.m57.hermescontrol.theme.searchHighlightColors
+import com.m57.hermescontrol.ui.chat.components.CodeBlockCard
+import com.m57.hermescontrol.ui.chat.components.GifImageThumbnail
 import com.m57.hermescontrol.util.BidiUtils
 
 private val URL_PATTERN = Regex("""https?://[^\s)>\[\]"'‘’]+""")
@@ -121,7 +123,7 @@ fun MarkdownText(
             when (block) {
                 is MdBlock.Code -> {
                     WithoutChatFontScale {
-                        com.m57.hermescontrol.ui.chat.components.CodeBlockCard(
+                        CodeBlockCard(
                             code = block.code,
                             language = block.language,
                             onCopy = { /* clipboard handled internally */ },
@@ -376,7 +378,7 @@ fun MarkdownText(
                                 .fillMaxWidth()
                                 .padding(vertical = Spacing.xs),
                     ) {
-                        com.m57.hermescontrol.ui.chat.components.GifImageThumbnail(
+                        GifImageThumbnail(
                             model = source.model,
                             gatewayPath = source.gatewayPath,
                             contentDescription = block.alt.ifBlank { null },

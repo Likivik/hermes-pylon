@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
+import com.m57.hermescontrol.data.model.Attachment
 import com.m57.hermescontrol.theme.HermesStatusColors
 import com.m57.hermescontrol.theme.StatusBlue
 import com.m57.hermescontrol.theme.StatusBlueContainer
@@ -465,7 +466,7 @@ class MarkdownTextFeatureTest {
     @Test
     fun testAttachment_isGif() {
         val gifAttachment =
-            com.m57.hermescontrol.data.model.Attachment(
+            Attachment(
                 uri = "content://media/1.gif",
                 name = "test.gif",
                 mimeType = "image/gif",
@@ -474,7 +475,7 @@ class MarkdownTextFeatureTest {
         assertTrue(gifAttachment.isGif)
 
         val nonGifAttachment =
-            com.m57.hermescontrol.data.model.Attachment(
+            Attachment(
                 uri = "content://media/1.jpg",
                 name = "test.jpg",
                 mimeType = "image/jpeg",

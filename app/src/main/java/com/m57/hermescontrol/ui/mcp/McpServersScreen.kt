@@ -294,7 +294,7 @@ private fun openOAuthAuthorization(
 private fun AddServerSection(
     state: McpServersUiState,
     viewModel: McpServersViewModel,
-    spacing: com.m57.hermescontrol.theme.Spacing,
+    spacing: Spacing,
 ) {
     SectionHeader(
         title = stringResource(R.string.mcp_servers_add_server),
@@ -425,7 +425,7 @@ private fun ServerCard(
     server: McpServer,
     state: McpServersUiState,
     viewModel: McpServersViewModel,
-    spacing: com.m57.hermescontrol.theme.Spacing,
+    spacing: Spacing,
     onClick: () -> Unit,
     onOpenBrowser: (String) -> Boolean,
 ) {
@@ -612,7 +612,7 @@ private fun EnvVarSection(
     server: McpServer,
     state: McpServersUiState,
     viewModel: McpServersViewModel,
-    spacing: com.m57.hermescontrol.theme.Spacing,
+    spacing: Spacing,
 ) {
     val isEditing = state.editingEnvFor == server.name
     val env = server.env ?: emptyMap()
@@ -715,7 +715,7 @@ private fun HealthBadge(
 private fun CatalogSection(
     state: McpServersUiState,
     viewModel: McpServersViewModel,
-    spacing: com.m57.hermescontrol.theme.Spacing,
+    spacing: Spacing,
     filteredCatalog: List<McpCatalogEntry>,
 ) {
     val catalogExpanded = remember { mutableStateOf(false) }
@@ -792,7 +792,7 @@ private fun CatalogEntryCard(
     entry: McpCatalogEntry,
     state: McpServersUiState,
     viewModel: McpServersViewModel,
-    spacing: com.m57.hermescontrol.theme.Spacing,
+    spacing: Spacing,
 ) {
     var showInstallForm by remember { mutableStateOf(false) }
     val isInstalling = state.installingCatalogEntry == entry.name

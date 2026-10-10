@@ -30,7 +30,7 @@ class NotificationEntryManifestTest {
         val component =
             ComponentName(
                 context,
-                "com.m57.hermescontrol.notification.NotificationReplyReceiver",
+                "NotificationReplyReceiver",
             )
 
         try {
