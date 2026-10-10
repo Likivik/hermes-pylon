@@ -7,8 +7,9 @@ import coil.ImageLoaderFactory
 import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
 import com.m57.hermescontrol.data.local.AuthManager
-import com.m57.hermescontrol.data.remote.NetworkMonitor
+import com.m57.hermescontrol.data.remote.AndroidNetworkMonitor
 import com.m57.hermescontrol.data.remote.OkHttpProvider
+import com.m57.hermescontrol.data.ws.HermesWsClient
 import com.m57.hermescontrol.ui.analytics.AnalyticsPreloader
 import io.kseongbin.stacktrace.CrashLogger
 import io.kseongbin.stacktrace.CrashLoggerConfig
@@ -33,7 +34,9 @@ class HermesControlApp :
         // Issue #478: guarantee a "Default" profile is always selected so there is no
         // separate standalone/default code path anywhere in the app.
         AuthManager.ensureDefaultProfile()
-        NetworkMonitor.init(this)
+        AndroidNetworkMonitor.init(this)
+        HermesWsClient.installNetworkMonitor(AndroidNetworkMonitor)
+        HermesWsClient.installAuth(AuthManager)
         // Issue #537 follow-up (A): preload analytics in the background after launch
         // so the tab renders instantly when opened (the usage endpoint is slow on a
         // cold backend). Fire-and-forget; never blocks UI startup.

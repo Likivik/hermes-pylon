@@ -154,6 +154,7 @@ class AuthenticatedDisposableFixtureTest {
         every { AuthManager.getToken() } returns "stale-bearer"
         every { AuthManager.isAutoReconnect() } returns false
         every { AuthManager.getSessionCookie() } returns null
+        HermesWsClient.installAuth(AuthManager)
         HermesWsClient.disconnect(clearPendingMessages = true)
         HermesWsClient.setAppForeground(true)
         AuthSessionState.markAuthenticated()

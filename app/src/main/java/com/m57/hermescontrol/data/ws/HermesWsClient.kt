@@ -5,7 +5,6 @@ package com.m57.hermescontrol.data.ws
 import android.util.Log
 import androidx.annotation.VisibleForTesting
 import com.m57.hermescontrol.BuildConfig
-import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.remote.AuthPayloads
 import com.m57.hermescontrol.data.remote.DashboardSessionTokenRefresher
 import com.m57.hermescontrol.data.remote.NetworkMonitor
@@ -36,30 +35,27 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.Response
-import okhttp3.WebSocket
-import okhttp3.WebSocketListener
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
-/** Immutable identity of one live WebSocket connection. */
+/** Immutable identity of one live socket connection. */
 class ConnectionBinding internal constructor(
     val profileId: String,
     val generation: Int,
-    internal val socket: WebSocket,
+    internal val socket: WsSocket,
 )
 
 /**
- * WebSocket client for the Hermes Dashboard JSON-RPC 2.0 interface.
+ * socket client for the Hermes Dashboard JSON-RPC 2.0 interface.
  *
- * Connects to the scheme-aware endpoint derived by [AuthManager],
+ * Connects to the scheme-aware endpoint derived by [WsAuthConfig],
  * auto-reconnects with exponential backoff, and emits parsed [WsEvent]s via [events] SharedFlow
  * as well as direct callbacks.
  */
 object HermesWsClient {
-    /** E2E: when non-blank, WS connects here instead of AuthManager.wsUrl(). */
+    /** E2E: when non-blank, WS connects here instead of the installed [WsAuthConfig] endpoint. */
     @Volatile
     var e2eWsOverride: String? = null
     private const val TAG = "HermesWsClient"
@@ -136,7 +132,71 @@ object HermesWsClient {
     private val backgroundIdleScheduleGeneration = AtomicInteger(0)
 
     @Volatile
-    private var webSocket: WebSocket? = null
+    private var webSocket: WsSocket? = null
+
+    /**
+     * Reachability as the init-block collector sees it.
+     *
+     * Stable for the lifetime of the object: that collector binds to this flow
+     * once, at class-initialisation, so the platform monitor is bridged in by
+     * [installNetworkMonitor] rather than swapped underneath it.
+     */
+    private val isNetworkAvailable = MutableStateFlow(true)
+
+    /**
+     * Installed platform monitor, null until [installNetworkMonitor] runs — so
+     * this class never names an Android-only type. Reads that need the current
+     * value synchronously go through [isNetworkConnected].
+     */
+    @Volatile
+    private var networkMonitor: NetworkMonitor? = null
+
+    private var networkMonitorJob: Job? = null
+
+    /**
+     * Auth and endpoint facts. Defaults to [UnconfiguredAuth] so this class
+     * names no Android-only type; the app installs its `AuthManager` at startup
+     * through [installAuth].
+     */
+    @Volatile
+    private var auth: WsAuthConfig = UnconfiguredAuth
+
+    /** Transport seam — production wires [OkHttpWsTransport]. Tests inject fakes. */
+    private val transport: WsTransport by lazy { OkHttpWsTransport(OkHttpProvider.websocket) }
+
+    /**
+     * Install the platform network monitor.
+     *
+     * Bridges [monitor] into [isNetworkAvailable] instead of replacing the flow
+     * the init-block collector already subscribed to: a swap would leave that
+     * collector reading a stale flow, and network-restore reconnect would never
+     * fire again.
+     */
+    fun installNetworkMonitor(monitor: NetworkMonitor) {
+        networkMonitor = monitor
+        networkMonitorJob?.cancel()
+        networkMonitorJob =
+            wsScope.launch {
+                monitor.isConnected.collect { isNetworkAvailable.value = it }
+            }
+    }
+
+    /**
+     * Current reachability, read synchronously.
+     *
+     * Reads the installed monitor directly so this is not one dispatch behind
+     * the platform's own flow; falls back to the bridged default when nothing
+     * has been installed.
+     */
+    private fun isNetworkConnected(): Boolean = networkMonitor?.isConnected?.value ?: isNetworkAvailable.value
+
+    /**
+     * Install the auth and endpoint config. Safe at any time: every use reads
+     * the field per call rather than subscribing to it.
+     */
+    fun installAuth(config: WsAuthConfig) {
+        auth = config
+    }
 
     /** Identity of [webSocket], guarded by [connectionLock]. */
     private var activeConnectionProfileId: String? = null
@@ -237,9 +297,9 @@ object HermesWsClient {
     init {
         // Monitor network state to trigger immediate reconnect when network is restored
         wsScope.launch {
-            NetworkMonitor.isConnected.collect { connected ->
+            isNetworkAvailable.collect { connected ->
                 val autoReconnect =
-                    runCatching { AuthManager.isAutoReconnect() }
+                    runCatching { auth.isAutoReconnect() }
                         .getOrDefault(false)
                 if (connected && shouldReconnectAfterNetworkRestore(autoReconnect)) {
                     Log.d(TAG, "Network restored — triggering immediate reconnect")
@@ -394,7 +454,7 @@ object HermesWsClient {
         requestId.set(0)
     }
 
-    /** Open a WebSocket connection using settings from [AuthManager]. */
+    /** Open a socket connection using settings from [WsAuthConfig]. */
     fun connect() {
         val generation =
             synchronized(connectionLock) {
@@ -431,7 +491,7 @@ object HermesWsClient {
     }
 
     /**
-     * In gated mode, mint a fresh WebSocket ticket from the dashboard. The
+     * In gated mode, mint a fresh socket ticket from the dashboard. The
      * ticket is single-use and has a 30-second time-to-live (TTL), so a new
      * one is required on every connect and reconnect.
      *
@@ -447,7 +507,7 @@ object HermesWsClient {
     private fun refreshWsTicketIfNeeded(): TicketRefreshResult {
         val isGated =
             try {
-                AuthManager.isGatedMode()
+                auth.isGatedMode()
             } catch (_: IllegalStateException) {
                 // serverStore not initialized yet (transient early call); treat
                 // as loopback so a stale-token refresh still runs. Log so a real
@@ -457,7 +517,7 @@ object HermesWsClient {
             }
         if (!isGated) {
             // The loopback dashboard token is regenerated on every server
-            // restart. Refresh it before each WebSocket handshake so automatic
+            // restart. Refresh it before each socket handshake so automatic
             // reconnect does not get stuck in AUTH_EXPIRED with a stale token.
             DashboardSessionTokenRefresher.refresh()
             return TicketRefreshResult(TicketRefreshStatus.READY)
@@ -475,7 +535,7 @@ object HermesWsClient {
                 Request
                     .Builder()
                     .url(
-                        AuthManager.endpointForBuild().resolve(
+                        auth.endpointForBuild().resolve(
                             "api/auth/ws-ticket",
                         ),
                     )
@@ -528,7 +588,7 @@ object HermesWsClient {
     }
 
     /**
-     * Cleanly close the WebSocket and stop auto-reconnect.
+     * Cleanly close the socket and stop auto-reconnect.
      *
      * Pass [clearPendingMessages] whenever the credentials behind the
      * connection are being discarded — logout, sign-in-required routing, or a
@@ -665,7 +725,7 @@ object HermesWsClient {
                 binding.runtimeSessionId.isBlank() ||
                 binding.connectionGeneration != activeConnectionGeneration ||
                 binding.profileId != activeConnectionProfileId ||
-                binding.profileId != AuthManager.getSelectedProfileId() ||
+                binding.profileId != auth.getSelectedProfileId() ||
                 ActiveSessionHolder.activeSessionId.value != binding.runtimeSessionId
             ) {
                 deferred.completeExceptionally(HermesRpcException("Privileged request is no longer active"))
@@ -707,7 +767,7 @@ object HermesWsClient {
                 binding.requestId.isBlank() || binding.runtimeSessionId.isBlank() ||
                 binding.connectionGeneration != activeConnectionGeneration ||
                 binding.profileId != activeConnectionProfileId ||
-                binding.profileId != AuthManager.getSelectedProfileId() ||
+                binding.profileId != auth.getSelectedProfileId() ||
                 ActiveSessionHolder.activeSessionId.value != binding.runtimeSessionId
             ) {
                 return@synchronized false
@@ -766,12 +826,12 @@ object HermesWsClient {
                 webSocket !== binding.socket ||
                 activeConnectionProfileId != binding.profileId ||
                 activeConnectionGeneration != binding.generation ||
-                AuthManager.getSelectedProfileId() != binding.profileId ||
+                auth.getSelectedProfileId() != binding.profileId ||
                 runtimeSessionId == null ||
                 ActiveSessionHolder.activeSessionId.value != runtimeSessionId
             ) {
                 deferred.completeExceptionally(
-                    HermesRpcException("WebSocket binding changed — request cancelled"),
+                    HermesRpcException("socket binding changed — request cancelled"),
                 )
                 return@synchronized deferred
             }
@@ -818,10 +878,10 @@ object HermesWsClient {
                 webSocket !== binding.socket ||
                 activeConnectionProfileId != binding.profileId ||
                 activeConnectionGeneration != binding.generation ||
-                AuthManager.getSelectedProfileId() != binding.profileId
+                auth.getSelectedProfileId() != binding.profileId
             ) {
                 deferred.completeExceptionally(
-                    HermesRpcException("WebSocket binding changed — request cancelled"),
+                    HermesRpcException("socket binding changed — request cancelled"),
                 )
                 return@synchronized deferred
             }
@@ -909,7 +969,7 @@ object HermesWsClient {
         method == WsMethods.SESSION_RESUME &&
             this.profileId == profileId &&
             connectionGeneration == generation &&
-            AuthManager.getSelectedProfileId() == profileId &&
+            auth.getSelectedProfileId() == profileId &&
             ActiveSessionHolder.activeSessionId.value == runtimeSessionId
 
     /**
@@ -1031,7 +1091,7 @@ object HermesWsClient {
                 clarifyRequestId.isBlank() ||
                 sourceConnectionGeneration != activeConnectionGeneration ||
                 sourceProfileId != activeConnectionProfileId ||
-                sourceProfileId != AuthManager.getSelectedProfileId() ||
+                sourceProfileId != auth.getSelectedProfileId() ||
                 ActiveSessionHolder.activeSessionId.value != sessionId
             ) {
                 return@synchronized false
@@ -1090,11 +1150,11 @@ object HermesWsClient {
      *
      * Caller must hold [connectionLock].
      */
-    private fun recoverRejectedSocket(ws: WebSocket) {
+    private fun recoverRejectedSocket(ws: WsSocket) {
         val generation = connectionGeneration.get()
         connected.set(false)
         _connectionStatus.value = ConnectionStatus.RECONNECTING
-        if (ws.queueSize() == 0L) {
+        if (!ws.hasPendingWrites()) {
             ws.cancel()
             scheduleReconnect(generation)
             return
@@ -1124,7 +1184,7 @@ object HermesWsClient {
      * way the previous unconditional `poll()` loop did. An oversized frame can
      * never succeed, so it is discarded to avoid livelocking the loop.
      */
-    private fun drainQueue(ws: WebSocket) {
+    private fun drainQueue(ws: WsSocket) {
         // e2e-38: drain OUTSIDE connectionLock so handleGatewayReady's
         // send()s (which also take the lock) can enqueue while we drain
         // instead of deadlocking on the lock and dropping the RPCs.
@@ -1213,7 +1273,7 @@ object HermesWsClient {
                 ws !== binding.socket ||
                 activeConnectionProfileId != binding.profileId ||
                 activeConnectionGeneration != binding.generation ||
-                AuthManager.getSelectedProfileId() != binding.profileId ||
+                auth.getSelectedProfileId() != binding.profileId ||
                 ActiveSessionHolder.activeSessionId.value != runtimeSessionId
             ) {
                 return@synchronized false
@@ -1259,10 +1319,10 @@ object HermesWsClient {
 
     private fun openSocket(generation: Int) {
         if (generation != connectionGeneration.get()) return
-        val profileId = AuthManager.getSelectedProfileId()
+        val profileId = auth.getSelectedProfileId()
         val ticketResult = refreshWsTicketIfNeeded()
         if (generation != connectionGeneration.get()) return
-        if (profileId != AuthManager.getSelectedProfileId()) {
+        if (profileId != auth.getSelectedProfileId()) {
             restartAfterProfileChange(generation)
             return
         }
@@ -1300,18 +1360,18 @@ object HermesWsClient {
                 // append the just-minted ticket so the gateway accepts us.
                 e2eWsOverride?.takeIf { it.isNotBlank() }?.let { base ->
                     val minted = ticketResult.ticket
-                    if (minted != null && AuthManager.isGatedMode()) {
+                    if (minted != null && auth.isGatedMode()) {
                         val sep = if ('?' in base) "&" else "?"
                         "$base${sep}ticket=$minted"
                     } else {
                         base
                     }
                 } ?: (
-                    ticketResult.ticket?.let(AuthManager::wsUrlWithCredential)
-                        ?: AuthManager.wsUrl()
+                    ticketResult.ticket?.let(auth::wsUrlWithCredential)
+                        ?: auth.wsUrl()
                 )
             } catch (e: IllegalArgumentException) {
-                Log.w(TAG, "WebSocket blocked by transport policy")
+                Log.w(TAG, "socket blocked by transport policy")
                 synchronized(connectionLock) {
                     if (generation != connectionGeneration.get()) return
                     _connectionStatus.value = ConnectionStatus.DISCONNECTED
@@ -1321,23 +1381,22 @@ object HermesWsClient {
         if (BuildConfig.DEBUG) {
             Log.d(
                 TAG,
-                "Connecting to WebSocket endpoint: $url override=${!e2eWsOverride.isNullOrBlank()}",
+                "Connecting to socket endpoint: $url override=${!e2eWsOverride.isNullOrBlank()}",
             )
         }
 
-        val request = Request.Builder().url(url).build()
         var restartForProfileChange = false
         synchronized(connectionLock) {
             when {
                 generation != connectionGeneration.get() || intentionalClose.get() -> return
-                profileId != AuthManager.getSelectedProfileId() -> {
+                profileId != auth.getSelectedProfileId() -> {
                     restartForProfileChange = true
                 }
                 else -> {
                     val eventSocketGeneration = socketGeneration.incrementAndGet()
                     webSocket =
-                        OkHttpProvider.websocket.newWebSocket(
-                            request,
+                        transport.connect(
+                            url,
                             WsListenerImpl(profileId, generation, eventSocketGeneration),
                         )
                     activeConnectionProfileId = profileId
@@ -1352,7 +1411,7 @@ object HermesWsClient {
         val shouldReconnect =
             synchronized(connectionLock) {
                 if (generation != connectionGeneration.get()) return
-                Log.d(TAG, "Connection profile changed during WebSocket setup; restarting")
+                Log.d(TAG, "Connection profile changed during socket setup; restarting")
                 val reconnect = !intentionalClose.get()
                 disconnect(clearPendingMessages = true)
                 reconnect
@@ -1368,12 +1427,12 @@ object HermesWsClient {
         synchronized(connectionLock) {
             if (generation != connectionGeneration.get()) return
             if (intentionalClose.get()) return
-            if (!AuthManager.isAutoReconnect()) {
+            if (!auth.isAutoReconnect()) {
                 if (BuildConfig.DEBUG) Log.d(TAG, "Auto-reconnect disabled")
                 _connectionStatus.value = ConnectionStatus.DISCONNECTED
                 return
             }
-            if (!NetworkMonitor.isConnected.value) {
+            if (!isNetworkConnected()) {
                 Log.d(TAG, "No network available — delaying reconnect scheduling")
                 _connectionStatus.value = ConnectionStatus.NO_NETWORK
                 return
@@ -1397,7 +1456,7 @@ object HermesWsClient {
     }
 
     /**
-     * A WebSocket ticket is single-use and can be rejected after the dashboard
+     * A socket ticket is single-use and can be rejected after the dashboard
      * session has already refreshed successfully. In gated mode, mint and try
      * one fresh ticket before declaring the dashboard session expired.
      */
@@ -1406,12 +1465,12 @@ object HermesWsClient {
             if (generation != connectionGeneration.get()) return
             val isGated =
                 runCatching {
-                    AuthManager.isGatedMode()
+                    auth.isGatedMode()
                 }.getOrDefault(false)
             if (isGated && !intentionalClose.get() &&
                 ticketAuthRetryUsed.compareAndSet(false, true)
             ) {
-                Log.w(TAG, "WebSocket ticket rejected; retrying once with a fresh ticket")
+                Log.w(TAG, "socket ticket rejected; retrying once with a fresh ticket")
                 _connectionStatus.value = ConnectionStatus.RECONNECTING
                 wsScope.launch { openSocket(generation) }
                 return
@@ -1429,7 +1488,7 @@ object HermesWsClient {
      * callback cannot reject calls registered on a replacement socket.
      */
     private fun detachTerminalSocket(
-        socket: WebSocket,
+        socket: WsSocket,
         generation: Int,
     ): Boolean =
         synchronized(connectionLock) {
@@ -1446,26 +1505,102 @@ object HermesWsClient {
             true
         }
 
+    /**
+     * Bind [socket] as the live connection for [profileId] and return the
+     * listener bound to it.
+     *
+     * Test seam: production reaches the same state in two steps — [openSocket]
+     * records the binding once the transport has connected, then
+     * [WsListenerImpl.onOpen] flips [connected] and [ConnectionStatus] — because
+     * the socket does not exist until the transport has produced it. Tests
+     * driving a connection without a real transport need both steps at once,
+     * and this is the single place that knows which fields must move together.
+     */
+    @VisibleForTesting
+    internal fun installConnection(
+        socket: WsSocket,
+        profileId: String,
+    ): WsListener {
+        val eventSocketGeneration = socketGeneration.incrementAndGet()
+        synchronized(connectionLock) {
+            webSocket = socket
+            activeConnectionProfileId = profileId
+            activeConnectionGeneration = eventSocketGeneration
+            connected.set(true)
+            _connectionStatus.value = ConnectionStatus.CONNECTED
+        }
+        return WsListenerImpl(profileId, connectionGeneration.get(), eventSocketGeneration)
+    }
+
+    // ── Test support ─────────────────────────────────────────────────────
+    // Seams for HermesWsClientTest, so the suite can read and reset this
+    // singleton without reflecting into private fields by name. Production code
+    // never calls them. Each mirrors exactly what the reflection it replaced
+    // did — same fields, same order, same liveness.
+
+    /** The suite's per-test reset, in the order the reflection performed it. */
+    @VisibleForTesting
+    internal fun resetForTest() {
+        connected.set(false)
+        _connectionStatus.value = ConnectionStatus.DISCONNECTED
+        messageQueue.clear()
+        pendingPromptSessions.clear()
+        pendingReplayResponses.clear()
+        pendingReply = false
+    }
+
+    /** The live outbound queue: tests read it and seed frames into it. */
+    @VisibleForTesting
+    internal fun outboundQueueForTest(): MutableCollection<String> = messageQueue
+
+    /** Ids of in-flight requests. */
+    @VisibleForTesting
+    internal fun pendingCallIdsForTest(): Set<String> = pendingCalls.keys
+
+    /** Timeout jobs attached to in-flight requests. */
+    @VisibleForTesting
+    internal fun pendingTimeoutJobsForTest(): List<Job> = pendingCalls.values.mapNotNull { it.timeoutJob }
+
+    @VisibleForTesting
+    internal fun pendingPromptSessionCountForTest(): Int = pendingPromptSessions.size
+
+    @VisibleForTesting
+    internal fun pendingReplayResponseCountForTest(): Int = pendingReplayResponses.size
+
+    @VisibleForTesting
+    internal val connectionGenerationForTest: Int get() = connectionGeneration.get()
+
+    @VisibleForTesting
+    internal fun bumpConnectionGenerationForTest() {
+        connectionGeneration.incrementAndGet()
+    }
+
+    @VisibleForTesting
+    internal val activeConnectionGenerationForTest: Int get() = activeConnectionGeneration
+
+    @VisibleForTesting
+    internal val currentBackoffForTest: Long get() = currentBackoff
+
+    @VisibleForTesting
+    internal val socketForTest: WsSocket? get() = webSocket
+
     // ── Listener ─────────────────────────────────────────────────────────
 
-    private class WsListenerImpl(
+    internal class WsListenerImpl(
         private val profileId: String?,
         private val generation: Int,
         private val eventSocketGeneration: Int,
-    ) : WebSocketListener() {
-        override fun onOpen(
-            webSocket: WebSocket,
-            response: Response,
-        ) {
+    ) : WsListener {
+        override fun onOpen(socket: WsSocket) {
             synchronized(connectionLock) {
                 if (generation != connectionGeneration.get() ||
-                    webSocket !== HermesWsClient.webSocket
+                    socket !== HermesWsClient.webSocket
                 ) {
-                    Log.d(TAG, "Ignoring stale WebSocket onOpen callback")
-                    webSocket.close(1000, "Superseded connection")
+                    Log.d(TAG, "Ignoring stale socket onOpen callback")
+                    socket.close(1000, "Superseded connection")
                     return
                 }
-                Log.i(TAG, "WebSocket opened")
+                Log.i(TAG, "socket opened")
                 connected.set(true)
                 _connectionStatus.value = ConnectionStatus.CONNECTED
                 currentBackoff = INITIAL_BACKOFF_MS
@@ -1476,18 +1611,18 @@ object HermesWsClient {
             // send(), so draining inside the lock would deadlock the enqueue of
             // the RPCs issued right after gateway.ready — they'd allocate an id
             // but never reach the wire (the e2e-37 "ids 1-2 vanish" symptom).
-            drainQueue(webSocket)
+            drainQueue(socket)
         }
 
-        override fun onMessage(
-            webSocket: WebSocket,
+        override fun onText(
+            socket: WsSocket,
             text: String,
         ) {
             synchronized(connectionLock) {
                 if (generation != connectionGeneration.get() ||
-                    webSocket !== HermesWsClient.webSocket
+                    socket !== HermesWsClient.webSocket
                 ) {
-                    Log.d(TAG, "Ignoring stale WebSocket message")
+                    Log.d(TAG, "Ignoring stale socket message")
                     return
                 }
             }
@@ -1500,7 +1635,7 @@ object HermesWsClient {
                 } catch (e: Exception) {
                     Log.e(
                         TAG,
-                        "Failed to parse WebSocket message (${e.javaClass.simpleName})",
+                        "Failed to parse socket message (${e.javaClass.simpleName})",
                     )
                     WsEvent.Unknown(text)
                 }
@@ -1531,9 +1666,9 @@ object HermesWsClient {
                 }
             synchronized(connectionLock) {
                 if (generation != connectionGeneration.get() ||
-                    webSocket !== HermesWsClient.webSocket
+                    socket !== HermesWsClient.webSocket
                 ) {
-                    Log.d(TAG, "Ignoring stale WebSocket message after parsing")
+                    Log.d(TAG, "Ignoring stale socket message after parsing")
                     return
                 }
                 lastPongTimestamp = monotonicTimeMs()
@@ -1623,34 +1758,34 @@ object HermesWsClient {
                         ),
                     )
                 if (!emitted && BuildConfig.DEBUG) {
-                    Log.w(TAG, "WebSocket message dropped due to buffer overflow")
+                    Log.w(TAG, "socket message dropped due to buffer overflow")
                 }
             }
             disconnectIfIdleInBackground()
         }
 
         override fun onClosing(
-            webSocket: WebSocket,
+            socket: WsSocket,
             code: Int,
             reason: String,
         ) {
-            Log.d(TAG, "WebSocket closing: $code")
-            webSocket.close(code, reason)
-            if (webSocket !== HermesWsClient.webSocket) {
-                Log.d(TAG, "Ignoring stale WebSocket onClosing callback")
+            Log.d(TAG, "socket closing: $code")
+            socket.close(code, reason)
+            if (socket !== HermesWsClient.webSocket) {
+                Log.d(TAG, "Ignoring stale socket onClosing callback")
             }
         }
 
         override fun onClosed(
-            webSocket: WebSocket,
+            socket: WsSocket,
             code: Int,
             reason: String,
         ) {
-            if (!detachTerminalSocket(webSocket, generation)) {
-                Log.d(TAG, "Ignoring stale WebSocket onClosed callback")
+            if (!detachTerminalSocket(socket, generation)) {
+                Log.d(TAG, "Ignoring stale socket onClosed callback")
                 return
             }
-            Log.i(TAG, "WebSocket closed: $code")
+            Log.i(TAG, "socket closed: $code")
             if (code == 4001 || code == 4401 ||
                 reason.contains("unauthorized", ignoreCase = true) ||
                 reason.startsWith("auth:", ignoreCase = true)
@@ -1666,19 +1801,19 @@ object HermesWsClient {
         }
 
         override fun onFailure(
-            webSocket: WebSocket,
-            t: Throwable,
-            response: Response?,
+            socket: WsSocket,
+            cause: Throwable,
+            statusCode: Int?,
         ) {
-            if (!detachTerminalSocket(webSocket, generation)) {
-                Log.d(TAG, "Ignoring stale WebSocket onFailure callback")
+            if (!detachTerminalSocket(socket, generation)) {
+                Log.d(TAG, "Ignoring stale socket onFailure callback")
                 return
             }
-            Log.e(TAG, "WebSocket failure (${t.javaClass.simpleName})")
-            val code = response?.code ?: 0
-            if (code == 401 || t.message?.contains(
+            Log.e(TAG, "socket failure (${cause.javaClass.simpleName})")
+            val code = statusCode ?: 0
+            if (code == 401 || cause.message?.contains(
                     "401",
-                ) == true || t.message?.contains("unauthorized", ignoreCase = true) == true
+                ) == true || cause.message?.contains("unauthorized", ignoreCase = true) == true
             ) {
                 handleAuthenticationRejected(generation)
             } else {

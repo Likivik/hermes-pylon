@@ -22,6 +22,7 @@ import com.m57.hermescontrol.data.security.SecretStore
 import com.m57.hermescontrol.data.security.SecureStorage
 import com.m57.hermescontrol.data.theme.ThemePreference
 import com.m57.hermescontrol.data.theme.ThemePreset
+import com.m57.hermescontrol.data.ws.WsAuthConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -36,7 +37,7 @@ import kotlinx.coroutines.launch
  *
  * Must call [init] with a Context before any other method.
  */
-object AuthManager {
+object AuthManager : WsAuthConfig {
     val chatFontScaleStops = listOf(0.85f, 1.0f, 1.15f, 1.3f, 1.5f)
     const val DEFAULT_PROFILE_ID = "default"
     const val DEFAULT_PROFILE_NAME = "Default"
@@ -178,7 +179,7 @@ object AuthManager {
     }
 
     /** True when the selected profile uses dashboard cookie authentication. */
-    fun isGatedMode(): Boolean = getWsAuthParam() == "ticket"
+    override fun isGatedMode(): Boolean = getWsAuthParam() == "ticket"
 
     // ── Session Cookie (for gated/dashboard REST API) ────────────────────
 
@@ -391,7 +392,7 @@ object AuthManager {
         }
     }
 
-    fun getSelectedProfileId(): String? {
+    override fun getSelectedProfileId(): String? {
         val id = serverStore.getLatestState().selectedProfileId
         return if (id.isNullOrBlank()) null else id
     }
@@ -577,7 +578,7 @@ object AuthManager {
             CleartextPolicy.ALLOW_WITH_WARNING,
         )
 
-    fun endpointForBuild(): ServerEndpoint = ServerEndpoint.parseForBuild(getBaseUrl())
+    override fun endpointForBuild(): ServerEndpoint = ServerEndpoint.parseForBuild(getBaseUrl())
 
     fun setBaseUrl(baseUrl: String) {
         val normalized =
@@ -633,7 +634,7 @@ object AuthManager {
 
     // ── Auto-reconnect ───────────────────────────────────────────────────
 
-    fun isAutoReconnect(): Boolean = serverStore.getLatestState().autoReconnect
+    override fun isAutoReconnect(): Boolean = serverStore.getLatestState().autoReconnect
 
     fun setAutoReconnect(enabled: Boolean) {
         serverStore.update { it.copy(autoReconnect = enabled) }
@@ -676,14 +677,14 @@ object AuthManager {
     fun baseUrl(): String = endpointForBuild().baseUrl.toString()
 
     /** Canonical WebSocket URL with an encoded token or short-lived ticket. */
-    fun wsUrl(): String {
+    override fun wsUrl(): String {
         return wsUrlWithCredential(getToken().orEmpty(), getWsAuthParam())
     }
 
     /** Build a WebSocket URL with a handshake-local credential. */
-    fun wsUrlWithCredential(
+    override fun wsUrlWithCredential(
         credential: String,
-        authParameter: String = "ticket",
+        authParameter: String,
     ): String {
         return endpointForBuild().webSocketUrl(
             authParameter = authParameter,

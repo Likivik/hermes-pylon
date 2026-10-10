@@ -7,9 +7,16 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-object NetworkMonitor {
+/**
+ * Android [NetworkMonitor]: reachability from [ConnectivityManager].
+ *
+ * `:shared` owns the [NetworkMonitor] seam because it cannot name a platform
+ * type; this object holds the only Android-specific part.
+ */
+object AndroidNetworkMonitor : NetworkMonitor {
     private val _isConnected = MutableStateFlow(true) // optimistic default
-    val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
+
+    override val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
 
     fun init(context: Context) {
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
