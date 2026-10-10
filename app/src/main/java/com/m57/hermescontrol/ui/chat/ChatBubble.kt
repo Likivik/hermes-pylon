@@ -90,6 +90,7 @@ import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.theme.onColorFor
 import com.m57.hermescontrol.ui.chat.components.DiffViewCard
+import com.m57.hermescontrol.ui.chat.components.GifImageThumbnail
 import com.m57.hermescontrol.ui.chat.components.ReasoningCard
 import com.m57.hermescontrol.ui.chat.components.SystemTimelineMarker
 import com.m57.hermescontrol.util.BidiUtils
@@ -2605,7 +2606,7 @@ private fun InlineAttachment(
     val clickable = Modifier.clickable { onOpen(attachment) }
     if (attachment.isImage) {
         // Image / GIF attachment — show thumbnail with GIF badge & tap-to-play animation.
-        com.m57.hermescontrol.ui.chat.components.GifImageThumbnail(
+        GifImageThumbnail(
             model = attachment.uri,
             gatewayPath = attachment.gatewayPath,
             contentDescription = attachment.name,

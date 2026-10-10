@@ -42,6 +42,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.ProcessInfo
+import com.m57.hermescontrol.theme.HermesStatusColors
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.ui.common.EmptyState
 import com.m57.hermescontrol.ui.common.ErrorState
@@ -261,5 +262,5 @@ private fun formatUptime(seconds: Int): String {
 private fun ProcessInfo.statusIcon(): ImageVector = if (isRunning) Icons.Filled.PlayArrow else Icons.Filled.Memory
 
 @Composable
-private fun ProcessInfo.statusColor(statusColors: com.m57.hermescontrol.theme.HermesStatusColors): Color =
+private fun ProcessInfo.statusColor(statusColors: HermesStatusColors): Color =
     if (isRunning) statusColors.success else statusColors.info

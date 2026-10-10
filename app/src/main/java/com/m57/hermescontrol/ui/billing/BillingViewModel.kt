@@ -3,6 +3,7 @@ package com.m57.hermescontrol.ui.billing
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.m57.hermescontrol.data.model.SubscriptionChangeRequest
+import com.m57.hermescontrol.data.model.SubscriptionPreviewResponse
 import com.m57.hermescontrol.data.model.SubscriptionStateResponse
 import com.m57.hermescontrol.data.model.UsageBarsResponse
 import com.m57.hermescontrol.data.ws.BillingRepository
@@ -30,7 +31,7 @@ data class BillingUiState(
     val isActionInFlight: Boolean = false,
     val subscription: SubscriptionStateResponse? = null,
     val usage: UsageBarsResponse? = null,
-    val preview: com.m57.hermescontrol.data.model.SubscriptionPreviewResponse? = null,
+    val preview: SubscriptionPreviewResponse? = null,
     /** Set when an RPC method is unavailable on the connected backend (e.g. -32601). */
     val featureUnavailable: Boolean = false,
     val errorMessage: String? = null,

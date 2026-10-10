@@ -74,6 +74,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.m57.hermescontrol.R
+import com.m57.hermescontrol.theme.HermesStatusColors
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.theme.LocalSpacing
 import com.m57.hermescontrol.theme.Spacing
@@ -327,8 +328,8 @@ fun SystemScreen(
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 private fun LazyListScope.hostSection(
     state: SystemUiState,
-    spacing: com.m57.hermescontrol.theme.Spacing,
-    statusColors: com.m57.hermescontrol.theme.HermesStatusColors,
+    spacing: Spacing,
+    statusColors: HermesStatusColors,
     viewModel: SystemViewModel,
 ) {
     state.stats?.let { stats ->
@@ -525,7 +526,7 @@ private fun LazyListScope.hostSection(
 
 private fun LazyListScope.portalSection(
     state: SystemUiState,
-    spacing: com.m57.hermescontrol.theme.Spacing,
+    spacing: Spacing,
     uriHandler: androidx.compose.ui.platform.UriHandler,
 ) {
     state.portal?.let { portal ->
@@ -609,8 +610,8 @@ private fun LazyListScope.portalSection(
 
 private fun LazyListScope.curatorSection(
     state: SystemUiState,
-    spacing: com.m57.hermescontrol.theme.Spacing,
-    statusColors: com.m57.hermescontrol.theme.HermesStatusColors,
+    spacing: Spacing,
+    statusColors: HermesStatusColors,
     viewModel: SystemViewModel,
 ) {
     state.curator?.let { curator ->
@@ -716,8 +717,8 @@ private fun LazyListScope.curatorSection(
 
 private fun LazyListScope.selfImprovementSection(
     state: SystemUiState,
-    spacing: com.m57.hermescontrol.theme.Spacing,
-    statusColors: com.m57.hermescontrol.theme.HermesStatusColors,
+    spacing: Spacing,
+    statusColors: HermesStatusColors,
 ) {
     val graph = state.learningGraph
     item {
@@ -832,8 +833,8 @@ private fun LazyListScope.selfImprovementSection(
 
 private fun LazyListScope.gatewaySection(
     state: SystemUiState,
-    spacing: com.m57.hermescontrol.theme.Spacing,
-    statusColors: com.m57.hermescontrol.theme.HermesStatusColors,
+    spacing: Spacing,
+    statusColors: HermesStatusColors,
     viewModel: SystemViewModel,
 ) {
     state.status?.let { status ->
@@ -984,7 +985,7 @@ private fun LazyListScope.gatewaySection(
 
 private fun LazyListScope.memorySection(
     state: SystemUiState,
-    spacing: com.m57.hermescontrol.theme.Spacing,
+    spacing: Spacing,
     resetTarget: String?,
     onResetRequest: (String) -> Unit,
     viewModel: SystemViewModel,
@@ -1078,7 +1079,7 @@ private fun LazyListScope.memorySection(
 
 private fun LazyListScope.credentialsSection(
     state: SystemUiState,
-    spacing: com.m57.hermescontrol.theme.Spacing,
+    spacing: Spacing,
     viewModel: SystemViewModel,
     credToRemove: Pair<String, Int>?,
     onRemoveRequest: (Pair<String, Int>) -> Unit,
@@ -1198,7 +1199,7 @@ private fun LazyListScope.credentialsSection(
 
 private fun LazyListScope.operationsSection(
     state: SystemUiState,
-    spacing: com.m57.hermescontrol.theme.Spacing,
+    spacing: Spacing,
     viewModel: SystemViewModel,
     importConfirm: Boolean,
     onImportConfirm: (Boolean) -> Unit,
@@ -1489,7 +1490,7 @@ private fun LazyListScope.operationsSection(
 
 private fun LazyListScope.checkpointsSection(
     state: SystemUiState,
-    spacing: com.m57.hermescontrol.theme.Spacing,
+    spacing: Spacing,
     pruneConfirm: Boolean,
     onPruneConfirm: (Boolean) -> Unit,
 ) {
@@ -1541,7 +1542,7 @@ private fun LazyListScope.checkpointsSection(
 
 private fun LazyListScope.shellHooksSection(
     state: SystemUiState,
-    spacing: com.m57.hermescontrol.theme.Spacing,
+    spacing: Spacing,
     viewModel: SystemViewModel,
 ) {
     val hooks = state.hooks?.hooks ?: emptyList()
@@ -1659,7 +1660,7 @@ private fun LazyListScope.shellHooksSection(
 
 private fun LazyListScope.actionLogSection(
     state: SystemUiState,
-    spacing: com.m57.hermescontrol.theme.Spacing,
+    spacing: Spacing,
     viewModel: SystemViewModel,
 ) {
     item {
@@ -1770,7 +1771,7 @@ private fun LazyListScope.actionLogSection(
 @Composable
 private fun UpdateReceiptSummary(
     receipt: UpdateReceiptDisplay,
-    spacing: com.m57.hermescontrol.theme.Spacing,
+    spacing: Spacing,
 ) {
     val outcome =
         receipt.outcome?.let {

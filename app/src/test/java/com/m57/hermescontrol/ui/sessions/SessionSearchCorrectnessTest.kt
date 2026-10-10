@@ -7,6 +7,7 @@ import com.m57.hermescontrol.data.model.SessionLatestDescendantResponse
 import com.m57.hermescontrol.data.model.SessionListResponse
 import com.m57.hermescontrol.data.model.SessionSearchResponse
 import com.m57.hermescontrol.data.model.SessionSearchResult
+import com.m57.hermescontrol.data.model.SessionStatsResponse
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.GatewayResponse
 import com.m57.hermescontrol.data.remote.HermesGatewayApi
@@ -45,7 +46,7 @@ class SessionSearchCorrectnessTest {
         coEvery { api.getSessions(any(), any(), any(), any(), any()) } returns
             GatewayResponse.success(SessionListResponse(emptyList()))
         coEvery { api.getSessionStats() } returns
-            GatewayResponse.success(com.m57.hermescontrol.data.model.SessionStatsResponse())
+            GatewayResponse.success(SessionStatsResponse())
         coEvery { api.getSessionLatestDescendant(any()) } returns GatewayResponse.error(404, "missing")
         coEvery { api.getSession(any()) } returns GatewayResponse.error(404, "missing")
     }

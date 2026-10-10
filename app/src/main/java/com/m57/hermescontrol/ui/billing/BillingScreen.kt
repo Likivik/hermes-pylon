@@ -31,6 +31,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.SubscriptionCurrent
 import com.m57.hermescontrol.data.model.SubscriptionStateResponse
+import com.m57.hermescontrol.data.model.UsageBar
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.ErrorState
 import com.m57.hermescontrol.ui.common.HermesScaffold
@@ -253,7 +254,7 @@ private fun NoActivePlanCard(subscription: SubscriptionStateResponse) {
 @Composable
 private fun UsageBarRow(
     label: String,
-    bar: com.m57.hermescontrol.data.model.UsageBar,
+    bar: UsageBar,
 ) {
     val fraction = (bar.fill_fraction ?: 0.0).toFloat().coerceIn(0f, 1f)
     val summary = bar.remaining_display ?: bar.total_display ?: ""

@@ -6,6 +6,7 @@ import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.model.BulkDeleteRequest
 import com.m57.hermescontrol.data.model.PruneRequest
 import com.m57.hermescontrol.data.model.SessionInfo
+import com.m57.hermescontrol.data.model.SessionListResponse
 import com.m57.hermescontrol.data.model.SessionLiveStatus
 import com.m57.hermescontrol.data.model.SessionRenameRequest
 import com.m57.hermescontrol.data.model.SessionSearchResult
@@ -85,7 +86,7 @@ data class SessionsUiState(
     val isSearchMode: Boolean get() = searchQuery.isNotBlank()
 }
 
-private fun com.m57.hermescontrol.data.model.SessionListResponse.nextOffset(requestOffset: Int): Int =
+private fun SessionListResponse.nextOffset(requestOffset: Int): Int =
     if (limit > 0) offset + limit else requestOffset + sessions.size
 
 class SessionsViewModel(

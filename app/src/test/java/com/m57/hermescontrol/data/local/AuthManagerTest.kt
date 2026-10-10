@@ -7,7 +7,9 @@ import android.content.SharedPreferences
 import com.m57.hermescontrol.data.config.ConnectionProfile
 import com.m57.hermescontrol.data.remote.CookieManager
 import com.m57.hermescontrol.data.remote.GatewayFileClient
+import com.m57.hermescontrol.data.remote.MediaCacheScope
 import com.m57.hermescontrol.data.security.SecretStore
+import com.m57.hermescontrol.data.security.SecureBlobException
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
@@ -189,14 +191,14 @@ class AuthManagerTest {
         assertTrue(passwords.all { it.size == 32 && it.contentEquals(passwords.first()) })
     }
 
-    @Test(expected = com.m57.hermescontrol.data.security.SecureBlobException::class)
+    @Test(expected = SecureBlobException::class)
     fun databasePasswordRejectsMalformedBase64() {
         every { mockPrefs.getString("db_password", null) } returns "%%%"
 
         AuthManager.getDatabasePassword()
     }
 
-    @Test(expected = com.m57.hermescontrol.data.security.SecureBlobException::class)
+    @Test(expected = SecureBlobException::class)
     fun databasePasswordRejectsWrongDecodedLength() {
         every { mockPrefs.getString("db_password", null) } returns
             java.util.Base64.getEncoder().withoutPadding().encodeToString(ByteArray(16))
@@ -511,7 +513,7 @@ class AuthManagerTest {
         val transition = Thread { AuthManager.setSelectedProfileId("prof-b") }.apply { start() }
         try {
             assertTrue(tokenReadStarted.await(5, TimeUnit.SECONDS))
-            var captured: com.m57.hermescontrol.data.remote.MediaCacheScope? = null
+            var captured: MediaCacheScope? = null
             val snapshotFinished = CountDownLatch(1)
             Thread {
                 captured = GatewayFileClient.currentContext().scope
@@ -759,7 +761,7 @@ class AuthManagerTest {
 
         val mutation = Thread(mutate).apply { start() }
         val switch = Thread { AuthManager.setSelectedProfileId("prof-b") }
-        var captured: com.m57.hermescontrol.data.remote.MediaCacheScope? = null
+        var captured: MediaCacheScope? = null
         val snapshotFinished = CountDownLatch(1)
         try {
             assertTrue(writeStarted.await(5, TimeUnit.SECONDS))

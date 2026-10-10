@@ -4514,7 +4514,7 @@ class ChatViewModel(
 
             try {
                 val loginClient =
-                    com.m57.hermescontrol.data.remote.OkHttpProvider.probe
+                    OkHttpProvider.probe
                         .newBuilder()
                         .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
                         .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)

@@ -2,7 +2,10 @@ package com.m57.hermescontrol.ui.sessions
 
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.model.SessionInfo
+import com.m57.hermescontrol.data.model.SessionLatestDescendantResponse
 import com.m57.hermescontrol.data.model.SessionListResponse
+import com.m57.hermescontrol.data.model.SessionSearchResponse
+import com.m57.hermescontrol.data.model.SessionSearchResult
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.GatewayResponse
 import com.m57.hermescontrol.data.remote.HermesGatewayApi
@@ -114,7 +117,7 @@ class SessionsViewModelTest {
                 ),
             )
         coEvery { mockApi.getSessionLatestDescendant("lineage-pinned") } returns
-            GatewayResponse.success(com.m57.hermescontrol.data.model.SessionLatestDescendantResponse("pinned-child"))
+            GatewayResponse.success(SessionLatestDescendantResponse("pinned-child"))
         coEvery { mockApi.getSession("pinned-child") } returns GatewayResponse.success(SessionInfo("pinned-child"))
         coEvery { mockApi.getSessions(50, 2, "recent", null, "cron") } returns
             GatewayResponse.success(
@@ -251,7 +254,7 @@ class SessionsViewModelTest {
             )
         coEvery { mockApi.getSessionLatestDescendant("lineage-pinned") } returns
             GatewayResponse.success(
-                com.m57.hermescontrol.data.model.SessionLatestDescendantResponse("cron_job-b_20260905_120000"),
+                SessionLatestDescendantResponse("cron_job-b_20260905_120000"),
             )
         coEvery { mockApi.getSession("cron_job-b_20260905_120000") } returns
             GatewayResponse.success(SessionInfo("cron_job-b_20260905_120000", source = "cron"))
@@ -326,11 +329,11 @@ class SessionsViewModelTest {
                 ),
             )
         coEvery { mockApi.getSessionLatestDescendant("chat-pin") } returns
-            GatewayResponse.success(com.m57.hermescontrol.data.model.SessionLatestDescendantResponse("chat-pin"))
+            GatewayResponse.success(SessionLatestDescendantResponse("chat-pin"))
         coEvery { mockApi.getSession("chat-pin") } returns GatewayResponse.success(SessionInfo("chat-pin"))
         coEvery { mockApi.getSessionLatestDescendant("cron-pin") } returns
             GatewayResponse.success(
-                com.m57.hermescontrol.data.model.SessionLatestDescendantResponse("cron_job_20260904_100000"),
+                SessionLatestDescendantResponse("cron_job_20260904_100000"),
             )
         coEvery { mockApi.getSession("cron_job_20260904_100000") } returns
             GatewayResponse.success(SessionInfo("cron_job_20260904_100000", source = "cron"))
@@ -356,15 +359,15 @@ class SessionsViewModelTest {
         val vm = createViewModel()
         coEvery { mockApi.searchSessions("deploy", null, null, "cron") } returns
             GatewayResponse.success(
-                com.m57.hermescontrol.data.model.SessionSearchResponse(
-                    listOf(com.m57.hermescontrol.data.model.SessionSearchResult(session_id = "chat-hit")),
+                SessionSearchResponse(
+                    listOf(SessionSearchResult(session_id = "chat-hit")),
                 ),
             )
         coEvery { mockApi.searchSessions("deploy", null, "cron", null) } returns
             GatewayResponse.success(
-                com.m57.hermescontrol.data.model.SessionSearchResponse(
+                SessionSearchResponse(
                     listOf(
-                        com.m57.hermescontrol.data.model.SessionSearchResult(
+                        SessionSearchResult(
                             session_id = "cron-hit",
                             source = "cron",
                         ),

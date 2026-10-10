@@ -8,6 +8,7 @@ import androidx.compose.ui.test.performClick
 import com.m57.hermescontrol.data.config.ConnectionProfile
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.remote.AuthPayloads
+import com.m57.hermescontrol.data.remote.CookieManager
 import com.m57.hermescontrol.data.remote.OkHttpProvider
 import com.m57.hermescontrol.data.ws.HermesWsClient
 import okhttp3.MediaType.Companion.toMediaType
@@ -154,8 +155,8 @@ object E2eHarness {
         // previous real-gateway test that switched the scope elsewhere would
         // leave the cookies stranded in that other scope and the ticket mint
         // would miss them.
-        com.m57.hermescontrol.data.remote.CookieManager.useStore(AuthManager.DEFAULT_PROFILE_ID)
-        com.m57.hermescontrol.data.remote.CookieManager.beginAuthentication()
+        CookieManager.useStore(AuthManager.DEFAULT_PROFILE_ID)
+        CookieManager.beginAuthentication()
 
         val passwordJson = AuthPayloads.passwordLogin(username = "admin", password = password)
         val loginMediaType = "application/json; charset=utf-8".toMediaType()

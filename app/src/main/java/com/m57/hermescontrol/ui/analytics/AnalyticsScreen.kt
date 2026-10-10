@@ -45,6 +45,10 @@ import com.m57.hermescontrol.NavigationController
 import com.m57.hermescontrol.R
 import com.m57.hermescontrol.SkillsScreen
 import com.m57.hermescontrol.data.model.AnalyticsDailyEntry
+import com.m57.hermescontrol.data.model.AnalyticsModelEntry
+import com.m57.hermescontrol.data.model.AnalyticsSkillEntry
+import com.m57.hermescontrol.data.model.AnalyticsToolUsage
+import com.m57.hermescontrol.data.model.AnalyticsTotals
 import com.m57.hermescontrol.data.model.ModelsAnalyticsModelEntry
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.theme.Spacing
@@ -304,7 +308,7 @@ private fun SectionTitle(text: String) {
 }
 
 @Composable
-private fun TotalsCard(totals: com.m57.hermescontrol.data.model.AnalyticsTotals) {
+private fun TotalsCard(totals: AnalyticsTotals) {
     val status = LocalHermesStatusColors.current
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -488,7 +492,7 @@ private fun ModelRow(model: ModelsAnalyticsModelEntry) {
 }
 
 @Composable
-private fun ModelEntryRow(entry: com.m57.hermescontrol.data.model.AnalyticsModelEntry) {
+private fun ModelEntryRow(entry: AnalyticsModelEntry) {
     val status = LocalHermesStatusColors.current
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -534,7 +538,7 @@ private fun ModelEntryRow(entry: com.m57.hermescontrol.data.model.AnalyticsModel
 }
 
 @Composable
-private fun SkillRow(skill: com.m57.hermescontrol.data.model.AnalyticsSkillEntry) {
+private fun SkillRow(skill: AnalyticsSkillEntry) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
@@ -571,7 +575,7 @@ private fun SkillRow(skill: com.m57.hermescontrol.data.model.AnalyticsSkillEntry
 }
 
 @Composable
-private fun ToolRow(tool: com.m57.hermescontrol.data.model.AnalyticsToolUsage) {
+private fun ToolRow(tool: AnalyticsToolUsage) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,

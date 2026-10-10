@@ -52,6 +52,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.CronJob
+import com.m57.hermescontrol.data.model.CronJobFireError
 import com.m57.hermescontrol.theme.LocalSpacing
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.EmptyState
@@ -628,8 +629,7 @@ private fun CronJob.hasSecondaryBadges(): Boolean =
         context_from?.contains("self") == true ||
         last_fire_error.hasContent()
 
-private fun com.m57.hermescontrol.data.model.CronJobFireError?.hasContent(): Boolean =
-    !this?.detail.isNullOrBlank() || !this?.at.isNullOrBlank()
+private fun CronJobFireError?.hasContent(): Boolean = !this?.detail.isNullOrBlank() || !this?.at.isNullOrBlank()
 
 @Composable
 private fun MonitorModeSection(

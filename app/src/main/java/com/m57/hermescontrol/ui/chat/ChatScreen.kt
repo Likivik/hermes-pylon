@@ -83,11 +83,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.m57.hermescontrol.HistoryScreen
 import com.m57.hermescontrol.NavigationController
+import com.m57.hermescontrol.ProvidersScreen
 import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.Attachment
 import com.m57.hermescontrol.data.model.capabilitiesFor
 import com.m57.hermescontrol.data.ws.ConnectionStatus
 import com.m57.hermescontrol.data.ws.HermesWsClient
+import com.m57.hermescontrol.theme.HermesPurple
+import com.m57.hermescontrol.theme.HermesPurpleLight
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.chat.components.ChatConnectionBanner
@@ -617,9 +620,9 @@ fun ChatScreen(
                         .background(
                             androidx.compose.ui.graphics.Brush.horizontalGradient(
                                 listOf(
-                                    com.m57.hermescontrol.theme.HermesPurple,
-                                    com.m57.hermescontrol.theme.HermesPurpleLight,
-                                    com.m57.hermescontrol.theme.HermesPurple,
+                                    HermesPurple,
+                                    HermesPurpleLight,
+                                    HermesPurple,
                                 ),
                             ),
                         ),
@@ -633,7 +636,7 @@ fun ChatScreen(
                 visibleCredentialWarning?.let { warning ->
                     CredentialWarningBanner(
                         warning = warning,
-                        onFix = { NavigationController.navigateTo(com.m57.hermescontrol.ProvidersScreen) },
+                        onFix = { NavigationController.navigateTo(ProvidersScreen) },
                         onDismiss = { HermesWsClient.clearCredentialWarning() },
                     )
                 }

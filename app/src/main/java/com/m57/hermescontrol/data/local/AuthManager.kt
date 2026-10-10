@@ -19,6 +19,7 @@ import com.m57.hermescontrol.data.remote.CookieManager
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.data.remote.parseForBuild
 import com.m57.hermescontrol.data.security.SecretStore
+import com.m57.hermescontrol.data.security.SecureBlobException
 import com.m57.hermescontrol.data.security.SecureStorage
 import com.m57.hermescontrol.data.theme.ThemePreference
 import com.m57.hermescontrol.data.theme.ThemePreset
@@ -221,10 +222,10 @@ object AuthManager {
                 try {
                     android.util.Base64.decode(dbPasswordBase64, android.util.Base64.NO_WRAP)
                 } catch (error: IllegalArgumentException) {
-                    throw com.m57.hermescontrol.data.security.SecureBlobException(error)
+                    throw SecureBlobException(error)
                 }
             if (decoded.size != DATABASE_PASSWORD_BYTES) {
-                throw com.m57.hermescontrol.data.security.SecureBlobException()
+                throw SecureBlobException()
             }
             decoded
         }

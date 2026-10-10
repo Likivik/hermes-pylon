@@ -5,6 +5,7 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKeys
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.m57.hermescontrol.data.remote.EncryptedCookieStore
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -307,7 +308,7 @@ class SecureStorageInstrumentedTest {
         val storage = SecureStorage(context)
         storage.putString(SecureStorage.authKey("session_cookie"), "legacy-cookie")
         storage.putString(SecureStorage.cookieKey("cookies::profile-a"), "[]")
-        val store = com.m57.hermescontrol.data.remote.EncryptedCookieStore(context)
+        val store = EncryptedCookieStore(context)
 
         kotlinx.coroutines.runBlocking {
             assertTrue(store.load("profile-a").isEmpty())
@@ -319,7 +320,7 @@ class SecureStorageInstrumentedTest {
     fun clearingCookiesSuppressesLegacyCookieFallback() {
         val storage = SecureStorage(context)
         storage.putString(SecureStorage.authKey("session_cookie"), "legacy-cookie")
-        val store = com.m57.hermescontrol.data.remote.EncryptedCookieStore(context)
+        val store = EncryptedCookieStore(context)
 
         kotlinx.coroutines.runBlocking {
             store.clearAll()
@@ -334,7 +335,7 @@ class SecureStorageInstrumentedTest {
         storage.putString(SecureStorage.cookieKey("cookies::profile-a"), "not-json")
 
         kotlinx.coroutines.runBlocking {
-            com.m57.hermescontrol.data.remote.EncryptedCookieStore(context).load("profile-a")
+            EncryptedCookieStore(context).load("profile-a")
         }
     }
 

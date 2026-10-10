@@ -63,6 +63,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.ManagedFileEntry
+import com.m57.hermescontrol.data.remote.NetworkError
+import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.readBytesLimited
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.EmptyState
@@ -537,7 +539,7 @@ private fun openManagedFile(
 ) {
     viewModel.downloadFile(entry, File(context.cacheDir, "gateway_media")) { result ->
         when (result) {
-            is com.m57.hermescontrol.data.remote.NetworkResult.Success -> {
+            is NetworkResult.Success -> {
                 val data = result.data
                 if (launchDownloadedFile != null) {
                     launchDownloadedFile(data)
@@ -579,13 +581,13 @@ private fun openManagedFile(
                 }
             }
 
-            is com.m57.hermescontrol.data.remote.NetworkResult.Failure -> {
+            is NetworkResult.Failure -> {
                 val message =
                     when (val error = result.error) {
-                        is com.m57.hermescontrol.data.remote.NetworkError.AuthExpired ->
+                        is NetworkError.AuthExpired ->
                             FilesUiText(R.string.files_error_session_expired)
 
-                        is com.m57.hermescontrol.data.remote.NetworkError.Http ->
+                        is NetworkError.Http ->
                             when (error.code) {
                                 403 -> FilesUiText(R.string.files_error_access_forbidden)
                                 404 -> FilesUiText(R.string.files_error_not_found)

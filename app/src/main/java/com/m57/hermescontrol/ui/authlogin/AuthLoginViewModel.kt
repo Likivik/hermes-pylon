@@ -13,6 +13,10 @@ import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.local.AuthSessionState
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.AuthPayloads
+import com.m57.hermescontrol.data.remote.CookieManager
+import com.m57.hermescontrol.data.remote.NetworkError
+import com.m57.hermescontrol.data.remote.NetworkResult
+import com.m57.hermescontrol.data.remote.OkHttpProvider
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.data.remote.parseForBuild
 import com.m57.hermescontrol.data.remote.resolve
@@ -105,7 +109,7 @@ class AuthLoginViewModel(
     }
 
     private val probeClient: OkHttpClient =
-        com.m57.hermescontrol.data.remote.OkHttpProvider.probe
+        OkHttpProvider.probe
 
     fun onBaseUrlChange(value: String) {
         val warning =
@@ -376,14 +380,14 @@ class AuthLoginViewModel(
         val result = safeApiCall(reportAuthExpiry = false) { tempApi.getSessions() }
 
         return when (result) {
-            is com.m57.hermescontrol.data.remote.NetworkResult.Success -> {
+            is NetworkResult.Success -> {
                 token
             }
 
-            is com.m57.hermescontrol.data.remote.NetworkResult.Failure -> {
+            is NetworkResult.Failure -> {
                 val msg =
                     when (val err = result.error) {
-                        is com.m57.hermescontrol.data.remote.NetworkError.Http -> {
+                        is NetworkError.Http -> {
                             when (err.code) {
                                 401 -> app.getString(R.string.connect_error_401)
                                 403 -> app.getString(R.string.connect_error_403)
@@ -391,15 +395,15 @@ class AuthLoginViewModel(
                             }
                         }
 
-                        is com.m57.hermescontrol.data.remote.NetworkError.AuthExpired -> {
+                        is NetworkError.AuthExpired -> {
                             app.getString(R.string.connect_error_401)
                         }
 
-                        is com.m57.hermescontrol.data.remote.NetworkError.Connection -> {
+                        is NetworkError.Connection -> {
                             app.getString(R.string.connect_error_connection_failed, err.cause.message ?: "")
                         }
 
-                        is com.m57.hermescontrol.data.remote.NetworkError.Unknown -> {
+                        is NetworkError.Unknown -> {
                             app.getString(R.string.connect_error_connection_failed, err.cause.message ?: "")
                         }
                     }
@@ -437,7 +441,7 @@ class AuthLoginViewModel(
         try {
             // Step 1: Authenticate via the password login endpoint to get a session cookie
             val loginClient =
-                com.m57.hermescontrol.data.remote.OkHttpProvider.probe
+                OkHttpProvider.probe
                     .newBuilder()
                     .connectTimeout(10, TimeUnit.SECONDS)
                     .readTimeout(10, TimeUnit.SECONDS)
@@ -450,7 +454,7 @@ class AuthLoginViewModel(
                     .header("Content-Type", "application/json")
                     .post(jsonBody.toRequestBody(jsonMediaType))
                     .build()
-            com.m57.hermescontrol.data.remote.CookieManager.beginAuthentication()
+            CookieManager.beginAuthentication()
             loginClient.newCall(loginReq).execute().use { loginResp ->
                 if (!loginResp.isSuccessful) {
                     val msg =

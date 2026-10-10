@@ -3,6 +3,8 @@ package com.m57.hermescontrol.ui.analytics
 import android.content.Context
 import com.m57.hermescontrol.data.local.AnalyticsCacheStore
 import com.m57.hermescontrol.data.local.AuthManager
+import com.m57.hermescontrol.data.model.AnalyticsResponse
+import com.m57.hermescontrol.data.model.ModelsAnalyticsResponse
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
@@ -37,11 +39,11 @@ object AnalyticsPreloader {
                 // Skip windows already cached on disk — don't refetch what we have.
                 if (store.load(days, null) != null) continue
                 val usage =
-                    safeApiCall<com.m57.hermescontrol.data.model.AnalyticsResponse> {
+                    safeApiCall<AnalyticsResponse> {
                         ApiClient.hermesApi.getAnalytics(days, null)
                     }
                 val models =
-                    safeApiCall<com.m57.hermescontrol.data.model.ModelsAnalyticsResponse> {
+                    safeApiCall<ModelsAnalyticsResponse> {
                         ApiClient.hermesApi.getModelsAnalytics(days, null)
                     }
                 val usageData = (usage as? NetworkResult.Success)?.data ?: continue

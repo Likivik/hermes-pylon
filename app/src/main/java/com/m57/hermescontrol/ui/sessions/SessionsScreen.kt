@@ -1180,7 +1180,7 @@ internal fun isSessionActive(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SessionCard(
-    session: com.m57.hermescontrol.data.model.SessionInfo,
+    session: SessionInfo,
     liveStatus: SessionLiveStatus?,
     liveStatusesAuthoritative: Boolean,
     displayTitle: String,
@@ -1375,7 +1375,7 @@ private fun LiveStatusBadge(status: SessionLiveStatus) {
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 private fun SearchResultCard(
-    session: com.m57.hermescontrol.data.model.SessionInfo,
+    session: SessionInfo,
     liveStatus: SessionLiveStatus?,
     query: String,
     isSelecting: Boolean,

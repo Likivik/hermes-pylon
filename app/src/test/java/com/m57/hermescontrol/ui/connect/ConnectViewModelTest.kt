@@ -4,6 +4,7 @@ import android.app.Application
 import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.config.ConnectionProfile
 import com.m57.hermescontrol.data.local.AuthManager
+import com.m57.hermescontrol.data.model.MemoryPressureStatus
 import com.m57.hermescontrol.data.model.StatusResponse
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.CleartextPolicy
@@ -124,7 +125,7 @@ class ConnectViewModelTest {
             coEvery { mockApiService.getStatus() } returns
                 GatewayResponse.success(
                     StatusResponse(
-                        memory = com.m57.hermescontrol.data.model.MemoryPressureStatus("critical"),
+                        memory = MemoryPressureStatus("critical"),
                     ),
                 )
             viewModel.connect()
@@ -169,7 +170,7 @@ class ConnectViewModelTest {
             firstResult.complete(
                 GatewayResponse.success(
                     StatusResponse(
-                        memory = com.m57.hermescontrol.data.model.MemoryPressureStatus("critical"),
+                        memory = MemoryPressureStatus("critical"),
                     ),
                 ),
             )
@@ -191,7 +192,7 @@ class ConnectViewModelTest {
             response.complete(
                 GatewayResponse.success(
                     StatusResponse(
-                        memory = com.m57.hermescontrol.data.model.MemoryPressureStatus("critical"),
+                        memory = MemoryPressureStatus("critical"),
                     ),
                 ),
             )

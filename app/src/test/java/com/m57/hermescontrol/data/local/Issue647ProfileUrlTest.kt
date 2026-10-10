@@ -6,6 +6,7 @@ import com.m57.hermescontrol.data.config.ConnectionProfile
 import com.m57.hermescontrol.data.config.ServerStoreState
 import com.m57.hermescontrol.data.config.resolveBaseUrl
 import com.m57.hermescontrol.data.config.resolvedBaseUrl
+import com.m57.hermescontrol.data.remote.CookieManager
 import com.m57.hermescontrol.data.security.SecretStore
 import io.mockk.every
 import io.mockk.mockk
@@ -87,8 +88,8 @@ class Issue647ProfileUrlTest {
                 }
             }
         AuthManager.secureStorageFactory = { testSecretStore }
-        com.m57.hermescontrol.data.remote.CookieManager.resetForTest()
-        com.m57.hermescontrol.data.remote.CookieManager.secureStorageFactory = { testSecretStore }
+        CookieManager.resetForTest()
+        CookieManager.secureStorageFactory = { testSecretStore }
         AuthManager.init(testContext)
         AuthManager.serverStore.getLatestState()
     }

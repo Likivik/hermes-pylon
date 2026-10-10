@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import com.m57.hermescontrol.theme.HermesPurple
 import com.m57.hermescontrol.theme.Spacing
 import org.kodein.emoji.*
 import org.kodein.emoji.compose.NotoAnimatedEmoji
@@ -223,7 +224,7 @@ private fun RailBody(
                             )
                         }
                         .clip(RoundedCornerShape(2.dp))
-                        .background(com.m57.hermescontrol.theme.HermesPurple.copy(alpha = 0.45f)),
+                        .background(HermesPurple.copy(alpha = 0.45f)),
                 )
             }
         }
@@ -276,7 +277,7 @@ private fun ReorderableCollectionItemScope.RailItem(
                                 ) { androidx.compose.foundation.interaction.MutableInteractionSource() },
                             indication =
                                 androidx.compose.material3.ripple(
-                                    color = com.m57.hermescontrol.theme.HermesPurple,
+                                    color = HermesPurple,
                                 ),
                             onClick = { onEvent(RailEvent.Switch(id)) },
                             onLongClick = { menuOpen = true },
@@ -290,7 +291,7 @@ private fun ReorderableCollectionItemScope.RailItem(
                 Modifier
                     .width(4.dp)
                     .fillMaxHeight()
-                    .background(com.m57.hermescontrol.theme.HermesPurple),
+                    .background(HermesPurple),
             )
             // Soft outer glow ring around the active item's icon.
             Box(
@@ -299,8 +300,8 @@ private fun ReorderableCollectionItemScope.RailItem(
                     .background(
                         androidx.compose.ui.graphics.Brush.horizontalGradient(
                             listOf(
-                                com.m57.hermescontrol.theme.HermesPurple.copy(alpha = 0.14f),
-                                com.m57.hermescontrol.theme.HermesPurple.copy(alpha = 0.04f),
+                                HermesPurple.copy(alpha = 0.14f),
+                                HermesPurple.copy(alpha = 0.04f),
                                 Color.Transparent,
                             ),
                         ),
@@ -422,7 +423,7 @@ private fun ReorderableCollectionItemScope.RailItem(
                         .padding(horizontal = Spacing.xs),
                 color =
                     if (display.active) {
-                        com.m57.hermescontrol.theme.HermesPurple
+                        HermesPurple
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha)
                     },

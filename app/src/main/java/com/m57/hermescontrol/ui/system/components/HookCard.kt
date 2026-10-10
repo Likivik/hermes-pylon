@@ -34,7 +34,7 @@ import com.m57.hermescontrol.ui.common.StatusBadgeType
 @Composable
 internal fun HookCard(
     hook: HookEntry,
-    spacing: com.m57.hermescontrol.theme.Spacing,
+    spacing: Spacing,
     onDelete: () -> Unit,
 ) {
     Card(

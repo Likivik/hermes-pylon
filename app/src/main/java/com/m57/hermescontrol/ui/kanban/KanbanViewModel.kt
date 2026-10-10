@@ -2,6 +2,7 @@ package com.m57.hermescontrol.ui.kanban
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.m57.hermescontrol.data.model.CreateTaskBody
 import com.m57.hermescontrol.data.model.KanbanBoard
 import com.m57.hermescontrol.data.model.KanbanColumn
 import com.m57.hermescontrol.data.model.KanbanTask
@@ -147,7 +148,7 @@ class KanbanViewModel(
                         ApiClient.hermesApi.createKanbanTask(
                             board = board.id,
                             task =
-                                com.m57.hermescontrol.data.model.CreateTaskBody(
+                                CreateTaskBody(
                                     title = title,
                                     body = description,
                                 ),

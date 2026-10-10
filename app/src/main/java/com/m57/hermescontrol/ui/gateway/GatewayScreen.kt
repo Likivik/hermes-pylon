@@ -36,6 +36,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.local.AuthManager
+import com.m57.hermescontrol.data.model.StatusResponse
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.ErrorState
@@ -303,6 +304,6 @@ fun GatewayScreen(
 }
 
 @Composable
-internal fun GatewayPressureAdvisory(status: com.m57.hermescontrol.data.model.StatusResponse?) {
+internal fun GatewayPressureAdvisory(status: StatusResponse?) {
     status?.let { PressureBanner(memory = it.memory, disk = it.disk) }
 }

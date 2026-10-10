@@ -1,6 +1,7 @@
 package com.m57.hermescontrol.ui.chat
 
 import com.m57.hermescontrol.data.remote.OkHttpProvider
+import com.m57.hermescontrol.data.ws.ServerRequestBinding
 import com.m57.hermescontrol.data.ws.WsEvent
 import com.m57.hermescontrol.data.ws.toJsonElement
 import kotlinx.serialization.encodeToString
@@ -582,7 +583,7 @@ object ChatWsEventReducer {
                                     if (srvReqId != null && sessId != null &&
                                         srcProfId != null && connGen != null
                                     ) {
-                                        com.m57.hermescontrol.data.ws.ServerRequestBinding(
+                                        ServerRequestBinding(
                                             srvReqId,
                                             sessId,
                                             srcProfId,
