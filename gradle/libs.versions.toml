@@ -23,7 +23,6 @@ nav3Core = "1.0.1"
 lifecycleViewmodelNav3 = "2.10.0"
 leakcanary = "2.14"
 okhttp = "5.5.0"
-retrofit = "3.0.0"
 securityCrypto = "1.0.0"
 mockk = "1.14.11"
 turbine = "1.2.1"
@@ -81,8 +80,6 @@ androidx-lifecycle-viewmodel-navigation3 = { module = "androidx.lifecycle:lifecy
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 okhttp-mockwebserver = { module = "com.squareup.okhttp3:mockwebserver", version.ref = "okhttp" }
 okhttp-logging = { module = "com.squareup.okhttp3:logging-interceptor", version.ref = "okhttp" }
-retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofit" }
-retrofit-converter-kotlinx-serialization = { module = "com.squareup.retrofit2:converter-kotlinx-serialization", version.ref = "retrofit" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version = "1.11.0" }
 emoji-kt = { module = "org.kodein.emoji:emoji-kt", version = "2.5.0" }
 emoji-compose = { module = "org.kodein.emoji:emoji-compose-m3", version = "2.5.0" }
@@ -113,10 +110,23 @@ roborazzi-core = { module = "io.github.takahirom.roborazzi:roborazzi", version.r
 roborazzi-rule = { module = "io.github.takahirom.roborazzi:roborazzi-compose", version.ref = "roborazzi" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 
-# Ktor: multiplatform HTTP primitives (URL parsing, etc.). ktor-http is the
-# common artifact that exposes `io.ktor.http.Url`; the rest of Ktor is not
-# needed by :shared.
+# Ktor: multiplatform HTTP primitives and client.
+# ktor-http is the common artifact that exposes `io.ktor.http.Url`, used by
+# :shared for multiplatform URL parsing. The ktor-client-* family is the
+# multiplatform replacement for Retrofit/OkHttp being introduced in Phase 4.
 ktor-http = { module = "io.ktor:ktor-http", version.ref = "ktor" }
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
+ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
+ktor-client-logging = { module = "io.ktor:ktor-client-logging", version.ref = "ktor" }
+# Platform engines. The OkHttp engine can be driven by an externally-owned
+# OkHttpClient, which lets Phase 4 reuse the existing cookie jar, TLS pinning,
+# connection pool and 401 authenticator while Retrofit is still live.
+#   androidMain/jvmMain -> ktor-client-okhttp (shares OkHttpProvider's client)
+#   jvmMain (console)   -> ktor-client-cio    (no OkHttp dependency at all)
+ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
+ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
+ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "androidGradlePlugin" }

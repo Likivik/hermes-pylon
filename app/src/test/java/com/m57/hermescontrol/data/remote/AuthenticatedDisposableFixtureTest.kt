@@ -190,11 +190,11 @@ class AuthenticatedDisposableFixtureTest {
             assertEquals(
                 requests.map { "${it.method} ${it.path} cookie=${it.getHeader("Cookie")}" }.toString(),
                 200,
-                status.code(),
+                status.code,
             )
             assertEquals("fixture", status.body()?.version)
-            assertEquals(403, ApiClient.hermesApi.getConfig().code())
-            assertEquals(403, ApiClient.hermesApi.updateConfig(ConfigUpdateRequest(config = emptyMap())).code())
+            assertEquals(403, ApiClient.hermesApi.getConfig().code)
+            assertEquals(403, ApiClient.hermesApi.updateConfig(ConfigUpdateRequest(config = emptyMap())).code)
 
             // Config has no explicit scope argument on this service revision. Use the production
             // OkHttp gated client with a caller-built URL; do not rely on unfinished global interception.

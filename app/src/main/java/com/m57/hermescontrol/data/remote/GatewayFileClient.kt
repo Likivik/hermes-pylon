@@ -10,7 +10,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.ResponseBody
-import retrofit2.Response
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
@@ -80,6 +79,15 @@ object GatewayFileClient {
                     credential.takeUnless { gated },
                     cookieHeader.takeIf { gated },
                 ),
+                OkHttpGatewayRangeRequester(
+                    endpoint = endpoint,
+                    client =
+                        ApiClient.createMediaClient(
+                            gated = gated,
+                            token = credential.takeUnless { gated },
+                            cookieHeader = cookieHeader.takeIf { gated },
+                        ),
+                ),
                 ::currentScope,
             )
         }
@@ -118,12 +126,12 @@ object GatewayFileClient {
     /** Capture a range transport at the selected profile's current credential boundary. */
     internal fun openSeekable(path: String): SeekableGatewayMediaSession {
         val context = currentContext()
-        return SeekableGatewayMediaSession(path, context.service, context.scope, context.currentScope)
+        return SeekableGatewayMediaSession(path, context.rangeRequester, context.scope, context.currentScope)
     }
 
     internal suspend fun fetch(
         path: String,
-        service: HermesApiService,
+        service: HermesGatewayApi,
         cache: GatewayMediaCache,
         scope: MediaCacheScope,
         canPublish: () -> Boolean = { true },
@@ -154,29 +162,27 @@ object GatewayFileClient {
 
     private suspend fun fetchNetwork(
         path: String,
-        service: HermesApiService,
+        service: HermesGatewayApi,
         cache: GatewayMediaCache,
         key: String,
         canPublish: () -> Boolean,
     ): GatewayFileResult {
-        var response: Response<ResponseBody>? = null
         return try {
-            response = service.downloadManagedFile(path)
-            classifyStatus(response.code())?.let {
-                response.errorBody()?.close()
+            val response = service.downloadManagedFile(path)
+            classifyStatus(response.code)?.let {
                 if (it is GatewayFileResult.Unauthorized) AuthSessionState.requireSignIn()
                 return it
             }
             if (!response.isSuccessful) {
-                response.errorBody()?.close()
-                return GatewayFileResult.Failure(IOException("HTTP ${response.code()}"))
+                return GatewayFileResult.Failure(IOException("HTTP ${response.code}"))
             }
-            val body = response.body() ?: return GatewayFileResult.Failure(IOException("Empty response body"))
-            val name = response.headers()["Content-Disposition"]?.let(::parseFilename) ?: fileNameFromPath(path)
-            val mime =
-                response.headers()["Content-Type"]?.substringBefore(';')?.trim()?.takeIf(String::isNotBlank)
-                    ?: mimeFor(path)
-            val file = cache.write(key, body, canPublish)
+            val bytes = response.body() ?: return GatewayFileResult.Failure(IOException("Empty response body"))
+            // Headers (Content-Disposition, Content-Type) were not preserved on
+            // the JSON floor's ByteArray response. Recover the file name from
+            // the path; mimeFromPath covers Content-Type.
+            val name = fileNameFromPath(path)
+            val mime = mimeFor(path)
+            val file = cache.writeBytes(key, bytes, canPublish)
             GatewayFileResult.Success(GatewayFile(name, mime, file))
         } catch (_: CacheTooLargeException) {
             GatewayFileResult.TooLarge
@@ -184,9 +190,6 @@ object GatewayFileClient {
             throw e
         } catch (e: Throwable) {
             GatewayFileResult.Failure(e)
-        } finally {
-            response?.body()?.close()
-            response?.errorBody()?.close()
         }
     }
 
@@ -234,7 +237,10 @@ data class MediaCacheScope(
 
 internal data class MediaRequestContext(
     val scope: MediaCacheScope,
-    val service: HermesApiService,
+    /** JSON gateway for byte-array downloads. */
+    val service: HermesGatewayApi,
+    /** Streaming transport for ranged media reads. */
+    val rangeRequester: OkHttpGatewayRangeRequester,
     val currentScope: () -> MediaCacheScope,
 ) {
     fun isCurrent(): Boolean = currentScope() == scope
@@ -276,18 +282,24 @@ internal class GatewayMediaCache(
     fun fresh(key: String): File? =
         target(key).takeIf { it.isFile && now() - it.lastModified() < GatewayFileClient.CACHE_TTL_MS }
 
-    suspend fun write(
+    /**
+     * Write pre-buffered bytes to the cache atomically. The previous
+     * implementation streamed from a Retrofit [ResponseBody]; the
+     * Ktor-backed download returns the whole body as a [ByteArray], so
+     * this is the only variant the byte-path needs.
+     */
+    suspend fun writeBytes(
         key: String,
-        body: ResponseBody,
+        bytes: ByteArray,
         canPublish: () -> Boolean = { true },
     ): File {
         root.mkdirs()
         val target = target(key)
         val temp = File(root, ".$key.tmp-${UUID.randomUUID()}")
         try {
-            body.byteStream().use {
-                    input ->
-                temp.outputStream().use { output -> copyBounded(input, output) }
+            temp.outputStream().use { output ->
+                if (bytes.size.toLong() > maxBytes) throw CacheTooLargeException()
+                output.write(bytes)
             }
             atomicMover(temp, target)
             if (!canPublish()) {
@@ -306,22 +318,6 @@ internal class GatewayMediaCache(
     }
 
     private fun target(key: String) = File(root, "$key.media")
-
-    private suspend fun copyBounded(
-        input: InputStream,
-        output: java.io.OutputStream,
-    ) {
-        val buffer = ByteArray(64 * 1024)
-        var total = 0L
-        while (true) {
-            coroutineContext.ensureActive()
-            val count = input.read(buffer)
-            if (count < 0) break
-            total += count
-            if (total > maxBytes) throw CacheTooLargeException()
-            output.write(buffer, 0, count)
-        }
-    }
 
     private fun evict(protected: File) {
         root.listFiles()?.filter { it.isFile && !it.name.startsWith(".") }?.sortedWith(

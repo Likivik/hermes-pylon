@@ -43,17 +43,18 @@ class ServerBaseUrl internal constructor(
         get() = protocol == URLProtocol.HTTPS
 
     /** Serialise back to the canonical wire form, e.g. `https://host:9119/prefix/`. */
-    override fun toString(): String = buildString {
-        append(protocol.name)
-        append("://")
-        if (':' in host) append('[').append(host).append(']') else append(host)
-        if (port != 0 && port != protocol.defaultPort) {
-            append(':')
-            append(port)
+    override fun toString(): String =
+        buildString {
+            append(protocol.name)
+            append("://")
+            if (':' in host) append('[').append(host).append(']') else append(host)
+            if (port != 0 && port != protocol.defaultPort) {
+                append(':')
+                append(port)
+            }
+            val path = if (encodedPath.startsWith('/')) encodedPath else "/$encodedPath"
+            append(path)
         }
-        val path = if (encodedPath.startsWith('/')) encodedPath else "/$encodedPath"
-        append(path)
-    }
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -85,12 +86,14 @@ class ServerBaseUrl internal constructor(
         private var encodedPath: String = initial.encodedPath
 
         fun protocol(value: URLProtocol): Builder = apply { protocol = value }
+
         fun host(value: String): Builder = apply { host = value }
+
         fun port(value: Int): Builder = apply { port = value }
+
         fun encodedPath(value: String): Builder = apply { encodedPath = value }
 
-        fun build(): ServerBaseUrl =
-            ServerBaseUrl(protocol, host, port, encodedPath)
+        fun build(): ServerBaseUrl = ServerBaseUrl(protocol, host, port, encodedPath)
     }
 
     fun newBuilder(): Builder = Builder(this)

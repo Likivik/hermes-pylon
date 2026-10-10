@@ -277,7 +277,7 @@ private fun UserBubble(
                     // Render inline attachments
                     if (!message.attachments.isNullOrEmpty()) {
                         Spacer(modifier = Modifier.height(6.dp))
-                        message.attachments.forEach { attachment ->
+                        message.attachments.orEmpty().forEach { attachment ->
                             InlineAttachment(
                                 attachment = attachment,
                                 textColor = userBubbleTextColor,
@@ -429,7 +429,7 @@ private fun AssistantBubble(
                     // media — images, files — shows in assistant bubbles too).
                     if (!message.attachments.isNullOrEmpty()) {
                         Spacer(modifier = Modifier.height(6.dp))
-                        message.attachments.forEach { attachment ->
+                        message.attachments.orEmpty().forEach { attachment ->
                             InlineAttachment(
                                 attachment = attachment,
                                 textColor = textColor,
@@ -2243,7 +2243,7 @@ private fun ToolBubble(
                 // ── Tool progress preview (tool.progress) ──
                 if (message.toolStatus == ToolStatus.RUNNING && !message.progressPreview.isNullOrEmpty()) {
                     Text(
-                        text = message.progressPreview,
+                        text = message.progressPreview.orEmpty(),
                         style =
                             MaterialTheme.typography.bodySmall.copy(
                                 color = contentColor.copy(alpha = 0.7f),

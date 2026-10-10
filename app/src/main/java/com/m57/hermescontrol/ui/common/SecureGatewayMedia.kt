@@ -14,20 +14,6 @@ import java.io.IOException
 import java.net.URLConnection
 import java.util.concurrent.atomic.AtomicLong
 
-enum class SecureGatewayMediaKind {
-    AUDIO,
-    VIDEO,
-}
-
-data class SecureGatewayMediaRequest(
-    val path: String,
-    val title: String,
-    val mimeType: String,
-    val kind: SecureGatewayMediaKind,
-) {
-    val isVideo: Boolean = kind == SecureGatewayMediaKind.VIDEO
-}
-
 internal sealed interface SecureMediaOpenRoute {
     data class Player(val request: SecureGatewayMediaRequest) : SecureMediaOpenRoute
 

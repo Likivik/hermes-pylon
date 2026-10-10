@@ -2,23 +2,76 @@ package com.m57.hermescontrol.data.remote
 
 import com.m57.hermescontrol.data.local.AuthSessionState
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import okhttp3.ResponseBody
-import retrofit2.Call
-import retrofit2.Callback
-import retrofit2.Response
 import java.io.IOException
-import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
+
+/**
+ * Streaming transport for byte-range reads of managed files.
+ *
+ * Replaces the Retrofit `Call<ResponseBody>` method on the old
+ * `HermesApiService`. Range semantics and streaming bodies are not modeled by
+ * the JSON floor, so the path stays on plain OkHttp: one prepared client per
+ * credential boundary, `Range` header attached, response body consumed by the
+ * caller's `ResponseBody` reader.
+ */
+internal interface GatewayRangeRequester {
+    /** Build a synchronous-ish range call. Body remains readable until [okhttp3.Response.close]. */
+    fun streamRange(
+        path: String,
+        range: String,
+    ): okhttp3.Response
+}
+
+/**
+ * Production implementation: build a `Range` request against [endpoint] and
+ * dispatch on [client]. The URL is composed with `path` as a *query parameter*
+ * (URL-form-encoded) to match the previous Retrofit endpoint (`api/files/stream?path=…`).
+ *
+ * The returned [okhttp3.Response] owns its body; callers must `close()` it (or
+ * rely on the `awaitRangeResult` extension below, which does so).
+ */
+internal class OkHttpGatewayRangeRequester(
+    private val endpoint: ServerEndpoint,
+    private val client: OkHttpClient,
+) : GatewayRangeRequester {
+    override fun streamRange(
+        path: String,
+        range: String,
+    ): okhttp3.Response {
+        val url: HttpUrl =
+            endpoint.baseUrl
+                .resolve("api/files/stream")
+                .toString()
+                .toHttpUrl()
+                .newBuilder()
+                .addQueryParameter("path", path)
+                .build()
+        val request =
+            Request
+                .Builder()
+                .url(url)
+                .header("Range", range)
+                .get()
+                .build()
+        return client.newCall(request).execute()
+    }
+}
 
 /**
  * A seekable gateway-media transport captured at one profile credential boundary.
  *
  * This is deliberately a transport seam rather than a URL factory: callers can
  * request bounded ranges, but credentials remain inside the endpoint-bound
- * Retrofit service and never appear in a URI. Every request is fenced before
- * dispatch and again before its response can be consumed.
+ * client and never appear in a URI. Every request is fenced before dispatch
+ * and again before its response can be consumed.
  */
 internal fun interface SeekableGatewayMediaReader {
     suspend fun read(
@@ -35,7 +88,7 @@ internal fun interface SeekableGatewayMediaReader {
 
 internal class SeekableGatewayMediaSession(
     rawPath: String,
-    private val service: HermesApiService,
+    private val rangeRequester: GatewayRangeRequester,
     private val scope: MediaCacheScope,
     private val currentScope: () -> MediaCacheScope,
 ) : SeekableGatewayMediaReader {
@@ -62,68 +115,57 @@ internal class SeekableGatewayMediaSession(
                         IllegalArgumentException("media byte range overflow"),
                     )
                 }
-        return try {
-            service.streamManagedFileRange(path, "bytes=$position-$end").awaitRangeResult(position, byteCount)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            GatewayMediaRangeResult.Failure(e)
+        return withContext(Dispatchers.IO) {
+            try {
+                val response = rangeRequester.streamRange(path, "bytes=$position-$end")
+                try {
+                    if (!isCurrent()) {
+                        response.close()
+                        GatewayMediaRangeResult.Stale
+                    } else {
+                        readBodyCancellable(response) { response.toRangeResult(position, byteCount) }
+                    }
+                } finally {
+                    // Cleanup failures must not replace a successfully parsed range or strand its waiter.
+                    response.close()
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                GatewayMediaRangeResult.Failure(e)
+            }
         }
     }
 
-    override fun isCurrent(): Boolean = currentScope() == scope
-
-    private suspend fun Call<ResponseBody>.awaitRangeResult(
-        requestedPosition: Long,
-        requestedCount: Int,
+    /**
+     * Runs the blocking body read as a child coroutine so the read can be cancelled.
+     *
+     * A blocking socket read cannot be interrupted, so cancelling closes the response
+     * body instead; the blocked read then fails with an [IOException] and the waiter
+     * observes a cancelled read rather than a stranded thread. This replaces what
+     * `retrofit2.Call.cancel()` used to provide for the old callback transport.
+     */
+    private suspend fun readBodyCancellable(
+        response: okhttp3.Response,
+        read: () -> GatewayMediaRangeResult,
     ): GatewayMediaRangeResult =
-        suspendCancellableCoroutine { continuation ->
-            val completed = AtomicBoolean(false)
-            continuation.invokeOnCancellation {
-                completed.compareAndSet(false, true)
-                cancel()
+        coroutineScope {
+            val worker = async { read() }
+            try {
+                worker.await()
+            } catch (cancelled: CancellationException) {
+                runCatching { response.body?.close() }
+                throw cancelled
             }
-            enqueue(
-                object : Callback<ResponseBody> {
-                    override fun onResponse(
-                        call: Call<ResponseBody>,
-                        response: Response<ResponseBody>,
-                    ) {
-                        if (completed.get()) {
-                            response.closeBodiesBestEffort()
-                            return
-                        }
-                        val result =
-                            try {
-                                if (!isCurrent()) {
-                                    GatewayMediaRangeResult.Stale
-                                } else {
-                                    response.toRangeResult(requestedPosition, requestedCount)
-                                }
-                            } catch (throwable: Throwable) {
-                                GatewayMediaRangeResult.Failure(throwable)
-                            } finally {
-                                // Cleanup failures must not replace a successfully parsed range or strand its waiter.
-                                response.closeBodiesBestEffort()
-                            }
-                        if (completed.compareAndSet(false, true)) continuation.resume(result)
-                    }
-
-                    override fun onFailure(
-                        call: Call<ResponseBody>,
-                        throwable: Throwable,
-                    ) {
-                        if (completed.compareAndSet(false, true)) continuation.resumeWithException(throwable)
-                    }
-                },
-            )
         }
 
-    private fun Response<ResponseBody>.toRangeResult(
+    override fun isCurrent(): Boolean = currentScope() == scope
+
+    private fun okhttp3.Response.toRangeResult(
         requestedPosition: Long,
         requestedCount: Int,
     ): GatewayMediaRangeResult =
-        when (code()) {
+        when (code) {
             401 -> {
                 AuthSessionState.requireSignIn()
                 GatewayMediaRangeResult.Unauthorized
@@ -133,18 +175,21 @@ internal class SeekableGatewayMediaSession(
             404 -> GatewayMediaRangeResult.NotFound
             413 -> GatewayMediaRangeResult.TooLarge
             206 -> toRangeSuccess(requestedPosition, requestedCount)
-            else -> GatewayMediaRangeResult.Failure(IOException("HTTP ${code()}"))
+            else -> GatewayMediaRangeResult.Failure(IOException("HTTP $code"))
         }
 
-    private fun Response<ResponseBody>.toRangeSuccess(
+    private fun okhttp3.Response.toRangeSuccess(
         requestedPosition: Long,
         requestedCount: Int,
     ): GatewayMediaRangeResult {
-        val body = body() ?: return GatewayMediaRangeResult.Failure(IOException("Empty range response body"))
+        val body: ResponseBody =
+            body ?: return GatewayMediaRangeResult.Failure(
+                IOException("Empty range response body"),
+            )
         val bytes =
             body.readBytesLimited(requestedCount.toLong())
                 ?: return GatewayMediaRangeResult.TooLarge
-        val contentRange = headers()["Content-Range"]
+        val contentRange = headers["Content-Range"]
         val match =
             contentRange?.let { CONTENT_RANGE.matchEntire(it.trim()) }
                 ?: return GatewayMediaRangeResult.Failure(IOException("Invalid Content-Range"))
@@ -157,18 +202,13 @@ internal class SeekableGatewayMediaSession(
         if (totalLength != null && totalLength <= end) {
             return GatewayMediaRangeResult.Failure(IOException("Mismatched Content-Range total"))
         }
-        val mimeType = headers()["Content-Type"]?.substringBefore(';')?.trim()?.takeIf(String::isNotBlank)
+        val mimeType = headers["Content-Type"]?.substringBefore(';')?.trim()?.takeIf(String::isNotBlank)
         return GatewayMediaRangeResult.Success(bytes, totalLength, mimeType)
     }
 
     companion object {
         private val CONTENT_RANGE = Regex("bytes (\\d+)-(\\d+)/(\\d+|\\*)", RegexOption.IGNORE_CASE)
     }
-}
-
-private fun Response<ResponseBody>.closeBodiesBestEffort() {
-    runCatching { body()?.close() }
-    runCatching { errorBody()?.close() }
 }
 
 internal sealed interface GatewayMediaRangeResult {

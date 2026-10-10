@@ -31,9 +31,13 @@ class ApiClientMediaServiceTest {
         runTest {
             server.enqueue(MockResponse().setBody("bytes"))
             val endpoint = ServerEndpoint.parseForBuild(server.url("/captured/").toString())
-            val service = ApiClient.createMediaService(endpoint, gated = false, token = "snapshot-token")
+            val rangeRequester =
+                OkHttpGatewayRangeRequester(
+                    endpoint,
+                    ApiClient.createMediaClient(gated = false, token = "snapshot-token"),
+                )
 
-            service.streamManagedFileRange("/tmp/a", "bytes=10-19").execute().body()?.close()
+            rangeRequester.streamRange("/tmp/a", "bytes=10-19").use { it.body?.close() }
 
             val request = server.takeRequest()
             assertEquals("Bearer snapshot-token", request.getHeader("Authorization"))
@@ -48,16 +52,19 @@ class ApiClientMediaServiceTest {
         runTest {
             server.enqueue(MockResponse().setResponseCode(401))
             val endpoint = ServerEndpoint.parseForBuild(server.url("/snapshot/").toString())
-            val service =
-                ApiClient.createMediaService(
+            val rangeRequester =
+                OkHttpGatewayRangeRequester(
                     endpoint = endpoint,
-                    gated = true,
-                    token = null,
-                    cookieHeader = "hermes_session=captured; secondary=fixed",
+                    client =
+                        ApiClient.createMediaClient(
+                            gated = true,
+                            token = null,
+                            cookieHeader = "hermes_session=captured; secondary=fixed",
+                        ),
                 )
 
-            val response = service.streamManagedFileRange("/tmp/a", "bytes=0-63").execute()
-            response.errorBody()?.close()
+            val response = rangeRequester.streamRange("/tmp/a", "bytes=0-63")
+            response.body?.close()
 
             val request = server.takeRequest()
             assertEquals("hermes_session=captured; secondary=fixed", request.getHeader("Cookie"))

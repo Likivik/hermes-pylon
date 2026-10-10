@@ -1,8 +1,6 @@
 package com.m57.hermescontrol.data.remote
 
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonNamingStrategy
 import okhttp3.ConnectionPool
 import okhttp3.CookieJar
 import okhttp3.OkHttpClient
@@ -100,10 +98,11 @@ object OkHttpProvider {
             .build()
     }
 
-    @OptIn(ExperimentalSerializationApi::class)
-    val json: Json =
-        Json {
-            ignoreUnknownKeys = true
-            namingStrategy = JsonNamingStrategy.SnakeCase
-        }
+    /**
+     * The shared [HermesJson.instance]. Kept as a property of this object
+     * because callers (and Retrofit's converter in tests) reference it by name;
+     * the configuration itself now lives in :shared so the console target uses
+     * byte-identical serialization.
+     */
+    val json: Json = HermesJson.instance
 }

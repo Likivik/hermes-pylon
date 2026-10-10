@@ -3,7 +3,8 @@ package com.m57.hermescontrol.ui.sessions
 import com.m57.hermescontrol.data.model.SessionInfo
 import com.m57.hermescontrol.data.model.SessionLatestDescendantResponse
 import com.m57.hermescontrol.data.remote.ApiClient
-import com.m57.hermescontrol.data.remote.HermesApiService
+import com.m57.hermescontrol.data.remote.GatewayResponse
+import com.m57.hermescontrol.data.remote.HermesGatewayApi
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -21,13 +22,12 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import retrofit2.Response
 import java.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SessionPinningTest {
     private val dispatcher = StandardTestDispatcher()
-    private val api = mockk<HermesApiService>(relaxed = true)
+    private val api = mockk<HermesGatewayApi>(relaxed = true)
 
     @Before
     fun setUp() {
@@ -75,7 +75,7 @@ class SessionPinningTest {
             // IOException, which safeApiCall converts to a NetworkResult.
             // The test then calls getSession("root") directly.
             val pinnedTip = SessionInfo(id = "tip", title = "Pinned")
-            coEvery { api.getSession("root") } returns Response.success(pinnedTip)
+            coEvery { api.getSession("root") } returns GatewayResponse.success(pinnedTip)
 
             val hydrated = hydratePinnedSessions(api, listOf("root"))
 
@@ -87,9 +87,9 @@ class SessionPinningTest {
     fun `loading a compressed pin resolves and hydrates its live tip`() =
         runTest {
             coEvery { api.getSessionLatestDescendant("root") } returns
-                Response.success(SessionLatestDescendantResponse(session_id = "tip"))
+                GatewayResponse.success(SessionLatestDescendantResponse(session_id = "tip"))
             coEvery { api.getSession("tip") } returns
-                Response.success(SessionInfo(id = "tip", title = "Live tip"))
+                GatewayResponse.success(SessionInfo(id = "tip", title = "Live tip"))
 
             val hydrated = hydratePinnedSessions(api, listOf("root"))
 

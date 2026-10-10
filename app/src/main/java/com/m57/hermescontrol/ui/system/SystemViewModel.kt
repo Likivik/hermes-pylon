@@ -24,6 +24,7 @@ import com.m57.hermescontrol.data.model.UpdateCheckResponse
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.data.remote.toJsonObject
 import com.m57.hermescontrol.ui.common.ToastHost
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -302,7 +303,11 @@ class SystemViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.setCuratorPaused(mapOf("paused" to !currentlyPaused)) }
+                    safeApiCall {
+                        ApiClient.hermesApi.setCuratorPaused(
+                            mapOf("paused" to !currentlyPaused).toJsonObject(),
+                        )
+                    }
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -514,7 +519,7 @@ class SystemViewModel(
 
     fun runImport(path: String) {
         runOperation(
-            apiCall = { safeApiCall { ApiClient.hermesApi.runImport(mapOf("path" to path)) } },
+            apiCall = { safeApiCall { ApiClient.hermesApi.runImport(mapOf("path" to path).toJsonObject()) } },
             label = "Import",
         )
     }
@@ -531,7 +536,7 @@ class SystemViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.runDebugShare(mapOf("redact" to shareRedact)) }
+                    safeApiCall { ApiClient.hermesApi.runDebugShare(mapOf("redact" to shareRedact).toJsonObject()) }
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -609,7 +614,7 @@ class SystemViewModel(
                 }
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.createHook(body) }
+                    safeApiCall { ApiClient.hermesApi.createHook(body.toJsonObject()) }
                 }
             when (result) {
                 is NetworkResult.Success -> {

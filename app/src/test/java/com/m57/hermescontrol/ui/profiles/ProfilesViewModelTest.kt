@@ -5,7 +5,8 @@ import com.m57.hermescontrol.data.model.CreateProfileRequest
 import com.m57.hermescontrol.data.model.ProfileInfo
 import com.m57.hermescontrol.data.model.ProfilesResponse
 import com.m57.hermescontrol.data.remote.ApiClient
-import com.m57.hermescontrol.data.remote.HermesApiService
+import com.m57.hermescontrol.data.remote.GatewayResponse
+import com.m57.hermescontrol.data.remote.HermesGatewayApi
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -17,18 +18,16 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
-import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.After
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import retrofit2.Response
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ProfilesViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
-    private lateinit var mockApi: HermesApiService
+    private lateinit var mockApi: HermesGatewayApi
 
     @Before
     fun setUp() {
@@ -37,13 +36,13 @@ class ProfilesViewModelTest {
         mockApi = mockk(relaxed = true)
         every { ApiClient.hermesApi } returns mockApi
         coEvery { mockApi.getProfiles() } returns
-            Response.success(
+            GatewayResponse.success(
                 ProfilesResponse(
                     listOf(ProfileInfo(name = "default", is_default = true)),
                 ),
             )
         coEvery { mockApi.getActiveProfile() } returns
-            Response.success(ActiveProfileResponse(active = "default"))
+            GatewayResponse.success(ActiveProfileResponse(active = "default"))
     }
 
     @After
@@ -54,7 +53,7 @@ class ProfilesViewModelTest {
 
     @Test
     fun `clone success uses create endpoint with source and reloads`() {
-        coEvery { mockApi.createProfile(any()) } returns Response.success(Unit)
+        coEvery { mockApi.createProfile(any()) } returns GatewayResponse.success(Unit)
         val viewModel = ProfilesViewModel(ioDispatcher = testDispatcher)
 
         viewModel.cloneProfile("default", "dev-copy")
@@ -79,7 +78,7 @@ class ProfilesViewModelTest {
     @Test
     fun `clone failure surfaces error and clears loading`() {
         coEvery { mockApi.createProfile(any()) } returns
-            Response.error(400, "{}".toResponseBody(null))
+            GatewayResponse.error(400, "{}")
         val viewModel = ProfilesViewModel(ioDispatcher = testDispatcher)
 
         viewModel.cloneProfile("default", "dev-copy")

@@ -5,7 +5,8 @@ import com.m57.hermescontrol.data.model.McpServerTestResponse
 import com.m57.hermescontrol.data.model.McpServerToolInfo
 import com.m57.hermescontrol.data.model.McpServersResponse
 import com.m57.hermescontrol.data.remote.ApiClient
-import com.m57.hermescontrol.data.remote.HermesApiService
+import com.m57.hermescontrol.data.remote.GatewayResponse
+import com.m57.hermescontrol.data.remote.HermesGatewayApi
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -19,20 +20,18 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.setMain
-import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import retrofit2.Response
 import java.util.concurrent.atomic.AtomicInteger
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class McpServersViewModelTest {
     private val dispatcher = StandardTestDispatcher()
-    private lateinit var api: HermesApiService
+    private lateinit var api: HermesGatewayApi
 
     @Before
     fun setUp() {
@@ -51,7 +50,7 @@ class McpServersViewModelTest {
     @Test
     fun `test all tests enabled servers and records each result`() {
         coEvery { api.getMcpServers() } returns
-            Response.success(
+            GatewayResponse.success(
                 McpServersResponse(
                     listOf(
                         McpServer(name = "healthy", enabled = true),
@@ -61,14 +60,14 @@ class McpServersViewModelTest {
                 ),
             )
         coEvery { api.testMcpServer("healthy") } returns
-            Response.success(
+            GatewayResponse.success(
                 McpServerTestResponse(
                     ok = true,
                     tools = listOf(McpServerToolInfo("read", schemaChars = 80)),
                 ),
             )
         coEvery { api.testMcpServer("broken") } returns
-            Response.error(503, "unavailable".toResponseBody())
+            GatewayResponse.error(503, "unavailable")
 
         val viewModel = McpServersViewModel(ioDispatcher = dispatcher)
         viewModel.loadServers()
@@ -90,7 +89,7 @@ class McpServersViewModelTest {
     @Test
     fun `test all bounds concurrent server tests`() {
         val servers = (1..7).map { McpServer(name = "server-$it", enabled = true) }
-        coEvery { api.getMcpServers() } returns Response.success(McpServersResponse(servers))
+        coEvery { api.getMcpServers() } returns GatewayResponse.success(McpServersResponse(servers))
         val release = CompletableDeferred<Unit>()
         val inFlight = AtomicInteger()
         val maximumInFlight = AtomicInteger()
@@ -99,7 +98,7 @@ class McpServersViewModelTest {
             maximumInFlight.updateAndGet { maximum -> maxOf(maximum, current) }
             release.await()
             inFlight.decrementAndGet()
-            Response.success(McpServerTestResponse(ok = true))
+            GatewayResponse.success(McpServerTestResponse(ok = true))
         }
 
         val viewModel = McpServersViewModel(ioDispatcher = dispatcher)
@@ -120,7 +119,7 @@ class McpServersViewModelTest {
     @Test
     fun `single and batch tests share one concurrency bound`() {
         val servers = (1..5).map { McpServer(name = "batch-$it", enabled = true) }
-        coEvery { api.getMcpServers() } returns Response.success(McpServersResponse(servers))
+        coEvery { api.getMcpServers() } returns GatewayResponse.success(McpServersResponse(servers))
         val release = CompletableDeferred<Unit>()
         val inFlight = AtomicInteger()
         val maximumInFlight = AtomicInteger()
@@ -129,7 +128,7 @@ class McpServersViewModelTest {
             maximumInFlight.updateAndGet { maximum -> maxOf(maximum, current) }
             release.await()
             inFlight.decrementAndGet()
-            Response.success(McpServerTestResponse(ok = true))
+            GatewayResponse.success(McpServerTestResponse(ok = true))
         }
 
         val viewModel = McpServersViewModel(ioDispatcher = dispatcher)
@@ -154,7 +153,7 @@ class McpServersViewModelTest {
     @Test
     fun `single and batch tests for the same server are serialized without clearing active state`() {
         coEvery { api.getMcpServers() } returns
-            Response.success(McpServersResponse(listOf(McpServer(name = "shared", enabled = true))))
+            GatewayResponse.success(McpServersResponse(listOf(McpServer(name = "shared", enabled = true))))
         val firstRelease = CompletableDeferred<Unit>()
         val secondRelease = CompletableDeferred<Unit>()
         val invocation = AtomicInteger()
@@ -163,7 +162,7 @@ class McpServersViewModelTest {
                 1 -> firstRelease.await()
                 2 -> secondRelease.await()
             }
-            Response.success(McpServerTestResponse(ok = true))
+            GatewayResponse.success(McpServerTestResponse(ok = true))
         }
 
         val viewModel = McpServersViewModel(ioDispatcher = dispatcher)

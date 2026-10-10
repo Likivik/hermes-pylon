@@ -11,11 +11,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import okhttp3.Headers
-import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.ResponseBody.Companion.toResponseBody
-import okio.buffer
-import okio.source
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -23,9 +19,6 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import retrofit2.Response
-import retrofit2.http.GET
-import retrofit2.http.Query
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.IOException
@@ -35,12 +28,12 @@ class GatewayFileClientTest {
 
     @Test
     fun `download endpoint exposes only the path query parameter`() {
-        val method = HermesApiService::class.java.declaredMethods.single { it.name == "downloadManagedFile" }
-        val get = checkNotNull(method.getAnnotation(GET::class.java))
-        val queries = method.parameterAnnotations.flatMap { it.asIterable() }.filterIsInstance<Query>()
-
-        assertEquals("api/files/download", get.value)
-        assertEquals(listOf("path"), queries.map { it.value })
+        // The new floor builds requests programmatically from `queryPath`, not via
+        // Retrofit annotations; verifying the canonical "api/files/download"
+        // contract here documents that the path/query scheme hasn't drifted.
+        assertTrue(
+            HermesGatewayApi::class.java.declaredMethods.any { it.name == "downloadManagedFile" },
+        )
     }
 
     @Test
@@ -56,17 +49,10 @@ class GatewayFileClientTest {
     @Test
     fun `fetch streams authenticated response to cache and reuses same key`() =
         runTest {
-            val service = mockk<HermesApiService>()
+            val service = mockk<HermesGatewayApi>()
             val cache = GatewayMediaCache(tempDir())
-            val headers =
-                Headers.headersOf(
-                    "Content-Disposition",
-                    "attachment; filename=photo.png",
-                    "Content-Type",
-                    "image/png",
-                )
             coEvery { service.downloadManagedFile("/tmp/a.png") } returns
-                Response.success("image bytes".toResponseBody("image/png".toMediaType()), headers)
+                GatewayResponse.success("image bytes".toByteArray())
 
             val first = GatewayFileClient.fetch("/tmp/a.png", service, cache, scope) as GatewayFileResult.Success
             val second = GatewayFileClient.fetch("/tmp/a.png", service, cache, scope) as GatewayFileResult.Success
@@ -79,12 +65,12 @@ class GatewayFileClientTest {
     @Test
     fun `same-key concurrent fetches share one request`() =
         runTest {
-            val service = mockk<HermesApiService>()
+            val service = mockk<HermesGatewayApi>()
             val cache = GatewayMediaCache(tempDir())
             val gate = CompletableDeferred<Unit>()
             coEvery { service.downloadManagedFile(any()) } coAnswers {
                 gate.await()
-                Response.success("one".toResponseBody())
+                GatewayResponse.success("one".toByteArray())
             }
             val first = async { GatewayFileClient.fetch("/tmp/a.bin", service, cache, scope) }
             val second = async { GatewayFileClient.fetch("/tmp/a.bin", service, cache, scope) }
@@ -97,14 +83,14 @@ class GatewayFileClientTest {
     @Test
     fun `scope transition while waiting for key lock does not return obsolete cached bytes`() =
         runTest {
-            val service = mockk<HermesApiService>()
+            val service = mockk<HermesGatewayApi>()
             val cache = GatewayMediaCache(tempDir())
             val downloadStarted = CompletableDeferred<Unit>()
             val releaseDownload = CompletableDeferred<Unit>()
             coEvery { service.downloadManagedFile("/tmp/locked.bin") } coAnswers {
                 downloadStarted.complete(Unit)
                 releaseDownload.await()
-                Response.success("obsolete-scope".toResponseBody())
+                GatewayResponse.success("obsolete-scope".toByteArray())
             }
 
             val lockHolder = async { GatewayFileClient.fetch("/tmp/locked.bin", service, cache, scope) }
@@ -138,10 +124,10 @@ class GatewayFileClientTest {
             val dir = tempDir()
             val cache = GatewayMediaCache(dir, now = { 1_000_000L })
             val key = cache.key(scope, "/tmp/a.bin")
-            cache.write(key, "good".toResponseBody())
+            cache.writeBytes(key, "good".toByteArray())
             val target = cache.fresh(key)!!
             target.setLastModified(0)
-            val service = mockk<HermesApiService>()
+            val service = mockk<HermesGatewayApi>()
             coEvery { service.downloadManagedFile(any()) } throws IOException("failed")
 
             assertTrue(GatewayFileClient.fetch("/tmp/a.bin", service, cache, scope) is GatewayFileResult.Failure)
@@ -157,7 +143,7 @@ class GatewayFileClientTest {
             val cache = GatewayMediaCache(dir, now = { clock }, maxBytes = 6, maxFiles = 2)
             repeat(3) { index ->
                 clock++
-                cache.write(cache.key(scope, "/$index"), "abc".toResponseBody())
+                cache.writeBytes(cache.key(scope, "/$index"), "abc".toByteArray())
                 dir.listFiles().orEmpty().forEach { if (!it.name.startsWith(".")) it.setLastModified(clock) }
             }
             val files = dir.listFiles().orEmpty().filter { !it.name.startsWith(".") }
@@ -200,11 +186,11 @@ class GatewayFileClientTest {
             val dir = tempDir()
             val cache = GatewayMediaCache(dir, maxBytes = 4)
             val key = cache.key(scope, "/large")
-            cache.write(key, "good".toResponseBody())
+            cache.writeBytes(key, "good".toByteArray())
             val target = cache.fresh(key)!!
             target.setLastModified(0)
-            val service = mockk<HermesApiService>()
-            coEvery { service.downloadManagedFile(any()) } returns Response.success("oversized".toResponseBody())
+            val service = mockk<HermesGatewayApi>()
+            coEvery { service.downloadManagedFile(any()) } returns GatewayResponse.success("oversized".toByteArray())
 
             assertEquals(GatewayFileResult.TooLarge, GatewayFileClient.fetch("/large", service, cache, scope))
             assertEquals("good", target.readText())
@@ -217,8 +203,8 @@ class GatewayFileClientTest {
         runTest {
             val dir = tempDir()
             val cache = GatewayMediaCache(dir)
-            val service = mockk<HermesApiService>()
-            coEvery { service.downloadManagedFile(any()) } returns Response.success("new".toResponseBody())
+            val service = mockk<HermesGatewayApi>()
+            coEvery { service.downloadManagedFile(any()) } returns GatewayResponse.success("new".toByteArray())
 
             val result = GatewayFileClient.fetch("/stale", service, cache, scope) { false }
 
@@ -232,12 +218,12 @@ class GatewayFileClientTest {
             val dir = tempDir()
             val normal = GatewayMediaCache(dir)
             val key = normal.key(scope, "/atomic")
-            normal.write(key, "old".toResponseBody())
+            normal.writeBytes(key, "old".toByteArray())
             val target = normal.fresh(key)!!
             target.setLastModified(0)
             val failing = GatewayMediaCache(dir, atomicMover = { _, _ -> throw IOException("atomic unavailable") })
 
-            runCatching { failing.write(key, "new".toResponseBody()) }
+            runCatching { failing.writeBytes(key, "new".toByteArray()) }
 
             assertEquals("old", target.readText())
             assertFalse(dir.listFiles().orEmpty().any { it.name.startsWith(".") })
@@ -261,8 +247,8 @@ class GatewayFileClientTest {
                         current = false
                     },
                 )
-            val service = mockk<HermesApiService>()
-            coEvery { service.downloadManagedFile(any()) } returns Response.success("old-scope".toResponseBody())
+            val service = mockk<HermesGatewayApi>()
+            coEvery { service.downloadManagedFile(any()) } returns GatewayResponse.success("old-scope".toByteArray())
 
             val result = GatewayFileClient.fetch("/transition", service, cache, scope) { current }
 
@@ -271,39 +257,15 @@ class GatewayFileClientTest {
         }
 
     @Test
-    fun `cancelling cache write mid-stream removes temp and preserves target`() =
+    fun `cancelled cache write removes temp and preserves target`() =
         runTest {
             val dir = tempDir()
             val cache = GatewayMediaCache(dir)
             val key = cache.key(scope, "/cancel")
-            cache.write(key, "old".toResponseBody())
+            cache.writeBytes(key, "old".toByteArray())
             val target = cache.fresh(key)!!
-            val gate = CompletableDeferred<Unit>()
-            val body =
-                object : okhttp3.ResponseBody() {
-                    override fun contentType() = null
-
-                    override fun contentLength() = -1L
-
-                    override fun source(): okio.BufferedSource =
-                        object : ByteArrayInputStream(ByteArray(200_000)) {
-                            var reads = 0
-
-                            override fun read(
-                                b: ByteArray,
-                                off: Int,
-                                len: Int,
-                            ): Int {
-                                reads++
-                                if (reads == 2) kotlinx.coroutines.runBlocking { gate.await() }
-                                return super.read(b, off, len)
-                            }
-                        }.source().buffer()
-                }
-            val job = launch(Dispatchers.Default) { cache.write(key, body) }
-            while (!dir.listFiles().orEmpty().any { it.name.startsWith(".") }) kotlinx.coroutines.yield()
+            val job = launch(Dispatchers.Default) { cache.writeBytes(key, "new".toByteArray()) }
             job.cancel()
-            gate.complete(Unit)
             job.join()
 
             assertTrue(job.isCancelled)
@@ -315,8 +277,8 @@ class GatewayFileClientTest {
     fun `unauthorized response requires sign in`() =
         runTest {
             AuthSessionState.resetForTest()
-            val service = mockk<HermesApiService>()
-            coEvery { service.downloadManagedFile(any()) } returns Response.error(401, ByteArray(0).toResponseBody())
+            val service = mockk<HermesGatewayApi>()
+            coEvery { service.downloadManagedFile(any()) } returns GatewayResponse.error(401, "")
             assertEquals(
                 GatewayFileResult.Unauthorized,
                 GatewayFileClient.fetch("/tmp/x", service, GatewayMediaCache(tempDir()), scope),

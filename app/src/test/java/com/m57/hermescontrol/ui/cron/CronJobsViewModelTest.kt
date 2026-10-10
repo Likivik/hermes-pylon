@@ -4,7 +4,8 @@ import com.m57.hermescontrol.data.model.CreateCronJobRequest
 import com.m57.hermescontrol.data.model.CronJob
 import com.m57.hermescontrol.data.model.UpdateCronJobRequest
 import com.m57.hermescontrol.data.remote.ApiClient
-import com.m57.hermescontrol.data.remote.HermesApiService
+import com.m57.hermescontrol.data.remote.GatewayResponse
+import com.m57.hermescontrol.data.remote.HermesGatewayApi
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -21,7 +22,6 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
-import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -29,12 +29,11 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import retrofit2.Response
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CronJobsViewModelTest {
     private val dispatcher = StandardTestDispatcher()
-    private val api = mockk<HermesApiService>(relaxed = true)
+    private val api = mockk<HermesGatewayApi>(relaxed = true)
 
     @Before
     fun setUp() {
@@ -76,9 +75,9 @@ class CronJobsViewModelTest {
             viewModel.updateEditorField("schedule", "every 10m")
             viewModel.setMonitorMode("script")
             viewModel.updateEditorField("monitor_script", "check.sh")
-            coEvery { api.createCronJob(any()) } returns Response.success(CronJob(id = "job-1", name = "Watch"))
+            coEvery { api.createCronJob(any()) } returns GatewayResponse.success(CronJob(id = "job-1", name = "Watch"))
             coEvery { api.updateCronJob("job-1", any()) } returns
-                Response.error(400, "monitor rejected".toResponseBody())
+                GatewayResponse.error(400, "monitor rejected")
 
             viewModel.saveEditor()
             advanceUntilIdle()
@@ -122,8 +121,8 @@ class CronJobsViewModelTest {
             viewModel.updateEditorField("schedule", "every 1d")
             viewModel.toggleRunContinuity()
             coEvery { api.createCronJob(any()) } returns
-                Response.success(CronJob(id = "job-continuity", name = "Daily digest"))
-            coEvery { api.getCronJobs() } returns Response.success(emptyList())
+                GatewayResponse.success(CronJob(id = "job-continuity", name = "Daily digest"))
+            coEvery { api.getCronJobs() } returns GatewayResponse.success(emptyList())
 
             viewModel.saveEditor()
             advanceUntilIdle()
@@ -138,7 +137,7 @@ class CronJobsViewModelTest {
         runTest(dispatcher) {
             val viewModel = CronJobsViewModel(ioDispatcher = dispatcher)
             coEvery { api.getCronJob("job-context") } returns
-                Response.success(
+                GatewayResponse.success(
                     CronJob(
                         id = "job-context",
                         name = "Digest",
@@ -147,8 +146,8 @@ class CronJobsViewModelTest {
                     ),
                 )
             coEvery { api.updateCronJob("job-context", any()) } returns
-                Response.success(CronJob(id = "job-context", name = "Digest"))
-            coEvery { api.getCronJobs() } returns Response.success(emptyList())
+                GatewayResponse.success(CronJob(id = "job-context", name = "Digest"))
+            coEvery { api.getCronJobs() } returns GatewayResponse.success(emptyList())
 
             viewModel.openEditJobDialog("job-context")
             advanceUntilIdle()
@@ -171,7 +170,7 @@ class CronJobsViewModelTest {
         runTest(dispatcher) {
             val viewModel = CronJobsViewModel(ioDispatcher = dispatcher)
             coEvery { api.getCronJob("job-external-context") } returns
-                Response.success(
+                GatewayResponse.success(
                     CronJob(
                         id = "job-external-context",
                         name = "Digest",
@@ -180,8 +179,8 @@ class CronJobsViewModelTest {
                     ),
                 )
             coEvery { api.updateCronJob("job-external-context", any()) } returns
-                Response.success(CronJob(id = "job-external-context", name = "Digest"))
-            coEvery { api.getCronJobs() } returns Response.success(emptyList())
+                GatewayResponse.success(CronJob(id = "job-external-context", name = "Digest"))
+            coEvery { api.getCronJobs() } returns GatewayResponse.success(emptyList())
 
             viewModel.openEditJobDialog("job-external-context")
             advanceUntilIdle()

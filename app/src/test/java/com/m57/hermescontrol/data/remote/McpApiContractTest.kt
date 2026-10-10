@@ -1,14 +1,12 @@
 package com.m57.hermescontrol.data.remote
 
 import kotlinx.coroutines.runBlocking
-import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import retrofit2.Retrofit
-import retrofit2.converter.kotlinx.serialization.asConverterFactory
 
 class McpApiContractTest {
     @Test
@@ -28,14 +26,13 @@ class McpApiContractTest {
                         """.trimIndent(),
                     ),
                 )
-                val api =
-                    Retrofit
-                        .Builder()
-                        .baseUrl(server.url("/"))
-                        .addConverterFactory(
-                            OkHttpProvider.json.asConverterFactory("application/json".toMediaType()),
-                        ).build()
-                        .create(HermesApiService::class.java)
+                val baseUrl =
+                    ServerEndpoint.parse(
+                        server.url("/").toString(),
+                        CleartextPolicy.ALLOW_WITH_WARNING,
+                    ).baseUrl
+                val client = createHermesHttpClient(OkHttpClient())
+                val api = HermesGatewayApi(client, baseUrl)
 
                 val response = api.testMcpServer("local tools")
 

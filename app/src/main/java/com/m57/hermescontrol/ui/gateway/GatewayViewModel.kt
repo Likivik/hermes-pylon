@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.m57.hermescontrol.data.model.StatusResponse
 import com.m57.hermescontrol.data.remote.ApiClient
-import com.m57.hermescontrol.data.remote.HermesApiService
+import com.m57.hermescontrol.data.remote.HermesGatewayApi
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
 import com.m57.hermescontrol.ui.common.ToastHost
@@ -98,7 +98,7 @@ class GatewayViewModel(
 
     private fun runGatewayAction(
         actionName: String,
-        apiCall: suspend (HermesApiService) -> NetworkResult<Unit>,
+        apiCall: suspend (HermesGatewayApi) -> NetworkResult<Unit>,
     ) {
         if (_uiState.value.isActionRunning) return
         val requestedProfileId = profileId

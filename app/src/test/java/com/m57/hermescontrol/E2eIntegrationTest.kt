@@ -45,7 +45,8 @@ import com.m57.hermescontrol.data.model.ToggleSkillRequest
 import com.m57.hermescontrol.data.model.UpdateCheckResponse
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.CleartextPolicy
-import com.m57.hermescontrol.data.remote.HermesApiService
+import com.m57.hermescontrol.data.remote.GatewayResponse
+import com.m57.hermescontrol.data.remote.HermesGatewayApi
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.ui.channels.ChannelsViewModel
 import com.m57.hermescontrol.ui.connect.ConnectViewModel
@@ -64,18 +65,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.*
 import kotlinx.serialization.json.JsonPrimitive
-import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
-import retrofit2.Response
 import java.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class E2eIntegrationTest {
     private val testDispatcher = StandardTestDispatcher()
-    private lateinit var mockApiService: HermesApiService
+    private lateinit var mockApiService: HermesGatewayApi
     private val mockApp = mockk<Application>(relaxed = true)
 
     @Before
@@ -131,9 +130,8 @@ class E2eIntegrationTest {
         NavigationController.backStack = null
     }
 
-    private fun <T> createErrorResponse(code: Int): Response<T> {
-        val errorBody = "".toResponseBody(null)
-        return Response.error(code, errorBody)
+    private fun <T> createErrorResponse(code: Int): GatewayResponse<T> {
+        return GatewayResponse.error<T>(code, "")
     }
 
     // ── Tier 1: Feature Coverage (>=5 per feature) ───────────────────────
@@ -144,7 +142,7 @@ class E2eIntegrationTest {
         runTest {
             val skill1 = Skill("Skill 1", "Description 1", "Category 1", true)
             val skill2 = Skill("Skill 2", "Description 2", "Category 2", false)
-            coEvery { mockApiService.getSkills() } returns Response.success(listOf(skill1, skill2))
+            coEvery { mockApiService.getSkills() } returns GatewayResponse.success(listOf(skill1, skill2))
 
             val viewModel = SkillsViewModel(application = mockApp, ioDispatcher = testDispatcher)
             viewModel.loadSkills()
@@ -191,8 +189,12 @@ class E2eIntegrationTest {
     fun testSkillsToggle_success() =
         runTest {
             val skill = Skill("Skill 1", "Description 1", "Category 1", false)
-            coEvery { mockApiService.getSkills() } returns Response.success(listOf(skill))
-            coEvery { mockApiService.toggleSkill(ToggleSkillRequest("Skill 1", true)) } returns Response.success(Unit)
+            coEvery { mockApiService.getSkills() } returns GatewayResponse.success(listOf(skill))
+            coEvery {
+                mockApiService.toggleSkill(
+                    ToggleSkillRequest("Skill 1", true),
+                )
+            } returns GatewayResponse.success(Unit)
 
             val viewModel = SkillsViewModel(application = mockApp, ioDispatcher = testDispatcher)
             viewModel.loadSkills()
@@ -223,7 +225,7 @@ class E2eIntegrationTest {
     fun testSkillsToggle_failure() =
         runTest {
             val skill = Skill("Skill 1", "Description 1", "Category 1", false)
-            coEvery { mockApiService.getSkills() } returns Response.success(listOf(skill))
+            coEvery { mockApiService.getSkills() } returns GatewayResponse.success(listOf(skill))
             coEvery { mockApiService.toggleSkill(ToggleSkillRequest("Skill 1", true)) } returns createErrorResponse(500)
 
             val viewModel = SkillsViewModel(application = mockApp, ioDispatcher = testDispatcher)
@@ -280,8 +282,8 @@ class E2eIntegrationTest {
 
             coEvery { mockApiService.getSkills() } returnsMany
                 listOf(
-                    Response.success(listOf(skillA)),
-                    Response.success(listOf(skillB)),
+                    GatewayResponse.success(listOf(skillA)),
+                    GatewayResponse.success(listOf(skillB)),
                 )
 
             val viewModel = SkillsViewModel(application = mockApp, ioDispatcher = testDispatcher)
@@ -309,7 +311,7 @@ class E2eIntegrationTest {
         runTest {
             val hubSkill = HubSkill("Test Skill", "A test hub skill", "hub", "General")
             coEvery { mockApiService.searchSkillsHub(any()) } returns
-                Response.success(SkillHubSearchResponse(results = listOf(hubSkill)))
+                GatewayResponse.success(SkillHubSearchResponse(results = listOf(hubSkill)))
 
             val viewModel = SkillsViewModel(application = mockApp, ioDispatcher = testDispatcher)
             viewModel.searchHub("test")
@@ -333,7 +335,7 @@ class E2eIntegrationTest {
     fun testSkillsHub_search_empty() =
         runTest {
             coEvery { mockApiService.searchSkillsHub(any()) } returns
-                Response.success(SkillHubSearchResponse(results = emptyList()))
+                GatewayResponse.success(SkillHubSearchResponse(results = emptyList()))
 
             val viewModel = SkillsViewModel(application = mockApp, ioDispatcher = testDispatcher)
             viewModel.searchHub("nonexistent")
@@ -387,9 +389,9 @@ class E2eIntegrationTest {
         runTest {
             val installed = Skill("New Skill", "Just installed", "General", false)
             coEvery { mockApiService.installHubSkill(any()) } returns
-                Response.success(ActionResponse("success", "Installed"))
+                GatewayResponse.success(ActionResponse("success", "Installed"))
             coEvery { mockApiService.getSkills() } returns
-                Response.success(listOf(installed))
+                GatewayResponse.success(listOf(installed))
 
             val viewModel = SkillsViewModel(application = mockApp, ioDispatcher = testDispatcher)
             viewModel.installSkill("new-skill")
@@ -430,9 +432,9 @@ class E2eIntegrationTest {
     fun testSkillsHub_uninstall_success() =
         runTest {
             coEvery { mockApiService.uninstallHubSkill(any()) } returns
-                Response.success(ActionResponse("success", "Uninstalled"))
+                GatewayResponse.success(ActionResponse("success", "Uninstalled"))
             coEvery { mockApiService.getSkills() } returns
-                Response.success(emptyList())
+                GatewayResponse.success(emptyList())
 
             val viewModel = SkillsViewModel(application = mockApp, ioDispatcher = testDispatcher)
             viewModel.uninstallSkill("hub-skill")
@@ -475,7 +477,7 @@ class E2eIntegrationTest {
     fun testCronJobsListing_success() =
         runTest {
             val job = CronJob("id1", "Job 1", JsonPrimitive("*/5 * * * *"), "active", "success", "2026-06-15T15:10:00Z")
-            coEvery { mockApiService.getCronJobs() } returns Response.success(listOf(job))
+            coEvery { mockApiService.getCronJobs() } returns GatewayResponse.success(listOf(job))
 
             val viewModel = CronJobsViewModel(ioDispatcher = testDispatcher)
             viewModel.loadCronJobs()
@@ -516,8 +518,8 @@ class E2eIntegrationTest {
     fun testCronJobPause_success() =
         runTest {
             val job = CronJob("id1", "Job 1", JsonPrimitive("*/5 * * * *"), "active", null, null)
-            coEvery { mockApiService.getCronJobs() } returns Response.success(listOf(job))
-            coEvery { mockApiService.pauseCronJob("id1") } returns Response.success(Unit)
+            coEvery { mockApiService.getCronJobs() } returns GatewayResponse.success(listOf(job))
+            coEvery { mockApiService.pauseCronJob("id1") } returns GatewayResponse.success(Unit)
 
             val viewModel = CronJobsViewModel(ioDispatcher = testDispatcher)
             viewModel.loadCronJobs()
@@ -543,8 +545,8 @@ class E2eIntegrationTest {
     fun testCronJobResume_success() =
         runTest {
             val job = CronJob("id1", "Job 1", JsonPrimitive("*/5 * * * *"), "paused", null, null)
-            coEvery { mockApiService.getCronJobs() } returns Response.success(listOf(job))
-            coEvery { mockApiService.resumeCronJob("id1") } returns Response.success(Unit)
+            coEvery { mockApiService.getCronJobs() } returns GatewayResponse.success(listOf(job))
+            coEvery { mockApiService.resumeCronJob("id1") } returns GatewayResponse.success(Unit)
 
             val viewModel = CronJobsViewModel(ioDispatcher = testDispatcher)
             viewModel.loadCronJobs()
@@ -569,7 +571,7 @@ class E2eIntegrationTest {
     @Test
     fun testCronJobTrigger_success() =
         runTest {
-            coEvery { mockApiService.triggerCronJob("id1") } returns Response.success(Unit)
+            coEvery { mockApiService.triggerCronJob("id1") } returns GatewayResponse.success(Unit)
 
             val viewModel = CronJobsViewModel(ioDispatcher = testDispatcher)
             viewModel.triggerCronJob("id1")
@@ -582,8 +584,8 @@ class E2eIntegrationTest {
     fun testCronJobDelete_success() =
         runTest {
             val job = CronJob("id1", "Job 1", null, null, null, null)
-            coEvery { mockApiService.getCronJobs() } returns Response.success(listOf(job))
-            coEvery { mockApiService.deleteCronJob("id1") } returns Response.success(Unit)
+            coEvery { mockApiService.getCronJobs() } returns GatewayResponse.success(listOf(job))
+            coEvery { mockApiService.deleteCronJob("id1") } returns GatewayResponse.success(Unit)
 
             val viewModel = CronJobsViewModel(ioDispatcher = testDispatcher)
             viewModel.loadCronJobs()
@@ -629,7 +631,7 @@ class E2eIntegrationTest {
             val session = SessionInfo("session-123", "Session 1", "2026-06-15T15:10:00Z", 5, "active")
             coEvery {
                 mockApiService.getSessions(any(), any(), any(), null, "cron")
-            } returns Response.success(SessionListResponse(listOf(session)))
+            } returns GatewayResponse.success(SessionListResponse(listOf(session)))
 
             val viewModel = SessionsViewModel(ioDispatcher = testDispatcher)
             viewModel.loadSessions()
@@ -685,8 +687,8 @@ class E2eIntegrationTest {
             val jobB = CronJob("idB", "Job B", null, null, null, null)
             coEvery { mockApiService.getCronJobs() } returnsMany
                 listOf(
-                    Response.success(listOf(jobA)),
-                    Response.success(listOf(jobB)),
+                    GatewayResponse.success(listOf(jobA)),
+                    GatewayResponse.success(listOf(jobB)),
                 )
 
             val viewModel = CronJobsViewModel(ioDispatcher = testDispatcher)
@@ -788,7 +790,7 @@ class E2eIntegrationTest {
     @Test
     fun testSkillsLoad_emptyResponse() =
         runTest {
-            coEvery { mockApiService.getSkills() } returns Response.success(emptyList())
+            coEvery { mockApiService.getSkills() } returns GatewayResponse.success(emptyList())
             val viewModel = SkillsViewModel(application = mockApp, ioDispatcher = testDispatcher)
             viewModel.loadSkills()
             advanceUntilIdle()
@@ -804,7 +806,7 @@ class E2eIntegrationTest {
     fun testSkillsToggle_httpError_500() =
         runTest {
             val skill = Skill("Skill 1", null, null, false)
-            coEvery { mockApiService.getSkills() } returns Response.success(listOf(skill))
+            coEvery { mockApiService.getSkills() } returns GatewayResponse.success(listOf(skill))
             coEvery { mockApiService.toggleSkill(any()) } returns createErrorResponse(500)
 
             val viewModel = SkillsViewModel(application = mockApp, ioDispatcher = testDispatcher)
@@ -842,7 +844,7 @@ class E2eIntegrationTest {
     fun testCronJobPause_httpError_500() =
         runTest {
             val job = CronJob("id1", "Job 1", null, "active", null, null)
-            coEvery { mockApiService.getCronJobs() } returns Response.success(listOf(job))
+            coEvery { mockApiService.getCronJobs() } returns GatewayResponse.success(listOf(job))
             coEvery { mockApiService.pauseCronJob("id1") } returns createErrorResponse(500)
 
             val viewModel = CronJobsViewModel(ioDispatcher = testDispatcher)
@@ -882,7 +884,7 @@ class E2eIntegrationTest {
     fun testCronJobDelete_httpError_500() =
         runTest {
             val job = CronJob("id1", "Job 1", null, null, null, null)
-            coEvery { mockApiService.getCronJobs() } returns Response.success(listOf(job))
+            coEvery { mockApiService.getCronJobs() } returns GatewayResponse.success(listOf(job))
             coEvery { mockApiService.deleteCronJob("id1") } returns createErrorResponse(500)
 
             val viewModel = CronJobsViewModel(ioDispatcher = testDispatcher)
@@ -915,7 +917,7 @@ class E2eIntegrationTest {
     @Test
     fun testCronJobsLoad_emptyResponse() =
         runTest {
-            coEvery { mockApiService.getCronJobs() } returns Response.success(emptyList())
+            coEvery { mockApiService.getCronJobs() } returns GatewayResponse.success(emptyList())
             val viewModel = CronJobsViewModel(ioDispatcher = testDispatcher)
             viewModel.loadCronJobs()
             advanceUntilIdle()
@@ -933,8 +935,8 @@ class E2eIntegrationTest {
     fun testDrawerTransitionDuringAction() =
         runTest {
             val skill = Skill("Skill 1", null, null, false)
-            coEvery { mockApiService.getSkills() } returns Response.success(listOf(skill))
-            coEvery { mockApiService.toggleSkill(any()) } returns Response.success(Unit)
+            coEvery { mockApiService.getSkills() } returns GatewayResponse.success(listOf(skill))
+            coEvery { mockApiService.toggleSkill(any()) } returns GatewayResponse.success(Unit)
 
             val viewModel = SkillsViewModel(application = mockApp, ioDispatcher = testDispatcher)
             viewModel.loadSkills()
@@ -985,7 +987,7 @@ class E2eIntegrationTest {
         runTest {
             // Step 1: User connects with valid token
             val statusResponse = StatusResponse()
-            coEvery { mockApiService.getStatus() } returns Response.success(statusResponse)
+            coEvery { mockApiService.getStatus() } returns GatewayResponse.success(statusResponse)
 
             val connectViewModel = ConnectViewModel(app = mockApp, ioDispatcher = testDispatcher)
             connectViewModel.onTokenChange("valid-token")
@@ -1003,7 +1005,7 @@ class E2eIntegrationTest {
 
             // Step 3: User toggles a skill, but API fails
             val skill = Skill("Skill X", "Desc X", "Cat X", false)
-            coEvery { mockApiService.getSkills() } returns Response.success(listOf(skill))
+            coEvery { mockApiService.getSkills() } returns GatewayResponse.success(listOf(skill))
             coEvery { mockApiService.toggleSkill(any()) } returns createErrorResponse(500)
 
             val skillsViewModel = SkillsViewModel(application = mockApp, ioDispatcher = testDispatcher)
@@ -1039,7 +1041,7 @@ class E2eIntegrationTest {
             assertEquals(CronJobsScreen, NavigationController.backStack?.lastOrNull())
 
             // Step 5: User triggers a cron job
-            coEvery { mockApiService.triggerCronJob("job-1") } returns Response.success(Unit)
+            coEvery { mockApiService.triggerCronJob("job-1") } returns GatewayResponse.success(Unit)
             val cronViewModel = CronJobsViewModel(ioDispatcher = testDispatcher)
             cronViewModel.triggerCronJob("job-1")
             advanceUntilIdle()
@@ -1051,7 +1053,7 @@ class E2eIntegrationTest {
     fun testLogsListing_success() =
         runTest {
             coEvery { mockApiService.getLogs(file = "agent", lines = 100, level = "ALL", component = "all") } returns
-                Response.success(LogResponse(listOf("Log line 1", "Log line 2")))
+                GatewayResponse.success(LogResponse(listOf("Log line 1", "Log line 2")))
 
             val viewModel = LogsViewModel(ioDispatcher = testDispatcher)
             viewModel.loadLogs()
@@ -1069,8 +1071,8 @@ class E2eIntegrationTest {
     fun testPluginsManagement_success() =
         runTest {
             val plugin = PluginInfo("plugin-1", "Desc", "1.0", null, "disabled")
-            coEvery { mockApiService.getPlugins() } returns Response.success(PluginsHubResponse(listOf(plugin)))
-            coEvery { mockApiService.enablePlugin("plugin-1") } returns Response.success(Unit)
+            coEvery { mockApiService.getPlugins() } returns GatewayResponse.success(PluginsHubResponse(listOf(plugin)))
+            coEvery { mockApiService.enablePlugin("plugin-1") } returns GatewayResponse.success(Unit)
 
             val viewModel = PluginsViewModel(ioDispatcher = testDispatcher)
             viewModel.loadPlugins()
@@ -1108,14 +1110,14 @@ class E2eIntegrationTest {
                     envVars = emptyList(),
                 )
             coEvery { mockApiService.getMessagingPlatforms() } returns
-                Response.success(
+                GatewayResponse.success(
                     MessagingPlatformResponse(
                         envPath = "/tmp/.env",
                         gatewayStartCommand = "hermes gateway start",
                         platforms = listOf(platform),
                     ),
                 )
-            coEvery { mockApiService.configurePlatform("telegram", any()) } returns Response.success(Unit)
+            coEvery { mockApiService.configurePlatform("telegram", any()) } returns GatewayResponse.success(Unit)
 
             val viewModel = ChannelsViewModel(ioDispatcher = testDispatcher)
             viewModel.loadPlatforms()
@@ -1136,8 +1138,8 @@ class E2eIntegrationTest {
     fun testKeysManagement_success() =
         runTest {
             coEvery { mockApiService.getEnvVars() } returns
-                Response.success(mapOf("KEY1" to EnvVarConfig(true, "value1", "desc", null, null, false)))
-            coEvery { mockApiService.updateEnvVar(any()) } returns Response.success(Unit)
+                GatewayResponse.success(mapOf("KEY1" to EnvVarConfig(true, "value1", "desc", null, null, false)))
+            coEvery { mockApiService.updateEnvVar(any()) } returns GatewayResponse.success(Unit)
 
             val viewModel = KeysViewModel(ioDispatcher = testDispatcher)
             viewModel.loadKeys()
@@ -1164,22 +1166,22 @@ class E2eIntegrationTest {
                     memory = MemoryStats(total = 8192, used = 4096, percent = 60.0),
                 )
             val doctor = DoctorResponse(true, 24856, "doctor")
-            coEvery { mockApiService.getSystemStats() } returns Response.success(stats)
-            coEvery { mockApiService.runDoctor() } returns Response.success(doctor)
+            coEvery { mockApiService.getSystemStats() } returns GatewayResponse.success(stats)
+            coEvery { mockApiService.runDoctor() } returns GatewayResponse.success(doctor)
             coEvery { mockApiService.getStatus() } returns
-                Response.success(StatusResponse("1.0", true, 0, false, null))
+                GatewayResponse.success(StatusResponse("1.0", true, 0, false, null))
             coEvery { mockApiService.getPortal() } returns
-                Response.success(PortalResponse(logged_in = false))
-            coEvery { mockApiService.getCurator() } returns Response.success(CuratorResponse())
-            coEvery { mockApiService.getMemory() } returns Response.success(MemoryResponse())
+                GatewayResponse.success(PortalResponse(logged_in = false))
+            coEvery { mockApiService.getCurator() } returns GatewayResponse.success(CuratorResponse())
+            coEvery { mockApiService.getMemory() } returns GatewayResponse.success(MemoryResponse())
             coEvery { mockApiService.getCredentialPool() } returns
-                Response.success(CredentialPoolResponse())
+                GatewayResponse.success(CredentialPoolResponse())
             coEvery { mockApiService.getCheckpoints() } returns
-                Response.success(CheckpointsResponse())
-            coEvery { mockApiService.getHooks() } returns Response.success(HookResponse())
+                GatewayResponse.success(CheckpointsResponse())
+            coEvery { mockApiService.getHooks() } returns GatewayResponse.success(HookResponse())
             coEvery { mockApiService.checkHermesUpdate(false) } returns
-                Response.success(UpdateCheckResponse())
-            coEvery { mockApiService.triggerBackup() } returns Response.success(ActionResponse())
+                GatewayResponse.success(UpdateCheckResponse())
+            coEvery { mockApiService.triggerBackup() } returns GatewayResponse.success(ActionResponse())
 
             val viewModel = SystemViewModel(ioDispatcher = testDispatcher)
             viewModel.loadAll()
@@ -1203,12 +1205,12 @@ class E2eIntegrationTest {
             val board = KanbanBoard("board-1", "Backlog", null)
             val task = KanbanTask("task-1", "Do laundry", null, "todo", null)
             coEvery { mockApiService.getKanbanBoards() } returns
-                Response.success(KanbanBoardsResponse(listOf(board), "board-1"))
-            coEvery { mockApiService.switchKanbanBoard("board-1") } returns Response.success(Unit)
+                GatewayResponse.success(KanbanBoardsResponse(listOf(board), "board-1"))
+            coEvery { mockApiService.switchKanbanBoard("board-1") } returns GatewayResponse.success(Unit)
             coEvery { mockApiService.getKanbanBoard() } returns
-                Response.success(KanbanBoardResponse(listOf(KanbanColumn("todo", listOf(task))), null, null))
+                GatewayResponse.success(KanbanBoardResponse(listOf(KanbanColumn("todo", listOf(task))), null, null))
             coEvery { mockApiService.updateKanbanTask("task-1", mapOf("status" to "in_progress")) } returns
-                Response.success(Unit)
+                GatewayResponse.success(Unit)
 
             val viewModel = KanbanViewModel(ioDispatcher = testDispatcher)
             viewModel.loadBoards()
@@ -1247,9 +1249,9 @@ class E2eIntegrationTest {
         runTest {
             val board = KanbanBoard("board-1", "Backlog", null)
             coEvery { mockApiService.getKanbanBoards() } returns
-                Response.success(KanbanBoardsResponse(listOf(board), "board-1"))
+                GatewayResponse.success(KanbanBoardsResponse(listOf(board), "board-1"))
             coEvery { mockApiService.getKanbanBoard() } returns
-                Response.success(KanbanBoardResponse(emptyList(), null, null))
+                GatewayResponse.success(KanbanBoardResponse(emptyList(), null, null))
 
             val viewModel = KanbanViewModel(ioDispatcher = testDispatcher)
             viewModel.loadBoards()
@@ -1267,10 +1269,10 @@ class E2eIntegrationTest {
             val first = KanbanBoard("board-1", "Backlog", null)
             val second = KanbanBoard("board-2", "Active", null)
             coEvery { mockApiService.getKanbanBoards() } returns
-                Response.success(KanbanBoardsResponse(listOf(first, second), "board-1"))
-            coEvery { mockApiService.switchKanbanBoard("board-2") } returns Response.success(Unit)
+                GatewayResponse.success(KanbanBoardsResponse(listOf(first, second), "board-1"))
+            coEvery { mockApiService.switchKanbanBoard("board-2") } returns GatewayResponse.success(Unit)
             coEvery { mockApiService.getKanbanBoard() } returns
-                Response.success(KanbanBoardResponse(emptyList(), null, null))
+                GatewayResponse.success(KanbanBoardResponse(emptyList(), null, null))
 
             val viewModel = KanbanViewModel(ioDispatcher = testDispatcher)
             viewModel.loadBoards()
@@ -1287,10 +1289,10 @@ class E2eIntegrationTest {
         runTest {
             val board = KanbanBoard("board-1", "Backlog", null)
             coEvery { mockApiService.getKanbanBoards() } returns
-                Response.success(KanbanBoardsResponse(listOf(board), null))
-            coEvery { mockApiService.switchKanbanBoard("board-1") } returns Response.success(Unit)
+                GatewayResponse.success(KanbanBoardsResponse(listOf(board), null))
+            coEvery { mockApiService.switchKanbanBoard("board-1") } returns GatewayResponse.success(Unit)
             coEvery { mockApiService.getKanbanBoard() } returns
-                Response.success(KanbanBoardResponse(emptyList(), null, null))
+                GatewayResponse.success(KanbanBoardResponse(emptyList(), null, null))
 
             val viewModel = KanbanViewModel(ioDispatcher = testDispatcher)
             viewModel.loadBoards()
@@ -1306,11 +1308,11 @@ class E2eIntegrationTest {
         runTest {
             val board = KanbanBoard("board-1", "Backlog", null)
             coEvery { mockApiService.getKanbanBoards() } returns
-                Response.success(KanbanBoardsResponse(listOf(board), "board-1"))
+                GatewayResponse.success(KanbanBoardsResponse(listOf(board), "board-1"))
             coEvery { mockApiService.getKanbanBoard() } returns
-                Response.success(KanbanBoardResponse(emptyList(), null, null))
+                GatewayResponse.success(KanbanBoardResponse(emptyList(), null, null))
             coEvery { mockApiService.createKanbanTask("board-1", any()) } returns
-                Response.success(KanbanTask("task-1", "Task", null, "todo", null))
+                GatewayResponse.success(KanbanTask("task-1", "Task", null, "todo", null))
 
             val viewModel = KanbanViewModel(ioDispatcher = testDispatcher)
             viewModel.loadBoards()
@@ -1329,12 +1331,12 @@ class E2eIntegrationTest {
             val first = KanbanBoard("board-1", "Backlog", null)
             val second = KanbanBoard("board-2", "Active", null)
             val createStarted = CompletableDeferred<Unit>()
-            val createResult = CompletableDeferred<Response<KanbanTask>>()
+            val createResult = CompletableDeferred<GatewayResponse<KanbanTask>>()
             coEvery { mockApiService.getKanbanBoards() } returns
-                Response.success(KanbanBoardsResponse(listOf(first, second), "board-1"))
+                GatewayResponse.success(KanbanBoardsResponse(listOf(first, second), "board-1"))
             coEvery { mockApiService.getKanbanBoard() } returns
-                Response.success(KanbanBoardResponse(emptyList(), null, null))
-            coEvery { mockApiService.switchKanbanBoard("board-2") } returns Response.success(Unit)
+                GatewayResponse.success(KanbanBoardResponse(emptyList(), null, null))
+            coEvery { mockApiService.switchKanbanBoard("board-2") } returns GatewayResponse.success(Unit)
             coEvery { mockApiService.createKanbanTask("board-1", any()) } coAnswers {
                 createStarted.complete(Unit)
                 createResult.await()
@@ -1348,7 +1350,7 @@ class E2eIntegrationTest {
             createStarted.await()
             viewModel.selectBoard(second)
             runCurrent()
-            createResult.complete(Response.success(KanbanTask("task-1", "Task", null, "todo", null)))
+            createResult.complete(GatewayResponse.success(KanbanTask("task-1", "Task", null, "todo", null)))
             advanceUntilIdle()
 
             assertEquals("board-2", viewModel.uiState.value.selectedBoard?.id)
@@ -1362,21 +1364,21 @@ class E2eIntegrationTest {
             val first = KanbanBoard("board-1", "Backlog", null)
             val second = KanbanBoard("board-2", "Active", null)
             val staleReloadStarted = CompletableDeferred<Unit>()
-            val staleReloadResult = CompletableDeferred<Response<KanbanBoardResponse>>()
+            val staleReloadResult = CompletableDeferred<GatewayResponse<KanbanBoardResponse>>()
             var loadCount = 0
             coEvery { mockApiService.getKanbanBoards() } returns
-                Response.success(KanbanBoardsResponse(listOf(first, second), "board-1"))
+                GatewayResponse.success(KanbanBoardsResponse(listOf(first, second), "board-1"))
             coEvery { mockApiService.getKanbanBoard() } coAnswers {
                 loadCount += 1
                 when (loadCount) {
-                    1 -> Response.success(KanbanBoardResponse(emptyList(), null, null))
+                    1 -> GatewayResponse.success(KanbanBoardResponse(emptyList(), null, null))
                     2 -> {
                         staleReloadStarted.complete(Unit)
                         staleReloadResult.await()
                     }
 
                     else ->
-                        Response.success(
+                        GatewayResponse.success(
                             KanbanBoardResponse(
                                 listOf(
                                     KanbanColumn(
@@ -1391,8 +1393,8 @@ class E2eIntegrationTest {
                 }
             }
             coEvery { mockApiService.createKanbanTask("board-1", any()) } returns
-                Response.success(KanbanTask("created", "Created", null, "todo", null))
-            coEvery { mockApiService.switchKanbanBoard("board-2") } returns Response.success(Unit)
+                GatewayResponse.success(KanbanTask("created", "Created", null, "todo", null))
+            coEvery { mockApiService.switchKanbanBoard("board-2") } returns GatewayResponse.success(Unit)
 
             val viewModel = KanbanViewModel(ioDispatcher = testDispatcher)
             viewModel.loadBoards()
@@ -1403,7 +1405,7 @@ class E2eIntegrationTest {
             viewModel.selectBoard(second)
             runCurrent()
             staleReloadResult.complete(
-                Response.success(
+                GatewayResponse.success(
                     KanbanBoardResponse(
                         listOf(
                             KanbanColumn(
@@ -1428,20 +1430,20 @@ class E2eIntegrationTest {
             val first = KanbanBoard("board-1", "Backlog", null)
             val second = KanbanBoard("board-2", "Active", null)
             val staleListStarted = CompletableDeferred<Unit>()
-            val staleListResult = CompletableDeferred<Response<KanbanBoardsResponse>>()
+            val staleListResult = CompletableDeferred<GatewayResponse<KanbanBoardsResponse>>()
             var listLoadCount = 0
             coEvery { mockApiService.getKanbanBoards() } coAnswers {
                 listLoadCount += 1
                 if (listLoadCount == 1) {
-                    Response.success(KanbanBoardsResponse(listOf(first, second), "board-1"))
+                    GatewayResponse.success(KanbanBoardsResponse(listOf(first, second), "board-1"))
                 } else {
                     staleListStarted.complete(Unit)
                     staleListResult.await()
                 }
             }
             coEvery { mockApiService.getKanbanBoard() } returns
-                Response.success(KanbanBoardResponse(emptyList(), null, null))
-            coEvery { mockApiService.switchKanbanBoard("board-2") } returns Response.success(Unit)
+                GatewayResponse.success(KanbanBoardResponse(emptyList(), null, null))
+            coEvery { mockApiService.switchKanbanBoard("board-2") } returns GatewayResponse.success(Unit)
 
             val viewModel = KanbanViewModel(ioDispatcher = testDispatcher)
             viewModel.loadBoards()
@@ -1451,7 +1453,7 @@ class E2eIntegrationTest {
             staleListStarted.await()
             viewModel.selectBoard(second)
             runCurrent()
-            staleListResult.complete(Response.error(500, "stale".toResponseBody()))
+            staleListResult.complete(GatewayResponse.error(500, "stale"))
             advanceUntilIdle()
 
             assertEquals("board-2", viewModel.uiState.value.selectedBoard?.id)
@@ -1465,25 +1467,25 @@ class E2eIntegrationTest {
             val first = KanbanBoard("board-1", "Backlog", null)
             val second = KanbanBoard("board-2", "Active", null)
             val staleReloadStarted = CompletableDeferred<Unit>()
-            val staleReloadResult = CompletableDeferred<Response<KanbanBoardResponse>>()
+            val staleReloadResult = CompletableDeferred<GatewayResponse<KanbanBoardResponse>>()
             var loadCount = 0
             coEvery { mockApiService.getKanbanBoards() } returns
-                Response.success(KanbanBoardsResponse(listOf(first, second), "board-1"))
+                GatewayResponse.success(KanbanBoardsResponse(listOf(first, second), "board-1"))
             coEvery { mockApiService.getKanbanBoard() } coAnswers {
                 loadCount += 1
                 when (loadCount) {
-                    1 -> Response.success(KanbanBoardResponse(emptyList(), null, null))
+                    1 -> GatewayResponse.success(KanbanBoardResponse(emptyList(), null, null))
                     2 -> {
                         staleReloadStarted.complete(Unit)
                         staleReloadResult.await()
                     }
 
-                    else -> Response.success(KanbanBoardResponse(emptyList(), null, null))
+                    else -> GatewayResponse.success(KanbanBoardResponse(emptyList(), null, null))
                 }
             }
             coEvery { mockApiService.createKanbanTask("board-1", any()) } returns
-                Response.success(KanbanTask("created", "Created", null, "todo", null))
-            coEvery { mockApiService.switchKanbanBoard("board-2") } returns Response.success(Unit)
+                GatewayResponse.success(KanbanTask("created", "Created", null, "todo", null))
+            coEvery { mockApiService.switchKanbanBoard("board-2") } returns GatewayResponse.success(Unit)
 
             val viewModel = KanbanViewModel(ioDispatcher = testDispatcher)
             viewModel.loadBoards()
@@ -1493,7 +1495,7 @@ class E2eIntegrationTest {
             staleReloadStarted.await()
             viewModel.selectBoard(second)
             runCurrent()
-            staleReloadResult.complete(Response.error(500, "stale".toResponseBody()))
+            staleReloadResult.complete(GatewayResponse.error(500, "stale"))
             advanceUntilIdle()
 
             assertEquals("board-2", viewModel.uiState.value.selectedBoard?.id)
@@ -1507,11 +1509,11 @@ class E2eIntegrationTest {
             val second = KanbanBoard("board-2", "Active", null)
             val third = KanbanBoard("board-3", "Done", null)
             val staleSwitchStarted = CompletableDeferred<Unit>()
-            val staleSwitchResult = CompletableDeferred<Response<Unit>>()
+            val staleSwitchResult = CompletableDeferred<GatewayResponse<Unit>>()
             coEvery { mockApiService.getKanbanBoards() } returns
-                Response.success(KanbanBoardsResponse(listOf(first, second, third), "board-1"))
+                GatewayResponse.success(KanbanBoardsResponse(listOf(first, second, third), "board-1"))
             coEvery { mockApiService.getKanbanBoard() } returns
-                Response.success(KanbanBoardResponse(emptyList(), null, null))
+                GatewayResponse.success(KanbanBoardResponse(emptyList(), null, null))
             coEvery { mockApiService.switchKanbanBoard(any()) } coAnswers {
                 val boardId = firstArg<String>()
                 when (boardId) {
@@ -1520,7 +1522,7 @@ class E2eIntegrationTest {
                         staleSwitchResult.await()
                     }
 
-                    "board-3" -> Response.success(Unit)
+                    "board-3" -> GatewayResponse.success(Unit)
                     else -> error("unexpected board")
                 }
             }
@@ -1533,7 +1535,7 @@ class E2eIntegrationTest {
             staleSwitchStarted.await()
             viewModel.selectBoard(third)
             runCurrent()
-            staleSwitchResult.complete(Response.error(500, "stale".toResponseBody()))
+            staleSwitchResult.complete(GatewayResponse.error(500, "stale"))
             advanceUntilIdle()
 
             assertEquals("board-3", viewModel.uiState.value.selectedBoard?.id)
@@ -1547,20 +1549,20 @@ class E2eIntegrationTest {
             val profile = ProfileInfo("default", null, true, "llama3", "ollama", null, null, null, null)
 
             coEvery { mockApiService.getModelOptions(any(), any()) } returns
-                Response.success(ModelOptionsResponse(listOf(provider)))
+                GatewayResponse.success(ModelOptionsResponse(listOf(provider)))
             coEvery { mockApiService.getActiveProfile() } returns
-                Response.success(ActiveProfileResponse("default", null))
-            coEvery { mockApiService.getProfiles() } returns Response.success(ProfilesResponse(listOf(profile)))
-            coEvery { mockApiService.updateProfileModel("default", any()) } returns Response.success(Unit)
+                GatewayResponse.success(ActiveProfileResponse("default", null))
+            coEvery { mockApiService.getProfiles() } returns GatewayResponse.success(ProfilesResponse(listOf(profile)))
+            coEvery { mockApiService.updateProfileModel("default", any()) } returns GatewayResponse.success(Unit)
             coEvery { mockApiService.getAuxiliaryModels() } returns
-                Response.success(
+                GatewayResponse.success(
                     AuxiliaryModelsResponse(
                         tasks = emptyList(),
                         main = MainModelAssignment("openai", "gpt-4"),
                     ),
                 )
             coEvery { mockApiService.getMoaModels() } returns
-                Response.success<MoaConfigResponse>(
+                GatewayResponse.success<MoaConfigResponse>(
                     MoaConfigResponse(
                         presets = emptyMap(),
                         default_preset = "",
@@ -1602,19 +1604,19 @@ class E2eIntegrationTest {
             val profile = ProfileInfo("default", null, true, "llama3", "ollama", null, null, null, null)
 
             coEvery { mockApiService.getModelOptions(any(), any()) } returns
-                Response.success(ModelOptionsResponse(listOf(provider)))
+                GatewayResponse.success(ModelOptionsResponse(listOf(provider)))
             coEvery { mockApiService.getActiveProfile() } returns
-                Response.success(ActiveProfileResponse("default", null))
-            coEvery { mockApiService.getProfiles() } returns Response.success(ProfilesResponse(listOf(profile)))
+                GatewayResponse.success(ActiveProfileResponse("default", null))
+            coEvery { mockApiService.getProfiles() } returns GatewayResponse.success(ProfilesResponse(listOf(profile)))
             coEvery { mockApiService.getAuxiliaryModels() } returns
-                Response.success(
+                GatewayResponse.success(
                     AuxiliaryModelsResponse(
                         tasks = emptyList(),
                         main = MainModelAssignment("openai", "gpt-4"),
                     ),
                 )
             coEvery { mockApiService.getMoaModels() } returns
-                Response.success<MoaConfigResponse>(
+                GatewayResponse.success<MoaConfigResponse>(
                     MoaConfigResponse(
                         presets = emptyMap(),
                         default_preset = "",
@@ -1627,7 +1629,7 @@ class E2eIntegrationTest {
             val capturedRefresh = mutableListOf<Boolean>()
             coEvery { mockApiService.getModelOptions(any(), any()) } answers {
                 capturedRefresh.add(firstArg())
-                Response.success(ModelOptionsResponse(listOf(provider)))
+                GatewayResponse.success(ModelOptionsResponse(listOf(provider)))
             }
 
             // Default loadAll() must call getModelOptions with refresh = false

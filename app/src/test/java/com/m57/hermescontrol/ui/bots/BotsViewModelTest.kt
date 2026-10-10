@@ -6,7 +6,8 @@ import com.m57.hermescontrol.data.model.ProfileInfo
 import com.m57.hermescontrol.data.model.ProfileWorkerSummary
 import com.m57.hermescontrol.data.model.ProfilesResponse
 import com.m57.hermescontrol.data.remote.ApiClient
-import com.m57.hermescontrol.data.remote.HermesApiService
+import com.m57.hermescontrol.data.remote.GatewayResponse
+import com.m57.hermescontrol.data.remote.HermesGatewayApi
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -28,12 +29,11 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import retrofit2.Response
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class BotsViewModelTest {
     private val dispatcher = StandardTestDispatcher()
-    private lateinit var api: HermesApiService
+    private lateinit var api: HermesGatewayApi
 
     @Before
     fun setUp() {
@@ -52,7 +52,7 @@ class BotsViewModelTest {
     @Test
     fun `load and refresh use only getProfiles`() =
         runTest(dispatcher) {
-            coEvery { api.getProfiles() } returns Response.success(ProfilesResponse(listOf(ProfileInfo("bot"))))
+            coEvery { api.getProfiles() } returns GatewayResponse.success(ProfilesResponse(listOf(ProfileInfo("bot"))))
             val viewModel =
                 BotsViewModel(
                     ioDispatcher = dispatcher,

@@ -1,7 +1,7 @@
 package com.m57.hermescontrol.ui.common
 
 import com.m57.hermescontrol.data.remote.GatewayMediaRangeResult
-import com.m57.hermescontrol.data.remote.HermesApiService
+import com.m57.hermescontrol.data.remote.GatewayRangeRequester
 import com.m57.hermescontrol.data.remote.MediaCacheScope
 import com.m57.hermescontrol.data.remote.SeekableGatewayMediaReader
 import com.m57.hermescontrol.data.remote.SeekableGatewayMediaSession
@@ -9,6 +9,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.awaitCancellation
+import okhttp3.Headers
 import okhttp3.ResponseBody
 import okio.Buffer
 import okio.ForwardingSource
@@ -18,9 +19,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import retrofit2.Call
-import retrofit2.Callback
-import retrofit2.Response
 import java.io.IOException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -189,26 +187,20 @@ class GatewayMediaDataReaderTest {
 
                 override fun source() = source
             }
-        val response: Response<ResponseBody> =
-            Response.success(
-                body,
-                okhttp3.Response.Builder()
-                    .request(okhttp3.Request.Builder().url("https://example.test/api/files/stream").build())
-                    .protocol(okhttp3.Protocol.HTTP_1_1)
-                    .code(206)
-                    .message("Partial Content")
-                    .header("Content-Range", "bytes 0-0/1")
-                    .build(),
-            )
-        val call = mockk<Call<ResponseBody>>(relaxed = true)
-        every { call.enqueue(any()) } answers {
-            firstArg<Callback<ResponseBody>>().onResponse(call, response)
-        }
-        every { call.cancel() } answers { body.close() }
-        val service = mockk<HermesApiService>()
-        every { service.streamManagedFileRange(any(), any()) } returns call
+        val response: okhttp3.Response =
+            okhttp3.Response.Builder()
+                .request(okhttp3.Request.Builder().url("https://example.test/api/files/stream").build())
+                .protocol(okhttp3.Protocol.HTTP_1_1)
+                .code(206)
+                .message("Partial Content")
+                .headers(Headers.headersOf("Content-Range", "bytes 0-0/1"))
+                .body(body)
+                .build()
+        val rangeRequester = mockk<GatewayRangeRequester>()
+        every { rangeRequester.streamRange(any(), any()) } returns response
         val scope = MediaCacheScope("profile-a", "https://example.test/", "direct-token", "cred-a")
-        val reader = GatewayMediaDataReader(SeekableGatewayMediaSession("/tmp/movie.mp4", service, scope) { scope })
+        val reader =
+            GatewayMediaDataReader(SeekableGatewayMediaSession("/tmp/movie.mp4", rangeRequester, scope) { scope })
         val executor = Executors.newSingleThreadExecutor()
         try {
             val read = executor.submit<Int> { reader.readAt(0, ByteArray(1), 0, 1) }
@@ -221,7 +213,7 @@ class GatewayMediaDataReaderTest {
             assertTrue("close blocked for $closeMillis ms", closeMillis < 100)
             assertTrue(bodyClosed.await(1, TimeUnit.SECONDS))
             assertThrows(Exception::class.java) { read.get(1, TimeUnit.SECONDS) }
-            verify(exactly = 1) { call.cancel() }
+            verify(exactly = 1) { rangeRequester.streamRange(any(), any()) }
         } finally {
             body.close()
             executor.shutdownNow()

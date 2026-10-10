@@ -18,6 +18,7 @@ import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.GatewayFile
 import com.m57.hermescontrol.data.remote.GatewayFileClient
 import com.m57.hermescontrol.data.remote.GatewayFileResult
+import com.m57.hermescontrol.data.remote.GatewayResponse
 import com.m57.hermescontrol.data.session.ActiveSessionHolder
 import com.m57.hermescontrol.data.ws.ConnectionStatus
 import com.m57.hermescontrol.data.ws.HermesWsClient
@@ -81,7 +82,7 @@ class ChatViewModelTest {
     private lateinit var app: Application
     private lateinit var fakeRepo: FakeChatPersistenceRepository
     private lateinit var fakeSlashUsageStore: FakeSlashUsageStore
-    private lateinit var mockApi: com.m57.hermescontrol.data.remote.HermesApiService
+    private lateinit var mockApi: com.m57.hermescontrol.data.remote.HermesGatewayApi
 
     /** Counter used to generate unique WS request IDs. */
     private var reqCount = 0
@@ -171,7 +172,7 @@ class ChatViewModelTest {
         mockApi = mockk(relaxed = true)
         every { ApiClient.hermesApi } returns mockApi
         coEvery { mockApi.getModelInfo() } returns
-            retrofit2.Response.success(
+            GatewayResponse.success(
                 com.m57.hermescontrol.data.model.ModelInfoResponse(
                     model = "gpt-5.6-sol",
                     provider = "openai-codex",
@@ -181,7 +182,7 @@ class ChatViewModelTest {
         coEvery {
             mockApi.getModelOptions(any(), any())
         } returns
-            retrofit2.Response.success(
+            GatewayResponse.success(
                 com.m57.hermescontrol.data.model.ModelOptionsResponse(
                     providers =
                         listOf(
@@ -221,7 +222,7 @@ class ChatViewModelTest {
     )
 
     private fun serverMessages(content: String) =
-        retrofit2.Response.success(
+        GatewayResponse.success(
             com.m57.hermescontrol.data.model.SessionMessagesResponse(
                 messages =
                     listOf(
@@ -289,13 +290,13 @@ class ChatViewModelTest {
     private suspend fun TestScope.createPaginatedViewModel(): ChatViewModel {
         val (viewModel, _) = createViewModelWithSession()
         coEvery { mockApi.getSessions(any(), any(), any()) } returns
-            retrofit2.Response.success(
+            GatewayResponse.success(
                 com.m57.hermescontrol.data.model.SessionListResponse(
                     sessions = listOf(com.m57.hermescontrol.data.model.SessionInfo(id = "paged", message_count = 300)),
                 ),
             )
         coEvery { mockApi.getSessionMessages("paged", 150, 0, true, "latest") } returns
-            retrofit2.Response.success(
+            GatewayResponse.success(
                 com.m57.hermescontrol.data.model.SessionMessagesResponse(
                     messages =
                         listOf(
@@ -342,7 +343,7 @@ class ChatViewModelTest {
                 val offset = arg<Int>(2)
                 pageOffsets += offset
                 val content = if (offset == 0) "kept recent" else "kept archived"
-                retrofit2.Response.success(
+                GatewayResponse.success(
                     com.m57.hermescontrol.data.model.SessionMessagesResponse(
                         messages =
                             listOf(
@@ -399,7 +400,7 @@ class ChatViewModelTest {
             var historyCalls = 0
             coEvery { mockApi.getSessionMessages(sessionId, any(), any(), true, "latest") } answers {
                 val content = if (++historyCalls == 1) "refresh superseded" else "undo authoritative"
-                retrofit2.Response.success(
+                GatewayResponse.success(
                     com.m57.hermescontrol.data.model.SessionMessagesResponse(
                         messages =
                             listOf(
@@ -486,7 +487,7 @@ class ChatViewModelTest {
             var messagePageCalls = 0
             coEvery { mockApi.getSessionMessages(any(), any(), any(), any(), any()) } answers {
                 messagePageCalls++
-                retrofit2.Response.success(
+                GatewayResponse.success(
                     com.m57.hermescontrol.data.model.SessionMessagesResponse(messages = emptyList()),
                 )
             }
@@ -516,7 +517,7 @@ class ChatViewModelTest {
             coEvery { mockApi.getSessionMessages(sessionId, any(), any(), true, "latest") } answers {
                 messagePageCalls++
                 every { HermesWsClient.isConnectionBindingCurrent(any()) } returns false
-                retrofit2.Response.success(
+                GatewayResponse.success(
                     com.m57.hermescontrol.data.model.SessionMessagesResponse(
                         messages =
                             listOf(
@@ -600,7 +601,7 @@ class ChatViewModelTest {
                             else -> page("post undo", 0)
                         }
                     }
-                retrofit2.Response.success(response)
+                GatewayResponse.success(response)
             }
             val undoResult = CompletableDeferred<Any?>()
             every {
@@ -2565,7 +2566,7 @@ class ChatViewModelTest {
             var olderCalls = 0
             coEvery { mockApi.getSessionMessages("paged", 150, 150, true, "latest") } answers {
                 olderCalls++
-                retrofit2.Response.success(
+                GatewayResponse.success(
                     com.m57.hermescontrol.data.model.SessionMessagesResponse(messages = emptyList()),
                 )
             }
@@ -2592,7 +2593,7 @@ class ChatViewModelTest {
             fakeRepo = rejectingRepo
             val viewModel = createPaginatedViewModel()
             coEvery { mockApi.getSessionMessages("paged", 150, 150, true, "latest") } returns
-                retrofit2.Response.success(
+                GatewayResponse.success(
                     com.m57.hermescontrol.data.model.SessionMessagesResponse(
                         messages =
                             listOf(
@@ -2619,7 +2620,7 @@ class ChatViewModelTest {
         runTest {
             val viewModel = createPaginatedViewModel()
             coEvery { mockApi.getSessionMessages("paged", 150, 150, true, "latest") } returns
-                retrofit2.Response.success(
+                GatewayResponse.success(
                     com.m57.hermescontrol.data.model.SessionMessagesResponse(
                         messages =
                             listOf(
@@ -2670,7 +2671,7 @@ class ChatViewModelTest {
                     releaseFreshFetch.await()
                 }
                 val content = if (call == 1) "stale older" else "fresh older"
-                retrofit2.Response.success(
+                GatewayResponse.success(
                     com.m57.hermescontrol.data.model.SessionMessagesResponse(
                         messages =
                             listOf(
@@ -2692,7 +2693,7 @@ class ChatViewModelTest {
                 )
             }
             coEvery { mockApi.getSessionMessages("paged", 150, 0, true, "latest") } returns
-                retrofit2.Response.success(
+                GatewayResponse.success(
                     com.m57.hermescontrol.data.model.SessionMessagesResponse(
                         messages =
                             listOf(
@@ -2748,7 +2749,7 @@ class ChatViewModelTest {
                 )
             val viewModel = createPaginatedViewModel()
             coEvery { mockApi.getSessionMessages("paged", 150, 150, true, "latest") } returns
-                retrofit2.Response.success(
+                GatewayResponse.success(
                     com.m57.hermescontrol.data.model.SessionMessagesResponse(
                         messages =
                             listOf(
@@ -2797,7 +2798,7 @@ class ChatViewModelTest {
             var refreshFetches = 0
             coEvery { mockApi.getSessionMessages("paged", 150, 0, true, "latest") } answers {
                 refreshFetches++
-                retrofit2.Response.success(
+                GatewayResponse.success(
                     com.m57.hermescontrol.data.model.SessionMessagesResponse(
                         messages =
                             listOf(
@@ -2885,7 +2886,7 @@ class ChatViewModelTest {
                     any(),
                 )
             } returns
-                retrofit2.Response.success(
+                GatewayResponse.success(
                     com.m57.hermescontrol.data.model.SessionMessagesResponse(
                         messages = emptyList(),
                     ),
@@ -3111,7 +3112,7 @@ class ChatViewModelTest {
             val (viewModel, _) = createViewModelWithSession()
             val api = ApiClient.hermesApi
             coEvery { api.getSessions(any(), any(), any()) } returns
-                retrofit2.Response.success(
+                GatewayResponse.success(
                     com.m57.hermescontrol.data.model.SessionListResponse(
                         sessions =
                             listOf(
@@ -3125,7 +3126,7 @@ class ChatViewModelTest {
             coEvery {
                 api.getSessionMessages("session-root", 150, 0, true, "latest")
             } returns
-                retrofit2.Response.success(
+                GatewayResponse.success(
                     com.m57.hermescontrol.data.model.SessionMessagesResponse(
                         messages =
                             listOf(
@@ -3153,7 +3154,7 @@ class ChatViewModelTest {
                 api.getSessionMessages("session-root", 150, 150, true, "latest")
             } answers {
                 olderPageRequested = true
-                retrofit2.Response.success(
+                GatewayResponse.success(
                     com.m57.hermescontrol.data.model.SessionMessagesResponse(
                         messages = emptyList(),
                     ),
@@ -3223,7 +3224,7 @@ class ChatViewModelTest {
                     when (initialCalls) {
                         1 -> {
                             withContext(NonCancellable) { releaseOlder.await() }
-                            retrofit2.Response.success(
+                            GatewayResponse.success(
                                 com.m57.hermescontrol.data.model.SessionMessagesResponse(
                                     messages =
                                         listOf(
@@ -3244,7 +3245,7 @@ class ChatViewModelTest {
                             )
                         }
                         2 ->
-                            retrofit2.Response.success(
+                            GatewayResponse.success(
                                 com.m57.hermescontrol.data.model.SessionMessagesResponse(
                                     messages =
                                         listOf(
@@ -3265,7 +3266,7 @@ class ChatViewModelTest {
                                 ),
                             )
                         else ->
-                            retrofit2.Response.success(
+                            GatewayResponse.success(
                                 com.m57.hermescontrol.data.model.SessionMessagesResponse(messages = emptyList()),
                             )
                     }
@@ -3303,9 +3304,9 @@ class ChatViewModelTest {
                 calls++
                 if (calls == 1) {
                     withContext(NonCancellable) { releaseFailure.await() }
-                    retrofit2.Response.error(500, okhttp3.ResponseBody.create(null, "stale failure"))
+                    GatewayResponse.error(500, "stale failure")
                 } else {
-                    retrofit2.Response.success(
+                    GatewayResponse.success(
                         com.m57.hermescontrol.data.model.SessionMessagesResponse(
                             messages =
                                 listOf(
@@ -3368,7 +3369,7 @@ class ChatViewModelTest {
                         }
                         else -> "post-refresh sync"
                     }
-                retrofit2.Response.success(
+                GatewayResponse.success(
                     com.m57.hermescontrol.data.model.SessionMessagesResponse(
                         messages =
                             listOf(
@@ -3517,7 +3518,7 @@ class ChatViewModelTest {
             coEvery { mockApi.getSessionMessages(any(), any(), any(), true, any()) } coAnswers {
                 releaseRefresh.await()
                 serverMessages("server").body()!!
-                    .let { retrofit2.Response.success(it) }
+                    .let { GatewayResponse.success(it) }
             }
             val viewModel = createViewModel()
 
@@ -3540,13 +3541,13 @@ class ChatViewModelTest {
             val requests = mutableListOf<Pair<String, Int>>()
             coEvery { mockApi.getSessionMessages(any(), any(), any(), true, "latest") } answers {
                 requests += arg<String>(0) to arg<Int>(2)
-                retrofit2.Response.success(
+                GatewayResponse.success(
                     com.m57.hermescontrol.data.model.SessionMessagesResponse(messages = emptyList()),
                 )
             }
             coEvery { mockApi.getSessions(any(), any(), any()) } coAnswers {
                 withContext(NonCancellable) { releaseCount.await() }
-                retrofit2.Response.success(
+                GatewayResponse.success(
                     com.m57.hermescontrol.data.model.SessionListResponse(
                         sessions =
                             listOf(
@@ -3574,7 +3575,7 @@ class ChatViewModelTest {
             val (viewModel, _) = createViewModelWithSession()
             val api = ApiClient.hermesApi
             coEvery { api.getSessions(any(), any(), any()) } returns
-                retrofit2.Response.success(
+                GatewayResponse.success(
                     com.m57.hermescontrol.data.model.SessionListResponse(
                         sessions =
                             listOf(
@@ -3606,7 +3607,7 @@ class ChatViewModelTest {
                     )
                 pageRequests += request
                 if (request.offset == 0) {
-                    retrofit2.Response.success(
+                    GatewayResponse.success(
                         com.m57.hermescontrol.data.model.SessionMessagesResponse(
                             messages =
                                 listOf(
@@ -3631,7 +3632,7 @@ class ChatViewModelTest {
                         ),
                     )
                 } else {
-                    retrofit2.Response.success(
+                    GatewayResponse.success(
                         com.m57.hermescontrol.data.model.SessionMessagesResponse(
                             messages =
                                 listOf(
@@ -3684,7 +3685,7 @@ class ChatViewModelTest {
             var countRequested = false
             coEvery { api.getSessions(any(), any(), any()) } answers {
                 countRequested = true
-                retrofit2.Response.success(
+                GatewayResponse.success(
                     com.m57.hermescontrol.data.model.SessionListResponse(
                         sessions =
                             listOf(
@@ -3701,7 +3702,7 @@ class ChatViewModelTest {
                 api.getSessionMessages(any(), any(), any(), any(), any())
             } answers {
                 pageRequests += Triple(arg(0), arg(1), arg(2))
-                retrofit2.Response.success(
+                GatewayResponse.success(
                     com.m57.hermescontrol.data.model.SessionMessagesResponse(
                         messages = emptyList(),
                     ),
