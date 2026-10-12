@@ -16,6 +16,8 @@ import io.ktor.client.HttpClient
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -113,7 +115,7 @@ object HermesWsClient {
      * held across ticket minting. Held briefly across non-blocking socket
      * construction and publication so callbacks cannot outrun assignment.
      */
-    private val connectionLock = Any()
+    private val connectionLock = SynchronizedObject()
 
     /**
      * False while a credential-clearing [disconnect] is in effect, so a send

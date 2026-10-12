@@ -37,6 +37,8 @@ kotlin {
                 implementation(libs.kotlinx.serialization.json)
                 // Flow / StateFlow / MutableStateFlow — moved from :app.
                 implementation(libs.kotlinx.coroutines.core)
+                // Multiplatform lock for HermesWsClient's critical sections.
+                implementation(libs.kotlinx.atomicfu)
                 // io.ktor.http.Url: multiplatform URL parsing — replaces the
                 // jvm-only okhttp3.HttpUrl so ServerEndpoint can move out of
                 // :app and into :shared's common source set.
