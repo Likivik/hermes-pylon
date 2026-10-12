@@ -300,7 +300,8 @@ object HermesWsClient {
             onBufferOverflow = BufferOverflow.DROP_OLDEST,
         )
 
-    internal val sourcedEvents: SharedFlow<SourcedWsEvent> = parsedEvents.asSharedFlow()
+    /** Parsed events paired with their provenance, for consumers that need the source. */
+    val sourcedEvents: SharedFlow<SourcedWsEvent> = parsedEvents.asSharedFlow()
 
     /** Collect this from ViewModels to receive all parsed [WsEvent]s. */
     val events: SharedFlow<WsEvent> =
@@ -427,11 +428,11 @@ object HermesWsClient {
     }
 
     @VisibleForTesting
-    internal fun hasScheduledBackgroundIdleCloseForTest(): Boolean =
+    fun hasScheduledBackgroundIdleCloseForTest(): Boolean =
         synchronized(connectionLock) { backgroundIdleJob?.isActive == true }
 
     @VisibleForTesting
-    internal fun expireBackgroundIdleGraceForTest() {
+    fun expireBackgroundIdleGraceForTest() {
         synchronized(connectionLock) {
             cancelBackgroundIdleCloseLocked()
             if (isIdleInBackgroundLocked()) closeIdleBackgroundSocket()
@@ -460,7 +461,7 @@ object HermesWsClient {
     }
 
     @VisibleForTesting
-    internal fun shouldReconnectAfterNetworkRestore(autoReconnect: Boolean): Boolean =
+    fun shouldReconnectAfterNetworkRestore(autoReconnect: Boolean): Boolean =
         !isConnected &&
             !intentionalClose.get() &&
             !backgroundIdleClosed.get() &&
@@ -483,7 +484,7 @@ object HermesWsClient {
      *   their callers don't hang across the test boundary.
      */
     @VisibleForTesting
-    internal fun resetRequestCounterForTest(rejectInflight: Boolean = true) {
+    fun resetRequestCounterForTest(rejectInflight: Boolean = true) {
         if (rejectInflight) rejectAllPending()
         requestId.set(0)
     }
@@ -1547,7 +1548,7 @@ object HermesWsClient {
      * and this is the single place that knows which fields must move together.
      */
     @VisibleForTesting
-    internal fun installConnection(
+    fun installConnection(
         socket: WsSocket,
         profileId: String,
     ): WsListener {
@@ -1570,7 +1571,7 @@ object HermesWsClient {
 
     /** The suite's per-test reset, in the order the reflection performed it. */
     @VisibleForTesting
-    internal fun resetForTest() {
+    fun resetForTest() {
         connected.set(false)
         _connectionStatus.value = ConnectionStatus.DISCONNECTED
         messageQueue.clear()
@@ -1581,42 +1582,47 @@ object HermesWsClient {
 
     /** The live outbound queue: tests read it and seed frames into it. */
     @VisibleForTesting
-    internal fun outboundQueueForTest(): MutableCollection<String> = messageQueue
+    fun outboundQueueForTest(): MutableCollection<String> = messageQueue
 
     /** Ids of in-flight requests. */
     @VisibleForTesting
-    internal fun pendingCallIdsForTest(): Set<String> = pendingCalls.keys
+    fun pendingCallIdsForTest(): Set<String> = pendingCalls.keys
 
     /** Timeout jobs attached to in-flight requests. */
     @VisibleForTesting
-    internal fun pendingTimeoutJobsForTest(): List<Job> = pendingCalls.values.mapNotNull { it.timeoutJob }
+    fun pendingTimeoutJobsForTest(): List<Job> = pendingCalls.values.mapNotNull { it.timeoutJob }
 
     @VisibleForTesting
-    internal fun pendingPromptSessionCountForTest(): Int = pendingPromptSessions.size
+    fun pendingPromptSessionCountForTest(): Int = pendingPromptSessions.size
 
     @VisibleForTesting
-    internal fun pendingReplayResponseCountForTest(): Int = pendingReplayResponses.size
+    fun pendingReplayResponseCountForTest(): Int = pendingReplayResponses.size
 
     @VisibleForTesting
-    internal val connectionGenerationForTest: Int get() = connectionGeneration.get()
+    val connectionGenerationForTest: Int get() = connectionGeneration.get()
 
     @VisibleForTesting
-    internal fun bumpConnectionGenerationForTest() {
+    fun bumpConnectionGenerationForTest() {
         connectionGeneration.incrementAndGet()
     }
 
     @VisibleForTesting
-    internal val activeConnectionGenerationForTest: Int get() = activeConnectionGeneration
+    val activeConnectionGenerationForTest: Int get() = activeConnectionGeneration
 
     @VisibleForTesting
-    internal val currentBackoffForTest: Long get() = currentBackoff
+    val currentBackoffForTest: Long get() = currentBackoff
 
     @VisibleForTesting
-    internal val socketForTest: WsSocket? get() = webSocket
+    val socketForTest: WsSocket? get() = webSocket
 
     // ── Listener ─────────────────────────────────────────────────────────
 
-    internal class WsListenerImpl(
+    /**
+     * The listener the client hands to [WsTransport.connect]. Public only so the
+     * suite can construct a stale-generation instance and drive its callbacks.
+     */
+    @VisibleForTesting
+    class WsListenerImpl(
         private val profileId: String?,
         private val generation: Int,
         private val eventSocketGeneration: Int,
