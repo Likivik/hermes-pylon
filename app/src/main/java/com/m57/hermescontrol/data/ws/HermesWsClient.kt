@@ -7,14 +7,15 @@ import com.m57.hermescontrol.concurrent.AtomicInteger
 import com.m57.hermescontrol.concurrent.ConcurrentLinkedQueue
 import com.m57.hermescontrol.concurrent.concurrentMutableMap
 import com.m57.hermescontrol.data.remote.AuthPayloads
-import com.m57.hermescontrol.data.remote.DashboardSessionTokenRefresher
 import com.m57.hermescontrol.data.remote.HermesJson
 import com.m57.hermescontrol.data.remote.NetworkMonitor
-import com.m57.hermescontrol.data.remote.OkHttpProvider
-import com.m57.hermescontrol.data.remote.resolve
 import com.m57.hermescontrol.data.session.ActiveSessionHolder
 import com.m57.hermescontrol.util.HermesLog
 import com.m57.hermescontrol.util.VisibleForTesting
+import io.ktor.client.HttpClient
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -37,8 +38,6 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
 
 /** Immutable identity of one live socket connection. */
 class ConnectionBinding internal constructor(
@@ -161,8 +160,43 @@ object HermesWsClient {
     @Volatile
     private var auth: WsAuthConfig = UnconfiguredAuth
 
-    /** Transport seam — production wires [OkHttpWsTransport]. Tests inject fakes. */
-    private val transport: WsTransport by lazy { OkHttpWsTransport(OkHttpProvider.websocket) }
+    /**
+     * Transport seam — installed by the app with the OkHttp-backed transport;
+     * tests inject fakes. No default, because naming a platform implementation
+     * here is exactly what keeps this class out of `:shared`.
+     */
+    @Volatile
+    private var transport: WsTransport? = null
+
+    /**
+     * Gateway HTTP client used to mint WS tickets, installed by the app so the
+     * request rides the same cookie jar as the rest of the session. Used per
+     * call, so installing it at any time is safe.
+     */
+    @Volatile
+    private var httpClient: HttpClient? = null
+
+    /**
+     * Loopback dashboard-token refresh, installed by the app. A no-op until
+     * then: the refresher is Android-only and cannot be named from `:shared`.
+     */
+    @Volatile
+    private var loopbackTokenRefresher: () -> Unit = {}
+
+    /** Install the socket transport. */
+    fun installTransport(newTransport: WsTransport) {
+        transport = newTransport
+    }
+
+    /** Install the gateway HTTP client used to mint WS tickets. */
+    fun installHttpClient(client: HttpClient) {
+        httpClient = client
+    }
+
+    /** Install the loopback dashboard-token refresher. */
+    fun installLoopbackTokenRefresher(refresher: () -> Unit) {
+        loopbackTokenRefresher = refresher
+    }
 
     /**
      * Install the platform network monitor.
@@ -496,8 +530,9 @@ object HermesWsClient {
      * one is required on every connect and reconnect.
      *
      * Dashboard access and refresh cookies are attached automatically by the
-     * shared CookieJar on [OkHttpProvider.probe]. The ticket endpoint decides
-     * whether those cookies represent a live or refreshable session.
+     * shared CookieJar on the installed gateway HTTP client. The ticket
+     * endpoint decides whether those cookies represent a live or refreshable
+     * session.
      *
      * Distinguishes a definitive authentication rejection from a retryable
      * transport/server failure. Only the former should force the user to sign
@@ -519,7 +554,7 @@ object HermesWsClient {
             // The loopback dashboard token is regenerated on every server
             // restart. Refresh it before each socket handshake so automatic
             // reconnect does not get stuck in AUTH_EXPIRED with a stale token.
-            DashboardSessionTokenRefresher.refresh()
+            loopbackTokenRefresher()
             return TicketRefreshResult(TicketRefreshStatus.READY)
         }
 
@@ -530,45 +565,37 @@ object HermesWsClient {
         // authority: the shared CookieJar attaches every applicable cookie and
         // the server either refreshes the session or returns an auth failure.
         try {
-            val client = OkHttpProvider.probe
-            val request =
-                Request
-                    .Builder()
-                    .url(
-                        auth.endpointForBuild().resolve(
-                            "api/auth/ws-ticket",
-                        ),
-                    )
-                    .post("{}".toRequestBody())
-                    .build()
+            val client =
+                httpClient
+                    ?: return TicketRefreshResult(TicketRefreshStatus.TRANSIENT_FAILURE)
+            val url = auth.endpointForBuild().baseUrl.resolve("api/auth/ws-ticket").toString()
 
             return kotlinx.coroutines.runBlocking(Dispatchers.IO) {
-                client.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) {
-                        HermesLog.w(
-                            TAG,
-                            "WS ticket refresh failed: HTTP ${response.code}",
-                        )
-                        return@use if (response.code == 401 || response.code == 403) {
-                            TicketRefreshResult(TicketRefreshStatus.AUTHENTICATION_FAILED)
-                        } else {
-                            TicketRefreshResult(TicketRefreshStatus.TRANSIENT_FAILURE)
-                        }
+                val response = client.post(url) { setBody("{}") }
+                if (response.status.value !in 200..299) {
+                    HermesLog.w(
+                        TAG,
+                        "WS ticket refresh failed: HTTP ${response.status.value}",
+                    )
+                    return@runBlocking if (response.status.value == 401 || response.status.value == 403) {
+                        TicketRefreshResult(TicketRefreshStatus.AUTHENTICATION_FAILED)
+                    } else {
+                        TicketRefreshResult(TicketRefreshStatus.TRANSIENT_FAILURE)
                     }
-
-                    val ticket =
-                        AuthPayloads.webSocketTicket(response.body.string())
-                    if (ticket.isNullOrBlank()) {
-                        HermesLog.w(
-                            TAG,
-                            "WS ticket refresh failed: invalid response",
-                        )
-                        return@use TicketRefreshResult(TicketRefreshStatus.TRANSIENT_FAILURE)
-                    }
-
-                    if (HermesLog.isDebug) HermesLog.d(TAG, "WS ticket refreshed")
-                    TicketRefreshResult(TicketRefreshStatus.READY, ticket)
                 }
+
+                val ticket =
+                    AuthPayloads.webSocketTicket(response.bodyAsText())
+                if (ticket.isNullOrBlank()) {
+                    HermesLog.w(
+                        TAG,
+                        "WS ticket refresh failed: invalid response",
+                    )
+                    return@runBlocking TicketRefreshResult(TicketRefreshStatus.TRANSIENT_FAILURE)
+                }
+
+                if (HermesLog.isDebug) HermesLog.d(TAG, "WS ticket refreshed")
+                TicketRefreshResult(TicketRefreshStatus.READY, ticket)
             }
         } catch (e: Exception) {
             HermesLog.w(TAG, "WS ticket refresh failed: ${e.javaClass.simpleName}")
@@ -1398,7 +1425,7 @@ object HermesWsClient {
                 else -> {
                     val eventSocketGeneration = socketGeneration.incrementAndGet()
                     webSocket =
-                        transport.connect(
+                        requireNotNull(transport) { "WsTransport not installed" }.connect(
                             url,
                             WsListenerImpl(profileId, generation, eventSocketGeneration),
                         )

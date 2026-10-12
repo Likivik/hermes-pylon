@@ -6,6 +6,7 @@ import android.util.Log
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.remote.CleartextPolicy
 import com.m57.hermescontrol.data.remote.CookieManager
+import com.m57.hermescontrol.data.remote.OkHttpProvider
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.data.remote.buildFakePersistentCookieJar
 import com.m57.hermescontrol.data.session.ActiveSessionHolder
@@ -82,6 +83,9 @@ class HermesWsClientTest {
         // The client reads its auth config through the :shared seam, so the
         // mocked AuthManager has to be installed rather than picked up by name.
         HermesWsClient.installAuth(AuthManager)
+        // Same transport the client used to default to, installed explicitly now
+        // that the seam has no platform default.
+        HermesWsClient.installTransport(OkHttpWsTransport(OkHttpProvider.websocket))
 
         // Issue #470: clients are built through OkHttpProvider, which now
         // resolves the shared CookieManager.cookieJar. Inject a fake jar so

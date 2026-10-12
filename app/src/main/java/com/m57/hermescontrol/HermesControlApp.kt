@@ -8,8 +8,12 @@ import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.remote.AndroidNetworkMonitor
+import com.m57.hermescontrol.data.remote.DashboardSessionTokenRefresher
+import com.m57.hermescontrol.data.remote.HermesHttpConfig
 import com.m57.hermescontrol.data.remote.OkHttpProvider
+import com.m57.hermescontrol.data.remote.createHermesHttpClient
 import com.m57.hermescontrol.data.ws.HermesWsClient
+import com.m57.hermescontrol.data.ws.OkHttpWsTransport
 import com.m57.hermescontrol.ui.analytics.AnalyticsPreloader
 import com.m57.hermescontrol.util.AndroidLogSink
 import com.m57.hermescontrol.util.HermesLog
@@ -42,6 +46,11 @@ class HermesControlApp :
         AndroidNetworkMonitor.init(this)
         HermesWsClient.installNetworkMonitor(AndroidNetworkMonitor)
         HermesWsClient.installAuth(AuthManager)
+        HermesWsClient.installTransport(OkHttpWsTransport(OkHttpProvider.websocket))
+        HermesWsClient.installHttpClient(
+            createHermesHttpClient(OkHttpProvider.probe, HermesHttpConfig.Probe),
+        )
+        HermesWsClient.installLoopbackTokenRefresher { DashboardSessionTokenRefresher.refresh() }
         // Issue #537 follow-up (A): preload analytics in the background after launch
         // so the tab renders instantly when opened (the usage endpoint is slow on a
         // cold backend). Fire-and-forget; never blocks UI startup.
