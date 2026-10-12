@@ -51,6 +51,10 @@ kotlin {
                 implementation(libs.ktor.client.content.negotiation)
                 implementation(libs.ktor.serialization.kotlinx.json)
                 implementation(libs.ktor.client.logging)
+                // Curated engine per target (Android -> OkHttp, JVM -> CIO), so a
+                // new target needs no engine declaration of its own. This is the
+                // documented KMP recommendation over per-source-set engines.
+                implementation(libs.ktor.client.engine.defaults)
             }
         }
 
@@ -65,17 +69,18 @@ kotlin {
 
         androidMain {
             dependencies {
-                // Engine for the Android target. OkHttp underneath, so an
-                // Android HttpClient can later be handed OkHttpProvider's
-                // OkHttpClient via `engine { preconfigured = ... }`.
+                // Engine for the Android target comes from engine-defaults in
+                // commonMain. OkHttp stays declared because
+                // HermesHttpClientOkHttp.kt names the engine type explicitly to
+                // hand it OkHttpProvider's OkHttpClient via `preconfigured`.
                 implementation(libs.ktor.client.okhttp)
             }
         }
 
         jvmMain {
             dependencies {
-                // Console target: no OkHttp dependency at all.
-                implementation(libs.ktor.client.cio)
+                // No engine declared: ktor-client-engine-defaults resolves one
+                // for this target. Nothing here depends on OkHttp.
             }
         }
     }
