@@ -2,18 +2,19 @@
 
 package com.m57.hermescontrol.data.ws
 
-import androidx.annotation.VisibleForTesting
 import com.m57.hermescontrol.concurrent.AtomicBoolean
 import com.m57.hermescontrol.concurrent.AtomicInteger
 import com.m57.hermescontrol.concurrent.ConcurrentLinkedQueue
 import com.m57.hermescontrol.concurrent.concurrentMutableMap
 import com.m57.hermescontrol.data.remote.AuthPayloads
 import com.m57.hermescontrol.data.remote.DashboardSessionTokenRefresher
+import com.m57.hermescontrol.data.remote.HermesJson
 import com.m57.hermescontrol.data.remote.NetworkMonitor
 import com.m57.hermescontrol.data.remote.OkHttpProvider
 import com.m57.hermescontrol.data.remote.resolve
 import com.m57.hermescontrol.data.session.ActiveSessionHolder
 import com.m57.hermescontrol.util.HermesLog
+import com.m57.hermescontrol.util.VisibleForTesting
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -739,7 +740,7 @@ object HermesWsClient {
                     )
             val request =
                 JsonRpcRequest(id = id, method = method, params = allParams.mapValues { it.value.toJsonElement() })
-            val json = OkHttpProvider.json.encodeToString(request)
+            val json = HermesJson.instance.encodeToString(request)
             val pending = PendingCall(method, deferred)
             pendingCalls[id] = pending
             if (!ws.send(json)) {
@@ -844,7 +845,7 @@ object HermesWsClient {
                 )
             val pending = PendingCall(method, deferred)
             pendingCalls[id] = pending
-            if (!binding.socket.send(OkHttpProvider.json.encodeToString(request))) {
+            if (!binding.socket.send(HermesJson.instance.encodeToString(request))) {
                 pendingCalls.remove(id)
                 deferred.completeExceptionally(HermesRpcException("Bound request was not sent"))
             } else {
@@ -894,7 +895,7 @@ object HermesWsClient {
                 )
             val pending = PendingCall(method, deferred)
             pendingCalls[id] = pending
-            if (!binding.socket.send(OkHttpProvider.json.encodeToString(request))) {
+            if (!binding.socket.send(HermesJson.instance.encodeToString(request))) {
                 pendingCalls.remove(id)
                 deferred.completeExceptionally(HermesRpcException("Bound request was not sent"))
             } else {
@@ -1007,7 +1008,7 @@ object HermesWsClient {
         val id = requestId.incrementAndGet().toString()
         onSent?.invoke(id)
         val request = JsonRpcRequest(id = id, method = method, params = params.mapValues { it.value.toJsonElement() })
-        val json = OkHttpProvider.json.encodeToString(request)
+        val json = HermesJson.instance.encodeToString(request)
         HermesLog.d(
             TAG,
             "send method=$method id=$id (${json.length}B) connected=${connected.get()} ws=${webSocket != null}",
@@ -1114,7 +1115,7 @@ object HermesWsClient {
                     method = WsMethods.CLARIFY_RESPOND,
                     params = params.mapValues { it.value.toJsonElement() },
                 )
-            ws.send(OkHttpProvider.json.encodeToString(request))
+            ws.send(HermesJson.instance.encodeToString(request))
         }
 
     /** Start an idle-close recovery without reopening a credential boundary. */
@@ -1287,7 +1288,7 @@ object HermesWsClient {
                     method = method,
                     params = params.mapValues { it.value.toJsonElement() },
                 )
-            val json = OkHttpProvider.json.encodeToString(request)
+            val json = HermesJson.instance.encodeToString(request)
             if (!ws.send(json)) return@synchronized false
             if (method == WsMethods.PROMPT_SUBMIT) {
                 pendingPromptSessions[id] = runtimeSessionId
@@ -1632,7 +1633,7 @@ object HermesWsClient {
             // (issue #526) before fanning the parsed event out to collectors.
             val parsedEvent =
                 try {
-                    val rpc = OkHttpProvider.json.decodeFromString<JsonRpcResponse>(text)
+                    val rpc = HermesJson.instance.decodeFromString<JsonRpcResponse>(text)
                     EventParser.parse(rpc, text)
                 } catch (e: Exception) {
                     HermesLog.e(
