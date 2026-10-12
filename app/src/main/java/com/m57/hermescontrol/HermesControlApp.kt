@@ -11,6 +11,8 @@ import com.m57.hermescontrol.data.remote.AndroidNetworkMonitor
 import com.m57.hermescontrol.data.remote.OkHttpProvider
 import com.m57.hermescontrol.data.ws.HermesWsClient
 import com.m57.hermescontrol.ui.analytics.AnalyticsPreloader
+import com.m57.hermescontrol.util.AndroidLogSink
+import com.m57.hermescontrol.util.HermesLog
 import io.kseongbin.stacktrace.CrashLogger
 import io.kseongbin.stacktrace.CrashLoggerConfig
 
@@ -31,6 +33,9 @@ class HermesControlApp :
             ),
         )
         AuthManager.init(this)
+        // Shared code logs through the :shared HermesLog facade; install the
+        // android.util.Log-backed sink (and its BuildConfig.DEBUG flag) here.
+        HermesLog.install(AndroidLogSink)
         // Issue #478: guarantee a "Default" profile is always selected so there is no
         // separate standalone/default code path anywhere in the app.
         AuthManager.ensureDefaultProfile()

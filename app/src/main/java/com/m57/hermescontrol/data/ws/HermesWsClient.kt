@@ -2,15 +2,14 @@
 
 package com.m57.hermescontrol.data.ws
 
-import android.util.Log
 import androidx.annotation.VisibleForTesting
-import com.m57.hermescontrol.BuildConfig
 import com.m57.hermescontrol.data.remote.AuthPayloads
 import com.m57.hermescontrol.data.remote.DashboardSessionTokenRefresher
 import com.m57.hermescontrol.data.remote.NetworkMonitor
 import com.m57.hermescontrol.data.remote.OkHttpProvider
 import com.m57.hermescontrol.data.remote.resolve
 import com.m57.hermescontrol.data.session.ActiveSessionHolder
+import com.m57.hermescontrol.util.HermesLog
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -302,7 +301,7 @@ object HermesWsClient {
                     runCatching { auth.isAutoReconnect() }
                         .getOrDefault(false)
                 if (connected && shouldReconnectAfterNetworkRestore(autoReconnect)) {
-                    Log.d(TAG, "Network restored — triggering immediate reconnect")
+                    HermesLog.d(TAG, "Network restored — triggering immediate reconnect")
                     // Serialize against scheduleReconnect(): both cancel and
                     // replace reconnectJob, so without the lock the collector
                     // and a backoff timer can each open a socket onto the same
@@ -459,7 +458,7 @@ object HermesWsClient {
         val generation =
             synchronized(connectionLock) {
                 if (connected.get()) {
-                    Log.d(TAG, "Already connected — skipping")
+                    HermesLog.d(TAG, "Already connected — skipping")
                     return
                 }
                 // Guard against re-entrant connect() while a connection is
@@ -467,7 +466,7 @@ object HermesWsClient {
                 if (_connectionStatus.value == ConnectionStatus.CONNECTING ||
                     _connectionStatus.value == ConnectionStatus.RECONNECTING
                 ) {
-                    Log.d(
+                    HermesLog.d(
                         TAG,
                         "Connection already in flight (${_connectionStatus.value}) — skipping",
                     )
@@ -475,7 +474,7 @@ object HermesWsClient {
                 }
                 // AUTH_EXPIRED cannot be resolved by reconnecting alone.
                 if (_connectionStatus.value == ConnectionStatus.AUTH_EXPIRED) {
-                    Log.d(TAG, "Connection is AUTH_EXPIRED — skipping reconnect; re-auth required")
+                    HermesLog.d(TAG, "Connection is AUTH_EXPIRED — skipping reconnect; re-auth required")
                     return
                 }
                 cancelBackgroundIdleCloseLocked()
@@ -512,7 +511,7 @@ object HermesWsClient {
                 // serverStore not initialized yet (transient early call); treat
                 // as loopback so a stale-token refresh still runs. Log so a real
                 // misconfiguration isn't silently swallowed.
-                Log.w(TAG, "serverStore uninitialized during WS handshake; assuming non-gated")
+                HermesLog.w(TAG, "serverStore uninitialized during WS handshake; assuming non-gated")
                 false
             }
         if (!isGated) {
@@ -545,7 +544,7 @@ object HermesWsClient {
             return kotlinx.coroutines.runBlocking(Dispatchers.IO) {
                 client.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) {
-                        Log.w(
+                        HermesLog.w(
                             TAG,
                             "WS ticket refresh failed: HTTP ${response.code}",
                         )
@@ -559,19 +558,19 @@ object HermesWsClient {
                     val ticket =
                         AuthPayloads.webSocketTicket(response.body.string())
                     if (ticket.isNullOrBlank()) {
-                        Log.w(
+                        HermesLog.w(
                             TAG,
                             "WS ticket refresh failed: invalid response",
                         )
                         return@use TicketRefreshResult(TicketRefreshStatus.TRANSIENT_FAILURE)
                     }
 
-                    if (BuildConfig.DEBUG) Log.d(TAG, "WS ticket refreshed")
+                    if (HermesLog.isDebug) HermesLog.d(TAG, "WS ticket refreshed")
                     TicketRefreshResult(TicketRefreshStatus.READY, ticket)
                 }
             }
         } catch (e: Exception) {
-            Log.w(TAG, "WS ticket refresh failed: ${e.javaClass.simpleName}")
+            HermesLog.w(TAG, "WS ticket refresh failed: ${e.javaClass.simpleName}")
             return TicketRefreshResult(TicketRefreshStatus.TRANSIENT_FAILURE)
         }
     }
@@ -988,7 +987,7 @@ object HermesWsClient {
                 pendingCalls.toList().also { pendingCalls.clear() }
             }
         for ((id, call) in snapshot) {
-            Log.w(TAG, "Rejecting pending request on disconnect: ${call.method} (id=$id)")
+            HermesLog.w(TAG, "Rejecting pending request on disconnect: ${call.method} (id=$id)")
             call.timeoutJob?.cancel()
             call.deferred.completeExceptionally(error)
         }
@@ -1009,7 +1008,10 @@ object HermesWsClient {
         onSent?.invoke(id)
         val request = JsonRpcRequest(id = id, method = method, params = params.mapValues { it.value.toJsonElement() })
         val json = OkHttpProvider.json.encodeToString(request)
-        Log.d(TAG, "send method=$method id=$id (${json.length}B) connected=${connected.get()} ws=${webSocket != null}")
+        HermesLog.d(
+            TAG,
+            "send method=$method id=$id (${json.length}B) connected=${connected.get()} ws=${webSocket != null}",
+        )
         var accepted = false
         synchronized(connectionLock) {
             cancelBackgroundIdleCloseLocked()
@@ -1027,35 +1029,35 @@ object HermesWsClient {
                 // previous code ignored that and silently dropped the message.
                 if (ws.send(json)) {
                     accepted = true
-                    Log.d(TAG, "send direct ok id=$id method=$method")
+                    HermesLog.d(TAG, "send direct ok id=$id method=$method")
                 } else {
                     if (webSocket !== ws || !acceptQueuedMessages.get()) {
-                        Log.w(
+                        HermesLog.w(
                             TAG,
                             "send identity-change drop id=$id method=$method " +
                                 "wsMatches=${webSocket === ws} accept=${acceptQueuedMessages.get()}",
                         )
                     } else if (isRetryableMessage(json)) {
-                        Log.w(TAG, "WS rejected outgoing message — queuing for reconnect")
+                        HermesLog.w(TAG, "WS rejected outgoing message — queuing for reconnect")
                         messageQueue.add(json)
                         accepted = true
-                        Log.d(TAG, "send queued id=$id method=$method queueSize=${messageQueue.size}")
+                        HermesLog.d(TAG, "send queued id=$id method=$method queueSize=${messageQueue.size}")
                         recoverRejectedSocket(ws)
                     } else {
-                        Log.w(TAG, "WS rejected oversized outgoing message — not retrying")
+                        HermesLog.w(TAG, "WS rejected oversized outgoing message — not retrying")
                     }
                 }
             } else if (acceptQueuedMessages.get()) {
                 if (isRetryableMessage(json)) {
-                    Log.d(TAG, "WS disconnected — queuing message")
+                    HermesLog.d(TAG, "WS disconnected — queuing message")
                     messageQueue.add(json)
                     accepted = true
-                    Log.d(TAG, "send queued (no ws) id=$id method=$method queueSize=${messageQueue.size}")
+                    HermesLog.d(TAG, "send queued (no ws) id=$id method=$method queueSize=${messageQueue.size}")
                 } else {
-                    Log.w(TAG, "WS disconnected with oversized outgoing message — not queueing")
+                    HermesLog.w(TAG, "WS disconnected with oversized outgoing message — not queueing")
                 }
             } else {
-                Log.w(TAG, "WS credentials cleared — dropping outgoing message")
+                HermesLog.w(TAG, "WS credentials cleared — dropping outgoing message")
             }
             if (!accepted && method == WsMethods.PROMPT_SUBMIT) {
                 pendingPromptSessions.remove(id)
@@ -1191,12 +1193,12 @@ object HermesWsClient {
         while (true) {
             val msg = messageQueue.peek() ?: break
             if (!isRetryableMessage(msg)) {
-                Log.w(TAG, "Dropping oversized queued message")
+                HermesLog.w(TAG, "Dropping oversized queued message")
                 messageQueue.poll()
                 continue
             }
             if (!ws.send(msg)) {
-                Log.w(TAG, "WS rejected queued message — retaining for next connection")
+                HermesLog.w(TAG, "WS rejected queued message — retaining for next connection")
                 recoverRejectedSocket(ws)
                 return
             }
@@ -1330,7 +1332,7 @@ object HermesWsClient {
             TicketRefreshStatus.READY -> Unit
 
             TicketRefreshStatus.AUTHENTICATION_FAILED -> {
-                Log.w(TAG, "Aborting openSocket: dashboard authentication rejected")
+                HermesLog.w(TAG, "Aborting openSocket: dashboard authentication rejected")
                 synchronized(connectionLock) {
                     if (generation != connectionGeneration.get()) return
                     intentionalClose.set(true)
@@ -1340,7 +1342,7 @@ object HermesWsClient {
             }
 
             TicketRefreshStatus.TRANSIENT_FAILURE -> {
-                Log.w(TAG, "Deferring openSocket: WS ticket refresh temporarily unavailable")
+                HermesLog.w(TAG, "Deferring openSocket: WS ticket refresh temporarily unavailable")
                 synchronized(connectionLock) {
                     if (generation != connectionGeneration.get()) return
                     _connectionStatus.value = ConnectionStatus.RECONNECTING
@@ -1371,15 +1373,15 @@ object HermesWsClient {
                         ?: auth.wsUrl()
                 )
             } catch (e: IllegalArgumentException) {
-                Log.w(TAG, "socket blocked by transport policy")
+                HermesLog.w(TAG, "socket blocked by transport policy")
                 synchronized(connectionLock) {
                     if (generation != connectionGeneration.get()) return
                     _connectionStatus.value = ConnectionStatus.DISCONNECTED
                 }
                 return
             }
-        if (BuildConfig.DEBUG) {
-            Log.d(
+        if (HermesLog.isDebug) {
+            HermesLog.d(
                 TAG,
                 "Connecting to socket endpoint: $url override=${!e2eWsOverride.isNullOrBlank()}",
             )
@@ -1411,7 +1413,7 @@ object HermesWsClient {
         val shouldReconnect =
             synchronized(connectionLock) {
                 if (generation != connectionGeneration.get()) return
-                Log.d(TAG, "Connection profile changed during socket setup; restarting")
+                HermesLog.d(TAG, "Connection profile changed during socket setup; restarting")
                 val reconnect = !intentionalClose.get()
                 disconnect(clearPendingMessages = true)
                 reconnect
@@ -1428,12 +1430,12 @@ object HermesWsClient {
             if (generation != connectionGeneration.get()) return
             if (intentionalClose.get()) return
             if (!auth.isAutoReconnect()) {
-                if (BuildConfig.DEBUG) Log.d(TAG, "Auto-reconnect disabled")
+                if (HermesLog.isDebug) HermesLog.d(TAG, "Auto-reconnect disabled")
                 _connectionStatus.value = ConnectionStatus.DISCONNECTED
                 return
             }
             if (!isNetworkConnected()) {
-                Log.d(TAG, "No network available — delaying reconnect scheduling")
+                HermesLog.d(TAG, "No network available — delaying reconnect scheduling")
                 _connectionStatus.value = ConnectionStatus.NO_NETWORK
                 return
             }
@@ -1442,7 +1444,7 @@ object HermesWsClient {
                 (currentBackoff * BACKOFF_MULTIPLIER)
                     .toLong()
                     .coerceAtMost(MAX_BACKOFF_MS)
-            if (BuildConfig.DEBUG) Log.d(TAG, "Reconnecting in ${delay}ms …")
+            if (HermesLog.isDebug) HermesLog.d(TAG, "Reconnecting in ${delay}ms …")
 
             reconnectJob?.cancel()
             reconnectJob =
@@ -1470,7 +1472,7 @@ object HermesWsClient {
             if (isGated && !intentionalClose.get() &&
                 ticketAuthRetryUsed.compareAndSet(false, true)
             ) {
-                Log.w(TAG, "socket ticket rejected; retrying once with a fresh ticket")
+                HermesLog.w(TAG, "socket ticket rejected; retrying once with a fresh ticket")
                 _connectionStatus.value = ConnectionStatus.RECONNECTING
                 wsScope.launch { openSocket(generation) }
                 return
@@ -1596,11 +1598,11 @@ object HermesWsClient {
                 if (generation != connectionGeneration.get() ||
                     socket !== HermesWsClient.webSocket
                 ) {
-                    Log.d(TAG, "Ignoring stale socket onOpen callback")
+                    HermesLog.d(TAG, "Ignoring stale socket onOpen callback")
                     socket.close(1000, "Superseded connection")
                     return
                 }
-                Log.i(TAG, "socket opened")
+                HermesLog.i(TAG, "socket opened")
                 connected.set(true)
                 _connectionStatus.value = ConnectionStatus.CONNECTED
                 currentBackoff = INITIAL_BACKOFF_MS
@@ -1622,7 +1624,7 @@ object HermesWsClient {
                 if (generation != connectionGeneration.get() ||
                     socket !== HermesWsClient.webSocket
                 ) {
-                    Log.d(TAG, "Ignoring stale socket message")
+                    HermesLog.d(TAG, "Ignoring stale socket message")
                     return
                 }
             }
@@ -1633,7 +1635,7 @@ object HermesWsClient {
                     val rpc = OkHttpProvider.json.decodeFromString<JsonRpcResponse>(text)
                     EventParser.parse(rpc, text)
                 } catch (e: Exception) {
-                    Log.e(
+                    HermesLog.e(
                         TAG,
                         "Failed to parse socket message (${e.javaClass.simpleName})",
                     )
@@ -1668,7 +1670,7 @@ object HermesWsClient {
                 if (generation != connectionGeneration.get() ||
                     socket !== HermesWsClient.webSocket
                 ) {
-                    Log.d(TAG, "Ignoring stale socket message after parsing")
+                    HermesLog.d(TAG, "Ignoring stale socket message after parsing")
                     return
                 }
                 lastPongTimestamp = monotonicTimeMs()
@@ -1757,8 +1759,8 @@ object HermesWsClient {
                                 ),
                         ),
                     )
-                if (!emitted && BuildConfig.DEBUG) {
-                    Log.w(TAG, "socket message dropped due to buffer overflow")
+                if (!emitted && HermesLog.isDebug) {
+                    HermesLog.w(TAG, "socket message dropped due to buffer overflow")
                 }
             }
             disconnectIfIdleInBackground()
@@ -1769,10 +1771,10 @@ object HermesWsClient {
             code: Int,
             reason: String,
         ) {
-            Log.d(TAG, "socket closing: $code")
+            HermesLog.d(TAG, "socket closing: $code")
             socket.close(code, reason)
             if (socket !== HermesWsClient.webSocket) {
-                Log.d(TAG, "Ignoring stale socket onClosing callback")
+                HermesLog.d(TAG, "Ignoring stale socket onClosing callback")
             }
         }
 
@@ -1782,10 +1784,10 @@ object HermesWsClient {
             reason: String,
         ) {
             if (!detachTerminalSocket(socket, generation)) {
-                Log.d(TAG, "Ignoring stale socket onClosed callback")
+                HermesLog.d(TAG, "Ignoring stale socket onClosed callback")
                 return
             }
-            Log.i(TAG, "socket closed: $code")
+            HermesLog.i(TAG, "socket closed: $code")
             if (code == 4001 || code == 4401 ||
                 reason.contains("unauthorized", ignoreCase = true) ||
                 reason.startsWith("auth:", ignoreCase = true)
@@ -1806,10 +1808,10 @@ object HermesWsClient {
             statusCode: Int?,
         ) {
             if (!detachTerminalSocket(socket, generation)) {
-                Log.d(TAG, "Ignoring stale socket onFailure callback")
+                HermesLog.d(TAG, "Ignoring stale socket onFailure callback")
                 return
             }
-            Log.e(TAG, "socket failure (${cause.javaClass.simpleName})")
+            HermesLog.e(TAG, "socket failure (${cause.javaClass.simpleName})")
             val code = statusCode ?: 0
             if (code == 401 || cause.message?.contains(
                     "401",
