@@ -3,6 +3,10 @@
 package com.m57.hermescontrol.data.ws
 
 import androidx.annotation.VisibleForTesting
+import com.m57.hermescontrol.concurrent.AtomicBoolean
+import com.m57.hermescontrol.concurrent.AtomicInteger
+import com.m57.hermescontrol.concurrent.ConcurrentLinkedQueue
+import com.m57.hermescontrol.concurrent.concurrentMutableMap
 import com.m57.hermescontrol.data.remote.AuthPayloads
 import com.m57.hermescontrol.data.remote.DashboardSessionTokenRefresher
 import com.m57.hermescontrol.data.remote.NetworkMonitor
@@ -34,10 +38,6 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicInteger
 
 /** Immutable identity of one live socket connection. */
 class ConnectionBinding internal constructor(
@@ -662,7 +662,7 @@ object HermesWsClient {
     )
 
     /** Tracks in-flight [request] calls by their JSON-RPC id. */
-    private val pendingCalls = ConcurrentHashMap<String, PendingCall>()
+    private val pendingCalls: MutableMap<String, PendingCall> = concurrentMutableMap()
 
     /**
      * Send a JSON-RPC request that expects a result and returns a
@@ -948,7 +948,7 @@ object HermesWsClient {
         }
     }
 
-    private val pendingReplayResponses = ConcurrentHashMap<String, ReplayAdmission>()
+    private val pendingReplayResponses: MutableMap<String, ReplayAdmission> = concurrentMutableMap()
 
     private fun replayAdmission(
         method: String,
