@@ -1,6 +1,7 @@
 package com.m57.hermescontrol.data.ws
 
 import com.m57.hermescontrol.data.remote.ServerEndpoint
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
@@ -46,7 +47,20 @@ class HermesWsClientJvmSmokeTest {
 
         HermesWsClient.connect()
         try {
-            val url = runBlocking { withTimeout(CONNECT_TIMEOUT_MS) { transport.firstConnect.await() } }
+            val url =
+                runBlocking {
+                    withTimeout(CONNECT_TIMEOUT_MS) {
+                        val connectedUrl = transport.firstConnect.await()
+                        // connect() dispatches the open, and the client assigns the
+                        // returned socket to its own field just after
+                        // transport.connect returns — so wait for that instead of
+                        // assuming it has already landed.
+                        while (HermesWsClient.socketForTest !== transport.socket) {
+                            delay(POLL_INTERVAL_MS)
+                        }
+                        connectedUrl
+                    }
+                }
 
             assertEquals(WS_URL, url, "client connected to the wrong URL")
             assertNotNull(HermesWsClient.socketForTest, "connect() published no socket")
@@ -66,5 +80,6 @@ class HermesWsClientJvmSmokeTest {
     private companion object {
         const val WS_URL = "ws://127.0.0.1:9119/api/ws"
         const val CONNECT_TIMEOUT_MS = 5_000L
+        const val POLL_INTERVAL_MS = 10L
     }
 }

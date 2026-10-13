@@ -6,6 +6,7 @@ import com.m57.hermescontrol.concurrent.AtomicBoolean
 import com.m57.hermescontrol.concurrent.AtomicInteger
 import com.m57.hermescontrol.concurrent.ConcurrentLinkedQueue
 import com.m57.hermescontrol.concurrent.concurrentMutableMap
+import com.m57.hermescontrol.concurrent.ioDispatcher
 import com.m57.hermescontrol.concurrent.removeIfValue
 import com.m57.hermescontrol.data.remote.AuthPayloads
 import com.m57.hermescontrol.data.remote.HermesJson
@@ -21,7 +22,6 @@ import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.BufferOverflow
@@ -36,12 +36,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlin.concurrent.Volatile
+import kotlin.time.TimeSource
 
 /** Immutable identity of one live socket connection. */
 class ConnectionBinding internal constructor(
@@ -90,7 +92,21 @@ object HermesWsClient {
     private const val STALE_THRESHOLD_MS = 45_000L
     private const val LIVENESS_PROBE_TIMEOUT_MS = 5_000L
 
-    private fun monotonicTimeMs(): Long = System.nanoTime() / 1_000_000L
+    /**
+     * Keeps [monotonicTimeMs] in the magnitude `System.nanoTime() / 1_000_000`
+     * produced (a large number measured from boot), so the `0L` "never ponged"
+     * sentinel on [lastPongTimestamp] stays far in the past.
+     */
+    private const val MONOTONIC_EPOCH_OFFSET_MS = 86_400_000L
+
+    /**
+     * Monotonic milliseconds. `System.nanoTime()` is JVM-only, so the origin is a
+     * `TimeSource.Monotonic` mark taken at initialization: every call site either
+     * assigns a timestamp or subtracts two, so only the origin's stability matters.
+     */
+    private val monotonicOrigin = TimeSource.Monotonic.markNow()
+
+    private fun monotonicTimeMs(): Long = monotonicOrigin.elapsedNow().inWholeMilliseconds + MONOTONIC_EPOCH_OFFSET_MS
 
     // ── Internal state (all access through synchronized / atomic) ────────
 
@@ -243,7 +259,7 @@ object HermesWsClient {
     @Volatile
     private var currentBackoff = INITIAL_BACKOFF_MS
 
-    private val wsScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val wsScope = CoroutineScope(ioDispatcher + SupervisorJob())
 
     @Volatile
     private var reconnectJob: Job? = null
@@ -526,7 +542,10 @@ object HermesWsClient {
                 _connectionStatus.value = ConnectionStatus.CONNECTING
                 connectionGeneration.incrementAndGet()
             }
-        openSocket(generation)
+        // Dispatched rather than inline, matching the reconnect paths above: the
+        // lock must not be held across ticket minting or the handshake, and the
+        // mint is suspending now — a browser cannot block on HTTP.
+        wsScope.launch { openSocket(generation) }
     }
 
     /**
@@ -544,7 +563,7 @@ object HermesWsClient {
      * in again; treating every ticket-mint failure as expired authentication
      * turns brief gateway or network interruptions into logout loops.
      */
-    private fun refreshWsTicketIfNeeded(): TicketRefreshResult {
+    private suspend fun refreshWsTicketIfNeeded(): TicketRefreshResult {
         val isGated =
             try {
                 auth.isGatedMode()
@@ -575,14 +594,14 @@ object HermesWsClient {
                     ?: return TicketRefreshResult(TicketRefreshStatus.TRANSIENT_FAILURE)
             val url = auth.endpointForBuild().baseUrl.resolve("api/auth/ws-ticket").toString()
 
-            return kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+            return withContext(ioDispatcher) {
                 val response = client.post(url) { setBody("{}") }
                 if (response.status.value !in 200..299) {
                     HermesLog.w(
                         TAG,
                         "WS ticket refresh failed: HTTP ${response.status.value}",
                     )
-                    return@runBlocking if (response.status.value == 401 || response.status.value == 403) {
+                    return@withContext if (response.status.value == 401 || response.status.value == 403) {
                         TicketRefreshResult(TicketRefreshStatus.AUTHENTICATION_FAILED)
                     } else {
                         TicketRefreshResult(TicketRefreshStatus.TRANSIENT_FAILURE)
@@ -596,7 +615,7 @@ object HermesWsClient {
                         TAG,
                         "WS ticket refresh failed: invalid response",
                     )
-                    return@runBlocking TicketRefreshResult(TicketRefreshStatus.TRANSIENT_FAILURE)
+                    return@withContext TicketRefreshResult(TicketRefreshStatus.TRANSIENT_FAILURE)
                 }
 
                 if (HermesLog.isDebug) HermesLog.d(TAG, "WS ticket refreshed")
@@ -1352,7 +1371,7 @@ object HermesWsClient {
 
     // ── Internal ─────────────────────────────────────────────────────────
 
-    private fun openSocket(generation: Int) {
+    private suspend fun openSocket(generation: Int) {
         if (generation != connectionGeneration.get()) return
         val profileId = auth.getSelectedProfileId()
         val ticketResult = refreshWsTicketIfNeeded()
