@@ -2,6 +2,7 @@ package com.m57.hermescontrol.data.remote
 
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.local.AuthSessionState
+import com.m57.hermescontrol.util.GatewayPath
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
@@ -20,7 +21,6 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.UUID
-import java.util.regex.Pattern
 import kotlin.coroutines.coroutineContext
 
 /** Authenticated, profile-safe access to gateway-managed files. */
@@ -33,12 +33,7 @@ object GatewayFileClient {
     // unbounded process-lifetime map of hashed gateway paths.
     private val keyLocks = Array(64) { Mutex() }
 
-    internal fun normalizePath(raw: String): String? {
-        val trimmed = raw.trim().removeSurrounding("`").removeSurrounding("\"").removeSurrounding("'")
-        if (trimmed == "~" || trimmed.startsWith("~/")) return trimmed
-        if (!trimmed.startsWith("/") && !Pattern.compile("^[A-Za-z]:[/\\\\]").matcher(trimmed).find()) return null
-        return trimmed
-    }
+    internal fun normalizePath(raw: String): String? = GatewayPath.normalizePath(raw)
 
     internal fun classifyStatus(code: Int): GatewayFileResult? =
         when (code) {

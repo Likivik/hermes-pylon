@@ -34,21 +34,6 @@ data class SessionStats(
     val messages: Int = 0,
 )
 
-/** History is split by provenance: interactive conversations vs. scheduled automation runs. */
-enum class HistorySection {
-    CONVERSATIONS,
-    AUTOMATIONS,
-}
-
-internal val HistorySection.showsGlobalStats: Boolean
-    get() = this == HistorySection.CONVERSATIONS
-
-internal val HistorySection.source: String?
-    get() = if (this == HistorySection.AUTOMATIONS) AUTOMATION_SOURCE else null
-
-internal val HistorySection.excludeSources: String?
-    get() = if (this == HistorySection.CONVERSATIONS) AUTOMATION_SOURCE else null
-
 data class SessionsUiState(
     val section: HistorySection = HistorySection.CONVERSATIONS,
     val isLoading: Boolean = false,

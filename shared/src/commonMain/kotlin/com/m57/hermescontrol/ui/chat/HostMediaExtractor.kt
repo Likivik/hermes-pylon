@@ -1,6 +1,6 @@
 package com.m57.hermescontrol.ui.chat
 
-import com.m57.hermescontrol.data.remote.GatewayFileClient
+import com.m57.hermescontrol.util.GatewayPath
 
 /**
  * Issue #724: parse agent-delivered `MEDIA:<path>` directives out of message
@@ -18,7 +18,7 @@ import com.m57.hermescontrol.data.remote.GatewayFileClient
  * audio, video, CSV, PDF and arbitrary files are all supported. The pure parse
  * logic lives here so it can be unit-tested without an Android context.
  */
-internal object HostMediaExtractor {
+object HostMediaExtractor {
     /** A single `MEDIA:<path>` directive found in message text. */
     data class Item(
         val match: String, // the full matched directive (for stripping)
@@ -55,5 +55,5 @@ internal object HostMediaExtractor {
     }
 
     /** Validate in the gateway namespace; preserve `~` for server resolution. */
-    internal fun normalizePath(raw: String): String? = GatewayFileClient.normalizePath(raw)
+    private fun normalizePath(raw: String): String? = GatewayPath.normalizePath(raw)
 }
