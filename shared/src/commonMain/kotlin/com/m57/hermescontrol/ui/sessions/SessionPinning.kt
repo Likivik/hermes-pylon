@@ -1,6 +1,5 @@
 package com.m57.hermescontrol.ui.sessions
 
-import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.model.SessionInfo
 import com.m57.hermescontrol.data.model.SessionTreeItem
 import com.m57.hermescontrol.data.model.flattenSessionTree
@@ -8,33 +7,29 @@ import com.m57.hermescontrol.data.remote.HermesGatewayApi
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
 
+/**
+ * Where pinned session ids are persisted.
+ *
+ * The app's implementation reads them out of `AuthManager`; a console or web
+ * target supplies its own. Nothing below this interface knows which - the pin
+ * and grouping logic is pure `SessionInfo` manipulation.
+ */
 interface SessionPinStore {
     fun load(): List<String>
 
     fun save(pinIds: List<String>)
 }
 
-internal class AuthManagerSessionPinStore(
-    private val profileId: String =
-        AuthManager.getSelectedProfileId() ?: AuthManager.DEFAULT_PROFILE_ID,
-) : SessionPinStore {
-    override fun load(): List<String> = AuthManager.getPinnedSessionIds(profileId)
+fun SessionInfo.pinId(): String = _lineage_root_id?.takeIf(String::isNotBlank) ?: id
 
-    override fun save(pinIds: List<String>) {
-        AuthManager.savePinnedSessionIds(pinIds, profileId)
-    }
-}
+fun SessionInfo.matchesPin(pinId: String): Boolean = id == pinId || _lineage_root_id == pinId
 
-internal fun SessionInfo.pinId(): String = _lineage_root_id?.takeIf(String::isNotBlank) ?: id
-
-internal fun SessionInfo.matchesPin(pinId: String): Boolean = id == pinId || _lineage_root_id == pinId
-
-internal data class SessionSections(
+data class SessionSections(
     val pinned: List<SessionTreeItem>,
     val recent: List<SessionTreeItem>,
 )
 
-internal fun buildSessionSections(
+fun buildSessionSections(
     sessions: List<SessionInfo>,
     pinnedSessionIds: List<String>,
 ): SessionSections {
@@ -62,7 +57,7 @@ internal fun buildSessionSections(
     )
 }
 
-internal suspend fun hydratePinnedSessions(
+suspend fun hydratePinnedSessions(
     api: HermesGatewayApi,
     pinIds: List<String>,
 ): List<SessionInfo> =
@@ -86,7 +81,7 @@ internal suspend fun hydratePinnedSessions(
         }
     }
 
-internal fun remainingPinsAfterDeleting(
+fun remainingPinsAfterDeleting(
     pinnedSessionIds: List<String>,
     sessions: List<SessionInfo>,
     deletedSessionIds: Set<String>,
@@ -98,7 +93,7 @@ internal fun remainingPinsAfterDeleting(
     return pinnedSessionIds.filterNot { it in deletedPinIds }
 }
 
-internal fun mergeSessionPage(
+fun mergeSessionPage(
     previous: List<SessionInfo>,
     incoming: List<SessionInfo>,
     pinnedSessionIds: List<String>,
@@ -113,7 +108,7 @@ internal fun mergeSessionPage(
     return preservedPins + incoming
 }
 
-internal fun mergeSessionRows(
+fun mergeSessionRows(
     existing: List<SessionInfo>,
     incoming: List<SessionInfo>,
 ): List<SessionInfo> {
