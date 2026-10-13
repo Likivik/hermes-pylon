@@ -136,7 +136,7 @@ class ChatViewModel(
     private val startCleanup: Boolean,
     repo: ChatPersistenceRepository =
         ChatPersistenceRepository(
-            HermesDatabase.get(application).chatMessageDao(),
+            RoomChatMessageStore(HermesDatabase.get(application).chatMessageDao()),
         ),
     slashUsageStore: SlashUsageStore = SlashUsageStore(application.applicationContext),
     searchDispatcher: kotlinx.coroutines.CoroutineDispatcher = kotlinx.coroutines.Dispatchers.Default,

@@ -1,35 +1,42 @@
 package com.m57.hermescontrol.ui.chat
 
-import com.m57.hermescontrol.data.local.ChatMessageDao
-import com.m57.hermescontrol.data.local.toEntity
-import com.m57.hermescontrol.data.local.toUiModel
+import com.m57.hermescontrol.concurrent.removeIfValue
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 
-internal fun interface OperationRegistrationHook {
+fun interface OperationRegistrationHook {
     suspend fun afterRegistration(sessionId: String)
 }
 
 /**
- * Wraps Room DAO operations for chat message persistence.
+ * Wraps chat message persistence.
  *
- * Extracted from ChatViewModel to separate persistence concerns from
- * UI state management and WebSocket event handling.
+ * Extracted from ChatViewModel to separate persistence concerns from UI state
+ * management and WebSocket event handling.
+ *
+ * Storage reaches this through [ChatMessageStore], so the repository itself has no
+ * idea whether messages land in Room, a file or memory.
  */
-open class ChatPersistenceRepository internal constructor(
-    private val dao: ChatMessageDao,
+open class ChatPersistenceRepository(
+    private val store: ChatMessageStore,
     private val operationRegistrationHook: OperationRegistrationHook,
 ) {
-    constructor(dao: ChatMessageDao) : this(dao, OperationRegistrationHook {})
+    constructor(store: ChatMessageStore) : this(store, OperationRegistrationHook {})
 
-    private class TranscriptRevision(var generation: Long = 0L)
+    private class TranscriptRevision(var generation: Long = 0L) {
+        val lock = SynchronizedObject()
+    }
 
+    private val fencesLock = SynchronizedObject()
+    private val tailsLock = SynchronizedObject()
     private val replacementFences = mutableMapOf<String, TranscriptRevision>()
     private val operationTails = mutableMapOf<String, CompletableDeferred<Unit>>()
 
     private fun replacementFence(sessionId: String): TranscriptRevision =
-        synchronized(replacementFences) {
+        synchronized(fencesLock) {
             replacementFences.getOrPut(sessionId) { TranscriptRevision() }
         }
 
@@ -39,7 +46,7 @@ open class ChatPersistenceRepository internal constructor(
     ): T {
         val completion = CompletableDeferred<Unit>()
         val predecessor =
-            synchronized(operationTails) {
+            synchronized(tailsLock) {
                 operationTails.put(sessionId, completion)
             }
         try {
@@ -50,20 +57,20 @@ open class ChatPersistenceRepository internal constructor(
             withContext(NonCancellable) {
                 predecessor?.await()
                 completion.complete(Unit)
-                synchronized(operationTails) {
-                    operationTails.remove(sessionId, completion)
+                synchronized(tailsLock) {
+                    operationTails.removeIfValue(sessionId, completion)
                 }
             }
         }
     }
 
-    internal fun queuedSessionCount(): Int = synchronized(operationTails) { operationTails.size }
+    fun queuedSessionCount(): Int = synchronized(tailsLock) { operationTails.size }
 
     fun replacementGeneration(sessionId: String): Long =
-        replacementFence(sessionId).let { fence -> synchronized(fence) { fence.generation } }
+        replacementFence(sessionId).let { fence -> synchronized(fence.lock) { fence.generation } }
 
     fun invalidateReplacementWrites(sessionId: String) {
-        replacementFence(sessionId).let { fence -> synchronized(fence) { fence.generation++ } }
+        replacementFence(sessionId).let { fence -> synchronized(fence.lock) { fence.generation++ } }
     }
 
     suspend fun awaitSessionOperations(sessionId: String) {
@@ -78,9 +85,9 @@ open class ChatPersistenceRepository internal constructor(
     ): Boolean =
         enqueueSessionOperation(sessionId) {
             val fence = replacementFence(sessionId)
-            synchronized(fence) {
+            synchronized(fence.lock) {
                 if (fence.generation != expectedRevision) return@synchronized false
-                dao.upsertAll(listOf(message.toEntity(sessionId)))
+                store.upsertAll(listOf(message), sessionId)
                 true
             }
         }
@@ -93,9 +100,9 @@ open class ChatPersistenceRepository internal constructor(
     ): Boolean =
         enqueueSessionOperation(sessionId) {
             val fence = replacementFence(sessionId)
-            synchronized(fence) {
+            synchronized(fence.lock) {
                 if (fence.generation != expectedRevision) return@synchronized false
-                dao.upsertAll(messages.map { it.toEntity(sessionId) })
+                store.upsertAll(messages, sessionId)
                 true
             }
         }
@@ -108,16 +115,15 @@ open class ChatPersistenceRepository internal constructor(
     ): Boolean =
         enqueueSessionOperation(sessionId) {
             val fence = replacementFence(sessionId)
-            synchronized(fence) {
+            synchronized(fence.lock) {
                 if (fence.generation != expectedGeneration || !isOwnerCurrent()) return@synchronized false
-                dao.upsertAll(messages.map { it.toEntity(sessionId) })
+                store.upsertAll(messages, sessionId)
                 true
             }
         }
 
-    /** Load cached messages for a session from Room. */
-    open suspend fun loadMessages(sessionId: String): List<ChatMessage> =
-        dao.getMessagesForSession(sessionId).map { it.toUiModel() }
+    /** Load cached messages for a session. */
+    open suspend fun loadMessages(sessionId: String): List<ChatMessage> = store.messagesForSession(sessionId)
 
     suspend fun replaceMessagesIfCurrent(
         messages: List<ChatMessage>,
@@ -126,9 +132,9 @@ open class ChatPersistenceRepository internal constructor(
     ): Boolean =
         enqueueSessionOperation(sessionId) {
             val fence = replacementFence(sessionId)
-            synchronized(fence) {
+            synchronized(fence.lock) {
                 if (fence.generation != expectedGeneration) return@synchronized false
-                dao.replaceMessagesForSession(sessionId, messages.map { it.toEntity(sessionId) })
+                store.replaceMessagesForSession(sessionId, messages)
                 true
             }
         }
