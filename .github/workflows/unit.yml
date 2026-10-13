@@ -72,10 +72,34 @@ jobs:
       - name: Run unit tests (iris debug)
         run: ./gradlew testIrisDebugUnitTest --no-daemon -Dorg.gradle.workers.max=2
 
+      # The wasmJs target is the only non-JVM runtime :shared/commonMain is
+      # exercised on, and it runs the same commonTest sources through karma in a
+      # browser. Compiling them is not enough: a JVM-only assumption in
+      # commonMain (e.g. relying on an unchecked array read to raise) only
+      # surfaces once the tests actually execute. ubuntu-latest ships Chrome, so
+      # karma's default ChromeHeadless works here — the dev boxes, which do not
+      # have Chrome, pass -PwasmTestBrowser=firefox via scripts/local-tests.sh
+      # `wasm`.
+      - name: Install yarn for the wasm toolchain
+        run: |
+          npm install --global yarn
+          yarn --version
+
+      - name: Run :shared wasmJs tests
+        run: ./gradlew :shared:wasmJsBrowserTest --no-daemon -Dorg.gradle.workers.max=2
+
       - name: Upload unit test reports
         if: failure()
         uses: actions/upload-artifact@v5
         with:
           name: unit-test-reports
           path: app/build/reports/tests/
+          retention-days: 14
+
+      - name: Upload wasm test reports
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: wasm-test-reports
+          path: shared/build/reports/tests/
           retention-days: 14

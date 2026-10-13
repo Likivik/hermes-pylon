@@ -75,6 +75,14 @@
             # The local test toolchain (scripts/local-tests.sh, e2e_gateway.py)
             python3
             uv
+
+            # The wasmJs test tier (scripts/local-tests.sh `wasm`). The Kotlin
+            # wasm toolchain is configured to use node + yarn from PATH instead
+            # of downloading its own copies: those downloads register
+            # project-level ivy repos, which settings.gradle.kts forbids
+            # (FAIL_ON_PROJECT_REPOS). See shared/build.gradle.kts.
+            nodejs
+            yarn
           ];
 
           # Point everything at the Nix-managed SDK
