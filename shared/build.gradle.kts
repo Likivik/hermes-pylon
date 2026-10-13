@@ -20,6 +20,16 @@ plugins {
 kotlin {
     jvmToolchain(21)
 
+    // Web target — compile-only. This is the litmus test that keeps `commonMain`
+    // honest: with every target JVM-based, `compileCommonMainKotlinMetadata` is
+    // SKIPPED, so commonMain is only ever compiled per target against the JVM
+    // stdlib. That is how 38 JVM-only APIs sat here undetected — see
+    // docs/kmp-boundary.md. No test run is wired up for it yet.
+    @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
+    wasmJs {
+        browser()
+    }
+
     // Console (JVM) target - the Linux app target later on.
     jvm()
 

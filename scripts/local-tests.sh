@@ -104,7 +104,7 @@ PY
 case "${1:-help}" in
   sdk)          setup_sdk ;;
   unit)         python3 scripts/check_kmp_boundary.py || exit 1
-                gradle ":app:testIrisDebugUnitTest --console=plain --rerun" ; summarise unit ;;
+                gradle ":shared:compileKotlinWasmJs :app:testIrisDebugUnitTest --console=plain --rerun" ; summarise unit ;;
   instrumented) gradle ":app:e2eApi34IrisDebugAndroidTest --no-daemon --rerun -Dorg.gradle.workers.max=2 \
                   -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect \
                   -Pandroid.testInstrumentationRunnerArguments.notPackage=com.m57.hermescontrol.e2e" ; summarise gmd ;;
