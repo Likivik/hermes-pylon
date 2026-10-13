@@ -91,7 +91,11 @@ private fun com.m57.hermescontrol.data.model.SessionListResponse.nextOffset(requ
 class SessionsViewModel(
     private val pinStore: SessionPinStore = AuthManagerSessionPinStore(),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    private val liveStatusSource: SessionLiveStatusSource = HermesSessionLiveStatusSource(),
+    private val liveStatusSource: SessionLiveStatusSource =
+        HermesSessionLiveStatusSource(
+            selectedProfileIdsProvider = { AuthManager.selectedProfileIdFlow },
+            selectedProfileIdProvider = { AuthManager.getSelectedProfileId() },
+        ),
 ) : ViewModel(), ToastHost {
     private val _uiState =
         MutableStateFlow(

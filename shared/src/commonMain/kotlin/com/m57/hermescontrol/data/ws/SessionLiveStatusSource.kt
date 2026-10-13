@@ -1,6 +1,5 @@
 package com.m57.hermescontrol.data.ws
 
-import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.model.ActiveSessionsResponse
 import com.m57.hermescontrol.data.model.LiveSessionSnapshot
 import com.m57.hermescontrol.data.model.SessionLiveStatus
@@ -179,12 +178,13 @@ class HermesSessionLiveStatusSource(
         }
     },
     connectionStatusProvider: () -> StateFlow<ConnectionStatus> = { HermesWsClient.connectionStatus },
-    selectedProfileIdsProvider: () -> Flow<String> = { AuthManager.selectedProfileIdFlow },
+    selectedProfileIdsProvider: () -> Flow<String>,
+    private val selectedProfileIdProvider: () -> String?,
     private val currentConnectionProvider: (String) -> SessionLiveConnection? = { profileId ->
         HermesWsClient.connectionBinding(profileId)?.let { SessionLiveConnection(it.profileId, it.generation) }
     },
     private val isConnectionCurrent: (SessionLiveConnection) -> Boolean = { connection ->
-        AuthManager.getSelectedProfileId() == connection.profileId &&
+        selectedProfileIdProvider() == connection.profileId &&
             HermesWsClient.connectionBinding(connection.profileId)?.generation == connection.generation
     },
 ) : SessionLiveStatusSource {

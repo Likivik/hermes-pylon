@@ -3,12 +3,12 @@ package com.m57.hermescontrol.data.ws
 import com.m57.hermescontrol.data.model.SessionLiveStatus
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.runBlocking
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
-import org.junit.Test
+import kotlinx.coroutines.test.runTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class SessionLiveStatusSourceTest {
     @Test
@@ -119,7 +119,7 @@ class SessionLiveStatusSourceTest {
 
     @Test
     fun `HermesSessionLiveStatusSource fetches and decodes snapshot via RPC`() =
-        runBlocking {
+        runTest {
             var capturedMethod: String? = null
             var capturedParams: Map<String, Any>? = null
             var capturedConnection: SessionLiveConnection? = null
@@ -143,6 +143,8 @@ class SessionLiveStatusSourceTest {
                     },
                     sourcedEventsProvider = { MutableSharedFlow() },
                     connectionStatusProvider = { MutableStateFlow(ConnectionStatus.CONNECTED) },
+                    selectedProfileIdsProvider = { MutableStateFlow("profile-a") },
+                    selectedProfileIdProvider = { "profile-a" },
                     isConnectionCurrent = { true },
                 )
 
@@ -157,12 +159,14 @@ class SessionLiveStatusSourceTest {
 
     @Test
     fun `HermesSessionLiveStatusSource returns null when RPC throws`() =
-        runBlocking {
+        runTest {
             val source =
                 HermesSessionLiveStatusSource(
                     boundRpcRequest = { _, _, _ -> throw RuntimeException("RPC error") },
                     sourcedEventsProvider = { MutableSharedFlow() },
                     connectionStatusProvider = { MutableStateFlow(ConnectionStatus.CONNECTED) },
+                    selectedProfileIdsProvider = { MutableStateFlow("profile-a") },
+                    selectedProfileIdProvider = { "profile-a" },
                     isConnectionCurrent = { true },
                 )
 
@@ -172,13 +176,15 @@ class SessionLiveStatusSourceTest {
 
     @Test
     fun `HermesSessionLiveStatusSource rejects snapshot when connection becomes stale during RPC`() =
-        runBlocking {
+        runTest {
             var fenceChecks = 0
             val source =
                 HermesSessionLiveStatusSource(
                     boundRpcRequest = { _, _, _ -> mapOf("sessions" to emptyList<Map<String, Any>>()) },
                     sourcedEventsProvider = { MutableSharedFlow() },
                     connectionStatusProvider = { MutableStateFlow(ConnectionStatus.CONNECTED) },
+                    selectedProfileIdsProvider = { MutableStateFlow("profile-a") },
+                    selectedProfileIdProvider = { "profile-a" },
                     isConnectionCurrent = { fenceChecks++ == 0 },
                 )
 
