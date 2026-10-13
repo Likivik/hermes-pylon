@@ -59,6 +59,14 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # The multiplatform boundary: no platform API imports in :shared/commonMain,
+      # and every `expect` declaration has an `actual` in each declared target
+      # source set. Sub-second and needs no JDK, so it runs first to fail fast.
+      - name: Check the multiplatform boundary
+        run: |
+          python3 scripts/check_kmp_boundary.py
+          python3 scripts/test_check_kmp_boundary.py
+
       # The shared data/logic layer: ChatViewModel reducers, rail grouping + order
       # persistence, rename fast-path. JUnit + Robolectric, ~7 min.
       - name: Run unit tests (iris debug)

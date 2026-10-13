@@ -6,6 +6,7 @@
 #   scripts/local-tests.sh instrumented   89 emulator tests, non-e2e         (~6 min warm)
 #   scripts/local-tests.sh e2e            8 E2E classes vs a local gateway   (~2 min warm)
 #   scripts/local-tests.sh gateway start|stop|status|health
+#   scripts/local-tests.sh boundary       multiplatform boundary check          (<1 s)
 #
 # Verified on Serenity 2026-10-06: unit 1028/1028, instrumented 89/89, e2e 8/8.
 #
@@ -102,7 +103,8 @@ PY
 
 case "${1:-help}" in
   sdk)          setup_sdk ;;
-  unit)         gradle ":app:testIrisDebugUnitTest --console=plain --rerun" ; summarise unit ;;
+  unit)         python3 scripts/check_kmp_boundary.py || exit 1
+                gradle ":app:testIrisDebugUnitTest --console=plain --rerun" ; summarise unit ;;
   instrumented) gradle ":app:e2eApi34IrisDebugAndroidTest --no-daemon --rerun -Dorg.gradle.workers.max=2 \
                   -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect \
                   -Pandroid.testInstrumentationRunnerArguments.notPackage=com.m57.hermescontrol.e2e" ; summarise gmd ;;
@@ -119,7 +121,8 @@ case "${1:-help}" in
       -Pandroid.testInstrumentationRunnerArguments.e2ePassword=e2e-pass-123 \
       -Pandroid.testInstrumentationRunnerArguments.e2eBaseUrl=http://10.0.2.2:$PORT/"
     summarise gmd ;;
+  boundary) python3 scripts/check_kmp_boundary.py && python3 scripts/test_check_kmp_boundary.py ;;
   gateway)  python3 scripts/e2e_gateway.py "${2:-start}" "$PORT" ;;
-  all)      "$0" unit && "$0" instrumented && "$0" e2e ;;
+  all)      "$0" boundary && "$0" unit && "$0" instrumented && "$0" e2e ;;
   *)        sed -n '2,30p' "$0" ;;
 esac
