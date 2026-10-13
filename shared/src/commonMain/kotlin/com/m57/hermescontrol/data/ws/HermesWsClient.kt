@@ -2,9 +2,9 @@
 
 package com.m57.hermescontrol.data.ws
 
-import com.m57.hermescontrol.concurrent.AtomicBoolean
-import com.m57.hermescontrol.concurrent.AtomicInteger
-import com.m57.hermescontrol.concurrent.ConcurrentLinkedQueue
+import com.m57.hermescontrol.concurrent.atomicBoolean
+import com.m57.hermescontrol.concurrent.atomicInteger
+import com.m57.hermescontrol.concurrent.concurrentLinkedQueue
 import com.m57.hermescontrol.concurrent.concurrentMutableMap
 import com.m57.hermescontrol.concurrent.ioDispatcher
 import com.m57.hermescontrol.concurrent.removeIfValue
@@ -110,18 +110,18 @@ object HermesWsClient {
 
     // ── Internal state (all access through synchronized / atomic) ────────
 
-    private val requestId = AtomicInteger(0)
-    private val connectionGeneration = AtomicInteger(0)
-    private val socketGeneration = AtomicInteger(0)
-    private val connected = AtomicBoolean(false)
-    private val intentionalClose = AtomicBoolean(false)
-    private val ticketAuthRetryUsed = AtomicBoolean(false)
-    private val appInForeground = AtomicBoolean(true)
-    private val messageQueue = ConcurrentLinkedQueue<String>()
+    private val requestId = atomicInteger(0)
+    private val connectionGeneration = atomicInteger(0)
+    private val socketGeneration = atomicInteger(0)
+    private val connected = atomicBoolean(false)
+    private val intentionalClose = atomicBoolean(false)
+    private val ticketAuthRetryUsed = atomicBoolean(false)
+    private val appInForeground = atomicBoolean(true)
+    private val messageQueue = concurrentLinkedQueue<String>()
 
     /** Prompt request id to session id, guarded by [connectionLock]. */
     private val pendingPromptSessions = linkedMapOf<String, String>()
-    private val backgroundIdleClosed = AtomicBoolean(false)
+    private val backgroundIdleClosed = atomicBoolean(false)
 
     @Volatile
     var pendingReply: Boolean = false
@@ -140,7 +140,7 @@ object HermesWsClient {
      * racing that disconnect cannot re-populate the queue that was just
      * cleared. Reset by [connect].
      */
-    private val acceptQueuedMessages = AtomicBoolean(true)
+    private val acceptQueuedMessages = atomicBoolean(true)
 
     @Volatile
     private var outboundDrainJob: Job? = null
@@ -148,7 +148,7 @@ object HermesWsClient {
     @Volatile
     private var backgroundIdleJob: Job? = null
 
-    private val backgroundIdleScheduleGeneration = AtomicInteger(0)
+    private val backgroundIdleScheduleGeneration = atomicInteger(0)
 
     @Volatile
     private var webSocket: WsSocket? = null

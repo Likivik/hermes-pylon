@@ -1,24 +1,84 @@
 package com.m57.hermescontrol.concurrent
 
 /**
- * JVM actuals for [concurrentMutableMap], [removeIfValue], [ConcurrentLinkedQueue],
- * [AtomicInteger] and [AtomicBoolean]: the JDK types themselves, so shared code
- * keeps the exact concurrency semantics it had when it imported
- * `java.util.concurrent` directly.
+ * JVM actuals for [concurrentMutableMap], [removeIfValue] and the three factories. Each
+ * implementation wraps the JDK type the code used before, so shared code keeps the exact
+ * concurrency semantics it had when it imported `java.util.concurrent` directly.
  */
 actual fun <K, V> concurrentMutableMap(): MutableMap<K, V> = java.util.concurrent.ConcurrentHashMap()
 
 /**
- * `java.util.Map.remove(key, value)` — atomic on `ConcurrentHashMap`, and the
- * exact call the shared code made before it had to name a common operation.
+ * `java.util.Map.remove(key, value)` — atomic on `ConcurrentHashMap`, and the exact call
+ * the shared code made before it had to name a common operation.
  */
 actual fun <K, V> MutableMap<K, V>.removeIfValue(
     key: K,
     value: V,
 ): Boolean = remove(key, value)
 
-actual typealias ConcurrentLinkedQueue<E> = java.util.concurrent.ConcurrentLinkedQueue<E>
+actual fun atomicInteger(initial: Int): AtomicInteger = JvmAtomicInteger(initial)
 
-actual typealias AtomicInteger = java.util.concurrent.atomic.AtomicInteger
+actual fun atomicBoolean(initial: Boolean): AtomicBoolean = JvmAtomicBoolean(initial)
 
-actual typealias AtomicBoolean = java.util.concurrent.atomic.AtomicBoolean
+actual fun <E> concurrentLinkedQueue(): ConcurrentLinkedQueue<E> = JvmConcurrentLinkedQueue()
+
+private class JvmAtomicInteger(
+    initial: Int,
+) : AtomicInteger {
+    private val delegate = java.util.concurrent.atomic.AtomicInteger(initial)
+
+    override fun get(): Int = delegate.get()
+
+    override fun set(value: Int) {
+        delegate.set(value)
+    }
+
+    override fun incrementAndGet(): Int = delegate.incrementAndGet()
+}
+
+private class JvmAtomicBoolean(
+    initial: Boolean,
+) : AtomicBoolean {
+    private val delegate = java.util.concurrent.atomic.AtomicBoolean(initial)
+
+    override fun get(): Boolean = delegate.get()
+
+    override fun set(value: Boolean) {
+        delegate.set(value)
+    }
+
+    override fun compareAndSet(
+        expect: Boolean,
+        update: Boolean,
+    ): Boolean = delegate.compareAndSet(expect, update)
+}
+
+private class JvmConcurrentLinkedQueue<E> : ConcurrentLinkedQueue<E> {
+    private val delegate = java.util.concurrent.ConcurrentLinkedQueue<E>()
+
+    override val size: Int get() = delegate.size
+
+    override fun isEmpty(): Boolean = delegate.isEmpty()
+
+    override fun contains(element: E): Boolean = delegate.contains(element)
+
+    override fun containsAll(elements: Collection<E>): Boolean = delegate.containsAll(elements)
+
+    override fun iterator(): MutableIterator<E> = delegate.iterator()
+
+    override fun add(element: E): Boolean = delegate.add(element)
+
+    override fun remove(element: E): Boolean = delegate.remove(element)
+
+    override fun addAll(elements: Collection<E>): Boolean = delegate.addAll(elements)
+
+    override fun removeAll(elements: Collection<E>): Boolean = delegate.removeAll(elements)
+
+    override fun retainAll(elements: Collection<E>): Boolean = delegate.retainAll(elements)
+
+    override fun clear() = delegate.clear()
+
+    override fun poll(): E? = delegate.poll()
+
+    override fun peek(): E? = delegate.peek()
+}

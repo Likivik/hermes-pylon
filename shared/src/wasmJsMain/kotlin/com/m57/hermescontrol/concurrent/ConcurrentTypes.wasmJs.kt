@@ -2,14 +2,13 @@ package com.m57.hermescontrol.concurrent
 
 /**
  * wasmJs actuals: the browser has one thread, so every structure here is a plain
- * collection and the atomics are ordinary fields. This is not a weaker lock — it
- * is the absence of the problem the JVM actuals solve.
+ * collection and the atomics are ordinary fields. This is not a weaker lock — it is the
+ * absence of the problem the JVM actuals solve.
  *
- * A `wasmJs` target must stay declared even while nothing runs on it: without a
- * non-JVM target, `compileCommonMainKotlinMetadata` is SKIPPED and `commonMain`
- * is only compiled per target against the JVM stdlib.
+ * A `wasmJs` target must stay declared even while nothing runs on it: without a non-JVM
+ * target, `compileCommonMainKotlinMetadata` is SKIPPED and `commonMain` is only compiled
+ * per target against the JVM stdlib.
  */
-
 actual fun <K, V> concurrentMutableMap(): MutableMap<K, V> = LinkedHashMap()
 
 actual fun <K, V> MutableMap<K, V>.removeIfValue(
@@ -23,58 +22,34 @@ actual fun <K, V> MutableMap<K, V>.removeIfValue(
         false
     }
 
-actual class ConcurrentLinkedQueue<E> actual constructor() : MutableCollection<E> {
-    private val delegate = ArrayDeque<E>()
+actual fun atomicInteger(initial: Int): AtomicInteger = WasmAtomicInteger(initial)
 
-    actual override val size: Int get() = delegate.size
+actual fun atomicBoolean(initial: Boolean): AtomicBoolean = WasmAtomicBoolean(initial)
 
-    actual override fun isEmpty(): Boolean = delegate.isEmpty()
+actual fun <E> concurrentLinkedQueue(): ConcurrentLinkedQueue<E> = WasmConcurrentLinkedQueue()
 
-    actual override fun contains(element: E): Boolean = delegate.contains(element)
+private class WasmAtomicInteger(
+    private var current: Int,
+) : AtomicInteger {
+    override fun get(): Int = current
 
-    actual override fun containsAll(elements: Collection<E>): Boolean = delegate.containsAll(elements)
-
-    actual override fun iterator(): MutableIterator<E> = delegate.iterator()
-
-    actual override fun add(element: E): Boolean = delegate.add(element)
-
-    actual override fun remove(element: E): Boolean = delegate.remove(element)
-
-    actual override fun addAll(elements: Collection<E>): Boolean = delegate.addAll(elements)
-
-    actual override fun removeAll(elements: Collection<E>): Boolean = delegate.removeAll(elements)
-
-    actual override fun retainAll(elements: Collection<E>): Boolean = delegate.retainAll(elements)
-
-    actual override fun clear() = delegate.clear()
-
-    actual fun poll(): E? = delegate.removeFirstOrNull()
-
-    actual fun peek(): E? = delegate.firstOrNull()
-}
-
-actual class AtomicInteger actual constructor(value: Int) {
-    private var current = value
-
-    actual fun get(): Int = current
-
-    actual fun set(value: Int) {
+    override fun set(value: Int) {
         current = value
     }
 
-    actual fun incrementAndGet(): Int = ++current
+    override fun incrementAndGet(): Int = ++current
 }
 
-actual class AtomicBoolean actual constructor(value: Boolean) {
-    private var current = value
+private class WasmAtomicBoolean(
+    private var current: Boolean,
+) : AtomicBoolean {
+    override fun get(): Boolean = current
 
-    actual fun get(): Boolean = current
-
-    actual fun set(value: Boolean) {
+    override fun set(value: Boolean) {
         current = value
     }
 
-    actual fun compareAndSet(
+    override fun compareAndSet(
         expect: Boolean,
         update: Boolean,
     ): Boolean {
@@ -82,4 +57,34 @@ actual class AtomicBoolean actual constructor(value: Boolean) {
         current = update
         return true
     }
+}
+
+private class WasmConcurrentLinkedQueue<E> : ConcurrentLinkedQueue<E> {
+    private val delegate = ArrayDeque<E>()
+
+    override val size: Int get() = delegate.size
+
+    override fun isEmpty(): Boolean = delegate.isEmpty()
+
+    override fun contains(element: E): Boolean = delegate.contains(element)
+
+    override fun containsAll(elements: Collection<E>): Boolean = delegate.containsAll(elements)
+
+    override fun iterator(): MutableIterator<E> = delegate.iterator()
+
+    override fun add(element: E): Boolean = delegate.add(element)
+
+    override fun remove(element: E): Boolean = delegate.remove(element)
+
+    override fun addAll(elements: Collection<E>): Boolean = delegate.addAll(elements)
+
+    override fun removeAll(elements: Collection<E>): Boolean = delegate.removeAll(elements)
+
+    override fun retainAll(elements: Collection<E>): Boolean = delegate.retainAll(elements)
+
+    override fun clear() = delegate.clear()
+
+    override fun poll(): E? = delegate.removeFirstOrNull()
+
+    override fun peek(): E? = delegate.firstOrNull()
 }
