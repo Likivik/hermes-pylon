@@ -3,6 +3,7 @@ package com.m57.hermescontrol.data.session
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlin.concurrent.Volatile
 
 /**
  * App-wide mirror of the active chat session id.

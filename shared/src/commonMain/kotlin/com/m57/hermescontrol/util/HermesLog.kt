@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.util
 
+import kotlin.concurrent.Volatile
+
 /**
  * Where `:shared` code sends its diagnostics.
  *

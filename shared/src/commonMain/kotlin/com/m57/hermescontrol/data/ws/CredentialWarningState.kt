@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.data.ws
 
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -8,28 +10,30 @@ import kotlinx.coroutines.flow.asStateFlow
  * Owns the gateway's credential warning without letting a repeated
  * `session.info` event undo an explicit dismissal.
  */
-class CredentialWarningState {
+class CredentialWarningState : SynchronizedObject() {
     private val _warning = MutableStateFlow<String?>(null)
     val warning: StateFlow<String?> = _warning.asStateFlow()
 
     private var dismissedWarning: String? = null
 
-    @Synchronized
     fun update(reportedWarning: String?) {
-        val warning = reportedWarning?.trim()?.takeIf { it.isNotEmpty() }
-        if (warning == null) {
-            dismissedWarning = null
-            _warning.value = null
-            return
-        }
-        if (warning != dismissedWarning) {
-            _warning.value = warning
+        synchronized(this) {
+            val warning = reportedWarning?.trim()?.takeIf { it.isNotEmpty() }
+            if (warning == null) {
+                dismissedWarning = null
+                _warning.value = null
+                return@synchronized
+            }
+            if (warning != dismissedWarning) {
+                _warning.value = warning
+            }
         }
     }
 
-    @Synchronized
     fun dismiss() {
-        dismissedWarning = _warning.value
-        _warning.value = null
+        synchronized(this) {
+            dismissedWarning = _warning.value
+            _warning.value = null
+        }
     }
 }

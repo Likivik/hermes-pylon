@@ -13,9 +13,24 @@ package com.m57.hermescontrol.concurrent
  * The map is a factory rather than an `expect class`: the JDK
  * `ConcurrentHashMap`'s mapped supertypes do not line up with a `MutableMap`
  * expect declaration, so `actual typealias` is rejected for it. Its static type
- * is plain `MutableMap`, which covers every call site.
+ * is plain `MutableMap`, which is not quite enough: the one operation common code
+ * lacks is supplied as an `expect` extension (`removeIfValue`).
  */
 expect fun <K, V> concurrentMutableMap(): MutableMap<K, V>
+
+/**
+ * Removes [key] only while it still maps to [value].
+ *
+ * The two-argument `MutableMap.remove(key, value)` is a JVM default method with
+ * no common declaration, so `:shared` compiled on the JVM only because the map's
+ * static type resolves to `java.util.Map` there. Call sites relied on it being
+ * atomic, so each target supplies its own: the JDK's atomic remove on JVM and
+ * Android, a plain check-then-act where there are no threads to race with.
+ */
+expect fun <K, V> MutableMap<K, V>.removeIfValue(
+    key: K,
+    value: V,
+): Boolean
 
 expect class ConcurrentLinkedQueue<E>() : MutableCollection<E> {
     fun poll(): E?

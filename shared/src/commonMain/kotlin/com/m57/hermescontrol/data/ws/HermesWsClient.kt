@@ -6,6 +6,7 @@ import com.m57.hermescontrol.concurrent.AtomicBoolean
 import com.m57.hermescontrol.concurrent.AtomicInteger
 import com.m57.hermescontrol.concurrent.ConcurrentLinkedQueue
 import com.m57.hermescontrol.concurrent.concurrentMutableMap
+import com.m57.hermescontrol.concurrent.removeIfValue
 import com.m57.hermescontrol.data.remote.AuthPayloads
 import com.m57.hermescontrol.data.remote.HermesJson
 import com.m57.hermescontrol.data.remote.NetworkMonitor
@@ -40,6 +41,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlin.concurrent.Volatile
 
 /** Immutable identity of one live socket connection. */
 class ConnectionBinding internal constructor(
@@ -601,7 +603,7 @@ object HermesWsClient {
                 TicketRefreshResult(TicketRefreshStatus.READY, ticket)
             }
         } catch (e: Exception) {
-            HermesLog.w(TAG, "WS ticket refresh failed: ${e.javaClass.simpleName}")
+            HermesLog.w(TAG, "WS ticket refresh failed: ${e::class.simpleName}")
             return TicketRefreshResult(TicketRefreshStatus.TRANSIENT_FAILURE)
         }
     }
@@ -972,7 +974,7 @@ object HermesWsClient {
     /** Remove a request abandoned by its owning coroutine and cancel its timeout. */
     private fun cancelPendingRequest(deferred: CompletableDeferred<Any?>) {
         val entry = pendingCalls.entries.firstOrNull { it.value.deferred === deferred } ?: return
-        if (pendingCalls.remove(entry.key, entry.value)) {
+        if (pendingCalls.removeIfValue(entry.key, entry.value)) {
             entry.value.timeoutJob?.cancel()
             deferred.cancel()
             disconnectIfIdleInBackground()
@@ -1173,7 +1175,7 @@ object HermesWsClient {
     private fun isRetryableMessage(json: String): Boolean {
         if (json.length > MAX_OUTBOUND_MESSAGE_BYTES) return false
         if (json.length <= MAX_OUTBOUND_MESSAGE_BYTES / 4) return true
-        return json.toByteArray(Charsets.UTF_8).size <= MAX_OUTBOUND_MESSAGE_BYTES
+        return json.encodeToByteArray().size <= MAX_OUTBOUND_MESSAGE_BYTES
     }
 
     /**
@@ -1673,7 +1675,7 @@ object HermesWsClient {
                 } catch (e: Exception) {
                     HermesLog.e(
                         TAG,
-                        "Failed to parse socket message (${e.javaClass.simpleName})",
+                        "Failed to parse socket message (${e::class.simpleName})",
                     )
                     WsEvent.Unknown(text)
                 }
@@ -1847,7 +1849,7 @@ object HermesWsClient {
                 HermesLog.d(TAG, "Ignoring stale socket onFailure callback")
                 return
             }
-            HermesLog.e(TAG, "socket failure (${cause.javaClass.simpleName})")
+            HermesLog.e(TAG, "socket failure (${cause::class.simpleName})")
             val code = statusCode ?: 0
             if (code == 401 || cause.message?.contains(
                     "401",
