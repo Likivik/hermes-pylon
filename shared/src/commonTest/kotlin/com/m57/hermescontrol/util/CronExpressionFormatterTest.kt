@@ -2,27 +2,16 @@
 
 package com.m57.hermescontrol.util
 
-import android.util.Log
-import io.mockk.every
-import io.mockk.mockkStatic
-import io.mockk.unmockkAll
-import org.junit.After
-import org.junit.Assert.assertEquals
-import org.junit.Before
-import org.junit.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
+/**
+ * The exception paths used to need `mockkStatic(Log::class)` here: the production
+ * code called `android.util.Log.w`, which throws "not mocked" on a plain JVM.
+ * Routing through [HermesLog] removes the need - the default sink is a no-op, so
+ * nothing has to be stubbed and the assertions below are unchanged.
+ */
 class CronExpressionFormatterTest {
-    @Before
-    fun setup() {
-        mockkStatic(Log::class)
-        every { Log.w(any(), any<String>()) } returns 0
-    }
-
-    @After
-    fun teardown() {
-        unmockkAll()
-    }
-
     @Test
     fun testCronToHumanReadable() {
         assertEquals("At 09:00 and 21:00 every day", CronExpressionFormatter.cronToHumanReadable("0 9,21 * * *"))

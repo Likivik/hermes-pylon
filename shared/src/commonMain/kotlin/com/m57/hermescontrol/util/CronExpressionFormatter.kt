@@ -2,8 +2,6 @@
 
 package com.m57.hermescontrol.util
 
-import com.m57.hermescontrol.BuildConfig
-
 object CronExpressionFormatter {
     private val dowNames =
         listOf("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
@@ -50,10 +48,10 @@ object CronExpressionFormatter {
             // Fallback
             return schedule
         } catch (e: Exception) {
-            if (BuildConfig.DEBUG) {
-                android.util.Log.w(
+            if (HermesLog.isDebug) {
+                HermesLog.w(
                     "CronExpressionFormatter",
-                    "Failed to parse cron expression (${e.javaClass.simpleName})",
+                    "Failed to parse cron expression (${e::class.simpleName})",
                 )
             }
             return "Raw: $schedule"
@@ -174,7 +172,7 @@ object CronExpressionFormatter {
         m: Int,
     ): String {
         if (h == 0 && m == 0) return "midnight"
-        return String.format("%02d:%02d", h, m)
+        return "${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}"
     }
 
     private fun formatOrdinal(d: Int): String =
