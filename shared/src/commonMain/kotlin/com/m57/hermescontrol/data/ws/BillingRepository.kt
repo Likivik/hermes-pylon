@@ -7,7 +7,7 @@ import com.m57.hermescontrol.data.model.SubscriptionResumeResponse
 import com.m57.hermescontrol.data.model.SubscriptionStateResponse
 import com.m57.hermescontrol.data.model.SubscriptionUpgradeResponse
 import com.m57.hermescontrol.data.model.UsageBarsResponse
-import com.m57.hermescontrol.data.remote.OkHttpProvider
+import com.m57.hermescontrol.data.remote.HermesJson
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -33,7 +33,7 @@ import kotlinx.serialization.serializer
  * deserializing, so both shapes decode correctly.
  */
 object BillingRepository {
-    private val json get() = OkHttpProvider.json
+    private val json get() = HermesJson.instance
 
     @Suppress("UNCHECKED_CAST")
     private inline fun <reified T> decode(result: Any?): T? {
