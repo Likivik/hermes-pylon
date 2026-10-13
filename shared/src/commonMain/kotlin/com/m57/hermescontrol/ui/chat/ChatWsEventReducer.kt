@@ -1,6 +1,6 @@
 package com.m57.hermescontrol.ui.chat
 
-import com.m57.hermescontrol.data.remote.OkHttpProvider
+import com.m57.hermescontrol.data.remote.HermesJson
 import com.m57.hermescontrol.data.ws.WsEvent
 import com.m57.hermescontrol.data.ws.toJsonElement
 import kotlinx.serialization.encodeToString
@@ -379,7 +379,7 @@ object ChatWsEventReducer {
     ): ReducerResult {
         val contentJson =
             event.data?.let {
-                OkHttpProvider.json.encodeToString(it.toJsonElement())
+                HermesJson.instance.encodeToString(it.toJsonElement())
             } ?: ""
         val toolMessage =
             ChatMessage(
@@ -437,7 +437,7 @@ object ChatWsEventReducer {
     ): ReducerResult {
         val contentJson =
             event.data?.let {
-                OkHttpProvider.json.encodeToString(it.toJsonElement())
+                HermesJson.instance.encodeToString(it.toJsonElement())
             } ?: ""
         val messages = state.messages.toMutableList()
         val completedToolCallId = event.data.toolCallIdOrNull()
@@ -895,7 +895,7 @@ fun extractTodosFromMap(data: Map<String, Any?>?): List<TodoItem>? {
 fun extractTodosFromJson(content: String): List<TodoItem>? {
     if (content.isBlank()) return null
     return try {
-        val element = OkHttpProvider.json.parseToJsonElement(content)
+        val element = HermesJson.instance.parseToJsonElement(content)
         val obj = element as? JsonObject ?: return null
         val todosArray =
             (obj["todos"] as? JsonArray)
