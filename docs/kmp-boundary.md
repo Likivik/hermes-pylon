@@ -28,9 +28,11 @@ The whole gateway surface, and the logic around it:
   `TodoHierarchy`, `RailGrouping` and the rest of the shared domain model.
 * `HermesJson` — the single wire codec, configured once.
 
-Today there are **eight** `expect` declarations. Two are the thin, platform-shaped
-kind this design wants; six exist only because `commonMain` may not name
-`java.util.concurrent` types, and are candidates for deletion.
+Today there are **eight** `expect` declarations, and **no** `expect class` among
+them — every one is an `expect fun`/`expect val`. Three are the thin,
+platform-shaped kind this design wants; five exist only because `commonMain` may
+not name `java.util.concurrent` types, and are *factories* returning plain common
+interfaces rather than the types themselves.
 
 | Expect | Android | JVM |
 |---|---|---|
@@ -39,14 +41,15 @@ kind this design wants; six exist only because `commonMain` may not name
 | `ioDispatcher` | `Dispatchers.IO` | `Dispatchers.IO` |
 | `concurrentMutableMap()` | `ConcurrentHashMap` | `ConcurrentHashMap` |
 | `removeIfValue(key, value)` | `java.util.Map.remove(k, v)` | same |
-| `ConcurrentLinkedQueue` | JDK type | JDK type |
-| `AtomicInteger` | JDK type | JDK type |
-| `AtomicBoolean` | JDK type | JDK type |
+| `atomicInteger(initial)` | `AtomicInteger` | `AtomicInteger` |
+| `atomicBoolean(initial)` | `AtomicBoolean` | `AtomicBoolean` |
+| `concurrentLinkedQueue()` | `ConcurrentLinkedQueue` | `ConcurrentLinkedQueue` |
 
-`expect`/`actual` **classes** (the three JDK typealiases above) are still **Beta**
-on Kotlin 2.4.x: the compiler warns, and silencing it needs
-`-Xexpect-actual-classes`. Prefer interfaces or multiplatform libraries for
-anything new, and delete these when a call site no longer needs them.
+The last five are factories on purpose. `expect`/`actual` **classes** are still
+**Beta** on Kotlin 2.4.x — the compiler warns, and silencing it needs
+`-Xexpect-actual-classes` — so the concurrent types are declared as plain common
+interfaces and built by an `expect fun`, which has been Stable since 1.9.20. No
+`expect class` is left in `commonMain`; prefer this shape for anything new.
 
 ## Adding a target
 

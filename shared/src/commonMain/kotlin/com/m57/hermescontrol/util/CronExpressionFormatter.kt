@@ -91,6 +91,16 @@ object CronExpressionFormatter {
             val months = parseField(monthPart, 1, 12)
             if (doms.size == 1 && months.size == 1 && hoursList.size == 1 && minutesList.size == 1) {
                 val timeStr = formatTime(hoursList[0], minutesList[0])
+                // parseField does not clamp to [min, max], so an out-of-range
+                // field arrives here intact. Guard the index explicitly instead
+                // of relying on the read to raise: on Kotlin/Wasm an unchecked
+                // out-of-bounds access traps the VM (V8 reports the trap as
+                // "index out of bounds") and a trap is NOT a catchable Kotlin
+                // exception, so the `catch (e: Exception)` in
+                // cronToHumanReadable would never run and the "Raw:" fallback
+                // would be lost. Throwing a real Kotlin exception keeps the
+                // contract identical on every target.
+                if (months[0] !in monthNames.indices) throw IndexOutOfBoundsException("month ${months[0]}")
                 val monthStr = monthNames[months[0]]
                 val domStr = formatOrdinal(doms[0])
                 return if (timeStr == "midnight") {
@@ -138,6 +148,9 @@ object CronExpressionFormatter {
 
         val dows = parseField(dowPart, 0, 7)
         if (dows.size == 1) {
+            // Same guard as the month index above: parseField does not clamp, and
+            // an unchecked read traps on Kotlin/Wasm instead of raising.
+            if (dows[0] !in dowNames.indices) throw IndexOutOfBoundsException("day of week ${dows[0]}")
             val dowName = dowNames[dows[0]]
             return "Every $dowName at $timeStr"
         }

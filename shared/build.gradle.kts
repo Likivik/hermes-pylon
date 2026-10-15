@@ -17,17 +17,60 @@ plugins {
     alias(libs.plugins.ktlint)
 }
 
+// The wasm toolchain downloads Node.js (https://nodejs.org/dist) and Yarn
+// (https://github.com/yarnpkg/yarn/releases/download) into the Gradle cache,
+// which registers PROJECT-level ivy repositories. settings.gradle.kts sets
+// FAIL_ON_PROJECT_REPOS, so that registration fails the build at task-graph
+// time ("repository 'Distributions at ...' was added by unknown code").
+// AbstractSetupTask only touches project.repositories when download == true, so
+// turning the downloads off skips it entirely and the plugin falls back to
+// `node`/`yarn` on PATH. Any host running the wasm tier therefore needs node
+// and yarn installed — see scripts/local-tests.sh `wasm` and the unit-tests
+// workflow.
+// The node knob is the root extension's `download`, which every
+// WasmNodeJsEnvSpec conventions from (it covers both `:kotlinWasmNodeJsSetup`
+// and `:shared:kotlinWasmNodeJsSetup`); it is DeprecationLevel.ERROR in Kotlin
+// 2.4, hence the @Suppress. Yarn uses the non-deprecated EnvSpec property.
+@Suppress("DEPRECATION", "DEPRECATION_ERROR")
+fun org.gradle.api.Project.enableSystemToolchainForWasm() {
+    plugins.withType(org.jetbrains.kotlin.gradle.targets.wasm.nodejs.WasmNodeJsRootPlugin::class.java) {
+        extensions.getByType(
+            org.jetbrains.kotlin.gradle.targets.wasm.nodejs.WasmNodeJsRootExtension::class.java,
+        ).download = false
+    }
+    plugins.withType(org.jetbrains.kotlin.gradle.targets.wasm.yarn.WasmYarnPlugin::class.java) {
+        extensions.getByType(
+            org.jetbrains.kotlin.gradle.targets.wasm.yarn.WasmYarnRootEnvSpec::class.java,
+        ).download.set(false)
+    }
+}
+rootProject.enableSystemToolchainForWasm()
+
 kotlin {
     jvmToolchain(21)
 
-    // Web target — compile-only. This is the litmus test that keeps `commonMain`
-    // honest: with every target JVM-based, `compileCommonMainKotlinMetadata` is
-    // SKIPPED, so commonMain is only ever compiled per target against the JVM
-    // stdlib. That is how 38 JVM-only APIs sat here undetected — see
-    // docs/kmp-boundary.md. No test run is wired up for it yet.
+    // Web target — the litmus test that keeps `commonMain` honest: with every
+    // target JVM-based, `compileCommonMainKotlinMetadata` is SKIPPED, so
+    // commonMain is only ever compiled per target against the JVM stdlib. That
+    // is how 38 JVM-only APIs sat here undetected — see docs/kmp-boundary.md.
+    // The test run is wired up (scripts/local-tests.sh `wasm`, plus the
+    // unit-tests workflow). It is the only target exercising commonMain on a
+    // non-JVM runtime, and it has already caught one JVM-only assumption.
     @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
     wasmJs {
-        browser()
+        browser {
+            testTask {
+                useKarma {
+                    // CI runners ship Chrome; the dev boxes here do not, so the
+                    // browser is switchable: -PwasmTestBrowser=firefox.
+                    if (providers.gradleProperty("wasmTestBrowser").orNull == "firefox") {
+                        useFirefoxHeadless()
+                    } else {
+                        useChromeHeadless()
+                    }
+                }
+            }
+        }
     }
 
     // Console (JVM) target - the Linux app target later on.

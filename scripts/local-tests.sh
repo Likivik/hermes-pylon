@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Local test runner for hermes-pylon — the same three tiers CI runs, on this box.
+# Local test runner for hermes-pylon — the same tiers CI runs, on this box.
 #
 #   scripts/local-tests.sh sdk            one-time: writable SDK root (GMD fetches its own image)
 #   scripts/local-tests.sh unit           1,028 JVM/Robolectric tests        (~2-3 min warm)
+#   scripts/local-tests.sh wasm           183 :shared tests on wasmJs         (~1 min warm)
 #   scripts/local-tests.sh instrumented   89 emulator tests, non-e2e         (~6 min warm)
 #   scripts/local-tests.sh e2e            8 E2E classes vs a local gateway   (~2 min warm)
 #   scripts/local-tests.sh gateway start|stop|status|health
@@ -17,6 +18,10 @@
 #     fails with "Permission denied" (exit 126), ./gradlew included.
 #     Durable fix belongs in the host config; interim on a dev box:
 #       sudo mount -o remount,exec,nosuid,nodev /Storage/Git
+#   * For `wasm`: node + yarn come from the devshell (the Kotlin wasm toolchain
+#     is configured NOT to download its own — see shared/build.gradle.kts), and
+#     karma needs a browser. Chrome is used where it exists (CI runners), Firefox
+#     otherwise; override with WASM_BROWSER=chrome|firefox and FIREFOX_BIN=… .
 #   * For `e2e` only: a gateway source checkout (default /Storage/Git/hermes-agent)
 #     with a uv venv, installed as CI does:
 #       git clone --depth 1 https://github.com/Likivik/hermes-agent.git
@@ -71,6 +76,7 @@ gradle() {
       export ANDROID_HOME='$SDK_ROOT'
       export PATH=\"\$ANDROID_SDK_ROOT/platform-tools:\$PATH\"
     fi
+    [ -n '${FIREFOX_BIN:-}' ] && export FIREFOX_BIN='${FIREFOX_BIN:-}'
     ./gradlew $1"
 }
 
@@ -83,6 +89,7 @@ summarise() {
   local pattern
   case "${1:-unit}" in
     unit) pattern='app/build/test-results/testIrisDebugUnitTest/*.xml' ;;
+    wasm) pattern='shared/build/test-results/wasmJsBrowserTest/*.xml' ;;
     gmd)  pattern='app/build/outputs/androidTest-results/managedDevice/**/*.xml' ;;
     *)    echo "summarise: unknown tier $1"; return 1 ;;
   esac
@@ -105,6 +112,30 @@ case "${1:-help}" in
   sdk)          setup_sdk ;;
   unit)         python3 scripts/check_kmp_boundary.py || exit 1
                 gradle ":shared:compileKotlinWasmJs :shared:compileTestKotlinWasmJs :app:testIrisDebugUnitTest --console=plain --rerun" ; summarise unit ;;
+  # The only non-JVM runtime :shared/commonMain is exercised on. Compiling it in
+  # `unit` above is not enough — a JVM-only assumption (e.g. relying on an
+  # IndexOutOfBoundsException from an unchecked array read, which traps instead
+  # of raising on wasm) only shows up when the tests actually execute.
+  wasm)
+    python3 scripts/check_kmp_boundary.py || exit 1
+    if [ -z "${WASM_BROWSER:-}" ]; then
+      if command -v google-chrome >/dev/null 2>&1 || command -v chromium >/dev/null 2>&1; then
+        WASM_BROWSER=chrome
+      else
+        WASM_BROWSER=firefox
+      fi
+    fi
+    if [ "$WASM_BROWSER" = firefox ] && [ -z "${FIREFOX_BIN:-}" ]; then
+      FIREFOX_BIN="$(command -v firefox || true)"
+      [ -n "$FIREFOX_BIN" ] || { echo "[wasm] no firefox on PATH — set FIREFOX_BIN"; exit 1; }
+    fi
+    echo "[wasm] browser=$WASM_BROWSER${FIREFOX_BIN:+ (FIREFOX_BIN=$FIREFOX_BIN)}"
+    # Target the concrete runner, not the `wasmJsTest` umbrella: Gradle's --rerun
+    # applies only to the tasks named on the command line, and the umbrella is a
+    # lifecycle task with no actions, so `:shared:wasmJsTest --rerun` leaves
+    # `wasmJsBrowserTest` UP-TO-DATE and the tier reports green off stale XML.
+    # If a `nodejs()` test runner is ever added, add its task here too.
+    gradle ":shared:wasmJsBrowserTest -PwasmTestBrowser=$WASM_BROWSER --console=plain --rerun" ; summarise wasm ;;
   instrumented) gradle ":app:e2eApi34IrisDebugAndroidTest --no-daemon --rerun -Dorg.gradle.workers.max=2 \
                   -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect \
                   -Pandroid.testInstrumentationRunnerArguments.notPackage=com.m57.hermescontrol.e2e" ; summarise gmd ;;
@@ -123,6 +154,6 @@ case "${1:-help}" in
     summarise gmd ;;
   boundary) python3 scripts/check_kmp_boundary.py && python3 scripts/test_check_kmp_boundary.py ;;
   gateway)  python3 scripts/e2e_gateway.py "${2:-start}" "$PORT" ;;
-  all)      "$0" boundary && "$0" unit && "$0" instrumented && "$0" e2e ;;
+  all)      "$0" boundary && "$0" unit && "$0" wasm && "$0" instrumented && "$0" e2e ;;
   *)        sed -n '2,30p' "$0" ;;
 esac
