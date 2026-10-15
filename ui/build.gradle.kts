@@ -153,6 +153,12 @@ kotlin {
                 implementation(libs.compose.adaptive.navigation)
                 implementation(libs.compose.adaptive.navigation3)
                 implementation(libs.compose.material3.adaptive.navigation.suite)
+                // Compose Resources: generates the typed `Res` accessor from
+                // ui/src/commonMain/composeResources/. Configured by the
+                // top-level `compose.resources { }` block at the bottom of
+                // this file — without `publicResClass = true` the generated
+                // class is `internal` and unreachable from other modules.
+                implementation(compose.components.resources)
                 // Phase 1: depends on the multiplatform data model + HTTP primitives
                 // that already live in :shared.
                 api(project(":shared"))
@@ -248,4 +254,17 @@ tasks.matching {
 
 ktlint {
     version.set(libs.versions.ktlintEngine.get())
+}
+
+// Compose Resources — Phase 2. Generates the typed `Res` accessor from
+// ui/src/commonMain/composeResources/.
+compose.resources {
+    // Required: the default is `internal`, which would leave `Res`
+    // unreachable from :app and any other consumer module.
+    publicResClass = true
+    packageOfResClass = "com.m57.hermescontrol.generated.resources"
+    // `auto` only generates when the module has a direct resources
+    // dependency; `always` is explicit and survives refactors of how the
+    // dependency arrives.
+    generateResClass = always
 }
