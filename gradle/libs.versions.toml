@@ -41,6 +41,29 @@ robolectric = "4.14.1"
 ktlintPlugin = "14.2.0"
 ktlintEngine = "1.2.1"
 ktor = "3.6.0"
+# Compose Multiplatform — Phase 2 of the CMP plan. The plugin id
+# `org.jetbrains.compose` ships from `compose-gradle-plugin:1.12.2` and is the
+# plugin that wires every `org.jetbrains.compose.*` runtime artifact; the
+# Kotlin-side `compose-compiler` alias above is the *companion* compiler plugin
+# that tells the Kotlin toolchain to treat commonMain as Compose-using.
+# 1.12.2 needs Kotlin >= 2.1; this repo pins 2.4.21.
+composeMultiplatform = "1.12.2"
+# Material3 is on its own line that lags the platform release. The release
+# table in CMP 1.12.2 pins `material3*:1.12.0-alpha03` and the navigation-suite
+# chrome shares that version. Pinning it separately avoids pulling a phantom
+# `material3:1.12.2` that does not exist.
+composeMaterial3 = "1.12.0-alpha03"
+# The CMP adaptive fork is published under `org.jetbrains.compose.material3.adaptive`,
+# not under `androidx.compose.material3.adaptive`. 1.3.0 is the latest stable
+# (2026-10-06) and matches the version table in CMP 1.12.2.
+composeAdaptive = "1.3.0"
+# Skiko native runtime for the jvmTest tier. CMP 1.12.2 requires Skiko 0.150.2
+# (declared transitively by org.jetbrains.compose.ui:ui), but the native
+# `libskiko-*.so` binary is NOT shipped by `ui-test` — it has to be pulled
+# in separately per-host (linux-x64 here). Without this, `runComposeUiTest`
+# throws `LibraryLoadException: Cannot find libskiko-linux-x64.so.sha256`
+# before the composable even runs.
+skiko = "0.150.2"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidxCore" }
@@ -131,11 +154,53 @@ ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "kto
 ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
 ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
 
+# Compose Multiplatform runtime — multiplatform republish of the Jetpack Compose
+# libraries. Group differs from `androidx.compose.*`; in CMP 1.12.x these are
+# literally the same artifact coordinates repackaged for the JVM/Android target
+# so types merge at compile time on Android.
+# Phase 2 proof uses a minimal set: runtime, ui, foundation, material3. The
+# adaptive fork splits into four so commonMain only declares what it actually
+# references (the layout primitives live in `adaptive-layout`; nav chrome in
+# `adaptive-navigation` / `adaptive-navigation3`; the umbrella `adaptive` pulls
+# everything in for callers that don't want to choose).
+compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "composeMultiplatform" }
+compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "composeMultiplatform" }
+compose-ui-tooling-preview = { module = "org.jetbrains.compose.ui:ui-tooling-preview", version.ref = "composeMultiplatform" }
+compose-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "composeMultiplatform" }
+compose-foundation-layout = { module = "org.jetbrains.compose.foundation:foundation-layout", version.ref = "composeMultiplatform" }
+compose-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "composeMaterial3" }
+# `material3-adaptive-navigation-suite` is the nav chrome (NavigationSuiteScaffold);
+# it depends on the four `adaptive*` artifacts below transitively, but pinning
+# each one lets commonMain reason about exactly what it imports. Shares the
+# Material3 version line above (lagging the platform release).
+compose-material3-adaptive-navigation-suite = { module = "org.jetbrains.compose.material3:material3-adaptive-navigation-suite", version.ref = "composeMaterial3" }
+compose-adaptive = { module = "org.jetbrains.compose.material3.adaptive:adaptive", version.ref = "composeAdaptive" }
+compose-adaptive-layout = { module = "org.jetbrains.compose.material3.adaptive:adaptive-layout", version.ref = "composeAdaptive" }
+compose-adaptive-navigation = { module = "org.jetbrains.compose.material3.adaptive:adaptive-navigation", version.ref = "composeAdaptive" }
+compose-adaptive-navigation3 = { module = "org.jetbrains.compose.material3.adaptive:adaptive-navigation3", version.ref = "composeAdaptive" }
+# `ui-test` provides `runComposeUiTest` for commonTest (multiplatform). On the
+# JVM target it runs Skiko headless; on Android it needs the androidx
+# ui-test-junit4 driver in androidTest. We declare only the multiplatform one
+# here so the proof test compiles against commonMain.
+compose-ui-test = { module = "org.jetbrains.compose.ui:ui-test", version.ref = "composeMultiplatform" }
+# Skiko native runtime for the jvmTest tier. The compile-time `ui-test`
+# artifact is platform-agnostic, but the test runtime needs the native
+# `libskiko-*.so` binary on the classpath — `ui-test` doesn't bring it.
+# Host: linux-x64 (the build agent is Linux). For a portable test setup
+# this should be selected by `System.getProperty("os.name")`; that is
+# outside the scope of this Phase 2 toolchain proof.
+skiko-awt-runtime-linux-x64 = { module = "org.jetbrains.skiko:skiko-awt-runtime-linux-x64", version.ref = "skiko" }
+
 [plugins]
 android-application = { id = "com.android.application", version.ref = "androidGradlePlugin" }
 android-kotlin-multiplatform-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "androidGradlePlugin" }
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+# CMP plugin — declares runtime artifact versions and configures Kotlin Compose
+# Compiler for every KMP target. Declared ONCE here at the root with
+# `apply false` (the hermes-pylon rule: every plugin version lives at the root,
+# modules apply by alias only).
+compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 room = { id = "androidx.room", version.ref = "room" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }

@@ -28,6 +28,10 @@ plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.kotlin.multiplatform.library)
     alias(libs.plugins.compose.compiler)
+    // Compose Multiplatform plugin (Phase 2). Pairs with compose-compiler above:
+    // compose-compiler is the Kotlin-side compiler plugin, this one declares
+    // the runtime artifact versions and configures Compose for every target.
+    alias(libs.plugins.compose.multiplatform)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.room)
     alias(libs.plugins.ksp)
@@ -126,6 +130,52 @@ kotlin {
     }
 
     sourceSets {
+        commonMain {
+            dependencies {
+                // Compose Multiplatform runtime — Phase 2 of the CMP plan. The
+                // minimal set that the proof composable needs: runtime + ui +
+                // foundation(/-layout) + material3. The :ui androidMain source
+                // set already has the AndroidX-backed compose UI on its
+                // classpath; CMP 1.12.x republishes these as the SAME types,
+                // so Android's `api(libs.androidx.compose.ui)` keeps compiling
+                // unchanged — the compiler sees one merged type tree.
+                implementation(libs.compose.runtime)
+                implementation(libs.compose.ui)
+                implementation(libs.compose.foundation)
+                implementation(libs.compose.foundation.layout)
+                implementation(libs.compose.material3)
+                // Adaptive fork (Phase 2). All four artifacts + the
+                // navigation-suite chrome so any commonMain composable can
+                // build ListDetailPaneScaffold + NavigationSuiteScaffold
+                // without reaching for AndroidX.
+                implementation(libs.compose.adaptive)
+                implementation(libs.compose.adaptive.layout)
+                implementation(libs.compose.adaptive.navigation)
+                implementation(libs.compose.adaptive.navigation3)
+                implementation(libs.compose.material3.adaptive.navigation.suite)
+                // Phase 1: depends on the multiplatform data model + HTTP primitives
+                // that already live in :shared.
+                api(project(":shared"))
+            }
+        }
+        commonTest {
+            dependencies {
+                implementation(kotlin("test"))
+                // runComposeUiTest for commonTest (multiplatform) — JVM runs
+                // Skiko headless, Android needs the androidx driver; this
+                // artifact is the common entry point.
+                implementation(libs.compose.ui.test)
+            }
+        }
+        // The native Skiko binary is platform-specific. linux-x64 is the
+        // build host; a portable multi-host setup would select by
+        // System.getProperty("os.name")/os.arch. The proof test only has to
+        // run on this one machine.
+        jvmTest {
+            dependencies {
+                implementation(libs.skiko.awt.runtime.linux.x64)
+            }
+        }
         androidMain {
             kotlin.srcDir(buildConfigOutDir)
             dependencies {
