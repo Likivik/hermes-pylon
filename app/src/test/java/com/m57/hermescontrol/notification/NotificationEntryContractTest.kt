@@ -8,14 +8,10 @@ import org.junit.Test
 
 class NotificationEntryContractTest {
     @Test
-    fun `notification actions are scoped to each application id`() {
+    fun `notification actions are scoped to the application id`() {
         assertEquals(
-            "sh.slb.hermesmobile.ACTION_OPEN_CHAT_FROM_NOTIFICATION",
-            openChatAction("sh.slb.hermesmobile"),
-        )
-        assertEquals(
-            "sh.slb.irismobile.ACTION_OPEN_CHAT_FROM_NOTIFICATION",
-            openChatAction("sh.slb.irismobile"),
+            "io.github.likivik.pylon.ACTION_OPEN_CHAT_FROM_NOTIFICATION",
+            openChatAction("io.github.likivik.pylon"),
         )
     }
 
@@ -102,6 +98,6 @@ class NotificationEntryContractTest {
     }
 
     companion object {
-        private const val APP_ID = "sh.slb.hermesmobile"
+        private const val APP_ID = "io.github.likivik.pylon"
     }
 }

@@ -9,7 +9,7 @@
   <br><br>
 </div>
 
-<h1 align="center">Hermes Mobile</h1>
+<h1 align="center">Pylon for Hermes</h1>
 <p align="center"><strong>Native Android companion app for your Hermes AI agent.</strong></p>
 
 <p align="center">
@@ -23,15 +23,14 @@
 
 ## Overview
 
-**Hermes Mobile** is an unofficial native Android client for
+**Pylon for Hermes** is an unofficial native Android client for
 [Hermes Agent](https://hermes-agent.nousresearch.com). This security-focused
 fork is based on [Hy4ri/hermes-mobile](https://github.com/Hy4ri/hermes-mobile),
 with a selectively reconciled `v1.19.2` baseline and compatible later fixes,
 most recently clarification cleanup from upstream commit `0db741e`. It retains
-downstream security,
-complete-history pagination, signing, and distribution changes. The public
-release uses generic Hermes branding; the optional `iris` flavor exists only to
-distinguish a side-by-side personal installation.
+downstream security, complete-history pagination, signing, and distribution
+changes. The single shipped application is **Pylon** (applicationId
+`io.github.likivik.pylon`).
 
 ---
 
@@ -66,12 +65,12 @@ Add this repository URL to
 https://github.com/saralilyb/hermes-mobile
 ```
 
-Obtainium installs the signed generic `Hermes Mobile` APK published with each
-GitHub Release. The `Iris Mobile` flavor is a separate personal build, not the
-public update channel. Obtainium is the sole supported binary update channel:
-the app deliberately has no in-app release checker, APK downloader, package
-installer permission, or self-update feature, and this fork is not distributed
-through F-Droid. Manual source builds remain supported below.
+Obtainium installs the signed `Pylon for Hermes` APK published with each
+GitHub Release — that is the only shipping channel. Obtainium is the sole
+supported binary update channel: the app deliberately has no in-app release
+checker, APK downloader, package installer permission, or self-update feature,
+and this fork is not distributed through F-Droid. Manual source builds remain
+supported below.
 
 ### Build from source
 
@@ -83,8 +82,8 @@ Prerequisites:
 ```sh
 git clone https://github.com/saralilyb/hermes-mobile.git
 cd hermes-mobile
-./gradlew assembleHermesDebug
-adb install app/build/outputs/apk/hermes/debug/app-hermes-debug.apk
+./gradlew assembleDebug
+adb install app/build/outputs/apk/debug/app-debug.apk
 ```
 
 Release builds require `KEYSTORE_PATH`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, and

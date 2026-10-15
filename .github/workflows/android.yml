@@ -1,16 +1,15 @@
 # Modified from Hy4ri/hermes-mobile for this fork; see NOTICE.
 #
-# SCOPE — the IRIS flavor only (`sh.slb.irismobile`).
-# Iris is the flavor this fork ships: apk.yml defaults to it, the E2E suite drives
-# it, and every APK delivered to the device has been an iris build. `hermes` is the
-# upstream identity (`sh.slb.hermesmobile`) and is deliberately NOT built or tested
-# here — Likivik, 2026-10-05: "for now we only ever want to test our own flavor and
-# nothing else." The hermes flavor still EXISTS in app/build.gradle.kts so upstream
-# merges keep applying; it is simply not part of CI. Add a variant back deliberately
-# if that changes.
+# SCOPE — there is a single flavorless build with applicationId
+# `io.github.likivik.pylon`. The `hermes`/`iris` flavor split was removed on
+# 2026-10-15: the `iris` flavor's only purpose was a one-file string override
+# to "Iris Mobile" (the name of an unrelated upstream product), and shipping
+# two builds of the same app was not earning its keep. There is therefore no
+# variant matrix here: this workflow runs on the one debug + one release
+# variant that exist. Add a variant back deliberately if that changes.
 #
 # COST — what runs when:
-#   every PR   : ktlint, Android Lint, Build Debug APK, Release Compile (all iris)
+#   every PR   : ktlint, Android Lint, Build Debug APK, Release Compile
 #   PR + label : add the `full-ci` label to also run Instrumented Tests
 #   push main  : everything, including Instrumented Tests (post-merge verification)
 #   tags       : everything (apk-*/e2e-*/robo-*/render-* workflows are separate)
@@ -113,30 +112,28 @@ jobs:
       - name: Grant Execute Permission for Gradlew
         run: chmod +x gradlew
 
-      # iris only, per the SCOPE note at the top — this was lintHermesDebug
-      # lintIrisDebug, i.e. two near-identical lint passes in one 6.2 min step.
+      # Single lint pass. Before the hermes/iris split was removed on 2026-10-15
+      # this needed two near-identical passes in one 6.2 min step.
       - name: Run debug lint
-        run: ./gradlew lintIrisDebug
+        run: ./gradlew lintDebug
 
       - name: Upload lint reports
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: lint-reports
-          # Flavor-qualified since the hermes/iris split: lint-results-irisDebug.*
+          # Unqualified since the flavor split was removed: lint-results-debug.*
           path: app/build/reports/lint-results-*
           if-no-files-found: error
           retention-days: 7
 
   # Unit tests are deliberately NOT run here: unit.yml owns them, runs on every
-  # push and every PR (including PRs into main), and covers the same irisDebug
+  # push and every PR (including PRs into main), and covers the same debug
   # variant this job used to duplicate.
   #
-  # What this job used to do: `./gradlew test` — the same 1,025 tests for all four
-  # variants (hermes/iris × debug/release) in ~16 min, which made it the critical
-  # path of this ~21 min workflow. Three of those four variants were near-copies
-  # (the flavours differ only by applicationId), and none of them is the iris
-  # flavour we ship.
+  # What this job used to do: `./gradlew test` — the same 1,025 tests for two
+  # near-identical debug variants in ~16 min, which made it the critical path
+  # of this ~21 min workflow.
 
   # ─────────────────────────────────────────────────────────────────────
   # Job 4: Build Debug APK — depends on ktlint + lint passing.
@@ -165,20 +162,20 @@ jobs:
       - name: Grant Execute Permission for Gradlew
         run: chmod +x gradlew
 
-      - name: Build debug APK (iris)
-        run: ./gradlew assembleIrisDebug
+      - name: Build debug APK
+        run: ./gradlew assembleDebug
 
       - name: Upload Debug APK Artifact
         if: success()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: hermescontrol-debug-apk
-          path: app/build/outputs/apk/iris/debug/*.apk
+          path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 7
 
   # ─────────────────────────────────────────────────────────────────────
-  # Job 5: Release Compile — verifies the iris release variant compiles.
+  # Job 5: Release Compile — verifies the release variant compiles.
   # Catches issues like debugImplementation-scoped dependencies that
   # main source code depends on (e.g. okhttp3.logging.HttpLoggingInterceptor).
   # debug-only CI jobs (ktlint, lint, tests) won't catch these.
@@ -207,12 +204,12 @@ jobs:
       - name: Grant Execute Permission for Gradlew
         run: chmod +x gradlew
 
-      - name: Compile release Kotlin (iris)
+      - name: Compile release Kotlin
         run: |
-          ./gradlew compileIrisReleaseKotlin
+          ./gradlew compileReleaseKotlin
 
   # ─────────────────────────────────────────────────────────────────────
-  # Job 6: Instrumented tests — Android emulator, iris only, OPT-IN on PRs.
+  # Job 6: Instrumented tests — Android emulator, OPT-IN on PRs.
   # Required for Compose UI tests (TEST-09, TEST-14) and Navigation3 tests
   # that need a real Activity lifecycle. Cannot run on JVM.
   # ─────────────────────────────────────────────────────────────────────
@@ -266,7 +263,7 @@ jobs:
             ~/.android/adb*
           key: avd-api34-atd-x86_64
 
-      - name: Run connectedIrisDebugAndroidTest
+      - name: Run connectedDebugAndroidTest
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
           api-level: 34
@@ -275,15 +272,14 @@ jobs:
           disable-animations: true
           force-avd-creation: false
           emulator-options: -no-window -no-audio -no-boot-anim -camera-back none -memory 2048
-          # iris only (see the SCOPE note at the top): this used to run the hermes
-          # variant first, which is the upstream identity and not what we ship.
+          # See the SCOPE note at the top: there is only one variant now.
           #
           # `com.m57.hermescontrol.e2e` is excluded on purpose: those 8 classes drive a
           # REAL Hermes gateway and get an ephemeral password from e2e.yml's setup.
           # Without it they throw "e2ePassword not set", which is the correct loud
           # failure for "E2E executed without a gateway".
           script: |
-            ./gradlew connectedIrisDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.notPackage=com.m57.hermescontrol.e2e
+            ./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.notPackage=com.m57.hermescontrol.e2e
 
       - name: Upload instrumented test reports
         if: always()

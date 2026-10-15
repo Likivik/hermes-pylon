@@ -12,8 +12,10 @@ release builds. Debug builds may use HTTP/WS on a trusted development network.
 
 - **Min SDK 26 / Target SDK 36 / Compile SDK 37**
 - **Namespace:** `com.m57.hermescontrol`
-- **Application IDs:** `sh.slb.hermesmobile` (`hermes`) and
-  `sh.slb.irismobile` (`iris`)
+- **Application ID:** `io.github.likivik.pylon` (single flavorless build; the
+  previous `hermes`/`iris` flavor split was removed on 2026-10-15 because the
+  `iris` flavor's only purpose was a one-file string override to "Iris
+  Mobile", the name of an unrelated upstream product.)
 - **Kotlin / KSP:** inspect `gradle/libs.versions.toml` for the live versions.
   KSP uses standalone versioning, not `kotlinVersion-kspVersion`.
 - **Jetpack Compose**, Room 2.7.x, Navigation3, Ktor 3.6.0 (OkHttp WebSocket),
@@ -72,7 +74,7 @@ release builds. Debug builds may use HTTP/WS on a trusted development network.
     gateway fetching that preserves the existing media security boundaries.
   - `f931565` and all subsequent in-app updater work, including `ff8370b`
     (#889) and `daf33dc` (#891). Distribution is the signed generic
-    `sh.slb.hermesmobile` APK published by this fork's GitHub Releases and
+    `io.github.likivik.pylon` APK published by this fork's GitHub Releases and
     consumed through Obtainium. The app must not request
     `REQUEST_INSTALL_PACKAGES`, check releases, download or install APKs,
     notify about available app versions, or expose updater UI. Manual source
@@ -106,14 +108,16 @@ echo "${ANDROID_HOME:?ANDROID_HOME unset}"
 
 Only after that command fails is "no SDK available" an accurate report.
 
-The project has `hermes` and `iris` product flavors. Unqualified tasks such as
-`assembleDebug`, `lintDebug`, and `testDebugUnitTest` are ambiguous; use the
-flavor-qualified tasks:
+The project has a single flavorless build. Unqualified tasks like
+`assembleDebug`, `lintDebug`, and `testDebugUnitTest` are no longer ambiguous
+(they no longer have a flavor suffix), so the flavor-qualified forms
+(`assembleDebug`, `testDebugUnitTest`, `lintDebug`, etc.) all map to the same
+tasks. A previous `hermes`/`iris` flavor split was removed on 2026-10-15.
 
 ```bash
-./gradlew assembleHermesDebug assembleIrisDebug
-./gradlew testHermesDebugUnitTest testIrisDebugUnitTest
-./gradlew lintHermesDebug lintIrisDebug
+./gradlew assembleDebug
+./gradlew testDebugUnitTest
+./gradlew lintDebug
 ./gradlew ktlintCheck checkColorLiterals
 ```
 
@@ -186,10 +190,10 @@ Scope note: iterate on a PR with unit tests; run all three tiers before merging 
 |-----|---------|
 | `ktlint` | ktlint 1.2.1 style check |
 | `android-lint` | Android Lint |
-| `unit-tests` | JUnit |
-| `build` | Assemble both debug flavors after the fast checks |
-| `release-compile` | Compile both release flavors to catch variant-only failures |
-| `instrumented-tests` | Run both debug flavors on an Android emulator |
+| `unit-tests` | JUnit (owned by unit.yml; this table is a single-source-of-truth index of CI jobs) |
+| `build` | Assemble the debug APK after the fast checks |
+| `release-compile` | Compile the release variant to catch variant-only failures |
+| `instrumented-tests` | Run the debug variant on an Android emulator |
 | `ci-summary` | Aggregator (`if: always()`) — branch protection gates on THIS check |
 
 Every Gradle job validates `gradle-wrapper.jar` and uses the remote build cache
@@ -197,8 +201,7 @@ Every Gradle job validates `gradle-wrapper.jar` and uses the remote build cache
 
 The separate `.github/workflows/codeql.yml` workflow runs Java/Kotlin CodeQL on
 pushes and pull requests to `main`, weekly, or by manual dispatch. It uses a
-manual build with `compileHermesDebugSources` and `compileIrisDebugSources` so
-both product flavors are analyzed.
+manual build with `compileDebugSources` for the single flavorless build.
 
 ### Releasing (`.github/workflows/release.yml`)
 
