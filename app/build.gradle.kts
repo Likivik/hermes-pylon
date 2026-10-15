@@ -1,4 +1,8 @@
 // Modified from Hy4ri/hermes-mobile for this fork; see NOTICE.
+//
+// After Phase 1 of the CMP migration (`.hermes/plans/2026-10-15_135602-cmp-migration.md`),
+// this module is a thin Android entry point: Application + Activity + notification
+// service. All Compose UI, data, network, theme, and util code lives in `:ui`.
 
 import org.gradle.api.tasks.testing.Test
 
@@ -6,35 +10,24 @@ plugins {
     alias(libs.plugins.ktlint)
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
-    alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.room)
-    alias(libs.plugins.ksp)
     alias(libs.plugins.screenshot)
     alias(libs.plugins.roborazzi)
 }
 
 android {
-    namespace = "com.m57.hermescontrol"
-    // Enable the screenshotTest source set (compose screenshot plugin).
+    namespace = "com.m57.hermescontrol.app"
     experimentalProperties["android.experimental.enableScreenshotTest"] = true
 
     testOptions {
         unitTests {
-            // Roborazzi needs includeAndroidResources to resolve themed resources.
             isIncludeAndroidResources = true
             all { it.jvmArgs("-Xmx2g") }
         }
-        // Gradle Managed Devices: AGP provisions + drives the emulator itself,
-        // so the CI workflow is one gradle task and test failures set the
-        // Gradle exit code (no am-instrument exit-0-on-failure trap).
         managedDevices {
             localDevices {
                 create("e2eApi34") {
                     device = "Pixel 5"
                     apiLevel = 34
-                    // ATD (test-only, headless, no GMS) boots much faster than
-                    // "google" and is what the GMD docs recommend for tests.
-                    // aosp-atd 34 exists on modern SDK images.
                     systemImageSource = "aosp-atd"
                 }
             }
@@ -48,24 +41,13 @@ android {
     defaultConfig {
         applicationId = "sh.slb.hermesmobile"
         minSdk = 26
-        // Android 17 target behavior requires a profile-aware local-network
-        // permission flow. Compile against API 37 without opting into that
-        // behavior until the product path is implemented and tested.
         targetSdk = 36
-        // Version overrides passed from CI via -PversionName / -PversionCode.
         versionCode =
             (project.findProperty("versionCode") as? String)?.toIntOrNull()
                 ?: 1
         versionName =
             (project.findProperty("versionName") as? String) ?: "1.0-dev"
         manifestPlaceholders["usesCleartextTraffic"] = "false"
-
-        val gitSha =
-            providers.exec {
-                // Fixed width: --short varies with the checkout's object graph.
-                commandLine("git", "rev-parse", "HEAD")
-            }.standardOutput.asText.get().trim().take(7)
-        buildConfigField("String", "GIT_SHA", "\"$gitSha\"")
     }
 
     flavorDimensions += "distribution"
@@ -104,13 +86,11 @@ android {
 
     buildTypes {
         debug {
-            buildConfigField("boolean", "ALLOW_CLEARTEXT", "true")
             manifestPlaceholders["usesCleartextTraffic"] = "true"
         }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            buildConfigField("boolean", "ALLOW_CLEARTEXT", "false")
             manifestPlaceholders["usesCleartextTraffic"] = "false"
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -128,7 +108,7 @@ android {
     buildFeatures {
         compose = true
         aidl = false
-        buildConfig = true
+        buildConfig = false
         shaders = false
     }
 
@@ -149,9 +129,6 @@ android {
     }
 }
 
-// Overwrite checkout-specific version-control metadata with empty content so
-// equivalent source and toolchain inputs can produce byte-identical artifacts
-// across detached and named-branch checkouts.
 tasks.matching { it.name.endsWith("VersionControlInfo") }.configureEach {
     doLast {
         outputs.files.filter { it.exists() }.forEach { it.writeText("") }
@@ -162,12 +139,11 @@ kotlin {
     jvmToolchain(21)
 }
 
-room {
-    schemaDirectory("$projectDir/schemas")
-}
-
 dependencies {
-    // Phase 1 (KMP): platform-agnostic logic lives in :shared.
+    // Phase 1 (KMP): platform-agnostic logic lives in `:ui`, which depends on
+    // `:shared`. `:app` itself only needs the entry-point collaborators it
+    // references directly.
+    implementation(project(":ui"))
     implementation(project(":shared"))
 
     // @PreviewTest annotation + validation for the screenshotTest source set.
@@ -183,59 +159,41 @@ dependencies {
     implementation(composeBom)
     androidTestImplementation(composeBom)
 
-    // Core Android dependencies
+    // Compose only here because MainActivity is Compose. Everything else lives
+    // in `:ui` and is reached transitively via project(":ui").
     implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
-    implementation(libs.androidx.browser)
-
-    // Arch Components
-    implementation(libs.androidx.lifecycle.runtime.compose)
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
-
-    // Compose
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
-    implementation(libs.androidx.compose.material.icons.extended)
-    // Tooling
+    implementation(libs.androidx.lifecycle.runtime.compose)
     debugImplementation(libs.androidx.compose.ui.tooling)
-    debugImplementation(libs.leakcanary.android)
-    // Instrumented tests
-    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
-    // Networking
-    implementation(libs.okhttp)
-    implementation(libs.okhttp.logging)
-    implementation(libs.ktor.client.core)
-    implementation(libs.kotlinx.serialization.json)
-    implementation(libs.emoji.kt)
-    implementation(libs.emoji.compose)
-    implementation(libs.reorderable)
-    implementation(libs.crashwatcher)
-
-    // Native Compose LaTeX rendering
-    implementation(libs.latex.base)
-    implementation(libs.latex.parser)
-    implementation(libs.latex.renderer)
-
-    // Image loading
+    // HermesControlApp owns the coil ImageLoader.
     implementation(libs.coil.compose)
     implementation(libs.coil.gif)
 
-    // Encrypted storage
-    implementation(libs.androidx.security.crypto)
-    implementation(libs.androidx.datastore)
+    // HermesControlApp wires the CrashWatcher into Android's crash handler.
+    implementation(libs.crashwatcher)
 
-    // Local database (Room) — message persistence
-    implementation(libs.androidx.room.runtime)
-    implementation(libs.androidx.room.ktx)
-    implementation(libs.sqlcipher)
-    ksp(libs.androidx.room.compiler)
-    androidTestImplementation(libs.androidx.room.testing)
+    // HermesControlApp constructs the Ktor-backed HermesHttpClient and
+    // NotificationEntryActivity uses NavKey for navigation; both come from
+    // `:ui`'s transitive types but the runtime types themselves must be on
+    // `:app`'s classpath.
+    implementation(libs.ktor.client.core)
+    implementation(libs.androidx.navigation3.runtime)
 
-    // Local tests: jUnit, coroutines, Android runner
+    // Tooling
+    debugImplementation(libs.leakcanary.android)
+
+    // Instrumented tests
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+
+    // Local tests: jUnit, coroutines, Android runner. Most assertions live in
+    // code that has moved into `:ui`; only what `:app`'s test code itself uses
+    // directly is declared here. `:ui` exposes its own test deps for tests
+    // that move with the source code (none in Phase 1).
     testImplementation(libs.junit)
     testImplementation(libs.junit.jupiter.api)
     testRuntimeOnly(libs.junit.jupiter.engine)
@@ -253,27 +211,15 @@ dependencies {
     testImplementation(libs.turbine)
 
     // Instrumented tests: jUnit rules and runners
+    androidTestImplementation(libs.androidx.room.testing)
     androidTestImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.androidx.test.rules)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.espresso.core)
     androidTestImplementation(libs.mockk.android)
-
-    // Navigation
-    implementation(libs.androidx.navigation3.ui)
-    implementation(libs.androidx.navigation3.runtime)
-    implementation(libs.androidx.lifecycle.viewmodel.navigation3)
 }
 
-// ── ktlint ───────────────────────────────────────────────────────────────
-// Provided by the org.jlleitschuh.gradle.ktlint plugin; the engine version is
-// pinned in gradle/libs.versions.toml. This replaced two Exec tasks that shelled
-// out to whatever `ktlint` happened to be on PATH -- so CI (a downloaded 1.2.1)
-// and a local devshell (nix's 1.8.0) could disagree about a required check.
-//
-// Tasks: ./gradlew ktlintCheck   (add --rerun to force a non-cached run)
-//        ./gradlew ktlintFormat
 ktlint {
     version.set(libs.versions.ktlintEngine.get())
 }
@@ -285,15 +231,13 @@ ktlint {
 // module, *Preview.kt files, and _test sources. Pairing/Auth screens are
 // exempt via the per-path overlay list below.
 //
-// Acceptable replacements:
-//   - MaterialTheme.colorScheme.<token>
-//   - LocalHermesStatusColors.current.<semantic>
-//   - Color.Transparent / Color.Unspecified (intentional)
+// Phase 1: theme/ has moved into `:ui`, so this guard now scans `:ui`'s
+// source tree. `:app`'s own sources are limited to MainActivity, the
+// notification service, HermesControlApp — none define colors.
 
-// Resolve paths at configuration time (config-cache compatible).
 val colorGuardSrcDir =
     layout.projectDirectory
-        .dir("src/main/java/com/m57/hermescontrol")
+        .dir("../ui/src/androidMain/kotlin/com/m57/hermescontrol")
 val colorGuardExemptions =
     listOf(
         "/theme/",

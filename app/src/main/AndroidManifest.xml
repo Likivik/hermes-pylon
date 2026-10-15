@@ -19,7 +19,7 @@
     </queries>
 
     <application
-        android:name=".HermesControlApp"
+        android:name="com.m57.hermescontrol.HermesControlApp"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -31,14 +31,14 @@
         android:usesCleartextTraffic="${usesCleartextTraffic}"
         android:theme="@style/Theme.HermesControl">
         <activity
-            android:name=".notification.NotificationEntryActivity"
+            android:name="com.m57.hermescontrol.notification.NotificationEntryActivity"
             android:excludeFromRecents="true"
             android:exported="false"
             android:noHistory="true"
             android:theme="@style/Theme.HermesControl.NotificationEntry" />
 
         <activity
-            android:name=".MainActivity"
+            android:name="com.m57.hermescontrol.MainActivity"
             android:windowSoftInputMode="adjustResize"
             android:launchMode="singleTop"
             android:exported="true">
@@ -49,7 +49,7 @@
         </activity>
 
         <service
-            android:name=".notification.ChatNotificationService"
+            android:name="com.m57.hermescontrol.notification.ChatNotificationService"
             android:foregroundServiceType="remoteMessaging"
             android:exported="false" />
 
