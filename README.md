@@ -131,7 +131,7 @@ trying to connect to your gateway, such as Telegram or Discord sessions.
 
 ```
 app/src/main/java/com/m57/hermescontrol/
-├── data/          # Local (Room, Keystore-backed atomic blobs) & Remote (Retrofit, OkHttp WS)
+├── data/          # Local (Room, Keystore-backed atomic blobs) & Remote (Ktor, OkHttp WS)
 ├── notification/  # Foreground service for message notifications
 ├── theme/         # Material You design system, status colors, spacing, and typography
 └── ui/            # Compose screens (Chat, Settings, Profiles, Kanban, etc.) + Navigation
@@ -144,7 +144,7 @@ app/src/main/java/com/m57/hermescontrol/
 - **Language:** Kotlin 2.4.21 with KSP compiler plugin
 - **UI & Layout:** Jetpack Compose (BOM 2026.03.01) & Material 3 / Material You
 - **Navigation:** Navigation3 (Compose-first Routing)
-- **Networking:** Retrofit 3.0.0, OkHttp 5.5.0, kotlinx-serialization
+- **Networking:** Ktor 3.6.0 (OkHttp 5.5.0 engine on Android), kotlinx-serialization
 - **Database:** Room 2.7.1 with SQLCipher encryption
 - **Security:** app-owned atomic AES-256-GCM blobs backed by Android Keystore;
   `EncryptedSharedPreferences` retained only for one-release migration compatibility

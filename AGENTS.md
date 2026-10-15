@@ -16,7 +16,7 @@ release builds. Debug builds may use HTTP/WS on a trusted development network.
   `sh.slb.irismobile` (`iris`)
 - **Kotlin / KSP:** inspect `gradle/libs.versions.toml` for the live versions.
   KSP uses standalone versioning, not `kotlinVersion-kspVersion`.
-- **Jetpack Compose**, Room 2.7.x, Navigation3, OkHttp WebSocket, Retrofit,
+- **Jetpack Compose**, Room 2.7.x, Navigation3, Ktor 3.6.0 (OkHttp WebSocket),
   kotlinx-serialization
 - **Auth:** encrypted bearer tokens for direct mode; endpoint-scoped encrypted
   cookies plus short-lived WebSocket tickets for gated mode
@@ -502,7 +502,7 @@ the UI and any test that reads only the UI both agree it worked.
 
 ```
 com.m57.hermescontrol/
-├── data/          local (AuthManager), remote (Retrofit), ws (WebSocket), model
+├── data/          local (AuthManager), remote (Ktor), ws (WebSocket), model
 ├── notification/  ChatNotificationService (foreground service)
 ├── theme/         Color, Theme, Motion, Spacing, Shapes, Type
 ├── ui/            chat, settings, common (HermesScaffold, StateViews), + 17 screens
