@@ -10,7 +10,10 @@ import sys
 from xml.etree import ElementTree
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-RESOURCE_ROOT = ROOT / "app" / "src" / "main" / "res"
+# Phase 1 (`:ui` split): the resource tree moved out of `app/src/main/res` and
+# into `ui/src/androidMain/res`. The flavor-specific override at
+# `app/src/iris/res` stays in `:app`.
+RESOURCE_ROOT = ROOT / "ui" / "src" / "androidMain" / "res"
 LOCALES = ("zh", "ja", "ko")
 SPARSE_LOCALES = ("ar",)
 FORMAT_ARGUMENT = re.compile(
