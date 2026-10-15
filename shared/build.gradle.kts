@@ -96,10 +96,8 @@ kotlin {
                 // jvm-only okhttp3.HttpUrl so ServerEndpoint can move out of
                 // :app and into :shared's common source set.
                 implementation(libs.ktor.http)
-                // The Ktor transport floor (HermesHttpClient). This is NEW code
-                // alongside Retrofit, not a replacement for it: :app's
-                // HermesApiService and its frozen tests stay exactly as
-                // upstream wrote them.
+                // The Ktor transport floor (HermesHttpClient) — the single wire
+                // transport now that Retrofit is gone from :app.
                 implementation(libs.ktor.client.core)
                 implementation(libs.ktor.client.content.negotiation)
                 implementation(libs.ktor.serialization.kotlinx.json)
