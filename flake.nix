@@ -55,6 +55,27 @@
               "mips-android-sysimage-license"
             ];
           }).androidsdk;
+
+        # Compose Desktop (Skiko) system libraries. Skiko's
+        # `libskiko-linux-x64.so` dlopens libGL, libX11, libfontconfig,
+        # libfreetype, libxkbcommon and libstdc++ at runtime. `mkShell`
+        # does not propagate the per-package `lib/` into `LD_LIBRARY_PATH`
+        # for packages whose libs are not referenced from a propagated
+        # build input, so we compute the runtime path explicitly with
+        # `pkgs.lib.makeLibraryPath`. Without this, `ldd <libskiko.so>`
+        # reports the libraries as `not found` and the JVM's
+        # `System.loadLibrary` aborts before any Compose code runs,
+        # failing `:ui:jvmTest`'s `runComposeUiTest` on a native-library
+        # load error rather than on an assertion.
+        # See .hermes/plans/2026-10-16_0030-cmp-phase2-adaptive-design.md.
+        skikoRuntimeLibs = with pkgs; [
+          libGL
+          libx11
+          fontconfig
+          freetype
+          libxkbcommon
+          stdenv.cc.cc.lib
+        ];
       in {
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
@@ -83,7 +104,12 @@
             # (FAIL_ON_PROJECT_REPOS). See shared/build.gradle.kts.
             nodejs
             yarn
-          ];
+          ]
+          ++ skikoRuntimeLibs;
+
+          # Make Skiko's `libskiko-linux-x64.so` resolvable at JVM startup.
+          # See `skikoRuntimeLibs` above for the rationale and source list.
+          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath skikoRuntimeLibs;
 
           # Point everything at the Nix-managed SDK
           ANDROID_HOME = "${androidSdk}/libexec/android-sdk";
