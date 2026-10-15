@@ -49,7 +49,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -58,9 +57,26 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.m57.hermescontrol.R
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.action_connect
+import com.m57.hermescontrol.generated.resources.connect_action_hide_manual
+import com.m57.hermescontrol.generated.resources.connect_action_select_profile
+import com.m57.hermescontrol.generated.resources.connect_action_show_manual
+import com.m57.hermescontrol.generated.resources.connect_placeholder_profile_name
+import com.m57.hermescontrol.generated.resources.connect_placeholder_server_url
+import com.m57.hermescontrol.generated.resources.connect_placeholder_token
+import com.m57.hermescontrol.generated.resources.connect_profile_name
+import com.m57.hermescontrol.generated.resources.connect_save_profile
+import com.m57.hermescontrol.generated.resources.connect_selected_profile
+import com.m57.hermescontrol.generated.resources.connect_server_url_label
+import com.m57.hermescontrol.generated.resources.content_desc_hide_token
+import com.m57.hermescontrol.generated.resources.content_desc_show_token
+import com.m57.hermescontrol.generated.resources.nav_drawer_subtitle
+import com.m57.hermescontrol.generated.resources.notif_title
+import com.m57.hermescontrol.generated.resources.settings_field_token
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.PressureBanner
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun ConnectScreen(
@@ -121,7 +137,7 @@ fun ConnectScreen(
             }
 
             Text(
-                text = stringResource(R.string.notif_title),
+                text = stringResource(Res.string.notif_title),
                 style =
                     MaterialTheme.typography.displayMedium.copy(
                         fontWeight = FontWeight.Bold,
@@ -129,7 +145,7 @@ fun ConnectScreen(
                     ),
             )
             Text(
-                text = stringResource(R.string.nav_drawer_subtitle),
+                text = stringResource(Res.string.nav_drawer_subtitle),
                 style =
                     MaterialTheme.typography.bodyLarge.copy(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -149,8 +165,8 @@ fun ConnectScreen(
                         Text(
                             text =
                                 state.selectedProfile?.let { p ->
-                                    stringResource(R.string.connect_selected_profile, p.name)
-                                } ?: stringResource(R.string.connect_action_select_profile),
+                                    stringResource(Res.string.connect_selected_profile, p.name)
+                                } ?: stringResource(Res.string.connect_action_select_profile),
                         )
                     }
                     DropdownMenu(
@@ -205,7 +221,7 @@ fun ConnectScreen(
                         onCheckedChange = viewModel::onSaveProfileChange,
                     )
                     Text(
-                        text = stringResource(R.string.connect_save_profile),
+                        text = stringResource(Res.string.connect_save_profile),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onBackground,
                     )
@@ -215,8 +231,8 @@ fun ConnectScreen(
                     OutlinedTextField(
                         value = state.profileName,
                         onValueChange = viewModel::onProfileNameChange,
-                        label = { Text(stringResource(R.string.connect_profile_name)) },
-                        placeholder = { Text(stringResource(R.string.connect_placeholder_profile_name)) },
+                        label = { Text(stringResource(Res.string.connect_profile_name)) },
+                        placeholder = { Text(stringResource(Res.string.connect_placeholder_profile_name)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -237,7 +253,7 @@ fun ConnectScreen(
                             strokeWidth = 2.dp,
                         )
                     } else {
-                        Text(stringResource(R.string.action_connect), style = MaterialTheme.typography.labelLarge)
+                        Text(stringResource(Res.string.action_connect), style = MaterialTheme.typography.labelLarge)
                     }
                 }
 
@@ -248,9 +264,9 @@ fun ConnectScreen(
                     Text(
                         text =
                             if (showManualFields) {
-                                stringResource(R.string.connect_action_hide_manual)
+                                stringResource(Res.string.connect_action_hide_manual)
                             } else {
-                                stringResource(R.string.connect_action_show_manual)
+                                stringResource(Res.string.connect_action_show_manual)
                             },
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
@@ -266,8 +282,8 @@ fun ConnectScreen(
                         OutlinedTextField(
                             value = state.baseUrl,
                             onValueChange = viewModel::onBaseUrlChange,
-                            label = { Text(stringResource(R.string.connect_server_url_label)) },
-                            placeholder = { Text(stringResource(R.string.connect_placeholder_server_url)) },
+                            label = { Text(stringResource(Res.string.connect_server_url_label)) },
+                            placeholder = { Text(stringResource(Res.string.connect_placeholder_server_url)) },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                             modifier = Modifier.fillMaxWidth(),
@@ -291,8 +307,8 @@ fun ConnectScreen(
                         OutlinedTextField(
                             value = state.token,
                             onValueChange = viewModel::onTokenChange,
-                            label = { Text(stringResource(R.string.settings_field_token)) },
-                            placeholder = { Text(stringResource(R.string.connect_placeholder_token)) },
+                            label = { Text(stringResource(Res.string.settings_field_token)) },
+                            placeholder = { Text(stringResource(Res.string.connect_placeholder_token)) },
                             singleLine = true,
                             visualTransformation =
                                 if (passwordVisible) {
@@ -311,9 +327,9 @@ fun ConnectScreen(
                                             },
                                         contentDescription =
                                             if (passwordVisible) {
-                                                stringResource(R.string.content_desc_hide_token)
+                                                stringResource(Res.string.content_desc_hide_token)
                                             } else {
-                                                stringResource(R.string.content_desc_show_token)
+                                                stringResource(Res.string.content_desc_show_token)
                                             },
                                     )
                                 }

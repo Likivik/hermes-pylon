@@ -16,12 +16,22 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import com.m57.hermescontrol.R
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.action_cancel
+import com.m57.hermescontrol.generated.resources.action_delete
+import com.m57.hermescontrol.generated.resources.action_save
+import com.m57.hermescontrol.generated.resources.auth_login_base_url_label
+import com.m57.hermescontrol.generated.resources.settings_delete_confirm_message
+import com.m57.hermescontrol.generated.resources.settings_delete_confirm_title
+import com.m57.hermescontrol.generated.resources.settings_field_profile_name
+import com.m57.hermescontrol.generated.resources.settings_field_token
+import com.m57.hermescontrol.generated.resources.settings_title_add_profile
+import com.m57.hermescontrol.generated.resources.settings_title_edit_profile
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun ProfileEditorDialog(
@@ -39,9 +49,9 @@ fun ProfileEditorDialog(
 ) {
     val title =
         if (isEditing) {
-            stringResource(R.string.settings_title_edit_profile)
+            stringResource(Res.string.settings_title_edit_profile)
         } else {
-            stringResource(R.string.settings_title_add_profile)
+            stringResource(Res.string.settings_title_add_profile)
         }
 
     androidx.compose.material3.AlertDialog(
@@ -52,7 +62,7 @@ fun ProfileEditorDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = onNameChange,
-                    label = { Text(stringResource(R.string.settings_field_profile_name)) },
+                    label = { Text(stringResource(Res.string.settings_field_profile_name)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -60,7 +70,7 @@ fun ProfileEditorDialog(
                     value = baseUrl,
                     onValueChange = onBaseUrlChange,
                     label = {
-                        Text(stringResource(R.string.auth_login_base_url_label))
+                        Text(stringResource(Res.string.auth_login_base_url_label))
                     },
                     placeholder = {
                         Text("https://hermes.example.com:9119")
@@ -88,7 +98,7 @@ fun ProfileEditorDialog(
                     OutlinedTextField(
                         value = token,
                         onValueChange = onTokenChange,
-                        label = { Text(stringResource(R.string.settings_field_token)) },
+                        label = { Text(stringResource(Res.string.settings_field_token)) },
                         singleLine = true,
                         visualTransformation =
                             if (token.isNotEmpty()) {
@@ -106,12 +116,12 @@ fun ProfileEditorDialog(
                 onClick = onSave,
                 enabled = name.isNotBlank() && baseUrl.isNotBlank(),
             ) {
-                Text(stringResource(R.string.action_save))
+                Text(stringResource(Res.string.action_save))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
+                Text(stringResource(Res.string.action_cancel))
             }
         },
     )
@@ -125,21 +135,21 @@ fun DeleteProfileConfirmDialog(
 ) {
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.settings_delete_confirm_title)) },
+        title = { Text(stringResource(Res.string.settings_delete_confirm_title)) },
         text = {
-            Text(stringResource(R.string.settings_delete_confirm_message, profileName))
+            Text(stringResource(Res.string.settings_delete_confirm_message, profileName))
         },
         confirmButton = {
             Button(
                 onClick = onConfirm,
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
             ) {
-                Text(stringResource(R.string.action_delete))
+                Text(stringResource(Res.string.action_delete))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
+                Text(stringResource(Res.string.action_cancel))
             }
         },
     )

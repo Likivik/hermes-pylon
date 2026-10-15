@@ -18,15 +18,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.m57.hermescontrol.R
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.language_arabic
+import com.m57.hermescontrol.generated.resources.language_chinese
+import com.m57.hermescontrol.generated.resources.language_english
+import com.m57.hermescontrol.generated.resources.language_japanese
+import com.m57.hermescontrol.generated.resources.language_korean
+import com.m57.hermescontrol.generated.resources.language_system
+import com.m57.hermescontrol.generated.resources.settings_item_language
 import com.m57.hermescontrol.ui.settings.SectionCard
 import com.m57.hermescontrol.util.LocaleContextWrapper
+import org.jetbrains.compose.resources.stringResource
 
 val SUPPORTED_LANGUAGE_CODES =
     listOf(
@@ -41,18 +48,18 @@ val SUPPORTED_LANGUAGE_CODES =
 @Composable
 fun supportedLanguages(): List<Pair<String, String>> =
     listOf(
-        LocaleContextWrapper.SYSTEM_LANGUAGE to stringResource(R.string.language_system),
-        "en" to stringResource(R.string.language_english),
-        "ar" to stringResource(R.string.language_arabic),
-        "zh" to stringResource(R.string.language_chinese),
-        "ja" to stringResource(R.string.language_japanese),
-        "ko" to stringResource(R.string.language_korean),
+        LocaleContextWrapper.SYSTEM_LANGUAGE to stringResource(Res.string.language_system),
+        "en" to stringResource(Res.string.language_english),
+        "ar" to stringResource(Res.string.language_arabic),
+        "zh" to stringResource(Res.string.language_chinese),
+        "ja" to stringResource(Res.string.language_japanese),
+        "ko" to stringResource(Res.string.language_korean),
     )
 
 @Composable
 fun languageLabel(code: String): String =
     supportedLanguages().firstOrNull { it.first == code }?.second
-        ?: stringResource(R.string.language_system)
+        ?: stringResource(Res.string.language_system)
 
 @Composable
 fun LanguageSection(
@@ -62,7 +69,7 @@ fun LanguageSection(
 ) {
     SectionCard {
         Text(
-            text = stringResource(R.string.settings_item_language),
+            text = stringResource(Res.string.settings_item_language),
             style = MaterialTheme.typography.bodyLarge,
         )
         Spacer(modifier = Modifier.height(8.dp))

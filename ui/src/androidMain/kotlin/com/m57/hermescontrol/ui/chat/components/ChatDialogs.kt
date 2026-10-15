@@ -21,13 +21,27 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import com.m57.hermescontrol.R
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.chat_privileged_cancel
+import com.m57.hermescontrol.generated.resources.chat_relogin_cancel
+import com.m57.hermescontrol.generated.resources.chat_relogin_error_empty
+import com.m57.hermescontrol.generated.resources.chat_relogin_password
+import com.m57.hermescontrol.generated.resources.chat_relogin_submit
+import com.m57.hermescontrol.generated.resources.chat_relogin_title
+import com.m57.hermescontrol.generated.resources.chat_relogin_username
+import com.m57.hermescontrol.generated.resources.chat_secret_body
+import com.m57.hermescontrol.generated.resources.chat_secret_title
+import com.m57.hermescontrol.generated.resources.chat_secret_value
+import com.m57.hermescontrol.generated.resources.chat_send
+import com.m57.hermescontrol.generated.resources.chat_sudo_body
+import com.m57.hermescontrol.generated.resources.chat_sudo_password
+import com.m57.hermescontrol.generated.resources.chat_sudo_title
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.ui.chat.VaultPromptUi
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun VaultPromptDialog(
@@ -97,7 +111,7 @@ fun VaultPromptDialog(
                         (!saveLogin || (prompt.hasValidRequestedOrigin && identifier.isNotBlank())) &&
                         !prompt.isSubmitting,
                 modifier = Modifier.testTag("vault_send_button"),
-            ) { Text(stringResource(R.string.chat_send)) }
+            ) { Text(stringResource(Res.string.chat_send)) }
         },
         dismissButton = {
             TextButton(
@@ -105,7 +119,7 @@ fun VaultPromptDialog(
                 enabled = !prompt.isSubmitting,
                 modifier = Modifier.testTag("vault_cancel_button"),
             ) {
-                Text(stringResource(R.string.chat_privileged_cancel))
+                Text(stringResource(Res.string.chat_privileged_cancel))
             }
         },
     )
@@ -133,15 +147,15 @@ fun SudoPromptDialog(
 
     AlertDialog(
         onDismissRequest = { if (!isSubmitting) onDismiss() },
-        title = { Text(stringResource(R.string.chat_sudo_title)) },
+        title = { Text(stringResource(Res.string.chat_sudo_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(text = stringResource(R.string.chat_sudo_body))
+                Text(text = stringResource(Res.string.chat_sudo_body))
                 Spacer(modifier = Modifier.height(4.dp))
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it },
-                    label = { Text(stringResource(R.string.chat_sudo_password)) },
+                    label = { Text(stringResource(Res.string.chat_sudo_password)) },
                     modifier = Modifier.fillMaxWidth().testTag("sudo_password_input"),
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
@@ -160,7 +174,7 @@ fun SudoPromptDialog(
                 enabled = password.isNotBlank() && !isSubmitting,
                 modifier = Modifier.testTag("sudo_send_button"),
             ) {
-                Text(stringResource(R.string.chat_send))
+                Text(stringResource(Res.string.chat_send))
             }
         },
         dismissButton = {
@@ -169,7 +183,7 @@ fun SudoPromptDialog(
                 modifier = Modifier.testTag("sudo_cancel_button"),
                 enabled = !isSubmitting,
             ) {
-                Text(stringResource(R.string.chat_privileged_cancel))
+                Text(stringResource(Res.string.chat_privileged_cancel))
             }
         },
     )
@@ -195,9 +209,9 @@ fun SecretPromptDialog(
     isSubmitting: Boolean = false,
 ) {
     var secret by remember(binding) { mutableStateOf("") }
-    val titleText = envVar?.takeIf { it.isNotBlank() } ?: stringResource(R.string.chat_secret_title)
-    val bodyText = prompt?.takeIf { it.isNotBlank() } ?: stringResource(R.string.chat_secret_body)
-    val labelText = envVar?.takeIf { it.isNotBlank() } ?: stringResource(R.string.chat_secret_value)
+    val titleText = envVar?.takeIf { it.isNotBlank() } ?: stringResource(Res.string.chat_secret_title)
+    val bodyText = prompt?.takeIf { it.isNotBlank() } ?: stringResource(Res.string.chat_secret_body)
+    val labelText = envVar?.takeIf { it.isNotBlank() } ?: stringResource(Res.string.chat_secret_value)
 
     AlertDialog(
         onDismissRequest = { if (!isSubmitting) onDismiss() },
@@ -228,7 +242,7 @@ fun SecretPromptDialog(
                 enabled = secret.isNotBlank() && !isSubmitting,
                 modifier = Modifier.testTag("secret_send_button"),
             ) {
-                Text(stringResource(R.string.chat_send))
+                Text(stringResource(Res.string.chat_send))
             }
         },
         dismissButton = {
@@ -237,7 +251,7 @@ fun SecretPromptDialog(
                 modifier = Modifier.testTag("secret_cancel_button"),
                 enabled = !isSubmitting,
             ) {
-                Text(stringResource(R.string.chat_privileged_cancel))
+                Text(stringResource(Res.string.chat_privileged_cancel))
             }
         },
     )
@@ -249,7 +263,7 @@ fun ReloginDialog(
     onDismiss: () -> Unit,
     onRelogin: (String, String, (Boolean, String?) -> Unit) -> Unit,
 ) {
-    val emptyCredentialsError = stringResource(R.string.chat_relogin_error_empty)
+    val emptyCredentialsError = stringResource(Res.string.chat_relogin_error_empty)
     val statusColors = LocalHermesStatusColors.current
     var username by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
@@ -258,7 +272,7 @@ fun ReloginDialog(
 
     AlertDialog(
         onDismissRequest = { if (!isLoading) onDismiss() },
-        title = { Text(stringResource(R.string.chat_relogin_title)) },
+        title = { Text(stringResource(Res.string.chat_relogin_title)) },
         text = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -270,7 +284,7 @@ fun ReloginDialog(
                         username = it
                         errorMessage = null
                     },
-                    label = { Text(stringResource(R.string.chat_relogin_username)) },
+                    label = { Text(stringResource(Res.string.chat_relogin_username)) },
                     singleLine = true,
                     enabled = !isLoading,
                     modifier = Modifier.fillMaxWidth(),
@@ -281,7 +295,7 @@ fun ReloginDialog(
                         password = it
                         errorMessage = null
                     },
-                    label = { Text(stringResource(R.string.chat_relogin_password)) },
+                    label = { Text(stringResource(Res.string.chat_relogin_password)) },
                     singleLine = true,
                     enabled = !isLoading,
                     visualTransformation =
@@ -325,7 +339,7 @@ fun ReloginDialog(
                         color = statusColors.info,
                     )
                 } else {
-                    Text(stringResource(R.string.chat_relogin_submit))
+                    Text(stringResource(Res.string.chat_relogin_submit))
                 }
             }
         },
@@ -334,7 +348,7 @@ fun ReloginDialog(
                 enabled = !isLoading,
                 onClick = onDismiss,
             ) {
-                Text(stringResource(R.string.chat_relogin_cancel))
+                Text(stringResource(Res.string.chat_relogin_cancel))
             }
         },
     )

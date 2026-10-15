@@ -30,16 +30,20 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.m57.hermescontrol.NavigationController
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.model.ProfileInfo
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.bots_empty_description
+import com.m57.hermescontrol.generated.resources.bots_empty_title
+import com.m57.hermescontrol.generated.resources.bots_search_placeholder
+import com.m57.hermescontrol.generated.resources.bots_toggle_hidden
+import com.m57.hermescontrol.generated.resources.screen_bots
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.BotAvatar
 import com.m57.hermescontrol.ui.common.EmptyState
@@ -47,6 +51,7 @@ import com.m57.hermescontrol.ui.common.ErrorState
 import com.m57.hermescontrol.ui.common.HermesScaffold
 import com.m57.hermescontrol.ui.common.LoadingState
 import com.m57.hermescontrol.ui.common.NavIcon
+import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,14 +72,14 @@ fun BotsScreen(
 
     HermesScaffold(
         modifier = modifier,
-        title = { Text(stringResource(R.string.screen_bots)) },
+        title = { Text(stringResource(Res.string.screen_bots)) },
         navigationIcon = onOpenDrawer?.let { NavIcon.Menu(it) },
         actions = {
             if (state.hasHiddenBots) {
                 IconButton(onClick = viewModel::toggleShowHidden) {
                     Icon(
                         if (state.showHidden) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                        contentDescription = stringResource(R.string.bots_toggle_hidden),
+                        contentDescription = stringResource(Res.string.bots_toggle_hidden),
                     )
                 }
             }
@@ -88,8 +93,8 @@ fun BotsScreen(
                 ErrorState(state.errorMessage.orEmpty(), onRetry = viewModel::loadBots)
             state.displayProfiles.isEmpty() ->
                 EmptyState(
-                    title = stringResource(R.string.bots_empty_title),
-                    subtitle = stringResource(R.string.bots_empty_description),
+                    title = stringResource(Res.string.bots_empty_title),
+                    subtitle = stringResource(Res.string.bots_empty_description),
                 )
             else ->
                 Column(Modifier.fillMaxSize()) {
@@ -97,7 +102,7 @@ fun BotsScreen(
                         value = state.searchQuery,
                         onValueChange = viewModel::setSearchQuery,
                         leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                        placeholder = { Text(stringResource(R.string.bots_search_placeholder)) },
+                        placeholder = { Text(stringResource(Res.string.bots_search_placeholder)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.md, vertical = Spacing.sm),
                     )

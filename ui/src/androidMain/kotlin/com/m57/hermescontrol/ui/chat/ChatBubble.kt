@@ -67,7 +67,6 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -80,10 +79,18 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.Attachment
 import com.m57.hermescontrol.data.remote.OkHttpProvider
 import com.m57.hermescontrol.data.ws.PrivilegedRequestBinding
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.chat_privileged_cancel
+import com.m57.hermescontrol.generated.resources.chat_tool_execution_error
+import com.m57.hermescontrol.generated.resources.chat_tool_exit_code
+import com.m57.hermescontrol.generated.resources.chat_tool_fallback
+import com.m57.hermescontrol.generated.resources.chat_tool_output_omitted
+import com.m57.hermescontrol.generated.resources.chat_tool_show_parsed
+import com.m57.hermescontrol.generated.resources.chat_tool_show_raw
+import com.m57.hermescontrol.generated.resources.content_desc_copy
 import com.m57.hermescontrol.theme.ChatFontScale
 import com.m57.hermescontrol.theme.HermesStatusColors
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
@@ -103,6 +110,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.double
 import kotlinx.serialization.json.int
+import org.jetbrains.compose.resources.stringResource
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -328,7 +336,7 @@ private fun UserBubble(
                     ) {
                         Icon(
                             Icons.Filled.ContentCopy,
-                            contentDescription = stringResource(R.string.content_desc_copy),
+                            contentDescription = stringResource(Res.string.content_desc_copy),
                             modifier = Modifier.size(16.dp),
                             tint = MaterialTheme.colorScheme.onSurface,
                         )
@@ -480,7 +488,7 @@ private fun AssistantBubble(
                     ) {
                         Icon(
                             Icons.Filled.ContentCopy,
-                            contentDescription = stringResource(R.string.content_desc_copy),
+                            contentDescription = stringResource(Res.string.content_desc_copy),
                             modifier = Modifier.size(16.dp),
                             tint = MaterialTheme.colorScheme.onSurface,
                         )
@@ -651,7 +659,7 @@ private fun SystemBubble(
                             .height(36.dp)
                             .testTag("cancel_approval_button"),
                 ) {
-                    Text(stringResource(R.string.chat_privileged_cancel))
+                    Text(stringResource(Res.string.chat_privileged_cancel))
                 }
             }
         }
@@ -2092,7 +2100,7 @@ private fun ExpandedToolContent(
             }
             parsed.error?.let {
                 Text(
-                    text = stringResource(R.string.chat_tool_execution_error, it),
+                    text = stringResource(Res.string.chat_tool_execution_error, it),
                     style =
                         MaterialTheme.typography.bodySmall.copy(
                             color = statusColors.error,
@@ -2105,7 +2113,7 @@ private fun ExpandedToolContent(
             parsed.exitCode?.let { code ->
                 if (code != 0) {
                     Text(
-                        text = stringResource(R.string.chat_tool_exit_code, code),
+                        text = stringResource(Res.string.chat_tool_exit_code, code),
                         style =
                             MaterialTheme.typography.labelSmall.copy(
                                 color = statusColors.error,
@@ -2146,7 +2154,7 @@ private fun ExpandedToolContent(
                 if (parsed.toolName == "process" || parsed.toolName == "process_manage") {
                     parsed.outputCut?.let { omitted ->
                         Text(
-                            text = stringResource(R.string.chat_tool_output_omitted, omitted),
+                            text = stringResource(Res.string.chat_tool_output_omitted, omitted),
                             style = MaterialTheme.typography.labelSmall.copy(color = statusColors.warning),
                         )
                     }
@@ -2320,7 +2328,7 @@ private fun ToolBubble(
 
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = stringResource(R.string.chat_tool_show_parsed),
+                            text = stringResource(Res.string.chat_tool_show_parsed),
                             style =
                                 MaterialTheme.typography.labelSmall.copy(
                                     color = MaterialTheme.colorScheme.primary,
@@ -2350,7 +2358,7 @@ private fun ToolBubble(
 
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = stringResource(R.string.chat_tool_show_raw),
+                            text = stringResource(Res.string.chat_tool_show_raw),
                             style =
                                 MaterialTheme.typography.labelSmall.copy(
                                     color = MaterialTheme.colorScheme.primary,
@@ -2440,7 +2448,7 @@ private fun HeaderRow(
         }
 
         Text(
-            text = message.toolName ?: stringResource(R.string.chat_tool_fallback),
+            text = message.toolName ?: stringResource(Res.string.chat_tool_fallback),
             style =
                 MaterialTheme.typography.labelMedium.copy(
                     color = contentColor,
@@ -2532,7 +2540,7 @@ private fun CopyButton(
             ) {
                 Icon(
                     Icons.Filled.ContentCopy,
-                    contentDescription = stringResource(R.string.content_desc_copy),
+                    contentDescription = stringResource(Res.string.content_desc_copy),
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.onSurface,
                 )

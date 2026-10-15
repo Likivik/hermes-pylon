@@ -41,12 +41,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.m57.hermescontrol.R
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.action_retry
 import com.m57.hermescontrol.theme.LocalSpacing
+import org.jetbrains.compose.resources.stringResource
 
 // Unified loading / error / empty / skeleton placeholders so every screen
 // shares the same visual language.
@@ -128,7 +129,7 @@ fun ErrorState(
                     modifier = Modifier.size(18.dp),
                 )
                 Spacer(modifier = Modifier.size(spacing.sm))
-                Text(stringResource(R.string.action_retry))
+                Text(stringResource(Res.string.action_retry))
             }
         }
     }

@@ -18,13 +18,16 @@ import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.m57.hermescontrol.R
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.chat_context_meter_label
+import com.m57.hermescontrol.generated.resources.chat_context_meter_percent
+import com.m57.hermescontrol.generated.resources.chat_context_meter_unknown
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.theme.Spacing
+import org.jetbrains.compose.resources.stringResource
 import java.util.Locale
 import kotlin.math.min
 
@@ -101,9 +104,9 @@ fun ContextUsageChip(
             Text(
                 text =
                     stringResource(
-                        R.string.chat_context_meter_label,
+                        Res.string.chat_context_meter_label,
                         usedTokens?.let { formatTokens(it) }
-                            ?: stringResource(R.string.chat_context_meter_unknown),
+                            ?: stringResource(Res.string.chat_context_meter_unknown),
                         formatTokens(fullTokens),
                     ),
                 style = MaterialTheme.typography.labelSmall,
@@ -114,9 +117,9 @@ fun ContextUsageChip(
             Text(
                 text =
                     if (usedTokens == null) {
-                        stringResource(R.string.chat_context_meter_unknown)
+                        stringResource(Res.string.chat_context_meter_unknown)
                     } else {
-                        stringResource(R.string.chat_context_meter_percent, pct)
+                        stringResource(Res.string.chat_context_meter_percent, pct)
                     },
                 style = MaterialTheme.typography.labelSmall,
                 color = barColor,

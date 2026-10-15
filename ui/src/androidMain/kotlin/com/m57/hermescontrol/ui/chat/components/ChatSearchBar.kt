@@ -25,11 +25,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import com.m57.hermescontrol.R
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.chat_clear_search_desc
+import com.m57.hermescontrol.generated.resources.chat_close_search_desc
+import com.m57.hermescontrol.generated.resources.chat_next_match_desc
+import com.m57.hermescontrol.generated.resources.chat_prev_match_desc
+import com.m57.hermescontrol.generated.resources.chat_search_placeholder
 import com.m57.hermescontrol.theme.Spacing
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun CompactSearchInput(
@@ -73,7 +78,7 @@ fun CompactSearchInput(
                 Box(modifier = Modifier.weight(1f)) {
                     if (value.isEmpty()) {
                         Text(
-                            text = stringResource(R.string.chat_search_placeholder),
+                            text = stringResource(Res.string.chat_search_placeholder),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                         )
@@ -87,7 +92,7 @@ fun CompactSearchInput(
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Close,
-                            contentDescription = stringResource(R.string.chat_clear_search_desc),
+                            contentDescription = stringResource(Res.string.chat_clear_search_desc),
                             modifier = Modifier.size(16.dp),
                         )
                     }
@@ -150,7 +155,7 @@ fun SearchBarRow(
         ) {
             Icon(
                 Icons.Filled.KeyboardArrowUp,
-                contentDescription = stringResource(R.string.chat_prev_match_desc),
+                contentDescription = stringResource(Res.string.chat_prev_match_desc),
                 modifier = Modifier.size(20.dp),
             )
         }
@@ -161,14 +166,14 @@ fun SearchBarRow(
         ) {
             Icon(
                 Icons.Filled.KeyboardArrowDown,
-                contentDescription = stringResource(R.string.chat_next_match_desc),
+                contentDescription = stringResource(Res.string.chat_next_match_desc),
                 modifier = Modifier.size(20.dp),
             )
         }
         IconButton(onClick = onClose, modifier = Modifier.size(36.dp)) {
             Icon(
                 Icons.Filled.Close,
-                contentDescription = stringResource(R.string.chat_close_search_desc),
+                contentDescription = stringResource(Res.string.chat_close_search_desc),
                 modifier = Modifier.size(20.dp),
             )
         }

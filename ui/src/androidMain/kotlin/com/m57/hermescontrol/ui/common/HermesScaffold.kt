@@ -32,11 +32,14 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
-import com.m57.hermescontrol.R
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.content_desc_back
+import com.m57.hermescontrol.generated.resources.content_desc_open_drawer
+import com.m57.hermescontrol.generated.resources.content_desc_refresh
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 
 /** Sealed interface for navigation icon types — eliminates boolean-flag anti-pattern. */
@@ -171,7 +174,7 @@ fun HermesScaffold(
                             IconButton(onClick = icon.onBack) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = stringResource(R.string.content_desc_back),
+                                    contentDescription = stringResource(Res.string.content_desc_back),
                                     modifier = Modifier.testTag("back_button"),
                                 )
                             }
@@ -181,7 +184,7 @@ fun HermesScaffold(
                             IconButton(onClick = icon.onOpen) {
                                 Icon(
                                     imageVector = Icons.Filled.Menu,
-                                    contentDescription = stringResource(R.string.content_desc_open_drawer),
+                                    contentDescription = stringResource(Res.string.content_desc_open_drawer),
                                     modifier = Modifier.testTag("menu_button"),
                                 )
                             }
@@ -195,7 +198,7 @@ fun HermesScaffold(
                         IconButton(onClick = onRefresh) {
                             Icon(
                                 imageVector = Icons.Filled.Refresh,
-                                contentDescription = stringResource(R.string.content_desc_refresh),
+                                contentDescription = stringResource(Res.string.content_desc_refresh),
                                 modifier = Modifier.testTag("refresh_button"),
                             )
                         }

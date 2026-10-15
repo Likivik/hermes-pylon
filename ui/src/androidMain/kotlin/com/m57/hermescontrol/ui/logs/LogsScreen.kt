@@ -43,13 +43,36 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.m57.hermescontrol.R
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.error_unknown
+import com.m57.hermescontrol.generated.resources.logs_action_export
+import com.m57.hermescontrol.generated.resources.logs_action_pause
+import com.m57.hermescontrol.generated.resources.logs_action_resume
+import com.m57.hermescontrol.generated.resources.logs_action_upload
+import com.m57.hermescontrol.generated.resources.logs_content_desc_jump_bottom
+import com.m57.hermescontrol.generated.resources.logs_empty_desc
+import com.m57.hermescontrol.generated.resources.logs_empty_title
+import com.m57.hermescontrol.generated.resources.logs_filter_agent
+import com.m57.hermescontrol.generated.resources.logs_filter_all
+import com.m57.hermescontrol.generated.resources.logs_filter_cli
+import com.m57.hermescontrol.generated.resources.logs_filter_component
+import com.m57.hermescontrol.generated.resources.logs_filter_cron
+import com.m57.hermescontrol.generated.resources.logs_filter_debug
+import com.m57.hermescontrol.generated.resources.logs_filter_error
+import com.m57.hermescontrol.generated.resources.logs_filter_errors
+import com.m57.hermescontrol.generated.resources.logs_filter_file
+import com.m57.hermescontrol.generated.resources.logs_filter_gateway
+import com.m57.hermescontrol.generated.resources.logs_filter_info
+import com.m57.hermescontrol.generated.resources.logs_filter_level
+import com.m57.hermescontrol.generated.resources.logs_filter_lines
+import com.m57.hermescontrol.generated.resources.logs_filter_tools
+import com.m57.hermescontrol.generated.resources.logs_filter_warning
+import com.m57.hermescontrol.generated.resources.screen_logs
 import com.m57.hermescontrol.theme.LocalSpacing
 import com.m57.hermescontrol.ui.common.EmptyState
 import com.m57.hermescontrol.ui.common.ErrorState
@@ -59,6 +82,7 @@ import com.m57.hermescontrol.ui.common.SearchBar
 import com.m57.hermescontrol.ui.common.SkeletonListState
 import com.m57.hermescontrol.ui.common.ToastEffect
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
 
 private data class LogsFilterOption(
     val value: String,
@@ -117,7 +141,7 @@ fun LogsScreen(
     val scope = rememberCoroutineScope()
 
     HermesScaffold(
-        title = { Text(stringResource(R.string.screen_logs)) },
+        title = { Text(stringResource(Res.string.screen_logs)) },
         navigationIcon = onOpenDrawer?.let { NavIcon.Menu(it) },
         isRefreshing = state.isLoading,
         onRefresh = { viewModel.loadLogs() },
@@ -128,7 +152,7 @@ fun LogsScreen(
                     imageVector = if (pauseScroll) Icons.Filled.PlayArrow else Icons.Filled.Pause,
                     contentDescription =
                         stringResource(
-                            if (pauseScroll) R.string.logs_action_resume else R.string.logs_action_pause,
+                            if (pauseScroll) Res.string.logs_action_resume else Res.string.logs_action_pause,
                         ),
                 )
             }
@@ -141,14 +165,14 @@ fun LogsScreen(
             ) {
                 Icon(
                     imageVector = Icons.Filled.Share,
-                    contentDescription = stringResource(R.string.logs_action_export),
+                    contentDescription = stringResource(Res.string.logs_action_export),
                 )
             }
             // Likivik patch: upload CrashWatcher app logs (crash/ANR) to Files
             IconButton(onClick = { viewModel.uploadAppLogs() }) {
                 Icon(
                     imageVector = Icons.Filled.FileUpload,
-                    contentDescription = stringResource(R.string.logs_action_upload),
+                    contentDescription = stringResource(Res.string.logs_action_upload),
                 )
             }
         },
@@ -170,7 +194,7 @@ fun LogsScreen(
                         onFiltersChange = viewModel::setFilters,
                     )
                     ErrorState(
-                        message = state.errorMessage ?: stringResource(R.string.error_unknown),
+                        message = state.errorMessage ?: stringResource(Res.string.error_unknown),
                         onRetry = { viewModel.loadLogs() },
                         modifier = Modifier.weight(1f),
                     )
@@ -189,8 +213,8 @@ fun LogsScreen(
                         onFiltersChange = viewModel::setFilters,
                     )
                     EmptyState(
-                        title = stringResource(R.string.logs_empty_title),
-                        subtitle = stringResource(R.string.logs_empty_desc),
+                        title = stringResource(Res.string.logs_empty_title),
+                        subtitle = stringResource(Res.string.logs_empty_desc),
                         icon = Icons.Filled.HistoryEdu,
                         modifier = Modifier.weight(1f),
                     )
@@ -260,7 +284,7 @@ fun LogsScreen(
                             Icon(
                                 imageVector = Icons.Filled.KeyboardDoubleArrowDown,
                                 contentDescription =
-                                    stringResource(R.string.logs_content_desc_jump_bottom),
+                                    stringResource(Res.string.logs_content_desc_jump_bottom),
                             )
                         }
                     }
@@ -279,26 +303,26 @@ private fun LogsFilterControls(
     val spacing = LocalSpacing.current
     val fileOptions =
         listOf(
-            LogsFilterOption("agent", stringResource(R.string.logs_filter_agent)),
-            LogsFilterOption("errors", stringResource(R.string.logs_filter_errors)),
-            LogsFilterOption("gateway", stringResource(R.string.logs_filter_gateway)),
+            LogsFilterOption("agent", stringResource(Res.string.logs_filter_agent)),
+            LogsFilterOption("errors", stringResource(Res.string.logs_filter_errors)),
+            LogsFilterOption("gateway", stringResource(Res.string.logs_filter_gateway)),
         )
     val levelOptions =
         listOf(
-            LogsFilterOption("ALL", stringResource(R.string.logs_filter_all)),
-            LogsFilterOption("DEBUG", stringResource(R.string.logs_filter_debug)),
-            LogsFilterOption("INFO", stringResource(R.string.logs_filter_info)),
-            LogsFilterOption("WARNING", stringResource(R.string.logs_filter_warning)),
-            LogsFilterOption("ERROR", stringResource(R.string.logs_filter_error)),
+            LogsFilterOption("ALL", stringResource(Res.string.logs_filter_all)),
+            LogsFilterOption("DEBUG", stringResource(Res.string.logs_filter_debug)),
+            LogsFilterOption("INFO", stringResource(Res.string.logs_filter_info)),
+            LogsFilterOption("WARNING", stringResource(Res.string.logs_filter_warning)),
+            LogsFilterOption("ERROR", stringResource(Res.string.logs_filter_error)),
         )
     val componentOptions =
         listOf(
-            LogsFilterOption("all", stringResource(R.string.logs_filter_all)),
-            LogsFilterOption("gateway", stringResource(R.string.logs_filter_gateway)),
-            LogsFilterOption("agent", stringResource(R.string.logs_filter_agent)),
-            LogsFilterOption("tools", stringResource(R.string.logs_filter_tools)),
-            LogsFilterOption("cli", stringResource(R.string.logs_filter_cli)),
-            LogsFilterOption("cron", stringResource(R.string.logs_filter_cron)),
+            LogsFilterOption("all", stringResource(Res.string.logs_filter_all)),
+            LogsFilterOption("gateway", stringResource(Res.string.logs_filter_gateway)),
+            LogsFilterOption("agent", stringResource(Res.string.logs_filter_agent)),
+            LogsFilterOption("tools", stringResource(Res.string.logs_filter_tools)),
+            LogsFilterOption("cli", stringResource(Res.string.logs_filter_cli)),
+            LogsFilterOption("cron", stringResource(Res.string.logs_filter_cron)),
         )
     val lineOptions = listOf("50", "100", "200", "500").map { LogsFilterOption(it, it) }
 
@@ -307,25 +331,25 @@ private fun LogsFilterControls(
         verticalArrangement = Arrangement.spacedBy(spacing.xs),
     ) {
         FilterChipRow(
-            label = stringResource(R.string.logs_filter_file),
+            label = stringResource(Res.string.logs_filter_file),
             options = fileOptions,
             selected = filters.file,
             onSelected = { onFiltersChange(filters.copy(file = it)) },
         )
         FilterChipRow(
-            label = stringResource(R.string.logs_filter_level),
+            label = stringResource(Res.string.logs_filter_level),
             options = levelOptions,
             selected = filters.level,
             onSelected = { onFiltersChange(filters.copy(level = it)) },
         )
         FilterChipRow(
-            label = stringResource(R.string.logs_filter_component),
+            label = stringResource(Res.string.logs_filter_component),
             options = componentOptions,
             selected = filters.component,
             onSelected = { onFiltersChange(filters.copy(component = it)) },
         )
         FilterChipRow(
-            label = stringResource(R.string.logs_filter_lines),
+            label = stringResource(Res.string.logs_filter_lines),
             options = lineOptions,
             selected = filters.lines.toString(),
             onSelected = { onFiltersChange(filters.copy(lines = it.toInt())) },

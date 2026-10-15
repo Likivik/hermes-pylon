@@ -28,13 +28,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.m57.hermescontrol.NavigationController
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.SettingsAbout
 import com.m57.hermescontrol.SettingsAppearance
 import com.m57.hermescontrol.SettingsBehavior
@@ -42,10 +40,27 @@ import com.m57.hermescontrol.SettingsChat
 import com.m57.hermescontrol.SettingsConnection
 import com.m57.hermescontrol.SettingsLanguage
 import com.m57.hermescontrol.data.theme.ThemePreference
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.screen_settings
+import com.m57.hermescontrol.generated.resources.settings_sec_about
+import com.m57.hermescontrol.generated.resources.settings_sec_appearance
+import com.m57.hermescontrol.generated.resources.settings_sec_behavior
+import com.m57.hermescontrol.generated.resources.settings_sec_chat
+import com.m57.hermescontrol.generated.resources.settings_sec_connection
+import com.m57.hermescontrol.generated.resources.settings_sec_language
+import com.m57.hermescontrol.generated.resources.settings_summary_off
+import com.m57.hermescontrol.generated.resources.settings_summary_on
+import com.m57.hermescontrol.generated.resources.settings_summary_profiles
+import com.m57.hermescontrol.generated.resources.settings_summary_theme_dark
+import com.m57.hermescontrol.generated.resources.settings_summary_theme_light
+import com.m57.hermescontrol.generated.resources.settings_summary_theme_system
+import com.m57.hermescontrol.generated.resources.settings_summary_typing_off
+import com.m57.hermescontrol.generated.resources.settings_summary_typing_on
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.HermesScaffold
 import com.m57.hermescontrol.ui.common.NavIcon
 import com.m57.hermescontrol.ui.settings.components.languageLabel
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun SettingsScreen(
@@ -58,7 +73,7 @@ fun SettingsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     HermesScaffold(
-        title = { Text(stringResource(R.string.screen_settings)) },
+        title = { Text(stringResource(Res.string.screen_settings)) },
         navigationIcon = onOpenDrawer?.let { NavIcon.Menu(it) },
     ) {
         Column(
@@ -73,17 +88,17 @@ fun SettingsScreen(
                     listOf(
                         SettingsRow(
                             icon = Icons.Filled.Language,
-                            label = stringResource(R.string.settings_sec_language),
+                            label = stringResource(Res.string.settings_sec_language),
                             summary = languageLabel(state.appLanguage),
                             onClick = { NavigationController.navigateTo(SettingsLanguage) },
                         ),
                         SettingsRow(
                             icon = Icons.AutoMirrored.Filled.ListAlt,
-                            label = stringResource(R.string.settings_sec_connection),
+                            label = stringResource(Res.string.settings_sec_connection),
                             summary =
                                 if (state.profiles.isNotEmpty()) {
                                     stringResource(
-                                        R.string.settings_summary_profiles,
+                                        Res.string.settings_summary_profiles,
                                         state.profiles.size,
                                     )
                                 } else {
@@ -93,35 +108,35 @@ fun SettingsScreen(
                         ),
                         SettingsRow(
                             icon = Icons.Filled.Palette,
-                            label = stringResource(R.string.settings_sec_appearance),
+                            label = stringResource(Res.string.settings_sec_appearance),
                             summary = appearanceSummary(state),
                             onClick = { NavigationController.navigateTo(SettingsAppearance) },
                         ),
                         SettingsRow(
                             icon = Icons.Filled.ChatBubbleOutline,
-                            label = stringResource(R.string.settings_sec_chat),
+                            label = stringResource(Res.string.settings_sec_chat),
                             summary =
                                 if (state.typingEffectEnabled) {
-                                    stringResource(R.string.settings_summary_typing_on)
+                                    stringResource(Res.string.settings_summary_typing_on)
                                 } else {
-                                    stringResource(R.string.settings_summary_typing_off)
+                                    stringResource(Res.string.settings_summary_typing_off)
                                 },
                             onClick = { NavigationController.navigateTo(SettingsChat) },
                         ),
                         SettingsRow(
                             icon = Icons.Filled.Tune,
-                            label = stringResource(R.string.settings_sec_behavior),
+                            label = stringResource(Res.string.settings_sec_behavior),
                             summary =
                                 if (state.autoReconnect) {
-                                    stringResource(R.string.settings_summary_on)
+                                    stringResource(Res.string.settings_summary_on)
                                 } else {
-                                    stringResource(R.string.settings_summary_off)
+                                    stringResource(Res.string.settings_summary_off)
                                 },
                             onClick = { NavigationController.navigateTo(SettingsBehavior) },
                         ),
                         SettingsRow(
                             icon = Icons.Filled.Info,
-                            label = stringResource(R.string.settings_sec_about),
+                            label = stringResource(Res.string.settings_sec_about),
                             onClick = { NavigationController.navigateTo(SettingsAbout) },
                         ),
                     ),
@@ -133,9 +148,9 @@ fun SettingsScreen(
 @Composable
 private fun appearanceSummary(state: SettingsUiState): String =
     when (state.themePreference) {
-        ThemePreference.SYSTEM -> stringResource(R.string.settings_summary_theme_system)
-        ThemePreference.LIGHT -> stringResource(R.string.settings_summary_theme_light)
-        ThemePreference.DARK -> stringResource(R.string.settings_summary_theme_dark)
+        ThemePreference.SYSTEM -> stringResource(Res.string.settings_summary_theme_system)
+        ThemePreference.LIGHT -> stringResource(Res.string.settings_summary_theme_light)
+        ThemePreference.DARK -> stringResource(Res.string.settings_summary_theme_dark)
     }
 
 private data class SettingsRow(

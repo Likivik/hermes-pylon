@@ -68,7 +68,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -79,8 +78,46 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.EnvVarConfig
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.action_cancel
+import com.m57.hermescontrol.generated.resources.action_clear
+import com.m57.hermescontrol.generated.resources.action_save
+import com.m57.hermescontrol.generated.resources.content_desc_add_key
+import com.m57.hermescontrol.generated.resources.content_desc_delete_key
+import com.m57.hermescontrol.generated.resources.content_desc_edit
+import com.m57.hermescontrol.generated.resources.content_desc_hide_token
+import com.m57.hermescontrol.generated.resources.content_desc_refresh
+import com.m57.hermescontrol.generated.resources.content_desc_show_token
+import com.m57.hermescontrol.generated.resources.empty_action_clear_search
+import com.m57.hermescontrol.generated.resources.keys_action_copy
+import com.m57.hermescontrol.generated.resources.keys_action_delete
+import com.m57.hermescontrol.generated.resources.keys_action_toggle_visibility
+import com.m57.hermescontrol.generated.resources.keys_add_action
+import com.m57.hermescontrol.generated.resources.keys_add_key_label
+import com.m57.hermescontrol.generated.resources.keys_add_key_placeholder
+import com.m57.hermescontrol.generated.resources.keys_add_value_label
+import com.m57.hermescontrol.generated.resources.keys_add_value_placeholder
+import com.m57.hermescontrol.generated.resources.keys_copied_toast
+import com.m57.hermescontrol.generated.resources.keys_copy_warning_confirm
+import com.m57.hermescontrol.generated.resources.keys_copy_warning_message
+import com.m57.hermescontrol.generated.resources.keys_copy_warning_title
+import com.m57.hermescontrol.generated.resources.keys_dialog_add_title
+import com.m57.hermescontrol.generated.resources.keys_dialog_delete_message
+import com.m57.hermescontrol.generated.resources.keys_dialog_delete_title
+import com.m57.hermescontrol.generated.resources.keys_empty_desc
+import com.m57.hermescontrol.generated.resources.keys_empty_title
+import com.m57.hermescontrol.generated.resources.keys_filter_all
+import com.m57.hermescontrol.generated.resources.keys_label_not_configured
+import com.m57.hermescontrol.generated.resources.keys_no_matching_desc
+import com.m57.hermescontrol.generated.resources.keys_no_matching_title
+import com.m57.hermescontrol.generated.resources.keys_restart_action
+import com.m57.hermescontrol.generated.resources.keys_restart_desc
+import com.m57.hermescontrol.generated.resources.keys_restart_title
+import com.m57.hermescontrol.generated.resources.keys_search_placeholder
+import com.m57.hermescontrol.generated.resources.keys_status_configured
+import com.m57.hermescontrol.generated.resources.keys_status_not_set
+import com.m57.hermescontrol.generated.resources.screen_keys
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.EmptyState
@@ -93,6 +130,7 @@ import com.m57.hermescontrol.ui.common.SkeletonListState
 import com.m57.hermescontrol.ui.common.StatusBadge
 import com.m57.hermescontrol.ui.common.StatusBadgeType
 import com.m57.hermescontrol.ui.common.ToastEffect
+import org.jetbrains.compose.resources.stringResource
 
 private const val FILTER_ALL = "ALL"
 
@@ -109,7 +147,7 @@ fun KeysScreen(
     var query by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf(FILTER_ALL) }
 
-    val filterAllLabel = stringResource(R.string.keys_filter_all)
+    val filterAllLabel = stringResource(Res.string.keys_filter_all)
 
     val filteredCategories =
         remember(query, state.categories) {
@@ -161,11 +199,11 @@ fun KeysScreen(
                         modifier = Modifier.size(20.dp),
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(stringResource(R.string.keys_dialog_delete_title))
+                    Text(stringResource(Res.string.keys_dialog_delete_title))
                 }
             },
             text = {
-                Text(stringResource(R.string.keys_dialog_delete_message, key))
+                Text(stringResource(Res.string.keys_dialog_delete_message, key))
             },
             confirmButton = {
                 Button(
@@ -175,12 +213,12 @@ fun KeysScreen(
                             containerColor = MaterialTheme.colorScheme.error,
                         ),
                 ) {
-                    Text(stringResource(R.string.keys_action_delete))
+                    Text(stringResource(Res.string.keys_action_delete))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.dismissDeleteDialog() }) {
-                    Text(stringResource(R.string.action_cancel))
+                    Text(stringResource(Res.string.action_cancel))
                 }
             },
         )
@@ -200,7 +238,7 @@ fun KeysScreen(
     }
 
     HermesScaffold(
-        title = { Text(stringResource(R.string.screen_keys)) },
+        title = { Text(stringResource(Res.string.screen_keys)) },
         navigationIcon = onOpenDrawer?.let { NavIcon.Menu(it) },
         isRefreshing = state.isLoading,
         onRefresh = { viewModel.loadKeys() },
@@ -208,7 +246,7 @@ fun KeysScreen(
             IconButton(onClick = { viewModel.openAddDialog() }) {
                 Icon(
                     imageVector = Icons.Filled.Add,
-                    contentDescription = stringResource(R.string.content_desc_add_key),
+                    contentDescription = stringResource(Res.string.content_desc_add_key),
                 )
             }
         },
@@ -229,10 +267,10 @@ fun KeysScreen(
 
                 !hasAnyVars && query.isBlank() -> {
                     EmptyState(
-                        title = stringResource(R.string.keys_empty_title),
-                        subtitle = stringResource(R.string.keys_empty_desc),
+                        title = stringResource(Res.string.keys_empty_title),
+                        subtitle = stringResource(Res.string.keys_empty_desc),
                         onAction = { viewModel.loadKeys() },
-                        actionLabel = stringResource(R.string.content_desc_refresh),
+                        actionLabel = stringResource(Res.string.content_desc_refresh),
                         modifier = Modifier.padding(paddingValues),
                     )
                 }
@@ -258,7 +296,7 @@ fun KeysScreen(
                             SearchBar(
                                 query = query,
                                 onQueryChange = { query = it },
-                                placeholder = stringResource(R.string.keys_search_placeholder),
+                                placeholder = stringResource(Res.string.keys_search_placeholder),
                             )
                         }
 
@@ -280,9 +318,9 @@ fun KeysScreen(
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     EmptyState(
-                                        title = stringResource(R.string.keys_no_matching_title),
-                                        subtitle = stringResource(R.string.keys_no_matching_desc),
-                                        actionLabel = stringResource(R.string.empty_action_clear_search),
+                                        title = stringResource(Res.string.keys_no_matching_title),
+                                        subtitle = stringResource(Res.string.keys_no_matching_desc),
+                                        actionLabel = stringResource(Res.string.empty_action_clear_search),
                                         onAction = {
                                             query = ""
                                             selectedCategory = FILTER_ALL
@@ -409,7 +447,7 @@ private fun AddKeyDialog(
                     modifier = Modifier.size(20.dp),
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(stringResource(R.string.keys_dialog_add_title))
+                Text(stringResource(Res.string.keys_dialog_add_title))
             }
         },
         text = {
@@ -419,15 +457,15 @@ private fun AddKeyDialog(
                     onValueChange = onNameChange,
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    label = { Text(stringResource(R.string.keys_add_key_label)) },
-                    placeholder = { Text(stringResource(R.string.keys_add_key_placeholder)) },
+                    label = { Text(stringResource(Res.string.keys_add_key_label)) },
+                    placeholder = { Text(stringResource(Res.string.keys_add_key_placeholder)) },
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
                     trailingIcon = {
                         if (newKeyName.isNotEmpty() && !isAdding) {
                             IconButton(onClick = { onNameChange("") }) {
                                 Icon(
                                     imageVector = Icons.Filled.Clear,
-                                    contentDescription = stringResource(R.string.action_clear),
+                                    contentDescription = stringResource(Res.string.action_clear),
                                 )
                             }
                         }
@@ -440,8 +478,8 @@ private fun AddKeyDialog(
                     onValueChange = onValueChange,
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    label = { Text(stringResource(R.string.keys_add_value_label)) },
-                    placeholder = { Text(stringResource(R.string.keys_add_value_placeholder)) },
+                    label = { Text(stringResource(Res.string.keys_add_value_label)) },
+                    placeholder = { Text(stringResource(Res.string.keys_add_value_placeholder)) },
                     visualTransformation =
                         if (valueVisible) {
                             VisualTransformation.None
@@ -460,9 +498,9 @@ private fun AddKeyDialog(
                                 contentDescription =
                                     stringResource(
                                         if (valueVisible) {
-                                            R.string.content_desc_hide_token
+                                            Res.string.content_desc_hide_token
                                         } else {
-                                            R.string.content_desc_show_token
+                                            Res.string.content_desc_show_token
                                         },
                                     ),
                             )
@@ -485,7 +523,7 @@ private fun AddKeyDialog(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                 }
-                Text(stringResource(R.string.keys_add_action))
+                Text(stringResource(Res.string.keys_add_action))
             }
         },
         dismissButton = {
@@ -493,7 +531,7 @@ private fun AddKeyDialog(
                 onClick = onDismiss,
                 enabled = !isAdding,
             ) {
-                Text(stringResource(R.string.action_cancel))
+                Text(stringResource(Res.string.action_cancel))
             }
         },
     )
@@ -508,24 +546,24 @@ fun SensitiveCopyWarningDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text(stringResource(R.string.keys_copy_warning_title))
+            Text(stringResource(Res.string.keys_copy_warning_title))
         },
         text = {
             Text(
                 stringResource(
-                    R.string.keys_copy_warning_message,
+                    Res.string.keys_copy_warning_message,
                     secretName,
                 ),
             )
         },
         confirmButton = {
             Button(onClick = onConfirm) {
-                Text(stringResource(R.string.keys_copy_warning_confirm))
+                Text(stringResource(Res.string.keys_copy_warning_confirm))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
+                Text(stringResource(Res.string.action_cancel))
             }
         },
     )
@@ -565,10 +603,10 @@ private fun EnvVarCard(
         } else if (config.isSet) {
             config.redactedValue ?: "••••••••••••"
         } else {
-            stringResource(R.string.keys_label_not_configured)
+            stringResource(Res.string.keys_label_not_configured)
         }
 
-    val copiedMessage = stringResource(R.string.keys_copied_toast)
+    val copiedMessage = stringResource(Res.string.keys_copied_toast)
 
     pendingCopyValue?.let { value ->
         SensitiveCopyWarningDialog(
@@ -629,9 +667,9 @@ private fun EnvVarCard(
                     StatusBadge(
                         text =
                             if (config.isSet) {
-                                stringResource(R.string.keys_status_configured)
+                                stringResource(Res.string.keys_status_configured)
                             } else {
-                                stringResource(R.string.keys_status_not_set)
+                                stringResource(Res.string.keys_status_not_set)
                             },
                         status =
                             if (config.isSet) {
@@ -667,7 +705,7 @@ private fun EnvVarCard(
                         } else {
                             Icon(
                                 imageVector = Icons.Filled.Delete,
-                                contentDescription = stringResource(R.string.content_desc_delete_key),
+                                contentDescription = stringResource(Res.string.content_desc_delete_key),
                                 tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
                             )
                         }
@@ -685,7 +723,7 @@ private fun EnvVarCard(
                         onValueChange = { editedValue = it },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        label = { Text(stringResource(R.string.keys_add_value_label)) },
+                        label = { Text(stringResource(Res.string.keys_add_value_label)) },
                         visualTransformation =
                             if (valueVisible) {
                                 VisualTransformation.None
@@ -704,9 +742,9 @@ private fun EnvVarCard(
                                     contentDescription =
                                         stringResource(
                                             if (valueVisible) {
-                                                R.string.content_desc_hide_token
+                                                Res.string.content_desc_hide_token
                                             } else {
-                                                R.string.content_desc_show_token
+                                                Res.string.content_desc_show_token
                                             },
                                         ),
                                 )
@@ -719,14 +757,14 @@ private fun EnvVarCard(
                         horizontalArrangement = Arrangement.End,
                     ) {
                         OutlinedButton(onClick = { isEditing = false }) {
-                            Text(stringResource(R.string.action_cancel))
+                            Text(stringResource(Res.string.action_cancel))
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         Button(onClick = {
                             onSave(editedValue)
                             isEditing = false
                         }) {
-                            Text(stringResource(R.string.action_save))
+                            Text(stringResource(Res.string.action_save))
                         }
                     }
                 }
@@ -776,7 +814,7 @@ private fun EnvVarCard(
                                             } else {
                                                 Icons.Filled.Visibility
                                             },
-                                        contentDescription = stringResource(R.string.keys_action_toggle_visibility),
+                                        contentDescription = stringResource(Res.string.keys_action_toggle_visibility),
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
@@ -786,7 +824,7 @@ private fun EnvVarCard(
                                     }) {
                                         Icon(
                                             imageVector = Icons.Outlined.ContentCopy,
-                                            contentDescription = stringResource(R.string.keys_action_copy),
+                                            contentDescription = stringResource(Res.string.keys_action_copy),
                                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
                                     }
@@ -798,7 +836,7 @@ private fun EnvVarCard(
                             }) {
                                 Icon(
                                     imageVector = Icons.Filled.Edit,
-                                    contentDescription = stringResource(R.string.content_desc_edit),
+                                    contentDescription = stringResource(Res.string.content_desc_edit),
                                     tint = MaterialTheme.colorScheme.primary,
                                 )
                             }
@@ -838,14 +876,14 @@ private fun RestartBanner(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = stringResource(R.string.keys_restart_title),
+                    text = stringResource(Res.string.keys_restart_title),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     color = statusColors.warning,
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = stringResource(R.string.keys_restart_desc),
+                    text = stringResource(Res.string.keys_restart_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = statusColors.warning.copy(alpha = 0.9f),
                 )
@@ -873,7 +911,7 @@ private fun RestartBanner(
                         modifier = Modifier.size(16.dp),
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text(stringResource(R.string.keys_restart_action))
+                    Text(stringResource(Res.string.keys_restart_action))
                 }
             }
         }

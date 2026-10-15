@@ -78,7 +78,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -92,13 +91,62 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.m57.hermescontrol.ChatScreen
 import com.m57.hermescontrol.NavigationController
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.model.SessionInfo
 import com.m57.hermescontrol.data.model.SessionLiveStatus
 import com.m57.hermescontrol.data.model.SessionSearchResult
 import com.m57.hermescontrol.data.model.SessionTreeItem
 import com.m57.hermescontrol.data.model.flattenSessionTree
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.action_cancel
+import com.m57.hermescontrol.generated.resources.action_delete
+import com.m57.hermescontrol.generated.resources.content_desc_collapse_automation_group
+import com.m57.hermescontrol.generated.resources.content_desc_enter_selection
+import com.m57.hermescontrol.generated.resources.content_desc_exit_selection
+import com.m57.hermescontrol.generated.resources.content_desc_expand_automation_group
+import com.m57.hermescontrol.generated.resources.content_desc_pin_session
+import com.m57.hermescontrol.generated.resources.content_desc_unpin_session
+import com.m57.hermescontrol.generated.resources.empty_action_start_chat
+import com.m57.hermescontrol.generated.resources.error_unknown
+import com.m57.hermescontrol.generated.resources.history_empty_desc
+import com.m57.hermescontrol.generated.resources.history_empty_title
+import com.m57.hermescontrol.generated.resources.history_load_more
+import com.m57.hermescontrol.generated.resources.history_message_count
+import com.m57.hermescontrol.generated.resources.history_untitled
+import com.m57.hermescontrol.generated.resources.screen_history
+import com.m57.hermescontrol.generated.resources.sessions_action_delete_n
+import com.m57.hermescontrol.generated.resources.sessions_action_deselect_all
+import com.m57.hermescontrol.generated.resources.sessions_action_prune
+import com.m57.hermescontrol.generated.resources.sessions_action_select_all
+import com.m57.hermescontrol.generated.resources.sessions_automations_empty_desc
+import com.m57.hermescontrol.generated.resources.sessions_automations_empty_title
+import com.m57.hermescontrol.generated.resources.sessions_bulk_delete_message
+import com.m57.hermescontrol.generated.resources.sessions_bulk_delete_title
+import com.m57.hermescontrol.generated.resources.sessions_delete_message
+import com.m57.hermescontrol.generated.resources.sessions_delete_title
+import com.m57.hermescontrol.generated.resources.sessions_fork_indicator
+import com.m57.hermescontrol.generated.resources.sessions_live_status_waiting
+import com.m57.hermescontrol.generated.resources.sessions_live_status_working
+import com.m57.hermescontrol.generated.resources.sessions_prune_confirm
+import com.m57.hermescontrol.generated.resources.sessions_prune_days_label
+import com.m57.hermescontrol.generated.resources.sessions_prune_desc
+import com.m57.hermescontrol.generated.resources.sessions_prune_title
+import com.m57.hermescontrol.generated.resources.sessions_search_empty_desc
+import com.m57.hermescontrol.generated.resources.sessions_search_empty_title
+import com.m57.hermescontrol.generated.resources.sessions_search_match_label
+import com.m57.hermescontrol.generated.resources.sessions_search_model_label
+import com.m57.hermescontrol.generated.resources.sessions_search_placeholder
+import com.m57.hermescontrol.generated.resources.sessions_search_played_at
+import com.m57.hermescontrol.generated.resources.sessions_search_results_header
+import com.m57.hermescontrol.generated.resources.sessions_section_automation_job
+import com.m57.hermescontrol.generated.resources.sessions_section_automation_runs
+import com.m57.hermescontrol.generated.resources.sessions_section_automation_unknown
+import com.m57.hermescontrol.generated.resources.sessions_section_pinned
+import com.m57.hermescontrol.generated.resources.sessions_section_recent
+import com.m57.hermescontrol.generated.resources.sessions_stat_messages
+import com.m57.hermescontrol.generated.resources.sessions_stat_total
+import com.m57.hermescontrol.generated.resources.sessions_tab_automations
+import com.m57.hermescontrol.generated.resources.sessions_tab_conversations
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.theme.LocalSpacing
 import com.m57.hermescontrol.theme.Spacing
@@ -119,6 +167,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import org.jetbrains.compose.resources.stringResource
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -385,15 +434,15 @@ fun SessionsScreen(
     if (state.showPruneDialog) {
         AlertDialog(
             onDismissRequest = { screenViewModel.hidePruneDialog() },
-            title = { Text(stringResource(R.string.sessions_prune_title)) },
+            title = { Text(stringResource(Res.string.sessions_prune_title)) },
             text = {
                 Column {
-                    Text(stringResource(R.string.sessions_prune_desc))
+                    Text(stringResource(Res.string.sessions_prune_desc))
                     Spacer(modifier = Modifier.height(Spacing.md))
                     OutlinedTextField(
                         value = pruneDays,
                         onValueChange = { pruneDays = it.filter { c -> c.isDigit() } },
-                        label = { Text(stringResource(R.string.sessions_prune_days_label)) },
+                        label = { Text(stringResource(Res.string.sessions_prune_days_label)) },
                         placeholder = { Text("7") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
@@ -418,12 +467,12 @@ fun SessionsScreen(
                             containerColor = statusColors.error,
                         ),
                 ) {
-                    Text(stringResource(R.string.sessions_prune_confirm))
+                    Text(stringResource(Res.string.sessions_prune_confirm))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { screenViewModel.hidePruneDialog() }) {
-                    Text(stringResource(R.string.action_cancel))
+                    Text(stringResource(Res.string.action_cancel))
                 }
             },
         )
@@ -443,12 +492,12 @@ fun SessionsScreen(
                     ?.snippet
                     ?.let(::cleanSearchSnippet)
                     ?.take(80)
-                ?: stringResource(R.string.history_untitled)
+                ?: stringResource(Res.string.history_untitled)
         AlertDialog(
             onDismissRequest = { screenViewModel.cancelDeleteSession() },
-            title = { Text(stringResource(R.string.sessions_delete_title)) },
+            title = { Text(stringResource(Res.string.sessions_delete_title)) },
             text = {
-                Text(stringResource(R.string.sessions_delete_message, sessionTitle))
+                Text(stringResource(Res.string.sessions_delete_message, sessionTitle))
             },
             confirmButton = {
                 Button(
@@ -458,12 +507,12 @@ fun SessionsScreen(
                             containerColor = statusColors.error,
                         ),
                 ) {
-                    Text(stringResource(R.string.action_delete))
+                    Text(stringResource(Res.string.action_delete))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { screenViewModel.cancelDeleteSession() }) {
-                    Text(stringResource(R.string.action_cancel))
+                    Text(stringResource(Res.string.action_cancel))
                 }
             },
         )
@@ -473,11 +522,11 @@ fun SessionsScreen(
     if (state.showBulkDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { screenViewModel.cancelBulkDelete() },
-            title = { Text(stringResource(R.string.sessions_bulk_delete_title)) },
+            title = { Text(stringResource(Res.string.sessions_bulk_delete_title)) },
             text = {
                 Text(
                     stringResource(
-                        R.string.sessions_bulk_delete_message,
+                        Res.string.sessions_bulk_delete_message,
                         state.selectedIds.size,
                     ),
                 )
@@ -490,19 +539,19 @@ fun SessionsScreen(
                             containerColor = statusColors.error,
                         ),
                 ) {
-                    Text(stringResource(R.string.action_delete))
+                    Text(stringResource(Res.string.action_delete))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { screenViewModel.cancelBulkDelete() }) {
-                    Text(stringResource(R.string.action_cancel))
+                    Text(stringResource(Res.string.action_cancel))
                 }
             },
         )
     }
 
     HermesScaffold(
-        title = { Text(stringResource(R.string.screen_history)) },
+        title = { Text(stringResource(Res.string.screen_history)) },
         navigationIcon = onOpenDrawer?.let { NavIcon.Menu(it) },
         isRefreshing = state.isLoading,
         onRefresh = { screenViewModel.loadSessions() },
@@ -523,13 +572,13 @@ fun SessionsScreen(
                 FilterChip(
                     selected = state.section == HistorySection.CONVERSATIONS,
                     onClick = { screenViewModel.selectSection(HistorySection.CONVERSATIONS) },
-                    label = { Text(stringResource(R.string.sessions_tab_conversations)) },
+                    label = { Text(stringResource(Res.string.sessions_tab_conversations)) },
                     modifier = Modifier.testTag("history_tab_conversations"),
                 )
                 FilterChip(
                     selected = state.section == HistorySection.AUTOMATIONS,
                     onClick = { screenViewModel.selectSection(HistorySection.AUTOMATIONS) },
-                    label = { Text(stringResource(R.string.sessions_tab_automations)) },
+                    label = { Text(stringResource(Res.string.sessions_tab_automations)) },
                     modifier = Modifier.testTag("history_tab_automations"),
                 )
             }
@@ -545,7 +594,7 @@ fun SessionsScreen(
                 SearchBar(
                     query = state.searchQuery,
                     onQueryChange = { screenViewModel.setSearchQuery(it) },
-                    placeholder = stringResource(R.string.sessions_search_placeholder),
+                    placeholder = stringResource(Res.string.sessions_search_placeholder),
                     modifier = Modifier.weight(1f),
                 )
                 Spacer(modifier = Modifier.width(Spacing.sm))
@@ -554,9 +603,9 @@ fun SessionsScreen(
                         imageVector = if (state.isSelecting) Icons.Filled.Close else Icons.Filled.SelectAll,
                         contentDescription =
                             if (state.isSelecting) {
-                                stringResource(R.string.content_desc_exit_selection)
+                                stringResource(Res.string.content_desc_exit_selection)
                             } else {
-                                stringResource(R.string.content_desc_enter_selection)
+                                stringResource(Res.string.content_desc_enter_selection)
                             },
                     )
                 }
@@ -576,17 +625,17 @@ fun SessionsScreen(
                                     ErrorState(
                                         message =
                                             state.searchError
-                                                ?: stringResource(R.string.error_unknown),
+                                                ?: stringResource(Res.string.error_unknown),
                                         onRetry = { screenViewModel.setSearchQuery(state.searchQuery) },
                                     )
                                 }
 
                                 state.searchResults.isEmpty() -> {
                                     EmptyState(
-                                        title = stringResource(R.string.sessions_search_empty_title),
+                                        title = stringResource(Res.string.sessions_search_empty_title),
                                         subtitle =
                                             stringResource(
-                                                R.string.sessions_search_empty_desc,
+                                                Res.string.sessions_search_empty_desc,
                                                 state.searchQuery,
                                             ),
                                         icon = Icons.Filled.Search,
@@ -598,7 +647,7 @@ fun SessionsScreen(
                                         Text(
                                             text =
                                                 stringResource(
-                                                    R.string.sessions_search_results_header,
+                                                    Res.string.sessions_search_results_header,
                                                     state.searchResults.size,
                                                     state.searchQuery,
                                                 ),
@@ -672,7 +721,7 @@ fun SessionsScreen(
                     state.errorMessage != null -> {
                         val errorMsg = state.errorMessage
                         ErrorState(
-                            message = errorMsg ?: stringResource(R.string.error_unknown),
+                            message = errorMsg ?: stringResource(Res.string.error_unknown),
                             onRetry = { screenViewModel.loadSessions() },
                         )
                     }
@@ -683,17 +732,17 @@ fun SessionsScreen(
                             title =
                                 stringResource(
                                     if (isAutomations) {
-                                        R.string.sessions_automations_empty_title
+                                        Res.string.sessions_automations_empty_title
                                     } else {
-                                        R.string.history_empty_title
+                                        Res.string.history_empty_title
                                     },
                                 ),
                             subtitle =
                                 stringResource(
                                     if (isAutomations) {
-                                        R.string.sessions_automations_empty_desc
+                                        Res.string.sessions_automations_empty_desc
                                     } else {
-                                        R.string.history_empty_desc
+                                        Res.string.history_empty_desc
                                     },
                                 ),
                             icon = Icons.Filled.History,
@@ -702,7 +751,7 @@ fun SessionsScreen(
                                 if (isAutomations) {
                                     null
                                 } else {
-                                    stringResource(R.string.empty_action_start_chat)
+                                    stringResource(Res.string.empty_action_start_chat)
                                 },
                             onAction = { NavigationController.navigateTo(ChatScreen) },
                         )
@@ -722,13 +771,13 @@ fun SessionsScreen(
                                     horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                                 ) {
                                     StatCard(
-                                        label = stringResource(R.string.sessions_stat_total),
+                                        label = stringResource(Res.string.sessions_stat_total),
                                         value = if (state.isLoadingStats) "…" else state.stats.total.toString(),
                                         icon = Icons.Filled.History,
                                         modifier = Modifier.weight(1f).fillMaxHeight(),
                                     )
                                     StatCard(
-                                        label = stringResource(R.string.sessions_stat_messages),
+                                        label = stringResource(Res.string.sessions_stat_messages),
                                         value = if (state.isLoadingStats) "…" else state.stats.messages.toString(),
                                         icon = Icons.Filled.CheckCircle,
                                         accentColor = statusColors.success,
@@ -755,7 +804,7 @@ fun SessionsScreen(
                                                 )
                                                 Spacer(modifier = Modifier.height(Spacing.xs))
                                                 Text(
-                                                    text = stringResource(R.string.sessions_action_prune),
+                                                    text = stringResource(Res.string.sessions_action_prune),
                                                     style = MaterialTheme.typography.labelMedium,
                                                     color = statusColors.warning,
                                                     fontWeight = FontWeight.SemiBold,
@@ -846,7 +895,7 @@ fun SessionsScreen(
                                         SessionSectionHeader(
                                             title =
                                                 stringResource(
-                                                    R.string.sessions_section_pinned,
+                                                    Res.string.sessions_section_pinned,
                                                 ),
                                             icon = Icons.Filled.PushPin,
                                         )
@@ -862,7 +911,7 @@ fun SessionsScreen(
                                             SessionSectionHeader(
                                                 title =
                                                     stringResource(
-                                                        R.string.sessions_section_recent,
+                                                        Res.string.sessions_section_recent,
                                                     ),
                                                 icon = Icons.Filled.History,
                                             )
@@ -921,7 +970,7 @@ fun SessionsScreen(
                                                 )
                                             } else {
                                                 Text(
-                                                    text = stringResource(R.string.history_load_more),
+                                                    text = stringResource(Res.string.history_load_more),
                                                     style = MaterialTheme.typography.labelLarge,
                                                     color = MaterialTheme.colorScheme.primary,
                                                     modifier =
@@ -990,9 +1039,9 @@ fun SessionsScreen(
                             Spacer(modifier = Modifier.width(Spacing.xs))
                             Text(
                                 if (allVisibleSessionsSelected) {
-                                    stringResource(R.string.sessions_action_deselect_all)
+                                    stringResource(Res.string.sessions_action_deselect_all)
                                 } else {
-                                    stringResource(R.string.sessions_action_select_all)
+                                    stringResource(Res.string.sessions_action_select_all)
                                 },
                             )
                         }
@@ -1022,7 +1071,7 @@ fun SessionsScreen(
                             Spacer(modifier = Modifier.width(Spacing.xs))
                             Text(
                                 stringResource(
-                                    R.string.sessions_action_delete_n,
+                                    Res.string.sessions_action_delete_n,
                                     state.selectedIds.size,
                                 ),
                             )
@@ -1075,9 +1124,9 @@ private fun AutomationGroupHeader(
     val expandLabel =
         stringResource(
             if (expanded) {
-                R.string.content_desc_collapse_automation_group
+                Res.string.content_desc_collapse_automation_group
             } else {
-                R.string.content_desc_expand_automation_group
+                Res.string.content_desc_expand_automation_group
             },
         )
     Row(
@@ -1106,9 +1155,9 @@ private fun AutomationGroupHeader(
                 text =
                     group.title
                         ?: group.jobId?.let {
-                            stringResource(R.string.sessions_section_automation_job, it)
+                            stringResource(Res.string.sessions_section_automation_job, it)
                         }
-                        ?: stringResource(R.string.sessions_section_automation_unknown),
+                        ?: stringResource(Res.string.sessions_section_automation_unknown),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
@@ -1117,7 +1166,7 @@ private fun AutomationGroupHeader(
             Text(
                 text =
                     stringResource(
-                        R.string.sessions_section_automation_runs,
+                        Res.string.sessions_section_automation_runs,
                         group.sessions.size,
                     ),
                 style = MaterialTheme.typography.labelMedium,
@@ -1150,9 +1199,9 @@ private fun SessionPinButton(
             contentDescription =
                 stringResource(
                     if (isPinned) {
-                        R.string.content_desc_unpin_session
+                        Res.string.content_desc_unpin_session
                     } else {
-                        R.string.content_desc_pin_session
+                        Res.string.content_desc_pin_session
                     },
                 ),
             modifier = Modifier.size(16.dp),
@@ -1248,7 +1297,7 @@ private fun SessionCard(
                     imageVector = Icons.AutoMirrored.Filled.CallSplit,
                     contentDescription =
                         stringResource(
-                            R.string.sessions_fork_indicator,
+                            Res.string.sessions_fork_indicator,
                             forkDepth,
                         ),
                     tint = MaterialTheme.colorScheme.primary,
@@ -1296,7 +1345,7 @@ private fun SessionCard(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = stringResource(R.string.history_message_count, session.message_count ?: 0),
+                        text = stringResource(Res.string.history_message_count, session.message_count ?: 0),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1336,7 +1385,7 @@ private fun SessionCard(
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Delete,
-                                contentDescription = stringResource(R.string.action_delete),
+                                contentDescription = stringResource(Res.string.action_delete),
                                 modifier = Modifier.size(16.dp),
                                 tint = statusColors.error,
                             )
@@ -1353,8 +1402,8 @@ private fun LiveStatusBadge(status: SessionLiveStatus) {
     val label =
         stringResource(
             when (status) {
-                SessionLiveStatus.WORKING -> R.string.sessions_live_status_working
-                SessionLiveStatus.WAITING -> R.string.sessions_live_status_waiting
+                SessionLiveStatus.WORKING -> Res.string.sessions_live_status_working
+                SessionLiveStatus.WAITING -> Res.string.sessions_live_status_waiting
             },
         )
     StatusBadge(
@@ -1392,7 +1441,7 @@ private fun SearchResultCard(
 ) {
     val spacing = LocalSpacing.current
     val statusColors = LocalHermesStatusColors.current
-    val snippet = session.preview?.takeIf { it.isNotBlank() } ?: stringResource(R.string.history_untitled)
+    val snippet = session.preview?.takeIf { it.isNotBlank() } ?: stringResource(Res.string.history_untitled)
     val cleanSnippet = cleanSearchSnippet(snippet)
     val playedAt = formatPlayedAt(session.started_at)
 
@@ -1451,7 +1500,7 @@ private fun SearchResultCard(
                         )
                     }
                     Text(
-                        text = stringResource(R.string.sessions_search_match_label),
+                        text = stringResource(Res.string.sessions_search_match_label),
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
@@ -1506,13 +1555,13 @@ private fun SearchResultCard(
                     }
                     session.model?.let { mdl ->
                         StatusBadge(
-                            text = stringResource(R.string.sessions_search_model_label) + ": " + mdl,
+                            text = stringResource(Res.string.sessions_search_model_label) + ": " + mdl,
                             status = StatusBadgeType.INFO,
                         )
                     }
                     playedAt?.let { time ->
                         StatusBadge(
-                            text = stringResource(R.string.sessions_search_played_at, time),
+                            text = stringResource(Res.string.sessions_search_played_at, time),
                             status = StatusBadgeType.NEUTRAL,
                         )
                     }
@@ -1539,7 +1588,7 @@ private fun SearchResultCard(
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Delete,
-                                contentDescription = stringResource(R.string.action_delete),
+                                contentDescription = stringResource(Res.string.action_delete),
                                 modifier = Modifier.size(16.dp),
                                 tint = statusColors.error,
                             )

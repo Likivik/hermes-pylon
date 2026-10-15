@@ -40,15 +40,38 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.WebhookSubscription
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.action_cancel
+import com.m57.hermescontrol.generated.resources.screen_webhooks
+import com.m57.hermescontrol.generated.resources.webhooks_action_add
+import com.m57.hermescontrol.generated.resources.webhooks_action_create
+import com.m57.hermescontrol.generated.resources.webhooks_action_delete
+import com.m57.hermescontrol.generated.resources.webhooks_dialog_create_title
+import com.m57.hermescontrol.generated.resources.webhooks_dialog_delete_message
+import com.m57.hermescontrol.generated.resources.webhooks_dialog_delete_title
+import com.m57.hermescontrol.generated.resources.webhooks_empty_desc
+import com.m57.hermescontrol.generated.resources.webhooks_empty_title
+import com.m57.hermescontrol.generated.resources.webhooks_field_deliver
+import com.m57.hermescontrol.generated.resources.webhooks_field_description
+import com.m57.hermescontrol.generated.resources.webhooks_field_events
+import com.m57.hermescontrol.generated.resources.webhooks_field_name
+import com.m57.hermescontrol.generated.resources.webhooks_field_secret
+import com.m57.hermescontrol.generated.resources.webhooks_hint_deliver
+import com.m57.hermescontrol.generated.resources.webhooks_hint_events
+import com.m57.hermescontrol.generated.resources.webhooks_hint_name
+import com.m57.hermescontrol.generated.resources.webhooks_hint_secret
+import com.m57.hermescontrol.generated.resources.webhooks_no_matching
+import com.m57.hermescontrol.generated.resources.webhooks_no_matching_desc
+import com.m57.hermescontrol.generated.resources.webhooks_search_placeholder
+import com.m57.hermescontrol.generated.resources.webhooks_sec_status
+import com.m57.hermescontrol.generated.resources.webhooks_sec_subscriptions
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.DetailDialog
 import com.m57.hermescontrol.ui.common.EmptyState
@@ -63,6 +86,7 @@ import com.m57.hermescontrol.ui.common.ToastEffect
 import com.m57.hermescontrol.ui.common.listContentPadding
 import com.m57.hermescontrol.ui.common.listItemSpacing
 import com.m57.hermescontrol.ui.common.toDetailRows
+import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -104,11 +128,11 @@ fun WebhooksScreen(
                         modifier = Modifier.size(20.dp),
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(stringResource(R.string.webhooks_dialog_delete_title))
+                    Text(stringResource(Res.string.webhooks_dialog_delete_title))
                 }
             },
             text = {
-                Text(stringResource(R.string.webhooks_dialog_delete_message, target.name))
+                Text(stringResource(Res.string.webhooks_dialog_delete_message, target.name))
             },
             confirmButton = {
                 Button(
@@ -127,7 +151,7 @@ fun WebhooksScreen(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                     }
-                    Text(stringResource(R.string.webhooks_action_delete))
+                    Text(stringResource(Res.string.webhooks_action_delete))
                 }
             },
             dismissButton = {
@@ -135,7 +159,7 @@ fun WebhooksScreen(
                     onClick = { viewModel.dismissDeleteDialog() },
                     enabled = !state.isDeleting,
                 ) {
-                    Text(stringResource(R.string.action_cancel))
+                    Text(stringResource(Res.string.action_cancel))
                 }
             },
         )
@@ -145,14 +169,14 @@ fun WebhooksScreen(
     if (state.showCreateDialog) {
         AlertDialog(
             onDismissRequest = { viewModel.dismissCreateDialog() },
-            title = { Text(stringResource(R.string.webhooks_dialog_create_title)) },
+            title = { Text(stringResource(Res.string.webhooks_dialog_create_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
                         value = state.createFormName,
                         onValueChange = viewModel::updateCreateFormName,
-                        label = { Text(stringResource(R.string.webhooks_field_name)) },
-                        placeholder = { Text(stringResource(R.string.webhooks_hint_name)) },
+                        label = { Text(stringResource(Res.string.webhooks_field_name)) },
+                        placeholder = { Text(stringResource(Res.string.webhooks_hint_name)) },
                         singleLine = true,
                         isError = state.createFormError != null,
                         modifier = Modifier.fillMaxWidth(),
@@ -161,7 +185,7 @@ fun WebhooksScreen(
                     OutlinedTextField(
                         value = state.createFormDescription,
                         onValueChange = viewModel::updateCreateFormDescription,
-                        label = { Text(stringResource(R.string.webhooks_field_description)) },
+                        label = { Text(stringResource(Res.string.webhooks_field_description)) },
                         placeholder = { Text("What this webhook does...") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
@@ -170,8 +194,8 @@ fun WebhooksScreen(
                     OutlinedTextField(
                         value = state.createFormEvents,
                         onValueChange = viewModel::updateCreateFormEvents,
-                        label = { Text(stringResource(R.string.webhooks_field_events)) },
-                        placeholder = { Text(stringResource(R.string.webhooks_hint_events)) },
+                        label = { Text(stringResource(Res.string.webhooks_field_events)) },
+                        placeholder = { Text(stringResource(Res.string.webhooks_hint_events)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -179,8 +203,8 @@ fun WebhooksScreen(
                     OutlinedTextField(
                         value = state.createFormDeliver,
                         onValueChange = viewModel::updateCreateFormDeliver,
-                        label = { Text(stringResource(R.string.webhooks_field_deliver)) },
-                        placeholder = { Text(stringResource(R.string.webhooks_hint_deliver)) },
+                        label = { Text(stringResource(Res.string.webhooks_field_deliver)) },
+                        placeholder = { Text(stringResource(Res.string.webhooks_hint_deliver)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -188,8 +212,8 @@ fun WebhooksScreen(
                     OutlinedTextField(
                         value = state.createFormSecret,
                         onValueChange = viewModel::updateCreateFormSecret,
-                        label = { Text(stringResource(R.string.webhooks_field_secret)) },
-                        placeholder = { Text(stringResource(R.string.webhooks_hint_secret)) },
+                        label = { Text(stringResource(Res.string.webhooks_field_secret)) },
+                        placeholder = { Text(stringResource(Res.string.webhooks_hint_secret)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -215,7 +239,7 @@ fun WebhooksScreen(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                     }
-                    Text(stringResource(R.string.webhooks_action_create))
+                    Text(stringResource(Res.string.webhooks_action_create))
                 }
             },
             dismissButton = {
@@ -223,14 +247,14 @@ fun WebhooksScreen(
                     onClick = { viewModel.dismissCreateDialog() },
                     enabled = !state.isActionRunning,
                 ) {
-                    Text(stringResource(R.string.action_cancel))
+                    Text(stringResource(Res.string.action_cancel))
                 }
             },
         )
     }
 
     HermesScaffold(
-        title = { Text(stringResource(R.string.screen_webhooks)) },
+        title = { Text(stringResource(Res.string.screen_webhooks)) },
         navigationIcon = onOpenDrawer?.let { NavIcon.Menu(it) },
         isRefreshing = state.isLoading,
         onRefresh = { viewModel.loadWebhooks() },
@@ -238,7 +262,7 @@ fun WebhooksScreen(
             IconButton(onClick = { viewModel.showCreateDialog() }) {
                 Icon(
                     imageVector = Icons.Filled.Add,
-                    contentDescription = stringResource(R.string.webhooks_action_add),
+                    contentDescription = stringResource(Res.string.webhooks_action_add),
                 )
             }
         },
@@ -286,7 +310,7 @@ fun WebhooksScreen(
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = stringResource(R.string.webhooks_sec_status),
+                                        text = stringResource(Res.string.webhooks_sec_status),
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
                                     )
@@ -317,7 +341,7 @@ fun WebhooksScreen(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                text = stringResource(R.string.webhooks_sec_subscriptions),
+                                text = stringResource(Res.string.webhooks_sec_subscriptions),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                             )
@@ -333,7 +357,7 @@ fun WebhooksScreen(
                         SearchBar(
                             query = query,
                             onQueryChange = { query = it },
-                            placeholder = stringResource(R.string.webhooks_search_placeholder),
+                            placeholder = stringResource(Res.string.webhooks_search_placeholder),
                         )
                     }
 
@@ -342,19 +366,19 @@ fun WebhooksScreen(
                             EmptyState(
                                 title =
                                     if (state.subscriptions.isEmpty()) {
-                                        stringResource(R.string.webhooks_empty_title)
+                                        stringResource(Res.string.webhooks_empty_title)
                                     } else {
-                                        stringResource(R.string.webhooks_no_matching)
+                                        stringResource(Res.string.webhooks_no_matching)
                                     },
                                 subtitle =
                                     if (state.subscriptions.isEmpty()) {
-                                        stringResource(R.string.webhooks_empty_desc)
+                                        stringResource(Res.string.webhooks_empty_desc)
                                     } else {
-                                        stringResource(R.string.webhooks_no_matching_desc)
+                                        stringResource(Res.string.webhooks_no_matching_desc)
                                     },
                                 actionLabel =
                                     if (state.subscriptions.isEmpty()) {
-                                        stringResource(R.string.webhooks_action_add)
+                                        stringResource(Res.string.webhooks_action_add)
                                     } else {
                                         null
                                     },

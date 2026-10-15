@@ -35,17 +35,34 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.m57.hermescontrol.NavigationController
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.SkillsScreen
 import com.m57.hermescontrol.data.model.AnalyticsDailyEntry
 import com.m57.hermescontrol.data.model.ModelsAnalyticsModelEntry
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.analytics_api_calls
+import com.m57.hermescontrol.generated.resources.analytics_cache_read
+import com.m57.hermescontrol.generated.resources.analytics_daily_cost
+import com.m57.hermescontrol.generated.resources.analytics_days
+import com.m57.hermescontrol.generated.resources.analytics_empty_desc
+import com.m57.hermescontrol.generated.resources.analytics_empty_title
+import com.m57.hermescontrol.generated.resources.analytics_estimated_cost
+import com.m57.hermescontrol.generated.resources.analytics_input_tokens
+import com.m57.hermescontrol.generated.resources.analytics_loading_usage
+import com.m57.hermescontrol.generated.resources.analytics_no_cost_data
+import com.m57.hermescontrol.generated.resources.analytics_output_tokens
+import com.m57.hermescontrol.generated.resources.analytics_reasoning
+import com.m57.hermescontrol.generated.resources.analytics_sessions
+import com.m57.hermescontrol.generated.resources.analytics_skill_uses
+import com.m57.hermescontrol.generated.resources.analytics_tool_uses
+import com.m57.hermescontrol.generated.resources.empty_action_explore
+import com.m57.hermescontrol.generated.resources.error_unknown
+import com.m57.hermescontrol.generated.resources.screen_analytics
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.EmptyState
@@ -55,6 +72,7 @@ import com.m57.hermescontrol.ui.common.NavIcon
 import com.m57.hermescontrol.ui.common.SkeletonListState
 import com.m57.hermescontrol.ui.common.listContentPadding
 import com.m57.hermescontrol.ui.common.listItemSpacing
+import org.jetbrains.compose.resources.stringResource
 
 private val DAY_OPTIONS = listOf(7, 30, 90)
 
@@ -72,7 +90,7 @@ fun AnalyticsScreen(
     }
 
     HermesScaffold(
-        title = { Text(stringResource(R.string.screen_analytics)) },
+        title = { Text(stringResource(Res.string.screen_analytics)) },
         navigationIcon = onOpenDrawer?.let { NavIcon.Menu(it) },
         isRefreshing = state.isLoading,
         onRefresh = { viewModel.load() },
@@ -85,17 +103,17 @@ fun AnalyticsScreen(
 
             state.errorMessage != null && state.usage == null && state.models == null -> {
                 ErrorState(
-                    message = state.errorMessage ?: stringResource(R.string.error_unknown),
+                    message = state.errorMessage ?: stringResource(Res.string.error_unknown),
                     onRetry = { viewModel.load() },
                 )
             }
 
             state.usage == null && state.models == null -> {
                 EmptyState(
-                    title = stringResource(R.string.analytics_empty_title),
-                    subtitle = stringResource(R.string.analytics_empty_desc),
+                    title = stringResource(Res.string.analytics_empty_title),
+                    subtitle = stringResource(Res.string.analytics_empty_desc),
                     icon = Icons.Filled.BarChart,
-                    actionLabel = stringResource(R.string.empty_action_explore),
+                    actionLabel = stringResource(Res.string.empty_action_explore),
                     onAction = { NavigationController.navigateTo(SkillsScreen) },
                 )
             }
@@ -138,7 +156,7 @@ private fun AnalyticsContent(
         if (usage != null) {
             item { TotalsCard(usage.totals) }
             if (usage.daily.isNotEmpty()) {
-                item { SectionTitle(stringResource(R.string.analytics_daily_cost)) }
+                item { SectionTitle(stringResource(Res.string.analytics_daily_cost)) }
                 item { DailyCostChart(entries = usage.daily) }
             }
         } else if (state.usageLoading) {
@@ -155,7 +173,7 @@ private fun AnalyticsContent(
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            text = stringResource(R.string.analytics_loading_usage),
+                            text = stringResource(Res.string.analytics_loading_usage),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -286,7 +304,7 @@ private fun DayRangeSelector(
             FilterChip(
                 selected = days == selected,
                 onClick = { onSelect(days) },
-                label = { Text(stringResource(R.string.analytics_days, days)) },
+                label = { Text(stringResource(Res.string.analytics_days, days)) },
             )
         }
     }
@@ -319,7 +337,7 @@ private fun TotalsCard(totals: com.m57.hermescontrol.data.model.AnalyticsTotals)
                 color = status.info,
             )
             Text(
-                text = stringResource(R.string.analytics_estimated_cost),
+                text = stringResource(Res.string.analytics_estimated_cost),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -328,18 +346,18 @@ private fun TotalsCard(totals: com.m57.hermescontrol.data.model.AnalyticsTotals)
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Metric(stringResource(R.string.analytics_sessions), totals.total_sessions.toString())
-                Metric(stringResource(R.string.analytics_api_calls), totals.total_api_calls.toString())
-                Metric(stringResource(R.string.analytics_input_tokens), formatTokens(totals.total_input))
+                Metric(stringResource(Res.string.analytics_sessions), totals.total_sessions.toString())
+                Metric(stringResource(Res.string.analytics_api_calls), totals.total_api_calls.toString())
+                Metric(stringResource(Res.string.analytics_input_tokens), formatTokens(totals.total_input))
             }
             Spacer(modifier = Modifier.height(8.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Metric(stringResource(R.string.analytics_output_tokens), formatTokens(totals.total_output))
-                Metric(stringResource(R.string.analytics_cache_read), formatTokens(totals.total_cache_read))
-                Metric(stringResource(R.string.analytics_reasoning), formatTokens(totals.total_reasoning))
+                Metric(stringResource(Res.string.analytics_output_tokens), formatTokens(totals.total_output))
+                Metric(stringResource(Res.string.analytics_cache_read), formatTokens(totals.total_cache_read))
+                Metric(stringResource(Res.string.analytics_reasoning), formatTokens(totals.total_reasoning))
             }
         }
     }
@@ -383,7 +401,7 @@ private fun DailyCostChart(entries: List<AnalyticsDailyEntry>) {
         Column(modifier = Modifier.padding(12.dp)) {
             if (maxCost <= 0.0) {
                 Text(
-                    text = stringResource(R.string.analytics_no_cost_data),
+                    text = stringResource(Res.string.analytics_no_cost_data),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -472,11 +490,11 @@ private fun ModelRow(model: ModelsAnalyticsModelEntry) {
                         append("  •  ")
                         append(formatTokens(model.input_tokens + model.output_tokens))
                         append(" tokens  •  ")
-                        append(stringResource(R.string.analytics_sessions).lowercase())
+                        append(stringResource(Res.string.analytics_sessions).lowercase())
                         append(" ")
                         append(model.sessions)
                         append("  •  ")
-                        append(stringResource(R.string.analytics_api_calls).lowercase())
+                        append(stringResource(Res.string.analytics_api_calls).lowercase())
                         append(" ")
                         append(model.api_calls)
                     },
@@ -517,7 +535,7 @@ private fun ModelEntryRow(entry: com.m57.hermescontrol.data.model.AnalyticsModel
                             append(" tokens  •  ")
                             append(entry.sessions)
                             append(" ")
-                            append(stringResource(R.string.analytics_sessions).lowercase())
+                            append(stringResource(Res.string.analytics_sessions).lowercase())
                         },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -558,7 +576,7 @@ private fun SkillRow(skill: com.m57.hermescontrol.data.model.AnalyticsSkillEntry
                 Text(
                     text =
                         stringResource(
-                            R.string.analytics_skill_uses,
+                            Res.string.analytics_skill_uses,
                             skill.total_count,
                             skill.percentage.toInt(),
                         ),
@@ -595,7 +613,7 @@ private fun ToolRow(tool: com.m57.hermescontrol.data.model.AnalyticsToolUsage) {
                 Text(
                     text =
                         stringResource(
-                            R.string.analytics_tool_uses,
+                            Res.string.analytics_tool_uses,
                             tool.count,
                             tool.percentage.toInt(),
                         ),

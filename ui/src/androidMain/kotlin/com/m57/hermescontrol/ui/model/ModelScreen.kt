@@ -49,14 +49,25 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.m57.hermescontrol.NavigationController
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.SettingsConnection
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.content_desc_active_model
+import com.m57.hermescontrol.generated.resources.content_desc_pinned_section_toggle
+import com.m57.hermescontrol.generated.resources.content_desc_unpin_model
+import com.m57.hermescontrol.generated.resources.empty_action_configure_model
+import com.m57.hermescontrol.generated.resources.model_empty_desc
+import com.m57.hermescontrol.generated.resources.model_empty_title
+import com.m57.hermescontrol.generated.resources.model_label_available
+import com.m57.hermescontrol.generated.resources.model_label_slug
+import com.m57.hermescontrol.generated.resources.model_no_models
+import com.m57.hermescontrol.generated.resources.model_section_pinned
+import com.m57.hermescontrol.generated.resources.model_status_current
+import com.m57.hermescontrol.generated.resources.screen_models
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.EmptyState
 import com.m57.hermescontrol.ui.common.ErrorState
@@ -68,6 +79,7 @@ import com.m57.hermescontrol.ui.common.ToastEffect
 import com.m57.hermescontrol.ui.model.components.MoaConfigDialog
 import com.m57.hermescontrol.ui.model.components.ModelPickerDialog
 import com.m57.hermescontrol.ui.model.components.modelCapabilityHint
+import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -98,7 +110,7 @@ fun ModelScreen(
     ToastEffect(toastMessage = state.toastMessage, onClearToast = viewModel::clearToast)
 
     HermesScaffold(
-        title = { Text(stringResource(R.string.screen_models)) },
+        title = { Text(stringResource(Res.string.screen_models)) },
         navigationIcon = onOpenDrawer?.let { NavIcon.Menu(it) },
         isRefreshing = state.isLoading,
         onRefresh = { viewModel.loadAll(refresh = true) },
@@ -118,9 +130,9 @@ fun ModelScreen(
 
             state.providers.isEmpty() -> {
                 EmptyState(
-                    title = stringResource(R.string.model_empty_title),
-                    subtitle = stringResource(R.string.model_empty_desc),
-                    actionLabel = stringResource(R.string.empty_action_configure_model),
+                    title = stringResource(Res.string.model_empty_title),
+                    subtitle = stringResource(Res.string.model_empty_desc),
+                    actionLabel = stringResource(Res.string.empty_action_configure_model),
                     onAction = { NavigationController.navigateTo(SettingsConnection) },
                     modifier = Modifier.padding(paddingValues),
                 )
@@ -587,7 +599,7 @@ private fun PinnedSectionCard(
                         tint = MaterialTheme.colorScheme.primary,
                     )
                     Text(
-                        text = stringResource(R.string.model_section_pinned),
+                        text = stringResource(Res.string.model_section_pinned),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                     )
@@ -596,7 +608,7 @@ private fun PinnedSectionCard(
                 IconButton(onClick = onToggleExpanded) {
                     Icon(
                         imageVector = if (isExpanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-                        contentDescription = stringResource(R.string.content_desc_pinned_section_toggle),
+                        contentDescription = stringResource(Res.string.content_desc_pinned_section_toggle),
                     )
                 }
             }
@@ -662,7 +674,7 @@ private fun PinnedSectionCard(
                                     if (isActive) {
                                         Icon(
                                             imageVector = Icons.Filled.Check,
-                                            contentDescription = stringResource(R.string.content_desc_active_model),
+                                            contentDescription = stringResource(Res.string.content_desc_active_model),
                                             tint = MaterialTheme.colorScheme.primary,
                                         )
                                     }
@@ -672,7 +684,7 @@ private fun PinnedSectionCard(
                                     ) {
                                         Icon(
                                             imageVector = Icons.Filled.PushPin,
-                                            contentDescription = stringResource(R.string.content_desc_unpin_model),
+                                            contentDescription = stringResource(Res.string.content_desc_unpin_model),
                                             tint = MaterialTheme.colorScheme.primary,
                                         )
                                     }
@@ -729,7 +741,7 @@ private fun ProviderCard(
                         fontWeight = FontWeight.Bold,
                     )
                     Text(
-                        text = stringResource(R.string.model_label_slug, provider.slug),
+                        text = stringResource(Res.string.model_label_slug, provider.slug),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -737,7 +749,7 @@ private fun ProviderCard(
 
                 if (isCurrent) {
                     Text(
-                        text = stringResource(R.string.model_status_current),
+                        text = stringResource(Res.string.model_status_current),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold,
@@ -759,7 +771,7 @@ private fun ProviderCard(
             AnimatedVisibility(visible = isExpanded) {
                 Column(modifier = Modifier.padding(top = Spacing.md)) {
                     Text(
-                        text = stringResource(R.string.model_label_available),
+                        text = stringResource(Res.string.model_label_available),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.padding(bottom = Spacing.sm),
@@ -775,7 +787,7 @@ private fun ProviderCard(
 
                     if (filteredModels.isEmpty()) {
                         Text(
-                            text = stringResource(R.string.model_no_models),
+                            text = stringResource(Res.string.model_no_models),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -855,7 +867,10 @@ private fun ProviderCard(
                                         if (isActive) {
                                             Icon(
                                                 imageVector = Icons.Filled.Check,
-                                                contentDescription = stringResource(R.string.content_desc_active_model),
+                                                contentDescription =
+                                                    stringResource(
+                                                        Res.string.content_desc_active_model,
+                                                    ),
                                                 tint = MaterialTheme.colorScheme.primary,
                                             )
                                         }
@@ -882,7 +897,7 @@ private fun ProviderCard(
                                                     },
                                                 contentDescription =
                                                     if (isPinned) {
-                                                        stringResource(R.string.content_desc_unpin_model)
+                                                        stringResource(Res.string.content_desc_unpin_model)
                                                     } else {
                                                         "Pin model"
                                                     },

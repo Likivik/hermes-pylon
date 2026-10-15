@@ -38,17 +38,26 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
-import com.m57.hermescontrol.R
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.image_viewer_close
+import com.m57.hermescontrol.generated.resources.image_viewer_content_desc
+import com.m57.hermescontrol.generated.resources.image_viewer_load_failed
+import com.m57.hermescontrol.generated.resources.image_viewer_save
+import com.m57.hermescontrol.generated.resources.image_viewer_save_failed
+import com.m57.hermescontrol.generated.resources.image_viewer_saved
+import com.m57.hermescontrol.generated.resources.image_viewer_share
+import com.m57.hermescontrol.generated.resources.image_viewer_share_failed
+import com.m57.hermescontrol.generated.resources.image_viewer_share_title
 import com.m57.hermescontrol.theme.Spacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Full-screen image viewer (issue #723).
@@ -81,11 +90,11 @@ fun ImageViewerDialog(
 
     // Resolve string resources at composable scope (Lint forbids reading
     // resource *values* from LocalContext.current inside coroutine lambdas).
-    val savedMsg = stringResource(R.string.image_viewer_saved)
-    val saveFailedMsg = stringResource(R.string.image_viewer_save_failed)
-    val loadFailedFmt = stringResource(R.string.image_viewer_load_failed)
-    val shareTitle = stringResource(R.string.image_viewer_share_title)
-    val shareFailedMsg = stringResource(R.string.image_viewer_share_failed)
+    val savedMsg = stringResource(Res.string.image_viewer_saved)
+    val saveFailedMsg = stringResource(Res.string.image_viewer_save_failed)
+    val loadFailedFmt = stringResource(Res.string.image_viewer_load_failed)
+    val shareTitle = stringResource(Res.string.image_viewer_share_title)
+    val shareFailedMsg = stringResource(Res.string.image_viewer_share_failed)
 
     LaunchedEffect(image) {
         resolvedImage =
@@ -207,7 +216,7 @@ fun ImageViewerDialog(
                         AsyncImage(
                             model = resolved.bytes,
                             contentDescription =
-                                image.name.ifBlank { stringResource(R.string.image_viewer_content_desc) },
+                                image.name.ifBlank { stringResource(Res.string.image_viewer_content_desc) },
                             modifier =
                                 Modifier
                                     .fillMaxSize()
@@ -246,7 +255,7 @@ fun ImageViewerDialog(
                     IconButton(onClick = onDismiss) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.image_viewer_close),
+                            contentDescription = stringResource(Res.string.image_viewer_close),
                             tint = MaterialTheme.colorScheme.onSurface,
                         )
                     }
@@ -264,7 +273,7 @@ fun ImageViewerDialog(
                             ) {
                                 Icon(
                                     imageVector = Icons.Filled.Download,
-                                    contentDescription = stringResource(R.string.image_viewer_save),
+                                    contentDescription = stringResource(Res.string.image_viewer_save),
                                     tint = MaterialTheme.colorScheme.onSurface,
                                 )
                             }
@@ -274,7 +283,7 @@ fun ImageViewerDialog(
                             ) {
                                 Icon(
                                     imageVector = Icons.Filled.Share,
-                                    contentDescription = stringResource(R.string.image_viewer_share),
+                                    contentDescription = stringResource(Res.string.image_viewer_share),
                                     tint = MaterialTheme.colorScheme.onSurface,
                                 )
                             }

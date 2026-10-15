@@ -33,16 +33,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.EnvVarField
 import com.m57.hermescontrol.data.model.MessagingPlatform
 import com.m57.hermescontrol.data.model.MessagingPlatformUpdate
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.action_cancel
+import com.m57.hermescontrol.generated.resources.channels_action_restart_now
+import com.m57.hermescontrol.generated.resources.channels_action_save_settings
+import com.m57.hermescontrol.generated.resources.channels_empty_desc
+import com.m57.hermescontrol.generated.resources.channels_empty_title
+import com.m57.hermescontrol.generated.resources.channels_restart_banner
+import com.m57.hermescontrol.generated.resources.channels_sec_settings
+import com.m57.hermescontrol.generated.resources.empty_action_connect_telegram
+import com.m57.hermescontrol.generated.resources.screen_channels
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.channels.components.PlatformCard
@@ -56,6 +64,7 @@ import com.m57.hermescontrol.ui.common.SkeletonListState
 import com.m57.hermescontrol.ui.common.ToastEffect
 import com.m57.hermescontrol.ui.common.listContentPadding
 import com.m57.hermescontrol.ui.common.listItemSpacing
+import org.jetbrains.compose.resources.stringResource
 
 // ── Validation helpers ──────────────────────────────────────────────────
 
@@ -125,7 +134,7 @@ fun ChannelsScreen(
     }
 
     HermesScaffold(
-        title = { Text(stringResource(R.string.screen_channels)) },
+        title = { Text(stringResource(Res.string.screen_channels)) },
         navigationIcon = onOpenDrawer?.let { NavIcon.Menu(it) },
         isRefreshing = state.isLoading,
         onRefresh = { viewModel.loadPlatforms() },
@@ -145,9 +154,9 @@ fun ChannelsScreen(
 
             state.platforms.isEmpty() -> {
                 EmptyState(
-                    title = stringResource(R.string.channels_empty_title),
-                    subtitle = stringResource(R.string.channels_empty_desc),
-                    actionLabel = stringResource(R.string.empty_action_connect_telegram),
+                    title = stringResource(Res.string.channels_empty_title),
+                    subtitle = stringResource(Res.string.channels_empty_desc),
+                    actionLabel = stringResource(Res.string.empty_action_connect_telegram),
                     onAction = { viewModel.startTelegramOnboarding() },
                     modifier = Modifier.padding(paddingValues),
                 )
@@ -234,7 +243,7 @@ private fun RestartBanner(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(
-                text = stringResource(R.string.channels_restart_banner),
+                text = stringResource(Res.string.channels_restart_banner),
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.weight(1f),
             )
@@ -252,7 +261,7 @@ private fun RestartBanner(
                     Spacer(modifier = Modifier.width(4.dp))
                 }
                 Text(
-                    text = stringResource(R.string.channels_action_restart_now),
+                    text = stringResource(Res.string.channels_action_restart_now),
                     style = MaterialTheme.typography.labelSmall,
                 )
             }
@@ -316,7 +325,7 @@ fun ConfigureForm(
 
     Spacer(modifier = Modifier.height(16.dp))
     Text(
-        text = stringResource(R.string.channels_sec_settings),
+        text = stringResource(Res.string.channels_sec_settings),
         style = MaterialTheme.typography.titleSmall,
     )
     Spacer(modifier = Modifier.height(8.dp))
@@ -379,7 +388,7 @@ fun ConfigureForm(
             onClick = onClose,
         ) {
             Text(
-                text = stringResource(R.string.action_cancel),
+                text = stringResource(Res.string.action_cancel),
                 style = MaterialTheme.typography.labelSmall,
             )
         }
@@ -407,7 +416,7 @@ fun ConfigureForm(
             },
         ) {
             Text(
-                text = stringResource(R.string.channels_action_save_settings),
+                text = stringResource(Res.string.channels_action_save_settings),
                 style = MaterialTheme.typography.labelSmall,
             )
         }

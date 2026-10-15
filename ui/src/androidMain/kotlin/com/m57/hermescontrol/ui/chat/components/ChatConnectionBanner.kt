@@ -19,13 +19,19 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.ws.ConnectionStatus
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.chat_action_reconnect
+import com.m57.hermescontrol.generated.resources.chat_action_relogin
+import com.m57.hermescontrol.generated.resources.chat_status_auth_expired
+import com.m57.hermescontrol.generated.resources.chat_status_disconnected
+import com.m57.hermescontrol.generated.resources.chat_status_no_network
+import com.m57.hermescontrol.generated.resources.chat_status_reconnecting
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.theme.Spacing
+import org.jetbrains.compose.resources.stringResource
 
 enum class ConnectionBannerAction {
     NONE,
@@ -97,10 +103,10 @@ fun ChatConnectionBanner(
                         overflow = TextOverflow.Ellipsis,
                         text =
                             when (connectionStatus) {
-                                ConnectionStatus.RECONNECTING -> stringResource(R.string.chat_status_reconnecting)
-                                ConnectionStatus.DISCONNECTED -> stringResource(R.string.chat_status_disconnected)
-                                ConnectionStatus.NO_NETWORK -> stringResource(R.string.chat_status_no_network)
-                                ConnectionStatus.AUTH_EXPIRED -> stringResource(R.string.chat_status_auth_expired)
+                                ConnectionStatus.RECONNECTING -> stringResource(Res.string.chat_status_reconnecting)
+                                ConnectionStatus.DISCONNECTED -> stringResource(Res.string.chat_status_disconnected)
+                                ConnectionStatus.NO_NETWORK -> stringResource(Res.string.chat_status_no_network)
+                                ConnectionStatus.AUTH_EXPIRED -> stringResource(Res.string.chat_status_auth_expired)
                                 else -> ""
                             },
                         style = MaterialTheme.typography.bodyMedium,
@@ -115,7 +121,7 @@ fun ChatConnectionBanner(
                                     contentColor = LocalHermesStatusColors.current.error,
                                 ),
                         ) {
-                            Text(stringResource(R.string.chat_action_reconnect))
+                            Text(stringResource(Res.string.chat_action_reconnect))
                         }
                     }
 
@@ -127,7 +133,7 @@ fun ChatConnectionBanner(
                                     contentColor = LocalHermesStatusColors.current.error,
                                 ),
                         ) {
-                            Text(stringResource(R.string.chat_action_relogin))
+                            Text(stringResource(Res.string.chat_action_relogin))
                         }
                     }
 

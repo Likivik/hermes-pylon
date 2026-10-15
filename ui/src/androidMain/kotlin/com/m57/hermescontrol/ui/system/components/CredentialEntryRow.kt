@@ -17,13 +17,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.CredentialPoolEntry
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.action_delete
+import com.m57.hermescontrol.generated.resources.system_credentials_api_key
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.StatusBadge
 import com.m57.hermescontrol.ui.common.StatusBadgeType
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun CredentialEntryRow(
@@ -39,7 +41,7 @@ fun CredentialEntryRow(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = entry.label ?: "(${stringResource(R.string.system_credentials_api_key)} ${entry.index ?: 0})",
+                text = entry.label ?: "(${stringResource(Res.string.system_credentials_api_key)} ${entry.index ?: 0})",
                 style = MaterialTheme.typography.bodyMedium,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
@@ -66,7 +68,7 @@ fun CredentialEntryRow(
         IconButton(onClick = onRemove) {
             Icon(
                 Icons.Filled.Delete,
-                contentDescription = stringResource(R.string.action_delete),
+                contentDescription = stringResource(Res.string.action_delete),
                 tint = MaterialTheme.colorScheme.error,
                 modifier = Modifier.size(20.dp),
             )

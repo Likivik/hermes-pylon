@@ -55,7 +55,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
@@ -64,6 +63,34 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.ManagedFileEntry
 import com.m57.hermescontrol.data.remote.readBytesLimited
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.action_cancel
+import com.m57.hermescontrol.generated.resources.content_desc_refresh
+import com.m57.hermescontrol.generated.resources.files_action_create
+import com.m57.hermescontrol.generated.resources.files_action_delete
+import com.m57.hermescontrol.generated.resources.files_action_delete_named
+import com.m57.hermescontrol.generated.resources.files_action_new_folder
+import com.m57.hermescontrol.generated.resources.files_action_up
+import com.m57.hermescontrol.generated.resources.files_action_upload
+import com.m57.hermescontrol.generated.resources.files_dialog_delete_message
+import com.m57.hermescontrol.generated.resources.files_dialog_delete_title
+import com.m57.hermescontrol.generated.resources.files_dialog_new_folder_title
+import com.m57.hermescontrol.generated.resources.files_empty_desc
+import com.m57.hermescontrol.generated.resources.files_empty_title
+import com.m57.hermescontrol.generated.resources.files_error_access_forbidden
+import com.m57.hermescontrol.generated.resources.files_error_not_found
+import com.m57.hermescontrol.generated.resources.files_error_open
+import com.m57.hermescontrol.generated.resources.files_error_open_failed
+import com.m57.hermescontrol.generated.resources.files_error_read_selected
+import com.m57.hermescontrol.generated.resources.files_error_selected_unavailable_or_too_large
+import com.m57.hermescontrol.generated.resources.files_error_session_expired
+import com.m57.hermescontrol.generated.resources.files_error_too_large_to_open
+import com.m57.hermescontrol.generated.resources.files_metadata_date_time
+import com.m57.hermescontrol.generated.resources.files_metadata_size_and_time
+import com.m57.hermescontrol.generated.resources.files_new_folder_label
+import com.m57.hermescontrol.generated.resources.files_new_folder_placeholder
+import com.m57.hermescontrol.generated.resources.files_root_label
+import com.m57.hermescontrol.generated.resources.screen_files
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.EmptyState
 import com.m57.hermescontrol.ui.common.ErrorState
@@ -80,6 +107,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.jetbrains.compose.resources.stringResource
 import java.io.File
 import java.util.Date
 
@@ -172,13 +200,13 @@ fun FilesScreen(
                         modifier = Modifier.size(20.dp),
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(stringResource(R.string.files_dialog_delete_title))
+                    Text(stringResource(Res.string.files_dialog_delete_title))
                 }
             },
             text = {
                 Text(
                     stringResource(
-                        R.string.files_dialog_delete_message,
+                        Res.string.files_dialog_delete_message,
                         entry.name,
                     ),
                 )
@@ -191,19 +219,19 @@ fun FilesScreen(
                             containerColor = MaterialTheme.colorScheme.error,
                         ),
                 ) {
-                    Text(stringResource(R.string.files_action_delete))
+                    Text(stringResource(Res.string.files_action_delete))
                 }
             },
             dismissButton = {
                 TextButton(onClick = viewModel::dismissDelete) {
-                    Text(stringResource(R.string.action_cancel))
+                    Text(stringResource(Res.string.action_cancel))
                 }
             },
         )
     }
 
     HermesScaffold(
-        title = { Text(stringResource(R.string.screen_files)) },
+        title = { Text(stringResource(Res.string.screen_files)) },
         navigationIcon = onOpenDrawer?.let { NavIcon.Menu(it) },
         isRefreshing = state.isLoading,
         onRefresh = viewModel::refresh,
@@ -212,14 +240,14 @@ fun FilesScreen(
                 IconButton(onClick = viewModel::navigateUp) {
                     Icon(
                         imageVector = Icons.Filled.ArrowUpward,
-                        contentDescription = stringResource(R.string.files_action_up),
+                        contentDescription = stringResource(Res.string.files_action_up),
                     )
                 }
             }
             IconButton(onClick = { uploadLauncher.launch("*/*") }) {
                 Icon(
                     imageVector = Icons.Filled.Upload,
-                    contentDescription = stringResource(R.string.files_action_upload),
+                    contentDescription = stringResource(Res.string.files_action_upload),
                 )
             }
         },
@@ -240,10 +268,10 @@ fun FilesScreen(
 
                 !hasEntries -> {
                     EmptyState(
-                        title = stringResource(R.string.files_empty_title),
-                        subtitle = stringResource(R.string.files_empty_desc),
+                        title = stringResource(Res.string.files_empty_title),
+                        subtitle = stringResource(Res.string.files_empty_desc),
                         onAction = viewModel::refresh,
-                        actionLabel = stringResource(R.string.content_desc_refresh),
+                        actionLabel = stringResource(Res.string.content_desc_refresh),
                         modifier = Modifier.padding(paddingValues),
                     )
                 }
@@ -268,7 +296,7 @@ fun FilesScreen(
                                 FileRow(
                                     icon = Icons.Filled.ArrowUpward,
                                     name = "..",
-                                    subtitle = stringResource(R.string.files_action_up),
+                                    subtitle = stringResource(Res.string.files_action_up),
                                     isBusy = false,
                                     onClick = viewModel::navigateUp,
                                 )
@@ -314,7 +342,7 @@ fun FilesScreen(
             ) {
                 Icon(
                     imageVector = Icons.Filled.CreateNewFolder,
-                    contentDescription = stringResource(R.string.files_action_new_folder),
+                    contentDescription = stringResource(Res.string.files_action_new_folder),
                 )
             }
         }
@@ -334,7 +362,7 @@ private fun BreadcrumbBar(
 ) {
     if (crumbs.isEmpty()) {
         Text(
-            text = stringResource(R.string.files_root_label),
+            text = stringResource(Res.string.files_root_label),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = Spacing.xs),
@@ -437,7 +465,7 @@ private fun FileRow(
                 IconButton(onClick = onDelete) {
                     Icon(
                         imageVector = Icons.Filled.Delete,
-                        contentDescription = stringResource(R.string.files_action_delete_named, entry.name),
+                        contentDescription = stringResource(Res.string.files_action_delete_named, entry.name),
                         tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(20.dp),
                     )
@@ -458,15 +486,15 @@ private fun CreateDirDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.files_dialog_new_folder_title)) },
+        title = { Text(stringResource(Res.string.files_dialog_new_folder_title)) },
         text = {
             OutlinedTextField(
                 value = name,
                 onValueChange = onNameChange,
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                label = { Text(stringResource(R.string.files_new_folder_label)) },
-                placeholder = { Text(stringResource(R.string.files_new_folder_placeholder)) },
+                label = { Text(stringResource(Res.string.files_new_folder_label)) },
+                placeholder = { Text(stringResource(Res.string.files_new_folder_placeholder)) },
             )
         },
         confirmButton = {
@@ -474,12 +502,12 @@ private fun CreateDirDialog(
                 onClick = onConfirm,
                 enabled = name.isNotBlank(),
             ) {
-                Text(stringResource(R.string.files_action_create))
+                Text(stringResource(Res.string.files_action_create))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
+                Text(stringResource(Res.string.action_cancel))
             }
         },
     )
@@ -508,7 +536,7 @@ private fun fileSubtitle(entry: ManagedFileEntry): String {
                 val formattedDate = DateFormat.getMediumDateFormat(context).format(date)
                 val formattedTime = DateFormat.getTimeFormat(context).format(date)
                 stringResource(
-                    R.string.files_metadata_date_time,
+                    Res.string.files_metadata_date_time,
                     formattedDate,
                     formattedTime,
                 )
@@ -516,7 +544,7 @@ private fun fileSubtitle(entry: ManagedFileEntry): String {
     return if (mtime == null) {
         size
     } else {
-        stringResource(R.string.files_metadata_size_and_time, size, mtime)
+        stringResource(Res.string.files_metadata_size_and_time, size, mtime)
     }
 }
 

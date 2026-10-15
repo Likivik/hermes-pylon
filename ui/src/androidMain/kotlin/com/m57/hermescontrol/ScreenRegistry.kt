@@ -1,6 +1,5 @@
 package com.m57.hermescontrol
 
-import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.ListAlt
@@ -28,6 +27,37 @@ import androidx.compose.material.icons.filled.Webhook
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation3.runtime.NavKey
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.nav_drawer_section_automate
+import com.m57.hermescontrol.generated.resources.nav_drawer_section_configure
+import com.m57.hermescontrol.generated.resources.nav_drawer_section_converse
+import com.m57.hermescontrol.generated.resources.nav_drawer_section_inspect
+import com.m57.hermescontrol.generated.resources.screen_achievements
+import com.m57.hermescontrol.generated.resources.screen_analytics
+import com.m57.hermescontrol.generated.resources.screen_billing
+import com.m57.hermescontrol.generated.resources.screen_bots
+import com.m57.hermescontrol.generated.resources.screen_channels
+import com.m57.hermescontrol.generated.resources.screen_chat
+import com.m57.hermescontrol.generated.resources.screen_config
+import com.m57.hermescontrol.generated.resources.screen_cron
+import com.m57.hermescontrol.generated.resources.screen_files
+import com.m57.hermescontrol.generated.resources.screen_gateway
+import com.m57.hermescontrol.generated.resources.screen_history
+import com.m57.hermescontrol.generated.resources.screen_kanban
+import com.m57.hermescontrol.generated.resources.screen_keys
+import com.m57.hermescontrol.generated.resources.screen_logs
+import com.m57.hermescontrol.generated.resources.screen_mcp_servers
+import com.m57.hermescontrol.generated.resources.screen_models
+import com.m57.hermescontrol.generated.resources.screen_plugins
+import com.m57.hermescontrol.generated.resources.screen_processes
+import com.m57.hermescontrol.generated.resources.screen_profiles
+import com.m57.hermescontrol.generated.resources.screen_providers
+import com.m57.hermescontrol.generated.resources.screen_settings
+import com.m57.hermescontrol.generated.resources.screen_skills
+import com.m57.hermescontrol.generated.resources.screen_system
+import com.m57.hermescontrol.generated.resources.screen_toolsets
+import com.m57.hermescontrol.generated.resources.screen_webhooks
+import org.jetbrains.compose.resources.StringResource
 import com.m57.hermescontrol.ui.achievements.AchievementsScreen as AchievementsScreenContent
 import com.m57.hermescontrol.ui.analytics.AnalyticsScreen as AnalyticsScreenContent
 import com.m57.hermescontrol.ui.billing.BillingScreen as BillingScreenContent
@@ -55,17 +85,17 @@ import com.m57.hermescontrol.ui.toolsets.ToolsetsScreen as ToolsetsScreenContent
 import com.m57.hermescontrol.ui.webhooks.WebhooksScreen as WebhooksScreenContent
 
 enum class DrawerSection(
-    @param:StringRes val titleRes: Int,
+    val titleRes: StringResource,
 ) {
-    CONVERSE(R.string.nav_drawer_section_converse),
-    AUTOMATE(R.string.nav_drawer_section_automate),
-    CONFIGURE(R.string.nav_drawer_section_configure),
-    INSPECT(R.string.nav_drawer_section_inspect),
+    CONVERSE(Res.string.nav_drawer_section_converse),
+    AUTOMATE(Res.string.nav_drawer_section_automate),
+    CONFIGURE(Res.string.nav_drawer_section_configure),
+    INSPECT(Res.string.nav_drawer_section_inspect),
 }
 
 data class ScreenDefinition(
     val key: NavKey,
-    @param:StringRes val labelRes: Int,
+    val labelRes: StringResource,
     val icon: ImageVector,
     val drawerSection: DrawerSection?,
     val content: @Composable (sessionId: String?, openDrawer: () -> Unit) -> Unit,
@@ -76,151 +106,151 @@ object ScreenRegistry {
         listOf(
             ScreenDefinition(
                 ChatScreen,
-                R.string.screen_chat,
+                Res.string.screen_chat,
                 Icons.AutoMirrored.Filled.Chat,
                 DrawerSection.CONVERSE,
             ) { sessionId, openDrawer -> ChatScreenContent(onOpenDrawer = openDrawer, sessionId = sessionId) },
             ScreenDefinition(
                 BotsScreen,
-                R.string.screen_bots,
+                Res.string.screen_bots,
                 Icons.Filled.SmartToy,
                 DrawerSection.CONVERSE,
             ) { sessionId, openDrawer -> BotsScreenContent(onOpenDrawer = openDrawer) },
             ScreenDefinition(
                 HistoryScreen,
-                R.string.screen_history,
+                Res.string.screen_history,
                 Icons.Filled.History,
                 DrawerSection.CONVERSE,
             ) { sessionId, openDrawer -> HistoryScreenContent(onOpenDrawer = openDrawer) },
             ScreenDefinition(
                 ProfilesScreen,
-                R.string.screen_profiles,
+                Res.string.screen_profiles,
                 Icons.Filled.AccountCircle,
                 DrawerSection.CONVERSE,
             ) { sessionId, openDrawer -> ProfilesScreenContent(onOpenDrawer = openDrawer) },
             ScreenDefinition(
                 CronJobsScreen,
-                R.string.screen_cron,
+                Res.string.screen_cron,
                 Icons.Filled.Schedule,
                 DrawerSection.AUTOMATE,
             ) { sessionId, openDrawer -> CronJobsScreenContent(onOpenDrawer = openDrawer) },
             ScreenDefinition(
                 WebhooksScreen,
-                R.string.screen_webhooks,
+                Res.string.screen_webhooks,
                 Icons.Filled.Webhook,
                 DrawerSection.AUTOMATE,
             ) { sessionId, openDrawer -> WebhooksScreenContent(onOpenDrawer = openDrawer) },
             ScreenDefinition(
                 KanbanScreen,
-                R.string.screen_kanban,
+                Res.string.screen_kanban,
                 Icons.Filled.Dashboard,
                 DrawerSection.AUTOMATE,
             ) { sessionId, openDrawer -> KanbanScreenContent(onOpenDrawer = openDrawer) },
             ScreenDefinition(
                 SkillsScreen,
-                R.string.screen_skills,
+                Res.string.screen_skills,
                 Icons.Filled.Extension,
                 DrawerSection.CONFIGURE,
             ) { sessionId, openDrawer -> SkillsScreenContent(onOpenDrawer = openDrawer) },
             ScreenDefinition(
                 ToolsetsScreen,
-                R.string.screen_toolsets,
+                Res.string.screen_toolsets,
                 Icons.Filled.Build,
                 DrawerSection.CONFIGURE,
             ) { sessionId, openDrawer -> ToolsetsScreenContent(onOpenDrawer = openDrawer) },
             ScreenDefinition(
                 PluginsScreen,
-                R.string.screen_plugins,
+                Res.string.screen_plugins,
                 Icons.Filled.Memory,
                 DrawerSection.CONFIGURE,
             ) { sessionId, openDrawer -> PluginsScreenContent(onOpenDrawer = openDrawer) },
             ScreenDefinition(
                 ConfigScreen,
-                R.string.screen_config,
+                Res.string.screen_config,
                 Icons.Filled.Code,
                 DrawerSection.CONFIGURE,
             ) { sessionId, openDrawer -> ConfigScreenContent(onOpenDrawer = openDrawer) },
             ScreenDefinition(
                 McpServersScreen,
-                R.string.screen_mcp_servers,
+                Res.string.screen_mcp_servers,
                 Icons.Filled.Dashboard,
                 DrawerSection.CONFIGURE,
             ) { sessionId, openDrawer -> McpServersScreenContent(onOpenDrawer = openDrawer) },
             ScreenDefinition(
                 ModelScreen,
-                R.string.screen_models,
+                Res.string.screen_models,
                 Icons.Filled.Psychology,
                 DrawerSection.CONFIGURE,
             ) { sessionId, openDrawer -> ModelScreenContent(onOpenDrawer = openDrawer) },
             ScreenDefinition(
                 KeysScreen,
-                R.string.screen_keys,
+                Res.string.screen_keys,
                 Icons.Filled.Key,
                 DrawerSection.CONFIGURE,
             ) { sessionId, openDrawer -> KeysScreenContent(onOpenDrawer = openDrawer) },
             ScreenDefinition(
                 ChannelsScreen,
-                R.string.screen_channels,
+                Res.string.screen_channels,
                 Icons.AutoMirrored.Filled.ListAlt,
                 DrawerSection.CONFIGURE,
             ) { sessionId, openDrawer -> ChannelsScreenContent(onOpenDrawer = openDrawer) },
             ScreenDefinition(
                 ProvidersScreen,
-                R.string.screen_providers,
+                Res.string.screen_providers,
                 Icons.Filled.Cloud,
                 DrawerSection.CONFIGURE,
             ) { sessionId, openDrawer -> ProvidersScreenContent(onOpenDrawer = openDrawer) },
             ScreenDefinition(
                 GatewayScreen,
-                R.string.screen_gateway,
+                Res.string.screen_gateway,
                 Icons.Filled.Bolt,
                 DrawerSection.INSPECT,
             ) { sessionId, openDrawer -> GatewayScreenContent(onOpenDrawer = openDrawer) },
             ScreenDefinition(
                 SystemScreen,
-                R.string.screen_system,
+                Res.string.screen_system,
                 Icons.Filled.Info,
                 DrawerSection.INSPECT,
             ) { sessionId, openDrawer -> SystemScreenContent(onOpenDrawer = openDrawer) },
             ScreenDefinition(
                 LogsScreen,
-                R.string.screen_logs,
+                Res.string.screen_logs,
                 Icons.Filled.HistoryEdu,
                 DrawerSection.INSPECT,
             ) { sessionId, openDrawer -> LogsScreenContent(onOpenDrawer = openDrawer) },
             ScreenDefinition(
                 ProcessesScreen,
-                R.string.screen_processes,
+                Res.string.screen_processes,
                 Icons.Filled.Memory,
                 DrawerSection.INSPECT,
             ) { sessionId, openDrawer -> ProcessesScreenContent(onOpenDrawer = openDrawer) },
             ScreenDefinition(
                 AnalyticsScreen,
-                R.string.screen_analytics,
+                Res.string.screen_analytics,
                 Icons.Filled.BarChart,
                 DrawerSection.INSPECT,
             ) { sessionId, openDrawer -> AnalyticsScreenContent(onOpenDrawer = openDrawer) },
             ScreenDefinition(
                 BillingScreen,
-                R.string.screen_billing,
+                Res.string.screen_billing,
                 Icons.Filled.AccountBalanceWallet,
                 DrawerSection.INSPECT,
             ) { sessionId, openDrawer -> BillingScreenContent(onOpenDrawer = openDrawer) },
             ScreenDefinition(
                 FilesScreen,
-                R.string.screen_files,
+                Res.string.screen_files,
                 Icons.Filled.Folder,
                 DrawerSection.INSPECT,
             ) { sessionId, openDrawer -> FilesScreenContent(onOpenDrawer = openDrawer) },
             ScreenDefinition(
                 AchievementsScreen,
-                R.string.screen_achievements,
+                Res.string.screen_achievements,
                 Icons.Filled.EmojiEvents,
                 DrawerSection.INSPECT,
             ) { sessionId, openDrawer -> AchievementsScreenContent(onOpenDrawer = openDrawer) },
             ScreenDefinition(
                 SettingsScreen,
-                R.string.screen_settings,
+                Res.string.screen_settings,
                 Icons.Filled.Settings,
                 DrawerSection.INSPECT,
             ) { sessionId, openDrawer ->

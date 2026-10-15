@@ -43,7 +43,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentType
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -53,8 +52,20 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.m57.hermescontrol.R
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.auth_login_action_connect
+import com.m57.hermescontrol.generated.resources.auth_login_action_probing
+import com.m57.hermescontrol.generated.resources.auth_login_base_url_label
+import com.m57.hermescontrol.generated.resources.auth_login_desc
+import com.m57.hermescontrol.generated.resources.auth_login_existing_profiles_title
+import com.m57.hermescontrol.generated.resources.auth_login_password_label
+import com.m57.hermescontrol.generated.resources.auth_login_probing_dashboard
+import com.m57.hermescontrol.generated.resources.auth_login_title
+import com.m57.hermescontrol.generated.resources.auth_login_token_label
+import com.m57.hermescontrol.generated.resources.auth_login_use_profile
+import com.m57.hermescontrol.generated.resources.auth_login_username_label
 import com.m57.hermescontrol.theme.Spacing
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun AuthLoginScreen(
@@ -118,7 +129,7 @@ fun AuthLoginScreen(
             }
 
             Text(
-                text = stringResource(R.string.auth_login_title),
+                text = stringResource(Res.string.auth_login_title),
                 style =
                     MaterialTheme.typography.headlineSmall.copy(
                         fontWeight = FontWeight.Bold,
@@ -126,7 +137,7 @@ fun AuthLoginScreen(
             )
 
             Text(
-                text = stringResource(R.string.auth_login_desc),
+                text = stringResource(Res.string.auth_login_desc),
                 style =
                     MaterialTheme.typography.bodyMedium.copy(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -137,7 +148,7 @@ fun AuthLoginScreen(
 
             if (showExistingProfiles && state.loggedInProfiles.isNotEmpty()) {
                 Text(
-                    text = stringResource(R.string.auth_login_existing_profiles_title),
+                    text = stringResource(Res.string.auth_login_existing_profiles_title),
                     style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier.padding(top = Spacing.sm),
                 )
@@ -152,7 +163,7 @@ fun AuthLoginScreen(
                             modifier = Modifier.size(18.dp),
                         )
                         Spacer(modifier = Modifier.size(8.dp))
-                        Text(stringResource(R.string.auth_login_use_profile, profile.name))
+                        Text(stringResource(Res.string.auth_login_use_profile, profile.name))
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
@@ -164,7 +175,7 @@ fun AuthLoginScreen(
                 value = state.baseUrl,
                 onValueChange = viewModel::onBaseUrlChange,
                 label = {
-                    Text(stringResource(R.string.auth_login_base_url_label))
+                    Text(stringResource(Res.string.auth_login_base_url_label))
                 },
                 placeholder = {
                     Text("https://hermes.example.com:9119")
@@ -187,7 +198,7 @@ fun AuthLoginScreen(
             if (state.probing) {
                 CircularProgressIndicator(modifier = Modifier.size(24.dp))
                 Text(
-                    text = stringResource(R.string.auth_login_probing_dashboard),
+                    text = stringResource(Res.string.auth_login_probing_dashboard),
                     style =
                         MaterialTheme.typography.bodySmall.copy(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -208,7 +219,7 @@ fun AuthLoginScreen(
                 OutlinedTextField(
                     value = state.token,
                     onValueChange = viewModel::onTokenChange,
-                    label = { Text(stringResource(R.string.auth_login_token_label)) },
+                    label = { Text(stringResource(Res.string.auth_login_token_label)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     visualTransformation =
@@ -244,7 +255,7 @@ fun AuthLoginScreen(
                 OutlinedTextField(
                     value = state.username,
                     onValueChange = viewModel::onUsernameChange,
-                    label = { Text(stringResource(R.string.auth_login_username_label)) },
+                    label = { Text(stringResource(Res.string.auth_login_username_label)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, autoCorrectEnabled = false),
                     modifier =
@@ -264,7 +275,7 @@ fun AuthLoginScreen(
                 OutlinedTextField(
                     value = state.password,
                     onValueChange = viewModel::onPasswordChange,
-                    label = { Text(stringResource(R.string.auth_login_password_label)) },
+                    label = { Text(stringResource(Res.string.auth_login_password_label)) },
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -315,9 +326,9 @@ fun AuthLoginScreen(
                     Text(
                         text =
                             if (state.authMode == null) {
-                                stringResource(R.string.auth_login_action_probing)
+                                stringResource(Res.string.auth_login_action_probing)
                             } else {
-                                stringResource(R.string.auth_login_action_connect)
+                                stringResource(Res.string.auth_login_action_connect)
                             },
                     )
                 }

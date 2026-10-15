@@ -42,7 +42,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -50,8 +49,57 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.CronJob
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.action_cancel
+import com.m57.hermescontrol.generated.resources.action_delete
+import com.m57.hermescontrol.generated.resources.action_discard
+import com.m57.hermescontrol.generated.resources.cron_action_add
+import com.m57.hermescontrol.generated.resources.cron_action_edit
+import com.m57.hermescontrol.generated.resources.cron_action_pause
+import com.m57.hermescontrol.generated.resources.cron_action_resume
+import com.m57.hermescontrol.generated.resources.cron_action_run
+import com.m57.hermescontrol.generated.resources.cron_badge_continuity
+import com.m57.hermescontrol.generated.resources.cron_badge_dispatch_error
+import com.m57.hermescontrol.generated.resources.cron_delete_message
+import com.m57.hermescontrol.generated.resources.cron_delete_title
+import com.m57.hermescontrol.generated.resources.cron_detail_dispatch_error
+import com.m57.hermescontrol.generated.resources.cron_discard_message
+import com.m57.hermescontrol.generated.resources.cron_discard_title
+import com.m57.hermescontrol.generated.resources.cron_edit_action_save
+import com.m57.hermescontrol.generated.resources.cron_edit_field_base_url
+import com.m57.hermescontrol.generated.resources.cron_edit_field_deliver
+import com.m57.hermescontrol.generated.resources.cron_edit_field_model
+import com.m57.hermescontrol.generated.resources.cron_edit_field_name
+import com.m57.hermescontrol.generated.resources.cron_edit_field_no_agent
+import com.m57.hermescontrol.generated.resources.cron_edit_field_prompt
+import com.m57.hermescontrol.generated.resources.cron_edit_field_provider
+import com.m57.hermescontrol.generated.resources.cron_edit_field_run_continuity
+import com.m57.hermescontrol.generated.resources.cron_edit_field_schedule
+import com.m57.hermescontrol.generated.resources.cron_edit_field_script
+import com.m57.hermescontrol.generated.resources.cron_edit_field_skills
+import com.m57.hermescontrol.generated.resources.cron_edit_field_workdir
+import com.m57.hermescontrol.generated.resources.cron_edit_hint_deliver
+import com.m57.hermescontrol.generated.resources.cron_edit_hint_run_continuity
+import com.m57.hermescontrol.generated.resources.cron_edit_hint_schedule
+import com.m57.hermescontrol.generated.resources.cron_edit_hint_skills
+import com.m57.hermescontrol.generated.resources.cron_edit_monitor_hint
+import com.m57.hermescontrol.generated.resources.cron_edit_monitor_mode
+import com.m57.hermescontrol.generated.resources.cron_edit_monitor_off
+import com.m57.hermescontrol.generated.resources.cron_edit_monitor_script
+import com.m57.hermescontrol.generated.resources.cron_edit_monitor_script_field
+import com.m57.hermescontrol.generated.resources.cron_edit_monitor_url
+import com.m57.hermescontrol.generated.resources.cron_edit_monitor_url_field
+import com.m57.hermescontrol.generated.resources.cron_edit_title
+import com.m57.hermescontrol.generated.resources.cron_edit_title_new
+import com.m57.hermescontrol.generated.resources.cron_empty_desc
+import com.m57.hermescontrol.generated.resources.cron_empty_title
+import com.m57.hermescontrol.generated.resources.cron_status_active
+import com.m57.hermescontrol.generated.resources.cron_status_blocked_config
+import com.m57.hermescontrol.generated.resources.cron_status_no_change
+import com.m57.hermescontrol.generated.resources.cron_status_paused
+import com.m57.hermescontrol.generated.resources.empty_action_create_job
+import com.m57.hermescontrol.generated.resources.screen_cron
 import com.m57.hermescontrol.theme.LocalSpacing
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.EmptyState
@@ -67,6 +115,7 @@ import com.m57.hermescontrol.ui.common.ToastEffect
 import com.m57.hermescontrol.ui.common.listContentPadding
 import com.m57.hermescontrol.ui.common.listItemSpacing
 import com.m57.hermescontrol.util.CronExpressionFormatter
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun CronJobsScreen(
@@ -85,7 +134,7 @@ fun CronJobsScreen(
     ToastEffect(toastMessage = state.toastMessage, onClearToast = viewModel::clearToast)
 
     HermesScaffold(
-        title = { Text(stringResource(R.string.screen_cron)) },
+        title = { Text(stringResource(Res.string.screen_cron)) },
         navigationIcon = onOpenDrawer?.let { NavIcon.Menu(it) },
         isRefreshing = state.isLoading,
         onRefresh = { viewModel.loadCronJobs() },
@@ -93,7 +142,7 @@ fun CronJobsScreen(
             IconButton(onClick = { viewModel.openNewJobDialog() }) {
                 Icon(
                     imageVector = Icons.Filled.Add,
-                    contentDescription = stringResource(R.string.cron_action_add),
+                    contentDescription = stringResource(Res.string.cron_action_add),
                 )
             }
         },
@@ -113,9 +162,9 @@ fun CronJobsScreen(
             state.jobs.isEmpty() -> {
                 EmptyState(
                     icon = Icons.Filled.Schedule,
-                    title = stringResource(R.string.cron_empty_title),
-                    subtitle = stringResource(R.string.cron_empty_desc),
-                    actionLabel = stringResource(R.string.empty_action_create_job),
+                    title = stringResource(Res.string.cron_empty_title),
+                    subtitle = stringResource(Res.string.cron_empty_desc),
+                    actionLabel = stringResource(Res.string.empty_action_create_job),
                     onAction = { viewModel.openNewJobDialog() },
                 )
             }
@@ -152,9 +201,9 @@ fun CronJobsScreen(
                                     StatusBadge(
                                         text =
                                             if (job.state == "active") {
-                                                stringResource(R.string.cron_status_active)
+                                                stringResource(Res.string.cron_status_active)
                                             } else {
-                                                stringResource(R.string.cron_status_paused)
+                                                stringResource(Res.string.cron_status_paused)
                                             },
                                         status =
                                             if (job.state == "active") {
@@ -173,24 +222,24 @@ fun CronJobsScreen(
                                         when (job.lastRunStatus) {
                                             "blocked_config" ->
                                                 StatusBadge(
-                                                    text = stringResource(R.string.cron_status_blocked_config),
+                                                    text = stringResource(Res.string.cron_status_blocked_config),
                                                     status = StatusBadgeType.ERROR,
                                                 )
                                             "no_change" ->
                                                 StatusBadge(
-                                                    text = stringResource(R.string.cron_status_no_change),
+                                                    text = stringResource(Res.string.cron_status_no_change),
                                                     status = StatusBadgeType.INFO,
                                                 )
                                         }
                                         if (job.context_from?.contains("self") == true) {
                                             StatusBadge(
-                                                text = stringResource(R.string.cron_badge_continuity),
+                                                text = stringResource(Res.string.cron_badge_continuity),
                                                 status = StatusBadgeType.INFO,
                                             )
                                         }
                                         if (job.last_fire_error.hasContent()) {
                                             StatusBadge(
-                                                text = stringResource(R.string.cron_badge_dispatch_error),
+                                                text = stringResource(Res.string.cron_badge_dispatch_error),
                                                 status = StatusBadgeType.ERROR,
                                             )
                                         }
@@ -218,7 +267,7 @@ fun CronJobsScreen(
                                     ) {
                                         Icon(
                                             imageVector = Icons.Filled.Edit,
-                                            contentDescription = stringResource(R.string.cron_action_edit),
+                                            contentDescription = stringResource(Res.string.cron_action_edit),
                                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
                                     }
@@ -228,7 +277,7 @@ fun CronJobsScreen(
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Filled.Pause,
-                                                contentDescription = stringResource(R.string.cron_action_pause),
+                                                contentDescription = stringResource(Res.string.cron_action_pause),
                                                 tint = MaterialTheme.colorScheme.primary,
                                             )
                                         }
@@ -238,7 +287,7 @@ fun CronJobsScreen(
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Filled.PlayArrow,
-                                                contentDescription = stringResource(R.string.cron_action_resume),
+                                                contentDescription = stringResource(Res.string.cron_action_resume),
                                                 tint = MaterialTheme.colorScheme.primary,
                                             )
                                         }
@@ -248,7 +297,7 @@ fun CronJobsScreen(
                                     ) {
                                         Icon(
                                             imageVector = Icons.Filled.Refresh,
-                                            contentDescription = stringResource(R.string.cron_action_run),
+                                            contentDescription = stringResource(Res.string.cron_action_run),
                                             tint = MaterialTheme.colorScheme.secondary,
                                         )
                                     }
@@ -257,7 +306,7 @@ fun CronJobsScreen(
                                     ) {
                                         Icon(
                                             imageVector = Icons.Filled.Delete,
-                                            contentDescription = stringResource(R.string.action_delete),
+                                            contentDescription = stringResource(Res.string.action_delete),
                                             tint = MaterialTheme.colorScheme.error,
                                         )
                                     }
@@ -294,8 +343,8 @@ fun CronJobsScreen(
                     RunDetailRow(
                         "Status",
                         when (job.lastRunStatus) {
-                            "blocked_config" -> stringResource(R.string.cron_status_blocked_config)
-                            "no_change" -> stringResource(R.string.cron_status_no_change)
+                            "blocked_config" -> stringResource(Res.string.cron_status_blocked_config)
+                            "no_change" -> stringResource(Res.string.cron_status_no_change)
                             else -> job.lastRunStatus.ifEmpty { "unknown" }
                         },
                     )
@@ -310,7 +359,7 @@ fun CronJobsScreen(
                         val at = fireError.at?.takeIf { it.isNotBlank() }
                         if (detail != null || at != null) {
                             RunDetailRow(
-                                stringResource(R.string.cron_detail_dispatch_error),
+                                stringResource(Res.string.cron_detail_dispatch_error),
                                 listOfNotNull(detail, at?.let { "($it)" }).joinToString(" "),
                             )
                         }
@@ -328,16 +377,16 @@ fun CronJobsScreen(
     state.deleteTarget?.let { job ->
         AlertDialog(
             onDismissRequest = viewModel::dismissDeleteDialog,
-            title = { Text(stringResource(R.string.cron_delete_title)) },
-            text = { Text(stringResource(R.string.cron_delete_message, job.name)) },
+            title = { Text(stringResource(Res.string.cron_delete_title)) },
+            text = { Text(stringResource(Res.string.cron_delete_message, job.name)) },
             confirmButton = {
                 TextButton(onClick = viewModel::confirmDeleteJob) {
-                    Text(stringResource(R.string.action_delete))
+                    Text(stringResource(Res.string.action_delete))
                 }
             },
             dismissButton = {
                 TextButton(onClick = viewModel::dismissDeleteDialog) {
-                    Text(stringResource(R.string.action_cancel))
+                    Text(stringResource(Res.string.action_cancel))
                 }
             },
         )
@@ -387,9 +436,9 @@ fun CronJobEditorDialog(
                 title = {
                     Text(
                         if (state.isNew) {
-                            stringResource(R.string.cron_edit_title_new)
+                            stringResource(Res.string.cron_edit_title_new)
                         } else {
-                            stringResource(R.string.cron_edit_title)
+                            stringResource(Res.string.cron_edit_title)
                         },
                     )
                 },
@@ -417,7 +466,7 @@ fun CronJobEditorDialog(
                                 )
                             } else {
                                 Text(
-                                    text = stringResource(R.string.cron_edit_action_save),
+                                    text = stringResource(Res.string.cron_edit_action_save),
                                     color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.Bold,
                                 )
@@ -441,7 +490,7 @@ fun CronJobEditorDialog(
                         OutlinedTextField(
                             value = state.name,
                             onValueChange = { onFieldChange("name", it) },
-                            label = { Text(stringResource(R.string.cron_edit_field_name)) },
+                            label = { Text(stringResource(Res.string.cron_edit_field_name)) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                         )
@@ -450,8 +499,8 @@ fun CronJobEditorDialog(
                         OutlinedTextField(
                             value = state.schedule,
                             onValueChange = { onFieldChange("schedule", it) },
-                            label = { Text(stringResource(R.string.cron_edit_field_schedule)) },
-                            placeholder = { Text(stringResource(R.string.cron_edit_hint_schedule)) },
+                            label = { Text(stringResource(Res.string.cron_edit_field_schedule)) },
+                            placeholder = { Text(stringResource(Res.string.cron_edit_hint_schedule)) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                         )
@@ -460,7 +509,7 @@ fun CronJobEditorDialog(
                         OutlinedTextField(
                             value = state.prompt,
                             onValueChange = { onFieldChange("prompt", it) },
-                            label = { Text(stringResource(R.string.cron_edit_field_prompt)) },
+                            label = { Text(stringResource(Res.string.cron_edit_field_prompt)) },
                             modifier =
                                 Modifier
                                     .fillMaxWidth()
@@ -475,12 +524,12 @@ fun CronJobEditorDialog(
                         OutlinedTextField(
                             value = state.deliver,
                             onValueChange = { onFieldChange("deliver", it) },
-                            label = { Text(stringResource(R.string.cron_edit_field_deliver)) },
+                            label = { Text(stringResource(Res.string.cron_edit_field_deliver)) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                             supportingText = {
                                 Text(
-                                    stringResource(R.string.cron_edit_hint_deliver),
+                                    stringResource(Res.string.cron_edit_hint_deliver),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                                 )
                             },
@@ -490,8 +539,8 @@ fun CronJobEditorDialog(
                         OutlinedTextField(
                             value = state.skills,
                             onValueChange = { onFieldChange("skills", it) },
-                            label = { Text(stringResource(R.string.cron_edit_field_skills)) },
-                            placeholder = { Text(stringResource(R.string.cron_edit_hint_skills)) },
+                            label = { Text(stringResource(Res.string.cron_edit_field_skills)) },
+                            placeholder = { Text(stringResource(Res.string.cron_edit_hint_skills)) },
                             modifier =
                                 Modifier
                                     .fillMaxWidth()
@@ -503,7 +552,7 @@ fun CronJobEditorDialog(
                         OutlinedTextField(
                             value = state.model,
                             onValueChange = { onFieldChange("model", it) },
-                            label = { Text(stringResource(R.string.cron_edit_field_model)) },
+                            label = { Text(stringResource(Res.string.cron_edit_field_model)) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                         )
@@ -512,7 +561,7 @@ fun CronJobEditorDialog(
                         OutlinedTextField(
                             value = state.provider,
                             onValueChange = { onFieldChange("provider", it) },
-                            label = { Text(stringResource(R.string.cron_edit_field_provider)) },
+                            label = { Text(stringResource(Res.string.cron_edit_field_provider)) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                         )
@@ -521,7 +570,7 @@ fun CronJobEditorDialog(
                         OutlinedTextField(
                             value = state.base_url,
                             onValueChange = { onFieldChange("base_url", it) },
-                            label = { Text(stringResource(R.string.cron_edit_field_base_url)) },
+                            label = { Text(stringResource(Res.string.cron_edit_field_base_url)) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                         )
@@ -530,7 +579,7 @@ fun CronJobEditorDialog(
                         OutlinedTextField(
                             value = state.script,
                             onValueChange = { onFieldChange("script", it) },
-                            label = { Text(stringResource(R.string.cron_edit_field_script)) },
+                            label = { Text(stringResource(Res.string.cron_edit_field_script)) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                         )
@@ -539,7 +588,7 @@ fun CronJobEditorDialog(
                         OutlinedTextField(
                             value = state.workdir,
                             onValueChange = { onFieldChange("workdir", it) },
-                            label = { Text(stringResource(R.string.cron_edit_field_workdir)) },
+                            label = { Text(stringResource(Res.string.cron_edit_field_workdir)) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                         )
@@ -555,7 +604,7 @@ fun CronJobEditorDialog(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = stringResource(R.string.cron_edit_field_no_agent),
+                                text = stringResource(Res.string.cron_edit_field_no_agent),
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         }
@@ -571,11 +620,11 @@ fun CronJobEditorDialog(
                             Spacer(modifier = Modifier.width(8.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = stringResource(R.string.cron_edit_field_run_continuity),
+                                    text = stringResource(Res.string.cron_edit_field_run_continuity),
                                     style = MaterialTheme.typography.bodyMedium,
                                 )
                                 Text(
-                                    text = stringResource(R.string.cron_edit_hint_run_continuity),
+                                    text = stringResource(Res.string.cron_edit_hint_run_continuity),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -601,8 +650,8 @@ fun CronJobEditorDialog(
     if (showDiscardConfirm) {
         AlertDialog(
             onDismissRequest = { showDiscardConfirm = false },
-            title = { Text(stringResource(R.string.cron_discard_title)) },
-            text = { Text(stringResource(R.string.cron_discard_message)) },
+            title = { Text(stringResource(Res.string.cron_discard_title)) },
+            text = { Text(stringResource(Res.string.cron_discard_message)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -610,12 +659,12 @@ fun CronJobEditorDialog(
                         onDismiss()
                     },
                 ) {
-                    Text(stringResource(R.string.action_discard))
+                    Text(stringResource(Res.string.action_discard))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDiscardConfirm = false }) {
-                    Text(stringResource(R.string.action_cancel))
+                    Text(stringResource(Res.string.action_cancel))
                 }
             },
         )
@@ -641,12 +690,12 @@ private fun MonitorModeSection(
     onSetMonitorMode: (String) -> Unit,
 ) {
     val spacing = LocalSpacing.current
-    val off = stringResource(R.string.cron_edit_monitor_off)
-    val script = stringResource(R.string.cron_edit_monitor_script)
-    val url = stringResource(R.string.cron_edit_monitor_url)
+    val off = stringResource(Res.string.cron_edit_monitor_off)
+    val script = stringResource(Res.string.cron_edit_monitor_script)
+    val url = stringResource(Res.string.cron_edit_monitor_url)
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         ExposedDropdownField(
-            label = stringResource(R.string.cron_edit_monitor_mode),
+            label = stringResource(Res.string.cron_edit_monitor_mode),
             options = listOf(off, script, url),
             selectedValue =
                 when (monitorMode) {
@@ -670,7 +719,7 @@ private fun MonitorModeSection(
                 OutlinedTextField(
                     value = monitorScript,
                     onValueChange = { onFieldChange("monitor_script", it) },
-                    label = { Text(stringResource(R.string.cron_edit_monitor_script_field)) },
+                    label = { Text(stringResource(Res.string.cron_edit_monitor_script_field)) },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = enabled,
                     singleLine = true,
@@ -679,14 +728,14 @@ private fun MonitorModeSection(
                 OutlinedTextField(
                     value = monitorUrl,
                     onValueChange = { onFieldChange("monitor_url", it) },
-                    label = { Text(stringResource(R.string.cron_edit_monitor_url_field)) },
+                    label = { Text(stringResource(Res.string.cron_edit_monitor_url_field)) },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = enabled,
                     singleLine = true,
                 )
         }
         Text(
-            text = stringResource(R.string.cron_edit_monitor_hint),
+            text = stringResource(Res.string.cron_edit_monitor_hint),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

@@ -19,11 +19,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.m57.hermescontrol.R
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.settings_logout
+import com.m57.hermescontrol.generated.resources.settings_sec_about
+import com.m57.hermescontrol.generated.resources.settings_sec_appearance
+import com.m57.hermescontrol.generated.resources.settings_sec_behavior
+import com.m57.hermescontrol.generated.resources.settings_sec_chat
+import com.m57.hermescontrol.generated.resources.settings_sec_connection
+import com.m57.hermescontrol.generated.resources.settings_sec_language
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.HermesScaffold
 import com.m57.hermescontrol.ui.common.NavIcon
@@ -35,6 +41,7 @@ import com.m57.hermescontrol.ui.settings.components.ConnectionSection
 import com.m57.hermescontrol.ui.settings.components.LanguageSection
 import com.m57.hermescontrol.ui.settings.components.TestConnectionButton
 import com.m57.hermescontrol.ui.settings.components.TestResultCard
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Drill-down sub-pages for Settings. Each is its own NavKey destination
@@ -56,7 +63,7 @@ fun SettingsConnectionPage(
     var passwordVisible by remember { mutableStateOf(false) }
 
     HermesScaffold(
-        title = { Text(stringResource(R.string.settings_sec_connection)) },
+        title = { Text(stringResource(Res.string.settings_sec_connection)) },
         navigationIcon = NavIcon.Back(onBack),
         // Non-primary drill-down: opt out of drawer gestures so the scrim can't
         // get stuck open (issue #619). DrawerGestureController handles the close.
@@ -96,7 +103,7 @@ fun SettingsConnectionPage(
                         containerColor = MaterialTheme.colorScheme.error,
                     ),
             ) {
-                Text(stringResource(R.string.settings_logout))
+                Text(stringResource(Res.string.settings_logout))
             }
         }
     }
@@ -110,7 +117,7 @@ fun SettingsAppearancePage(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     HermesScaffold(
-        title = { Text(stringResource(R.string.settings_sec_appearance)) },
+        title = { Text(stringResource(Res.string.settings_sec_appearance)) },
         navigationIcon = NavIcon.Back(onBack),
         drawerGesturesEnabled = false,
     ) {
@@ -142,7 +149,7 @@ fun SettingsLanguagePage(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     HermesScaffold(
-        title = { Text(stringResource(R.string.settings_sec_language)) },
+        title = { Text(stringResource(Res.string.settings_sec_language)) },
         navigationIcon = NavIcon.Back(onBack),
         drawerGesturesEnabled = false,
     ) {
@@ -170,7 +177,7 @@ fun SettingsChatPage(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     HermesScaffold(
-        title = { Text(stringResource(R.string.settings_sec_chat)) },
+        title = { Text(stringResource(Res.string.settings_sec_chat)) },
         navigationIcon = NavIcon.Back(onBack),
         drawerGesturesEnabled = false,
     ) {
@@ -202,7 +209,7 @@ fun SettingsBehaviorPage(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     HermesScaffold(
-        title = { Text(stringResource(R.string.settings_sec_behavior)) },
+        title = { Text(stringResource(Res.string.settings_sec_behavior)) },
         navigationIcon = NavIcon.Back(onBack),
         drawerGesturesEnabled = false,
     ) {
@@ -228,7 +235,7 @@ fun SettingsAboutPage(
     viewModel: SettingsViewModel = viewModel { SettingsViewModel() },
 ) {
     HermesScaffold(
-        title = { Text(stringResource(R.string.settings_sec_about)) },
+        title = { Text(stringResource(Res.string.settings_sec_about)) },
         navigationIcon = NavIcon.Back(onBack),
         drawerGesturesEnabled = false,
     ) {

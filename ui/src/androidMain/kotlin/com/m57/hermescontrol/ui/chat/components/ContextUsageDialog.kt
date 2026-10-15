@@ -16,12 +16,26 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.m57.hermescontrol.R
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.action_ok
+import com.m57.hermescontrol.generated.resources.chat_context_detail_calls
+import com.m57.hermescontrol.generated.resources.chat_context_detail_compressions
+import com.m57.hermescontrol.generated.resources.chat_context_detail_footnote
+import com.m57.hermescontrol.generated.resources.chat_context_detail_input
+import com.m57.hermescontrol.generated.resources.chat_context_detail_model
+import com.m57.hermescontrol.generated.resources.chat_context_detail_output
+import com.m57.hermescontrol.generated.resources.chat_context_detail_reasoning
+import com.m57.hermescontrol.generated.resources.chat_context_detail_title
+import com.m57.hermescontrol.generated.resources.chat_context_detail_total
+import com.m57.hermescontrol.generated.resources.chat_context_detail_totals
+import com.m57.hermescontrol.generated.resources.chat_context_detail_unknown_body
+import com.m57.hermescontrol.generated.resources.chat_context_detail_unknown_title
+import com.m57.hermescontrol.generated.resources.chat_context_detail_used
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.chat.ContextUsage
+import org.jetbrains.compose.resources.stringResource
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -45,7 +59,7 @@ fun ContextUsageDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.chat_context_detail_title)) },
+        title = { Text(stringResource(Res.string.chat_context_detail_title)) },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
@@ -58,18 +72,18 @@ fun ContextUsageDialog(
 
                 if (percent == null) {
                     Text(
-                        text = stringResource(R.string.chat_context_detail_unknown_title),
+                        text = stringResource(Res.string.chat_context_detail_unknown_title),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        text = stringResource(R.string.chat_context_detail_unknown_body),
+                        text = stringResource(Res.string.chat_context_detail_unknown_body),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } else {
                     Text(
-                        text = stringResource(R.string.chat_context_detail_used, percent),
+                        text = stringResource(Res.string.chat_context_detail_used, percent),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
@@ -77,32 +91,32 @@ fun ContextUsageDialog(
                 if (usage != null) {
                     HorizontalDivider()
                     Text(
-                        text = stringResource(R.string.chat_context_detail_totals),
+                        text = stringResource(Res.string.chat_context_detail_totals),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                     )
                     UsageRow(
-                        label = stringResource(R.string.chat_context_detail_input),
+                        label = stringResource(Res.string.chat_context_detail_input),
                         value = formatExactTokens(usage.inputTokens),
                     )
                     UsageRow(
-                        label = stringResource(R.string.chat_context_detail_output),
+                        label = stringResource(Res.string.chat_context_detail_output),
                         value = formatExactTokens(usage.outputTokens),
                     )
                     UsageRow(
-                        label = stringResource(R.string.chat_context_detail_reasoning),
+                        label = stringResource(Res.string.chat_context_detail_reasoning),
                         value = formatExactTokens(usage.reasoningTokens),
                     )
                     UsageRow(
-                        label = stringResource(R.string.chat_context_detail_total),
+                        label = stringResource(Res.string.chat_context_detail_total),
                         value = formatExactTokens(usage.totalTokens),
                     )
                     UsageRow(
-                        label = stringResource(R.string.chat_context_detail_calls),
+                        label = stringResource(Res.string.chat_context_detail_calls),
                         value = formatExactTokens(usage.apiCalls),
                     )
                     UsageRow(
-                        label = stringResource(R.string.chat_context_detail_compressions),
+                        label = stringResource(Res.string.chat_context_detail_compressions),
                         value = formatExactTokens(usage.compressions),
                     )
                     val resolvedModel =
@@ -110,12 +124,12 @@ fun ContextUsageDialog(
                             ?: model?.takeIf { it.isNotBlank() }
                     resolvedModel?.let { modelName ->
                         UsageRow(
-                            label = stringResource(R.string.chat_context_detail_model),
+                            label = stringResource(Res.string.chat_context_detail_model),
                             value = modelName,
                         )
                     }
                     Text(
-                        text = stringResource(R.string.chat_context_detail_footnote),
+                        text = stringResource(Res.string.chat_context_detail_footnote),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = Spacing.xs),
@@ -125,7 +139,7 @@ fun ContextUsageDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_ok))
+                Text(stringResource(Res.string.action_ok))
             }
         },
     )

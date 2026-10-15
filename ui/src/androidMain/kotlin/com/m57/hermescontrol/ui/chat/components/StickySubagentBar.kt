@@ -26,15 +26,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.m57.hermescontrol.R
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.task_progress_agent_running
+import com.m57.hermescontrol.generated.resources.task_progress_agents
+import com.m57.hermescontrol.generated.resources.task_progress_count
+import com.m57.hermescontrol.generated.resources.task_progress_open_details
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.chat.SubagentIndicator
 import com.m57.hermescontrol.ui.chat.TodoItem
+import org.jetbrains.compose.resources.pluralStringResource
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Compact progress indicator displayed below the top app bar while todos are
@@ -59,7 +63,7 @@ fun StickySubagentBar(
                 if (display.hasTodos) {
                     append(
                         stringResource(
-                            R.string.task_progress_count,
+                            Res.string.task_progress_count,
                             display.currentTaskNumber,
                             display.totalTasks,
                         ),
@@ -71,7 +75,7 @@ fun StickySubagentBar(
                 } else if (display.activeAgents > 0) {
                     append(
                         pluralStringResource(
-                            R.plurals.task_progress_agent_running,
+                            Res.plurals.task_progress_agent_running,
                             display.activeAgents,
                             display.activeAgents,
                         ),
@@ -81,7 +85,7 @@ fun StickySubagentBar(
                     append(" · ")
                     append(
                         pluralStringResource(
-                            R.plurals.task_progress_agents,
+                            Res.plurals.task_progress_agents,
                             display.activeAgents,
                             display.activeAgents,
                         ),
@@ -123,7 +127,7 @@ fun StickySubagentBar(
                 Icon(
                     imageVector = Icons.Filled.ChevronRight,
                     contentDescription =
-                        stringResource(R.string.task_progress_open_details),
+                        stringResource(Res.string.task_progress_open_details),
                     tint =
                         MaterialTheme.colorScheme.onSurfaceVariant.copy(
                             alpha = 0.7f,

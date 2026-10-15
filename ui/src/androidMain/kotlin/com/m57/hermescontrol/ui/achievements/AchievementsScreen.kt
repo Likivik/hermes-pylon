@@ -45,15 +45,45 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.Achievement
 import com.m57.hermescontrol.data.model.RecentUnlock
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.achievements_action_rescan
+import com.m57.hermescontrol.generated.resources.achievements_action_reset
+import com.m57.hermescontrol.generated.resources.achievements_count_label
+import com.m57.hermescontrol.generated.resources.achievements_criteria_hide
+import com.m57.hermescontrol.generated.resources.achievements_criteria_show
+import com.m57.hermescontrol.generated.resources.achievements_empty_desc
+import com.m57.hermescontrol.generated.resources.achievements_empty_title
+import com.m57.hermescontrol.generated.resources.achievements_filter_all
+import com.m57.hermescontrol.generated.resources.achievements_label_progress
+import com.m57.hermescontrol.generated.resources.achievements_menu_desc
+import com.m57.hermescontrol.generated.resources.achievements_recent_title
+import com.m57.hermescontrol.generated.resources.achievements_reset_desc
+import com.m57.hermescontrol.generated.resources.achievements_reset_title
+import com.m57.hermescontrol.generated.resources.achievements_scan_count
+import com.m57.hermescontrol.generated.resources.achievements_scan_error
+import com.m57.hermescontrol.generated.resources.achievements_scan_idle
+import com.m57.hermescontrol.generated.resources.achievements_scan_running
+import com.m57.hermescontrol.generated.resources.achievements_scan_scanning
+import com.m57.hermescontrol.generated.resources.achievements_search_hint
+import com.m57.hermescontrol.generated.resources.achievements_stale
+import com.m57.hermescontrol.generated.resources.achievements_stat_discovered
+import com.m57.hermescontrol.generated.resources.achievements_stat_secret
+import com.m57.hermescontrol.generated.resources.achievements_stat_total
+import com.m57.hermescontrol.generated.resources.achievements_stat_unlocked
+import com.m57.hermescontrol.generated.resources.achievements_state_discovered
+import com.m57.hermescontrol.generated.resources.achievements_state_secret
+import com.m57.hermescontrol.generated.resources.achievements_state_unlocked
+import com.m57.hermescontrol.generated.resources.achievements_unlocked_at
+import com.m57.hermescontrol.generated.resources.action_cancel
+import com.m57.hermescontrol.generated.resources.action_delete
+import com.m57.hermescontrol.generated.resources.screen_achievements
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.EmptyState
 import com.m57.hermescontrol.ui.common.ErrorState
@@ -65,6 +95,7 @@ import com.m57.hermescontrol.ui.common.SkeletonListState
 import com.m57.hermescontrol.ui.common.StatusBadge
 import com.m57.hermescontrol.ui.common.StatusBadgeType
 import com.m57.hermescontrol.ui.common.ToastEffect
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun AchievementsScreen(
@@ -103,8 +134,8 @@ fun AchievementsScreen(
     if (showResetDialog) {
         AlertDialog(
             onDismissRequest = { showResetDialog = false },
-            title = { Text(stringResource(R.string.achievements_reset_title)) },
-            text = { Text(stringResource(R.string.achievements_reset_desc)) },
+            title = { Text(stringResource(Res.string.achievements_reset_title)) },
+            text = { Text(stringResource(Res.string.achievements_reset_desc)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -113,21 +144,21 @@ fun AchievementsScreen(
                     },
                 ) {
                     Text(
-                        stringResource(R.string.action_delete),
+                        stringResource(Res.string.action_delete),
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showResetDialog = false }) {
-                    Text(stringResource(R.string.action_cancel))
+                    Text(stringResource(Res.string.action_cancel))
                 }
             },
         )
     }
 
     HermesScaffold(
-        title = { Text(stringResource(R.string.screen_achievements)) },
+        title = { Text(stringResource(Res.string.screen_achievements)) },
         navigationIcon = onOpenDrawer?.let { NavIcon.Menu(it) },
         isRefreshing = state.isLoading,
         onRefresh = { viewModel.loadAchievements() },
@@ -137,7 +168,7 @@ fun AchievementsScreen(
                 IconButton(onClick = { showMenu = true }) {
                     Icon(
                         imageVector = Icons.Default.MoreVert,
-                        contentDescription = stringResource(R.string.achievements_menu_desc),
+                        contentDescription = stringResource(Res.string.achievements_menu_desc),
                     )
                 }
                 DropdownMenu(
@@ -145,7 +176,7 @@ fun AchievementsScreen(
                     onDismissRequest = { showMenu = false },
                 ) {
                     DropdownMenuItem(
-                        text = { Text(stringResource(R.string.achievements_action_rescan)) },
+                        text = { Text(stringResource(Res.string.achievements_action_rescan)) },
                         onClick = {
                             showMenu = false
                             viewModel.rescan()
@@ -155,7 +186,7 @@ fun AchievementsScreen(
                     DropdownMenuItem(
                         text = {
                             Text(
-                                stringResource(R.string.achievements_action_reset),
+                                stringResource(Res.string.achievements_action_reset),
                                 color = MaterialTheme.colorScheme.error,
                             )
                         },
@@ -183,8 +214,8 @@ fun AchievementsScreen(
 
             state.achievements.isEmpty() -> {
                 EmptyState(
-                    title = stringResource(R.string.achievements_empty_title),
-                    subtitle = stringResource(R.string.achievements_empty_desc),
+                    title = stringResource(Res.string.achievements_empty_title),
+                    subtitle = stringResource(Res.string.achievements_empty_desc),
                     icon = Icons.Filled.Refresh,
                     modifier = Modifier.padding(paddingValues),
                 )
@@ -201,7 +232,7 @@ fun AchievementsScreen(
                         SearchBar(
                             query = query,
                             onQueryChange = { query = it },
-                            placeholder = stringResource(R.string.achievements_search_hint),
+                            placeholder = stringResource(Res.string.achievements_search_hint),
                         )
                     }
 
@@ -257,7 +288,7 @@ fun AchievementsScreen(
                     if (state.recentUnlocks.isNotEmpty()) {
                         item(key = "recent_header") {
                             SectionHeader(
-                                title = stringResource(R.string.achievements_recent_title),
+                                title = stringResource(Res.string.achievements_recent_title),
                             )
                         }
                         items(
@@ -273,7 +304,7 @@ fun AchievementsScreen(
                         Text(
                             text =
                                 stringResource(
-                                    R.string.achievements_count_label,
+                                    Res.string.achievements_count_label,
                                     filteredAchievements.size,
                                     state.totalCount,
                                 ),
@@ -310,25 +341,25 @@ private fun StatsRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         StatPill(
-            label = stringResource(R.string.achievements_stat_unlocked),
+            label = stringResource(Res.string.achievements_stat_unlocked),
             value = "$unlockedCount",
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.weight(1f),
         )
         StatPill(
-            label = stringResource(R.string.achievements_stat_discovered),
+            label = stringResource(Res.string.achievements_stat_discovered),
             value = "$discoveredCount",
             color = MaterialTheme.colorScheme.tertiary,
             modifier = Modifier.weight(1f),
         )
         StatPill(
-            label = stringResource(R.string.achievements_stat_secret),
+            label = stringResource(Res.string.achievements_stat_secret),
             value = "$secretCount",
             color = MaterialTheme.colorScheme.error,
             modifier = Modifier.weight(1f),
         )
         StatPill(
-            label = stringResource(R.string.achievements_stat_total),
+            label = stringResource(Res.string.achievements_stat_total),
             value = "$totalCount",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f),
@@ -385,23 +416,26 @@ private fun ScanStatusChip(
     ) {
         val (label, type) =
             when {
-                isRescanning -> stringResource(R.string.achievements_scan_scanning) to StatusBadgeType.INFO
-                scanState == "running" -> stringResource(R.string.achievements_scan_running) to StatusBadgeType.WARNING
-                scanLastError != null -> stringResource(R.string.achievements_scan_error) to StatusBadgeType.ERROR
-                else -> stringResource(R.string.achievements_scan_idle) to StatusBadgeType.SUCCESS
+                isRescanning -> stringResource(Res.string.achievements_scan_scanning) to StatusBadgeType.INFO
+                scanState == "running" ->
+                    stringResource(
+                        Res.string.achievements_scan_running,
+                    ) to StatusBadgeType.WARNING
+                scanLastError != null -> stringResource(Res.string.achievements_scan_error) to StatusBadgeType.ERROR
+                else -> stringResource(Res.string.achievements_scan_idle) to StatusBadgeType.SUCCESS
             }
         StatusBadge(text = label, status = type)
 
         if (isStale) {
             StatusBadge(
-                text = stringResource(R.string.achievements_stale),
+                text = stringResource(Res.string.achievements_stale),
                 status = StatusBadgeType.WARNING,
             )
         }
 
         if (scanRunCount > 0) {
             Text(
-                text = stringResource(R.string.achievements_scan_count, scanRunCount),
+                text = stringResource(Res.string.achievements_scan_count, scanRunCount),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -426,7 +460,7 @@ private fun CategoryFilterRow(
             FilterChip(
                 selected = activeCategory == null,
                 onClick = { onCategorySelected("") },
-                label = { Text(stringResource(R.string.achievements_filter_all)) },
+                label = { Text(stringResource(Res.string.achievements_filter_all)) },
             )
         }
         items(categories, key = { it }) { category ->
@@ -449,10 +483,10 @@ private fun StateFilterRow(
 ) {
     val filters =
         listOf(
-            stringResource(R.string.achievements_filter_all) to null,
-            stringResource(R.string.achievements_state_unlocked) to "unlocked",
-            stringResource(R.string.achievements_state_discovered) to "discovered",
-            stringResource(R.string.achievements_state_secret) to "secret",
+            stringResource(Res.string.achievements_filter_all) to null,
+            stringResource(Res.string.achievements_state_unlocked) to "unlocked",
+            stringResource(Res.string.achievements_state_discovered) to "discovered",
+            stringResource(Res.string.achievements_state_secret) to "secret",
         )
     LazyRow(
         modifier = modifier.fillMaxWidth(),
@@ -646,7 +680,7 @@ private fun AchievementCard(
                     Text(
                         text =
                             stringResource(
-                                R.string.achievements_label_progress,
+                                Res.string.achievements_label_progress,
                                 achievement.progress?.toInt() ?: 0,
                                 achievement.nextThreshold?.toInt() ?: 0,
                             ),
@@ -673,7 +707,7 @@ private fun AchievementCard(
             if (isUnlocked) {
                 achievement.unlockedAt?.let {
                     Text(
-                        text = stringResource(R.string.achievements_unlocked_at, formatTimestamp(it)),
+                        text = stringResource(Res.string.achievements_unlocked_at, formatTimestamp(it)),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
                     )
@@ -694,10 +728,10 @@ private fun AchievementCard(
                         text =
                             if (expanded) {
                                 stringResource(
-                                    R.string.achievements_criteria_hide,
+                                    Res.string.achievements_criteria_hide,
                                 )
                             } else {
-                                stringResource(R.string.achievements_criteria_show)
+                                stringResource(Res.string.achievements_criteria_show)
                             },
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
