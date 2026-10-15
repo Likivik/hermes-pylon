@@ -141,7 +141,7 @@ app/src/main/java/com/m57/hermescontrol/
 
 ## Tech Stack
 
-- **Language:** Kotlin 2.4.10 with KSP compiler plugin
+- **Language:** Kotlin 2.4.21 with KSP compiler plugin
 - **UI & Layout:** Jetpack Compose (BOM 2026.03.01) & Material 3 / Material You
 - **Navigation:** Navigation3 (Compose-first Routing)
 - **Networking:** Retrofit 3.0.0, OkHttp 5.5.0, kotlinx-serialization
