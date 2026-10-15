@@ -39,7 +39,7 @@ android {
     }
     compileSdk = 37
     defaultConfig {
-        applicationId = "sh.slb.hermesmobile"
+        applicationId = "io.github.likivik.pylon"
         minSdk = 26
         targetSdk = 36
         versionCode =
@@ -48,17 +48,6 @@ android {
         versionName =
             (project.findProperty("versionName") as? String) ?: "1.0-dev"
         manifestPlaceholders["usesCleartextTraffic"] = "false"
-    }
-
-    flavorDimensions += "distribution"
-    productFlavors {
-        create("hermes") {
-            dimension = "distribution"
-        }
-        create("iris") {
-            dimension = "distribution"
-            applicationId = "sh.slb.irismobile"
-        }
     }
 
     val releaseStorePath = System.getenv("KEYSTORE_PATH")

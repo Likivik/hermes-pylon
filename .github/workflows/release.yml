@@ -28,8 +28,8 @@ jobs:
   # the same commit minutes earlier. That cost ~7 minutes per release and
   # gave every release a second, independent chance to fail on runner
   # flake — which is exactly what happened on v0.4.4, where the duplicate
-  # run failed in `packageHermesDebug` on a commit whose push workflow had
-  # already produced both debug APKs.
+  # run failed in the package task on a commit whose push workflow had
+  # already produced the debug APK.
   #
   # Verifying the recorded conclusion of the real CI run keeps the actual
   # guarantee (a tag may only be released from a commit that passed the
@@ -117,7 +117,7 @@ jobs:
           done
 
   build-release:
-    name: Build signed Hermes Mobile APK
+    name: Build signed Pylon APK
     needs: verify-ci
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -190,14 +190,14 @@ jobs:
           printf '%s' "$KEYSTORE_BASE64" |
             base64 -d > "$RUNNER_TEMP/hermes-mobile-release.keystore"
 
-      - name: Build signed Hermes release APK
+      - name: Build signed Pylon release APK
         env:
           KEYSTORE_PATH: ${{ runner.temp }}/hermes-mobile-release.keystore
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          ./gradlew assembleHermesRelease \
+          ./gradlew assembleRelease \
             -PversionName="${{ steps.version.outputs.version }}" \
             -PversionCode="${{ steps.version.outputs.code }}"
 
@@ -207,8 +207,8 @@ jobs:
         run: |
           set -eu
           mkdir -p release
-          APK=app/build/outputs/apk/hermes/release/app-hermes-release.apk
-          OUT=release/hermes-mobile-$RELEASE_TAG.apk
+          APK=app/build/outputs/apk/release/app-release.apk
+          OUT=release/pylon-$RELEASE_TAG.apk
           cp "$APK" "$OUT"
           APKSIGNER=$(
             find "$ANDROID_HOME/build-tools" \
@@ -273,8 +273,8 @@ jobs:
 
           (
             cd release
-            sha256sum "hermes-mobile-$RELEASE_TAG.apk" \
-              > "hermes-mobile-$RELEASE_TAG.apk.sha256"
+            sha256sum "pylon-$RELEASE_TAG.apk" \
+              > "pylon-$RELEASE_TAG.apk.sha256"
           )
           cp LICENSE NOTICE SIGNING.md release/
           cp signing/hermes-mobile-release-certificate.pem release/
@@ -287,7 +287,7 @@ jobs:
       - name: Upload release artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: hermes-mobile-release
+          name: pylon-release
           path: release/
           if-no-files-found: error
           retention-days: 90
@@ -307,19 +307,19 @@ jobs:
       - name: Download verified release artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          name: hermes-mobile-release
+          name: pylon-release
           path: release
 
       - name: Create draft GitHub release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
         with:
           tag_name: ${{ needs.build-release.outputs.release_tag }}
-          name: Hermes Mobile ${{ needs.build-release.outputs.release_tag }}
+          name: Pylon ${{ needs.build-release.outputs.release_tag }}
           generate_release_notes: true
           draft: true
           files: |
-            release/hermes-mobile-${{ needs.build-release.outputs.release_tag }}.apk
-            release/hermes-mobile-${{ needs.build-release.outputs.release_tag }}.apk.sha256
+            release/pylon-${{ needs.build-release.outputs.release_tag }}.apk
+            release/pylon-${{ needs.build-release.outputs.release_tag }}.apk.sha256
             release/apksigner-verification.txt
             release/provenance.txt
             release/LICENSE

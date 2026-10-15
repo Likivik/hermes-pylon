@@ -83,14 +83,17 @@ a temporary URI permission grant. The app requests only network state,
 notifications, foreground-service, and microphone permissions used by its
 features.
 
-## Application identities
+## Application identity
 
-The `hermes` product flavor uses application ID `sh.slb.hermesmobile` and label
-`Hermes Mobile`. The `iris` flavor uses application ID `sh.slb.irismobile` and
-label `Iris Mobile`. Both are namespaced for this fork, can coexist with the
-upstream application, and cannot accidentally overwrite an upstream install
-signed by another key. Source package names remain unchanged to keep the
-transport patch reviewable upstream.
+The single shipped application uses application ID `io.github.likivik.pylon` and
+label `Pylon for Hermes`. The previous `hermes`/`iris` flavor split (with
+labels "Hermes Mobile" and "Iris Mobile" and IDs `io.github.likivik.pylon` and
+`io.github.likivik.pylon.iris`) was removed on 2026-10-15 because the `iris`
+flavor's only purpose was a one-file string override to "Iris Mobile", the
+name of an unrelated upstream product. The application ID is namespaced for
+this fork, can coexist with the upstream application, and cannot accidentally
+overwrite an upstream install signed by another key. Source package names
+remain unchanged to keep the transport patch reviewable upstream.
 
 ## Release provenance
 
@@ -101,7 +104,7 @@ The release workflow:
 3. grants repository write permission only to the isolated draft-publish job;
 4. decodes the signing keystore under `$RUNNER_TEMP` with mode `0600` or
    stricter and deletes it in an always-running cleanup step;
-5. builds only `assembleHermesRelease` for public distribution;
+5. builds only `assembleRelease` for public distribution;
 6. verifies the APK with `apksigner --verbose --print-certs`;
 7. publishes a SHA-256 checksum, commit identifier, version name, and monotonic
    semantic-version-derived version code;

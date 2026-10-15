@@ -55,13 +55,12 @@ jobs:
           languages: java-kotlin
           build-mode: manual
 
-      - name: Compile the iris debug sources
+      - name: Compile the debug sources
         run: |
-          # iris only: it is the flavor this fork ships (sh.slb.irismobile). The
-          # analyzed source set is shared, so hermes added a second compile of the
-          # same code under a different applicationId and nothing else.
+          # Single flavorless build (io.github.likivik.pylon); the analyzed
+          # source set is shared, so analyzing the one debug variant is enough.
           ./gradlew \
-            compileIrisDebugSources \
+            compileDebugSources \
             --no-daemon \
             --max-workers=1 \
             --no-build-cache

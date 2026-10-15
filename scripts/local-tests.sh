@@ -88,7 +88,7 @@ gradle() {
 summarise() {
   local pattern
   case "${1:-unit}" in
-    unit) pattern='app/build/test-results/testIrisDebugUnitTest/*.xml' ;;
+    unit) pattern='app/build/test-results/testDebugUnitTest/*.xml' ;;
     wasm) pattern='shared/build/test-results/wasmJsBrowserTest/*.xml' ;;
     gmd)  pattern='app/build/outputs/androidTest-results/managedDevice/**/*.xml' ;;
     *)    echo "summarise: unknown tier $1"; return 1 ;;
@@ -111,7 +111,7 @@ PY
 case "${1:-help}" in
   sdk)          setup_sdk ;;
   unit)         python3 scripts/check_kmp_boundary.py || exit 1
-                gradle ":shared:compileKotlinWasmJs :shared:compileTestKotlinWasmJs :app:testIrisDebugUnitTest --console=plain --rerun" ; summarise unit ;;
+                gradle ":shared:compileKotlinWasmJs :shared:compileTestKotlinWasmJs :app:testDebugUnitTest --console=plain --rerun" ; summarise unit ;;
   # The only non-JVM runtime :shared/commonMain is exercised on. Compiling it in
   # `unit` above is not enough — a JVM-only assumption (e.g. relying on an
   # IndexOutOfBoundsException from an unchecked array read, which traps instead
@@ -136,7 +136,7 @@ case "${1:-help}" in
     # `wasmJsBrowserTest` UP-TO-DATE and the tier reports green off stale XML.
     # If a `nodejs()` test runner is ever added, add its task here too.
     gradle ":shared:wasmJsBrowserTest -PwasmTestBrowser=$WASM_BROWSER --console=plain --rerun" ; summarise wasm ;;
-  instrumented) gradle ":app:e2eApi34IrisDebugAndroidTest --no-daemon --rerun -Dorg.gradle.workers.max=2 \
+  instrumented) gradle ":app:e2eApi34DebugAndroidTest --no-daemon --rerun -Dorg.gradle.workers.max=2 \
                   -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect \
                   -Pandroid.testInstrumentationRunnerArguments.notPackage=com.m57.hermescontrol.e2e" ; summarise gmd ;;
   e2e)
@@ -146,7 +146,7 @@ case "${1:-help}" in
       || { echo "[e2e] fixture failed to start — aborting (no gateway = confusing failures)"; exit 1; }
     curl -sf -o /dev/null "http://127.0.0.1:$PORT/api/health" \
       || { echo "[e2e] fixture is not healthy on $PORT — aborting"; exit 1; }
-    gradle ":app:e2eApi34IrisDebugAndroidTest --no-daemon --rerun -Dorg.gradle.workers.max=2 \
+    gradle ":app:e2eApi34DebugAndroidTest --no-daemon --rerun -Dorg.gradle.workers.max=2 \
       -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect \
       -Pandroid.testInstrumentationRunnerArguments.class=$E2E_CLASSES \
       -Pandroid.testInstrumentationRunnerArguments.e2ePassword=e2e-pass-123 \

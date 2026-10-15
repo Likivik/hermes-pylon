@@ -254,7 +254,7 @@ def start(port: str) -> None:
             seed_db()
             print(
                 "[start] run the E2E classes with:\n"
-                f"  ./gradlew e2eApi34IrisDebugAndroidTest --no-daemon \\\n"
+                f"  ./gradlew e2eApi34DebugAndroidTest --no-daemon \\\n"
                 f"    -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect \\\n"
                 f"    -Pandroid.testInstrumentationRunnerArguments.class=<fqns> \\\n"
                 f"    -Pandroid.testInstrumentationRunnerArguments.e2ePassword={PASSWORD} \\\n"

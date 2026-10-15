@@ -7,7 +7,7 @@
     <string name="media_player_seek">再生位置</string>
     <string name="media_player_error">メディアを読み込めなかったため、再生を停止しました。プレーヤーを閉じてもう一度お試しください。</string>
     <string name="chat_terminal_backend_content_description">ターミナルバックエンド: %1$s</string>
-    <string name="app_name">Hermes Mobile</string>
+    <string name="app_name">Pylon</string>
 
     <!-- Chat -->
     <string name="chat_send_desc">送信</string>
@@ -202,7 +202,7 @@
     <string name="settings_action_test_connection">接続をテスト</string>
     <string name="settings_sec_about">アプリ情報</string>
     <string name="settings_sec_language">言語</string>
-    <string name="settings_about_app_name">⚡ Hermes Mobile</string>
+    <string name="settings_about_app_name">⚡ Pylon for Hermes</string>
     <string name="settings_about_version">バージョン</string>
     <string name="settings_about_build">ビルド</string>
     <string name="settings_about_debug">デバッグ</string>
