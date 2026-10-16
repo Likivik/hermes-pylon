@@ -71,7 +71,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -83,11 +82,25 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.m57.hermescontrol.HistoryScreen
 import com.m57.hermescontrol.NavigationController
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.Attachment
 import com.m57.hermescontrol.data.model.capabilitiesFor
 import com.m57.hermescontrol.data.ws.ConnectionStatus
 import com.m57.hermescontrol.data.ws.HermesWsClient
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.chat_action_close_search
+import com.m57.hermescontrol.generated.resources.chat_action_search
+import com.m57.hermescontrol.generated.resources.chat_camera_error
+import com.m57.hermescontrol.generated.resources.chat_mic_listening
+import com.m57.hermescontrol.generated.resources.chat_model_confirm_action
+import com.m57.hermescontrol.generated.resources.chat_model_confirm_title
+import com.m57.hermescontrol.generated.resources.chat_model_picker_title
+import com.m57.hermescontrol.generated.resources.chat_model_picker_title_current
+import com.m57.hermescontrol.generated.resources.chat_terminal_backend_content_description
+import com.m57.hermescontrol.generated.resources.common_cancel
+import com.m57.hermescontrol.generated.resources.common_save
+import com.m57.hermescontrol.generated.resources.content_desc_new_chat
+import com.m57.hermescontrol.generated.resources.stt_not_available
+import com.m57.hermescontrol.generated.resources.stt_permission_denied
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.chat.components.ChatConnectionBanner
@@ -123,6 +136,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.jetbrains.compose.resources.stringResource
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -286,9 +300,9 @@ fun ChatScreen(
         }
     }
 
-    val micListeningPrompt = stringResource(R.string.chat_mic_listening)
-    val sttNotAvailableMsg = stringResource(R.string.stt_not_available)
-    val sttPermissionDeniedMsg = stringResource(R.string.stt_permission_denied)
+    val micListeningPrompt = stringResource(Res.string.chat_mic_listening)
+    val sttNotAvailableMsg = stringResource(Res.string.stt_not_available)
+    val sttPermissionDeniedMsg = stringResource(Res.string.stt_permission_denied)
 
     // Speech-to-text recognition launcher (issue #194)
     val speechLauncher =
@@ -406,7 +420,7 @@ fun ChatScreen(
 
     // Camera photo launcher (issue #195)
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
-    val cameraErrorMsg = stringResource(R.string.chat_camera_error)
+    val cameraErrorMsg = stringResource(Res.string.chat_camera_error)
     val cameraLauncher =
         rememberLauncherForActivityResult(
             ActivityResultContracts.TakePicture(),
@@ -507,7 +521,7 @@ fun ChatScreen(
                 if (!terminalBackend.isNullOrBlank() && !terminalBackend.equals("local", ignoreCase = true)) {
                     val terminalBackendDescription =
                         stringResource(
-                            R.string.chat_terminal_backend_content_description,
+                            Res.string.chat_terminal_backend_content_description,
                             terminalBackend,
                         )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -550,10 +564,10 @@ fun ChatScreen(
                     contentDescription =
                         if (state.isSearchActive) {
                             stringResource(
-                                R.string.chat_action_close_search,
+                                Res.string.chat_action_close_search,
                             )
                         } else {
-                            stringResource(R.string.chat_action_search)
+                            stringResource(Res.string.chat_action_search)
                         },
                 )
             }
@@ -561,7 +575,7 @@ fun ChatScreen(
             IconButton(onClick = { viewModel.createNewSession() }) {
                 Icon(
                     imageVector = Icons.Filled.Add,
-                    contentDescription = stringResource(R.string.content_desc_new_chat),
+                    contentDescription = stringResource(Res.string.content_desc_new_chat),
                 )
             }
         },
@@ -879,8 +893,8 @@ fun ChatScreen(
                 providers = state.modelPickerProviders,
                 title =
                     state.currentSessionModel?.let {
-                        stringResource(R.string.chat_model_picker_title_current, it)
-                    } ?: stringResource(R.string.chat_model_picker_title),
+                        stringResource(Res.string.chat_model_picker_title_current, it)
+                    } ?: stringResource(Res.string.chat_model_picker_title),
                 isLoading = state.modelPickerLoading && state.modelPickerProviders.isEmpty(),
                 pinnedModels = state.modelPickerPinned,
                 onPinToggle = { provider, model -> viewModel.togglePinModel(provider, model) },
@@ -904,16 +918,16 @@ fun ChatScreen(
         state.modelSwitchConfirmation?.let { confirmation ->
             AlertDialog(
                 onDismissRequest = viewModel::cancelModelSwitchConfirmation,
-                title = { Text(stringResource(R.string.chat_model_confirm_title)) },
+                title = { Text(stringResource(Res.string.chat_model_confirm_title)) },
                 text = { Text(confirmation.message) },
                 confirmButton = {
                     TextButton(onClick = viewModel::confirmModelSwitch) {
-                        Text(stringResource(R.string.chat_model_confirm_action))
+                        Text(stringResource(Res.string.chat_model_confirm_action))
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = viewModel::cancelModelSwitchConfirmation) {
-                        Text(stringResource(R.string.common_cancel))
+                        Text(stringResource(Res.string.common_cancel))
                     }
                 },
             )
@@ -1019,10 +1033,10 @@ private fun RailEditDialog(
                     if (icon.isNotEmpty()) storeRecentIcon(context, icon)
                     onSave(icon, name)
                 },
-            ) { Text(stringResource(R.string.common_save)) }
+            ) { Text(stringResource(Res.string.common_save)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
+            TextButton(onClick = onDismiss) { Text(stringResource(Res.string.common_cancel)) }
         },
     )
 }

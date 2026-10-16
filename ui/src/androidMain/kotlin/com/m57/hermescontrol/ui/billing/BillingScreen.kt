@@ -23,14 +23,25 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.SubscriptionCurrent
 import com.m57.hermescontrol.data.model.SubscriptionStateResponse
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.billing_cancel
+import com.m57.hermescontrol.generated.resources.billing_credits_remaining
+import com.m57.hermescontrol.generated.resources.billing_feature_unavailable
+import com.m57.hermescontrol.generated.resources.billing_free_plan
+import com.m57.hermescontrol.generated.resources.billing_login_required
+import com.m57.hermescontrol.generated.resources.billing_no_active_plan
+import com.m57.hermescontrol.generated.resources.billing_plan
+import com.m57.hermescontrol.generated.resources.billing_renews
+import com.m57.hermescontrol.generated.resources.billing_topup
+import com.m57.hermescontrol.generated.resources.billing_usage
+import com.m57.hermescontrol.generated.resources.error_unknown
+import com.m57.hermescontrol.generated.resources.screen_billing
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.ErrorState
 import com.m57.hermescontrol.ui.common.HermesScaffold
@@ -38,6 +49,7 @@ import com.m57.hermescontrol.ui.common.LoadingState
 import com.m57.hermescontrol.ui.common.NavIcon
 import com.m57.hermescontrol.ui.common.listContentPadding
 import com.m57.hermescontrol.ui.common.listItemSpacing
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun BillingScreen(
@@ -54,7 +66,7 @@ fun BillingScreen(
     }
 
     HermesScaffold(
-        title = { Text(stringResource(R.string.screen_billing)) },
+        title = { Text(stringResource(Res.string.screen_billing)) },
         navigationIcon = onOpenDrawer?.let { NavIcon.Menu(it) },
         isRefreshing = state.isLoading,
         onRefresh = { viewModel.load() },
@@ -71,7 +83,7 @@ fun BillingScreen(
 
             state.errorMessage != null && state.subscription == null && state.usage == null -> {
                 ErrorState(
-                    message = state.errorMessage ?: stringResource(R.string.error_unknown),
+                    message = state.errorMessage ?: stringResource(Res.string.error_unknown),
                     onRetry = { viewModel.load() },
                 )
             }
@@ -121,7 +133,7 @@ private fun BillingContent(
                             enabled = !state.isActionInFlight,
                             modifier = Modifier.weight(1f),
                         ) {
-                            Text(stringResource(R.string.billing_cancel))
+                            Text(stringResource(Res.string.billing_cancel))
                         }
                     }
                 }
@@ -164,12 +176,12 @@ private fun BillingContent(
         }
 
         if (usage != null && usage.available == true && (usage.plan_bar != null || usage.topup_bar != null)) {
-            item { SectionTitle(stringResource(R.string.billing_usage)) }
+            item { SectionTitle(stringResource(Res.string.billing_usage)) }
             usage.plan_bar?.let { bar ->
-                item { UsageBarRow(label = stringResource(R.string.billing_plan), bar = bar) }
+                item { UsageBarRow(label = stringResource(Res.string.billing_plan), bar = bar) }
             }
             usage.topup_bar?.let { bar ->
-                item { UsageBarRow(label = stringResource(R.string.billing_topup), bar = bar) }
+                item { UsageBarRow(label = stringResource(Res.string.billing_topup), bar = bar) }
             }
         }
     }
@@ -184,7 +196,7 @@ private fun PlanCard(subscription: SubscriptionCurrent) {
     ) {
         Column(modifier = Modifier.padding(Spacing.md)) {
             Text(
-                text = subscription.tier_name ?: stringResource(R.string.billing_free_plan),
+                text = subscription.tier_name ?: stringResource(Res.string.billing_free_plan),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
             )
@@ -193,7 +205,7 @@ private fun PlanCard(subscription: SubscriptionCurrent) {
                 Text(
                     text =
                         stringResource(
-                            R.string.billing_credits_remaining,
+                            Res.string.billing_credits_remaining,
                             creditsRemaining,
                         ),
                     style = MaterialTheme.typography.bodySmall,
@@ -204,7 +216,7 @@ private fun PlanCard(subscription: SubscriptionCurrent) {
             val cycleEndsAt = subscription.cycle_ends_at
             if (cycleEndsAt != null) {
                 Text(
-                    text = stringResource(R.string.billing_renews, cycleEndsAt),
+                    text = stringResource(Res.string.billing_renews, cycleEndsAt),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = Spacing.xs),
@@ -231,16 +243,16 @@ private fun NoActivePlanCard(subscription: SubscriptionStateResponse) {
     ) {
         Column(modifier = Modifier.padding(Spacing.md)) {
             Text(
-                text = stringResource(R.string.billing_free_plan),
+                text = stringResource(Res.string.billing_free_plan),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
             )
             Text(
                 text =
                     if (subscription.logged_in == true) {
-                        stringResource(R.string.billing_no_active_plan)
+                        stringResource(Res.string.billing_no_active_plan)
                     } else {
-                        stringResource(R.string.billing_login_required)
+                        stringResource(Res.string.billing_login_required)
                     },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -312,7 +324,7 @@ private fun FeatureUnavailableState(onRetry: () -> Unit) {
             modifier = Modifier.padding(bottom = Spacing.md).size(48.dp),
         )
         ErrorState(
-            message = stringResource(R.string.billing_feature_unavailable),
+            message = stringResource(Res.string.billing_feature_unavailable),
             onRetry = onRetry,
         )
     }

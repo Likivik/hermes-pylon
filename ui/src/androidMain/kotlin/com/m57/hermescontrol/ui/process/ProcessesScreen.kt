@@ -40,8 +40,19 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.ProcessInfo
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.error_unknown
+import com.m57.hermescontrol.generated.resources.processes_empty_desc
+import com.m57.hermescontrol.generated.resources.processes_empty_title
+import com.m57.hermescontrol.generated.resources.processes_kill_cd
+import com.m57.hermescontrol.generated.resources.processes_kill_confirm
+import com.m57.hermescontrol.generated.resources.processes_kill_desc
+import com.m57.hermescontrol.generated.resources.processes_kill_title
+import com.m57.hermescontrol.generated.resources.processes_no_session_desc
+import com.m57.hermescontrol.generated.resources.processes_no_session_title
+import com.m57.hermescontrol.generated.resources.processes_running_hint
+import com.m57.hermescontrol.generated.resources.screen_processes
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.ui.common.EmptyState
 import com.m57.hermescontrol.ui.common.ErrorState
@@ -51,6 +62,7 @@ import com.m57.hermescontrol.ui.common.SkeletonListState
 import com.m57.hermescontrol.ui.common.ToastEffect
 import com.m57.hermescontrol.ui.common.listContentPadding
 import com.m57.hermescontrol.ui.common.listItemSpacing
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun ProcessesScreen(
@@ -69,7 +81,7 @@ fun ProcessesScreen(
     ToastEffect(toastMessage = state.toastMessage, onClearToast = viewModel::clearToast)
 
     HermesScaffold(
-        title = { Text(stringResource(R.string.screen_processes)) },
+        title = { Text(stringResource(Res.string.screen_processes)) },
         navigationIcon = onOpenDrawer?.let { NavIcon.Menu(it) },
         isRefreshing = state.isLoading,
         onRefresh = { viewModel.load() },
@@ -78,8 +90,8 @@ fun ProcessesScreen(
         when {
             state.sessionId == null -> {
                 EmptyState(
-                    title = stringResource(R.string.processes_no_session_title),
-                    subtitle = stringResource(R.string.processes_no_session_desc),
+                    title = stringResource(Res.string.processes_no_session_title),
+                    subtitle = stringResource(Res.string.processes_no_session_desc),
                     icon = Icons.Filled.Memory,
                 )
             }
@@ -90,15 +102,15 @@ fun ProcessesScreen(
 
             state.errorMessage != null -> {
                 ErrorState(
-                    message = state.errorMessage ?: stringResource(R.string.error_unknown),
+                    message = state.errorMessage ?: stringResource(Res.string.error_unknown),
                     onRetry = { viewModel.load() },
                 )
             }
 
             state.processes.isEmpty() -> {
                 EmptyState(
-                    title = stringResource(R.string.processes_empty_title),
-                    subtitle = stringResource(R.string.processes_empty_desc),
+                    title = stringResource(Res.string.processes_empty_title),
+                    subtitle = stringResource(Res.string.processes_empty_desc),
                     icon = Icons.Filled.Memory,
                 )
             }
@@ -124,11 +136,11 @@ fun ProcessesScreen(
     killTarget?.let { process ->
         AlertDialog(
             onDismissRequest = { killTarget = null },
-            title = { Text(stringResource(R.string.processes_kill_title)) },
+            title = { Text(stringResource(Res.string.processes_kill_title)) },
             text = {
                 Text(
                     stringResource(
-                        R.string.processes_kill_desc,
+                        Res.string.processes_kill_desc,
                         process.title,
                     ),
                 )
@@ -139,7 +151,7 @@ fun ProcessesScreen(
                         viewModel.kill(process.sessionId)
                         killTarget = null
                     },
-                ) { Text(stringResource(R.string.processes_kill_confirm)) }
+                ) { Text(stringResource(Res.string.processes_kill_confirm)) }
             },
             dismissButton = {
                 TextButton(onClick = { killTarget = null }) {
@@ -197,7 +209,7 @@ private fun ProcessCard(
                 if (process.isRunning) {
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = stringResource(R.string.processes_running_hint),
+                        text = stringResource(Res.string.processes_running_hint),
                         style = MaterialTheme.typography.labelSmall,
                         color = statusColors.success,
                     )
@@ -217,7 +229,7 @@ private fun ProcessCard(
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Stop,
-                            contentDescription = stringResource(R.string.processes_kill_cd),
+                            contentDescription = stringResource(Res.string.processes_kill_cd),
                             tint = statusColors.error,
                         )
                     }

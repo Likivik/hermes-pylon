@@ -37,13 +37,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.KanbanTask
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.action_add
+import com.m57.hermescontrol.generated.resources.action_cancel
+import com.m57.hermescontrol.generated.resources.content_desc_move_left
+import com.m57.hermescontrol.generated.resources.content_desc_move_right
+import com.m57.hermescontrol.generated.resources.kanban_add_new_task
+import com.m57.hermescontrol.generated.resources.kanban_board_title
+import com.m57.hermescontrol.generated.resources.kanban_no_boards
+import com.m57.hermescontrol.generated.resources.kanban_no_columns
+import com.m57.hermescontrol.generated.resources.kanban_task_desc
+import com.m57.hermescontrol.generated.resources.kanban_task_title
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.ErrorState
 import com.m57.hermescontrol.ui.common.HermesScaffold
@@ -51,6 +60,7 @@ import com.m57.hermescontrol.ui.common.NavIcon
 import com.m57.hermescontrol.ui.common.SearchBar
 import com.m57.hermescontrol.ui.common.SkeletonListState
 import com.m57.hermescontrol.ui.common.ToastEffect
+import org.jetbrains.compose.resources.stringResource
 
 private const val DEFAULT_COLUMN = "todo"
 
@@ -88,7 +98,7 @@ fun KanbanScreen(
     ToastEffect(toastMessage = state.toastMessage, onClearToast = viewModel::clearToast)
 
     HermesScaffold(
-        title = { Text(stringResource(R.string.kanban_board_title)) },
+        title = { Text(stringResource(Res.string.kanban_board_title)) },
         navigationIcon = onOpenDrawer?.let { NavIcon.Menu(it) },
         isRefreshing = state.isLoading,
         onRefresh = { viewModel.loadBoards() },
@@ -144,11 +154,11 @@ fun KanbanScreen(
 
                             if (state.selectedBoard == null) {
                                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Text(stringResource(R.string.kanban_no_boards))
+                                    Text(stringResource(Res.string.kanban_no_boards))
                                 }
                             } else if (state.columns.isEmpty()) {
                                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Text(stringResource(R.string.kanban_no_columns))
+                                    Text(stringResource(Res.string.kanban_no_columns))
                                 }
                             } else {
                                 LazyRow(
@@ -243,7 +253,7 @@ fun TaskCard(
                     IconButton(onClick = onMoveLeft) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.content_desc_move_left),
+                            contentDescription = stringResource(Res.string.content_desc_move_left),
                         )
                     }
                 } else {
@@ -254,7 +264,7 @@ fun TaskCard(
                     IconButton(onClick = onMoveRight) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = stringResource(R.string.content_desc_move_right),
+                            contentDescription = stringResource(Res.string.content_desc_move_right),
                         )
                     }
                 } else {
@@ -276,20 +286,20 @@ fun AddTaskDialog(
 
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.kanban_add_new_task)) },
+        title = { Text(stringResource(Res.string.kanban_add_new_task)) },
         text = {
             Column {
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text(stringResource(R.string.kanban_task_title)) },
+                    label = { Text(stringResource(Res.string.kanban_task_title)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = desc,
                     onValueChange = { desc = it },
-                    label = { Text(stringResource(R.string.kanban_task_desc)) },
+                    label = { Text(stringResource(Res.string.kanban_task_desc)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -299,12 +309,12 @@ fun AddTaskDialog(
                 onClick = { if (title.isNotBlank()) onConfirm(title, desc.ifBlank { null }) },
                 enabled = title.isNotBlank(),
             ) {
-                Text(stringResource(R.string.action_add))
+                Text(stringResource(Res.string.action_add))
             }
         },
         dismissButton = {
             Button(onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
+                Text(stringResource(Res.string.action_cancel))
             }
         },
     )

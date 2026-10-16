@@ -1,7 +1,6 @@
 package com.m57.hermescontrol.ui.files
 
 import android.content.Context
-import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.m57.hermescontrol.R
@@ -15,6 +14,15 @@ import com.m57.hermescontrol.data.remote.GatewayFileResult
 import com.m57.hermescontrol.data.remote.NetworkError
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.generated.resources.files_error_create_folder
+import com.m57.hermescontrol.generated.resources.files_error_delete
+import com.m57.hermescontrol.generated.resources.files_error_folder_name_required
+import com.m57.hermescontrol.generated.resources.files_error_folder_name_slash
+import com.m57.hermescontrol.generated.resources.files_error_list
+import com.m57.hermescontrol.generated.resources.files_error_upload_file
+import com.m57.hermescontrol.generated.resources.files_status_deleted
+import com.m57.hermescontrol.generated.resources.files_status_file_uploaded
+import com.m57.hermescontrol.generated.resources.files_status_folder_created
 import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.ui.common.safeLaunchLoad
 import kotlinx.coroutines.CoroutineDispatcher
@@ -45,7 +53,7 @@ data class FilesUiState(
 )
 
 data class FilesUiText(
-    @param:StringRes val resourceId: Int,
+    val resourceId: Int,
     val args: List<String> = emptyList(),
 ) {
     fun resolve(context: Context): String = context.getString(resourceId, *args.toTypedArray())
@@ -282,8 +290,8 @@ class FilesViewModel(
 
     private fun handleActionResult(
         result: NetworkResult<ManagedFileActionResponse>,
-        @StringRes successMessageId: Int,
-        @StringRes errorMessageId: Int,
+        successMessageId: Int,
+        errorMessageId: Int,
     ) {
         when (result) {
             is NetworkResult.Success -> {

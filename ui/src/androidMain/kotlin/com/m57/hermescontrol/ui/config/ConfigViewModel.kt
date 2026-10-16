@@ -1,9 +1,7 @@
 package com.m57.hermescontrol.ui.config
 
-import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.ConfigSchemaResponse
 import com.m57.hermescontrol.data.model.ConfigUpdateRequest
 import com.m57.hermescontrol.data.model.RawConfigResponse
@@ -12,6 +10,14 @@ import com.m57.hermescontrol.data.model.UpdateRawConfigRequest
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.config_load_failed
+import com.m57.hermescontrol.generated.resources.config_load_yaml_failed
+import com.m57.hermescontrol.generated.resources.config_reset_count
+import com.m57.hermescontrol.generated.resources.config_save_failed
+import com.m57.hermescontrol.generated.resources.config_save_yaml_failed
+import com.m57.hermescontrol.generated.resources.config_saved
+import com.m57.hermescontrol.generated.resources.config_yaml_saved
 import com.m57.hermescontrol.ui.common.ToastHost
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -25,6 +31,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
+import org.jetbrains.compose.resources.StringResource
 
 data class ConfigUiState(
     val isLoading: Boolean = false,
@@ -112,7 +119,7 @@ fun reconcileEditorDrafts(
 }
 
 data class ConfigUiText(
-    @StringRes val resourceId: Int,
+    val resourceId: StringResource,
     val args: List<Any> = emptyList(),
 )
 
@@ -270,7 +277,7 @@ class ConfigViewModel :
                                 it.copy(
                                     isLoading = false,
                                     errorMessage = errorMsg,
-                                    toastMessage = ConfigUiText(R.string.config_load_failed, listOf(errorMsg)),
+                                    toastMessage = ConfigUiText(Res.string.config_load_failed, listOf(errorMsg)),
                                 )
                             }
                         }
@@ -281,7 +288,7 @@ class ConfigViewModel :
                         it.copy(
                             isLoading = false,
                             errorMessage = e.message.orEmpty(),
-                            toastMessage = ConfigUiText(R.string.config_load_failed, listOf(e.message.orEmpty())),
+                            toastMessage = ConfigUiText(Res.string.config_load_failed, listOf(e.message.orEmpty())),
                         )
                     }
                 }
@@ -406,7 +413,7 @@ class ConfigViewModel :
                                     yamlLoadError = loadResult.message,
                                     toastMessage =
                                         ConfigUiText(
-                                            R.string.config_load_yaml_failed,
+                                            Res.string.config_load_yaml_failed,
                                             listOf(loadResult.message),
                                         ),
                                 )
@@ -423,7 +430,7 @@ class ConfigViewModel :
                             yamlLoadError = result.error.message,
                             toastMessage =
                                 ConfigUiText(
-                                    R.string.config_load_yaml_failed,
+                                    Res.string.config_load_yaml_failed,
                                     listOf(result.error.message),
                                 ),
                         )
@@ -481,7 +488,7 @@ class ConfigViewModel :
                             modifiedKeys = pendingChanges.keys.toSet(),
                             invalidKeys = emptySet(),
                             fieldDrafts = emptyMap(),
-                            toastMessage = ConfigUiText(R.string.config_saved),
+                            toastMessage = ConfigUiText(Res.string.config_saved),
                         )
                     }
                 }
@@ -490,7 +497,7 @@ class ConfigViewModel :
                     _uiState.update {
                         it.copy(
                             isSaving = false,
-                            toastMessage = ConfigUiText(R.string.config_save_failed, listOf(result.error.message)),
+                            toastMessage = ConfigUiText(Res.string.config_save_failed, listOf(result.error.message)),
                         )
                     }
                 }
@@ -549,7 +556,7 @@ class ConfigViewModel :
                             invalidKeys = emptySet(),
                             fieldDrafts = emptyMap(),
                             errorMessage = structuredRefresh.errorMessage,
-                            toastMessage = ConfigUiText(R.string.config_yaml_saved),
+                            toastMessage = ConfigUiText(Res.string.config_yaml_saved),
                         )
                     }
                 }
@@ -558,7 +565,11 @@ class ConfigViewModel :
                     _uiState.update {
                         it.copy(
                             yamlIsSaving = false,
-                            toastMessage = ConfigUiText(R.string.config_save_yaml_failed, listOf(result.error.message)),
+                            toastMessage =
+                                ConfigUiText(
+                                    Res.string.config_save_yaml_failed,
+                                    listOf(result.error.message),
+                                ),
                         )
                     }
                 }
@@ -600,7 +611,7 @@ class ConfigViewModel :
 
         if (count > 0) {
             _uiState.update {
-                it.copy(toastMessage = ConfigUiText(R.string.config_reset_count, listOf(count)))
+                it.copy(toastMessage = ConfigUiText(Res.string.config_reset_count, listOf(count)))
             }
         }
     }

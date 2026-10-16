@@ -28,16 +28,37 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.theme.ThemePreference
 import com.m57.hermescontrol.data.theme.ThemePreset
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.settings_chat_font_scale
+import com.m57.hermescontrol.generated.resources.settings_chat_font_scale_description
+import com.m57.hermescontrol.generated.resources.settings_chat_font_scale_value
+import com.m57.hermescontrol.generated.resources.settings_delay_100ms
+import com.m57.hermescontrol.generated.resources.settings_delay_10ms
+import com.m57.hermescontrol.generated.resources.settings_desc_typing_effect
+import com.m57.hermescontrol.generated.resources.settings_desc_use_dynamic_colors
+import com.m57.hermescontrol.generated.resources.settings_item_theme
+import com.m57.hermescontrol.generated.resources.settings_item_theme_preset
+import com.m57.hermescontrol.generated.resources.settings_item_typing_delay
+import com.m57.hermescontrol.generated.resources.settings_item_typing_effect
+import com.m57.hermescontrol.generated.resources.settings_item_use_dynamic_colors
+import com.m57.hermescontrol.generated.resources.theme_dark
+import com.m57.hermescontrol.generated.resources.theme_light
+import com.m57.hermescontrol.generated.resources.theme_preset_amoled
+import com.m57.hermescontrol.generated.resources.theme_preset_catppuccin
+import com.m57.hermescontrol.generated.resources.theme_preset_default
+import com.m57.hermescontrol.generated.resources.theme_preset_gruvbox
+import com.m57.hermescontrol.generated.resources.theme_preset_monochrome
+import com.m57.hermescontrol.generated.resources.theme_preset_neon_noir
+import com.m57.hermescontrol.generated.resources.theme_system
 import com.m57.hermescontrol.ui.settings.SectionCard
+import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 
 @Composable
@@ -51,7 +72,7 @@ fun AppearanceSection(
 ) {
     SectionCard {
         Text(
-            text = stringResource(R.string.settings_item_theme),
+            text = stringResource(Res.string.settings_item_theme),
             style = MaterialTheme.typography.bodyLarge,
         )
         Spacer(modifier = Modifier.height(8.dp))
@@ -68,9 +89,9 @@ fun AppearanceSection(
                 ) {
                     Text(
                         when (pref) {
-                            ThemePreference.SYSTEM -> stringResource(R.string.theme_system)
-                            ThemePreference.LIGHT -> stringResource(R.string.theme_light)
-                            ThemePreference.DARK -> stringResource(R.string.theme_dark)
+                            ThemePreference.SYSTEM -> stringResource(Res.string.theme_system)
+                            ThemePreference.LIGHT -> stringResource(Res.string.theme_light)
+                            ThemePreference.DARK -> stringResource(Res.string.theme_dark)
                         },
                     )
                 }
@@ -86,11 +107,11 @@ fun AppearanceSection(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = stringResource(R.string.settings_item_use_dynamic_colors),
+                    text = stringResource(Res.string.settings_item_use_dynamic_colors),
                     style = MaterialTheme.typography.bodyLarge,
                 )
                 Text(
-                    text = stringResource(R.string.settings_desc_use_dynamic_colors),
+                    text = stringResource(Res.string.settings_desc_use_dynamic_colors),
                     style =
                         MaterialTheme.typography.bodySmall.copy(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -111,7 +132,7 @@ fun AppearanceSection(
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = stringResource(R.string.settings_item_theme_preset),
+            text = stringResource(Res.string.settings_item_theme_preset),
             style = MaterialTheme.typography.bodyLarge,
         )
         Spacer(modifier = Modifier.height(8.dp))
@@ -125,12 +146,12 @@ fun AppearanceSection(
             ) {
                 Text(
                     when (themePreset) {
-                        ThemePreset.DEFAULT -> stringResource(R.string.theme_preset_default)
-                        ThemePreset.MONOCHROME -> stringResource(R.string.theme_preset_monochrome)
-                        ThemePreset.GRUVBOX -> stringResource(R.string.theme_preset_gruvbox)
-                        ThemePreset.CATPPUCCIN -> stringResource(R.string.theme_preset_catppuccin)
-                        ThemePreset.AMOLED -> stringResource(R.string.theme_preset_amoled)
-                        ThemePreset.NEON_NOIR -> stringResource(R.string.theme_preset_neon_noir)
+                        ThemePreset.DEFAULT -> stringResource(Res.string.theme_preset_default)
+                        ThemePreset.MONOCHROME -> stringResource(Res.string.theme_preset_monochrome)
+                        ThemePreset.GRUVBOX -> stringResource(Res.string.theme_preset_gruvbox)
+                        ThemePreset.CATPPUCCIN -> stringResource(Res.string.theme_preset_catppuccin)
+                        ThemePreset.AMOLED -> stringResource(Res.string.theme_preset_amoled)
+                        ThemePreset.NEON_NOIR -> stringResource(Res.string.theme_preset_neon_noir)
                     },
                 )
             }
@@ -146,37 +167,37 @@ fun AppearanceSection(
                                 when (preset) {
                                     ThemePreset.DEFAULT -> {
                                         stringResource(
-                                            R.string.theme_preset_default,
+                                            Res.string.theme_preset_default,
                                         )
                                     }
 
                                     ThemePreset.MONOCHROME -> {
                                         stringResource(
-                                            R.string.theme_preset_monochrome,
+                                            Res.string.theme_preset_monochrome,
                                         )
                                     }
 
                                     ThemePreset.GRUVBOX -> {
                                         stringResource(
-                                            R.string.theme_preset_gruvbox,
+                                            Res.string.theme_preset_gruvbox,
                                         )
                                     }
 
                                     ThemePreset.CATPPUCCIN -> {
                                         stringResource(
-                                            R.string.theme_preset_catppuccin,
+                                            Res.string.theme_preset_catppuccin,
                                         )
                                     }
 
                                     ThemePreset.AMOLED -> {
                                         stringResource(
-                                            R.string.theme_preset_amoled,
+                                            Res.string.theme_preset_amoled,
                                         )
                                     }
 
                                     ThemePreset.NEON_NOIR -> {
                                         stringResource(
-                                            R.string.theme_preset_neon_noir,
+                                            Res.string.theme_preset_neon_noir,
                                         )
                                     }
                                 },
@@ -206,14 +227,14 @@ fun ChatSection(
         val fontScaleStops = AuthManager.chatFontScaleStops
         val selectedFontScaleIndex = fontScaleStops.indexOf(chatFontScale).coerceAtLeast(0)
         val fontScalePercent = (fontScaleStops[selectedFontScaleIndex] * 100).toInt()
-        val fontScaleDescription = stringResource(R.string.settings_chat_font_scale)
-        val fontScaleState = stringResource(R.string.settings_chat_font_scale_value, fontScalePercent)
+        val fontScaleDescription = stringResource(Res.string.settings_chat_font_scale)
+        val fontScaleState = stringResource(Res.string.settings_chat_font_scale_value, fontScalePercent)
         Text(
             text = fontScaleDescription,
             style = MaterialTheme.typography.bodyLarge,
         )
         Text(
-            text = stringResource(R.string.settings_chat_font_scale_description),
+            text = stringResource(Res.string.settings_chat_font_scale_description),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -234,8 +255,8 @@ fun ChatSection(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text(stringResource(R.string.settings_chat_font_scale_value, 85))
-            Text(stringResource(R.string.settings_chat_font_scale_value, 150))
+            Text(stringResource(Res.string.settings_chat_font_scale_value, 85))
+            Text(stringResource(Res.string.settings_chat_font_scale_value, 150))
         }
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -246,11 +267,11 @@ fun ChatSection(
         ) {
             Column {
                 Text(
-                    text = stringResource(R.string.settings_item_typing_effect),
+                    text = stringResource(Res.string.settings_item_typing_effect),
                     style = MaterialTheme.typography.bodyLarge,
                 )
                 Text(
-                    text = stringResource(R.string.settings_desc_typing_effect),
+                    text = stringResource(Res.string.settings_desc_typing_effect),
                     style =
                         MaterialTheme.typography.bodySmall.copy(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -274,7 +295,7 @@ fun ChatSection(
                 Text(
                     text =
                         stringResource(
-                            R.string.settings_item_typing_delay,
+                            Res.string.settings_item_typing_delay,
                             typingEffectDelayMs,
                         ),
                     style = MaterialTheme.typography.bodyMedium,
@@ -292,14 +313,14 @@ fun ChatSection(
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
-                        text = stringResource(R.string.settings_delay_10ms),
+                        text = stringResource(Res.string.settings_delay_10ms),
                         style =
                             MaterialTheme.typography.labelSmall.copy(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             ),
                     )
                     Text(
-                        text = stringResource(R.string.settings_delay_100ms),
+                        text = stringResource(Res.string.settings_delay_100ms),
                         style =
                             MaterialTheme.typography.labelSmall.copy(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,

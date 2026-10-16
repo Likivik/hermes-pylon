@@ -53,7 +53,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -64,9 +63,40 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.HubSkill
 import com.m57.hermescontrol.data.model.Skill
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.action_cancel
+import com.m57.hermescontrol.generated.resources.action_clear
+import com.m57.hermescontrol.generated.resources.action_discard
+import com.m57.hermescontrol.generated.resources.content_desc_edit_skill
+import com.m57.hermescontrol.generated.resources.content_desc_save_changes
+import com.m57.hermescontrol.generated.resources.content_desc_uninstall_skill
+import com.m57.hermescontrol.generated.resources.content_desc_update_skills_hub
+import com.m57.hermescontrol.generated.resources.detail_dialog_category
+import com.m57.hermescontrol.generated.resources.detail_dialog_description
+import com.m57.hermescontrol.generated.resources.detail_dialog_source
+import com.m57.hermescontrol.generated.resources.detail_dialog_tags
+import com.m57.hermescontrol.generated.resources.detail_dialog_trust_level
+import com.m57.hermescontrol.generated.resources.empty_action_browse_hub
+import com.m57.hermescontrol.generated.resources.skills_category_all
+import com.m57.hermescontrol.generated.resources.skills_content_placeholder
+import com.m57.hermescontrol.generated.resources.skills_discard_message
+import com.m57.hermescontrol.generated.resources.skills_discard_title
+import com.m57.hermescontrol.generated.resources.skills_edit_title
+import com.m57.hermescontrol.generated.resources.skills_empty_message
+import com.m57.hermescontrol.generated.resources.skills_hub_empty_results
+import com.m57.hermescontrol.generated.resources.skills_hub_install
+import com.m57.hermescontrol.generated.resources.skills_hub_search_button
+import com.m57.hermescontrol.generated.resources.skills_hub_search_hint
+import com.m57.hermescontrol.generated.resources.skills_hub_search_placeholder
+import com.m57.hermescontrol.generated.resources.skills_mode_hub
+import com.m57.hermescontrol.generated.resources.skills_mode_installed
+import com.m57.hermescontrol.generated.resources.skills_preview_empty
+import com.m57.hermescontrol.generated.resources.skills_preview_title
+import com.m57.hermescontrol.generated.resources.skills_screen_title
+import com.m57.hermescontrol.generated.resources.skills_search_placeholder
+import com.m57.hermescontrol.generated.resources.skills_source_all
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.DetailDialog
@@ -82,6 +112,7 @@ import com.m57.hermescontrol.ui.common.SkeletonListState
 import com.m57.hermescontrol.ui.common.ToastEffect
 import com.m57.hermescontrol.ui.common.listItemSpacing
 import com.m57.hermescontrol.ui.common.toDetailRows
+import org.jetbrains.compose.resources.stringResource
 
 const val CATEGORY_ALL = "All"
 
@@ -133,14 +164,14 @@ fun SkillsScreen(
                     onClick = { viewModel.setViewMode(SkillsViewMode.INSTALLED) },
                     shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
                 ) {
-                    Text(stringResource(R.string.skills_mode_installed))
+                    Text(stringResource(Res.string.skills_mode_installed))
                 }
                 SegmentedButton(
                     selected = state.viewMode == SkillsViewMode.HUB,
                     onClick = { viewModel.setViewMode(SkillsViewMode.HUB) },
                     shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
                 ) {
-                    Text(stringResource(R.string.skills_mode_hub))
+                    Text(stringResource(Res.string.skills_mode_hub))
                 }
             }
 
@@ -224,7 +255,7 @@ fun SkillsScaffold(
 ) {
     HermesScaffold(
         modifier = modifier,
-        title = { Text(stringResource(R.string.skills_screen_title)) },
+        title = { Text(stringResource(Res.string.skills_screen_title)) },
         navigationIcon = NavIcon.Menu(onOpen = onOpenDrawer),
         isRefreshing = isRefreshing,
         onRefresh = onReload,
@@ -233,7 +264,7 @@ fun SkillsScaffold(
                 IconButton(onClick = onUpdateFromHub) {
                     Icon(
                         imageVector = Icons.Filled.CloudDownload,
-                        contentDescription = stringResource(R.string.content_desc_update_skills_hub),
+                        contentDescription = stringResource(Res.string.content_desc_update_skills_hub),
                     )
                 }
             }
@@ -301,7 +332,7 @@ private fun InstalledSkillsView(
         SearchBar(
             query = query,
             onQueryChange = onQueryChange,
-            placeholder = stringResource(R.string.skills_search_placeholder),
+            placeholder = stringResource(Res.string.skills_search_placeholder),
             modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs),
         )
 
@@ -313,7 +344,7 @@ private fun InstalledSkillsView(
                 Text(
                     text =
                         if (chip == SkillFilter.ALL_STATUSES) {
-                            stringResource(R.string.skills_category_all)
+                            stringResource(Res.string.skills_category_all)
                         } else {
                             stringResource(chip.labelRes)
                         },
@@ -323,7 +354,7 @@ private fun InstalledSkillsView(
 
         if (categories.isNotEmpty() || sources.isNotEmpty()) {
             FilterChipRow(
-                chips = listOf(stringResource(R.string.skills_category_all)) + categories,
+                chips = listOf(stringResource(Res.string.skills_category_all)) + categories,
                 selectedChip = selectedCategory,
                 onChipSelected = onCategoryChange,
             )
@@ -334,7 +365,7 @@ private fun InstalledSkillsView(
                     onChipSelected = onSetSourceFilter,
                     chipLabel = { source ->
                         Text(
-                            text = source ?: stringResource(R.string.skills_source_all),
+                            text = source ?: stringResource(Res.string.skills_source_all),
                             style = MaterialTheme.typography.labelSmall,
                         )
                     },
@@ -357,8 +388,8 @@ private fun InstalledSkillsView(
             filteredSkills.isEmpty() -> {
                 EmptyState(
                     icon = Icons.Filled.Extension,
-                    title = stringResource(R.string.skills_empty_message),
-                    actionLabel = stringResource(R.string.empty_action_browse_hub),
+                    title = stringResource(Res.string.skills_empty_message),
+                    actionLabel = stringResource(Res.string.empty_action_browse_hub),
                     onAction = onBrowseHub,
                 )
             }
@@ -486,7 +517,7 @@ private fun SkillCard(
                         IconButton(onClick = onAction) {
                             Icon(
                                 imageVector = Icons.Filled.Edit,
-                                contentDescription = stringResource(R.string.content_desc_edit_skill),
+                                contentDescription = stringResource(Res.string.content_desc_edit_skill),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
@@ -503,7 +534,7 @@ private fun SkillCard(
                                 val statusColors = LocalHermesStatusColors.current
                                 Icon(
                                     imageVector = Icons.Filled.CloudOff,
-                                    contentDescription = stringResource(R.string.content_desc_uninstall_skill),
+                                    contentDescription = stringResource(Res.string.content_desc_uninstall_skill),
                                     tint = statusColors.error,
                                 )
                             }
@@ -518,7 +549,7 @@ private fun SkillCard(
                         IconButton(onClick = onAction) {
                             Icon(
                                 imageVector = Icons.Filled.Edit,
-                                contentDescription = stringResource(R.string.content_desc_edit_skill),
+                                contentDescription = stringResource(Res.string.content_desc_edit_skill),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
@@ -576,7 +607,7 @@ private fun HubBrowseView(
                 Modifier
                     .fillMaxWidth()
                     .padding(horizontal = Spacing.sm, vertical = 6.dp),
-            placeholder = { Text(stringResource(R.string.skills_hub_search_placeholder)) },
+            placeholder = { Text(stringResource(Res.string.skills_hub_search_placeholder)) },
             trailingIcon = {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -588,7 +619,7 @@ private fun HubBrowseView(
                         }) {
                             Icon(
                                 imageVector = Icons.Filled.Close,
-                                contentDescription = stringResource(R.string.action_clear),
+                                contentDescription = stringResource(Res.string.action_clear),
                             )
                         }
                     }
@@ -598,7 +629,7 @@ private fun HubBrowseView(
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Search,
-                            contentDescription = stringResource(R.string.skills_hub_search_button),
+                            contentDescription = stringResource(Res.string.skills_hub_search_button),
                         )
                     }
                 }
@@ -631,7 +662,7 @@ private fun HubBrowseView(
             state.hubResults.isEmpty() && hubQuery.isNotBlank() && !state.isHubSearching -> {
                 EmptyState(
                     icon = Icons.Filled.Extension,
-                    title = stringResource(R.string.skills_hub_empty_results),
+                    title = stringResource(Res.string.skills_hub_empty_results),
                 )
             }
 
@@ -661,7 +692,7 @@ private fun HubBrowseView(
             else -> {
                 EmptyState(
                     icon = Icons.Filled.Search,
-                    title = stringResource(R.string.skills_hub_search_hint),
+                    title = stringResource(Res.string.skills_hub_search_hint),
                 )
             }
         }
@@ -679,11 +710,14 @@ private fun HubBrowseView(
             title = hubSkill.name,
             rows =
                 listOf(
-                    DetailRow(stringResource(R.string.detail_dialog_category), hubSkill.category),
-                    DetailRow(stringResource(R.string.detail_dialog_source), hubSkill.source),
-                    DetailRow(stringResource(R.string.detail_dialog_description), fullContent),
-                    DetailRow(stringResource(R.string.detail_dialog_tags), hubSkill.tags.orEmpty().joinToString(", ")),
-                    DetailRow(stringResource(R.string.detail_dialog_trust_level), hubSkill.trustLevel),
+                    DetailRow(stringResource(Res.string.detail_dialog_category), hubSkill.category),
+                    DetailRow(stringResource(Res.string.detail_dialog_source), hubSkill.source),
+                    DetailRow(stringResource(Res.string.detail_dialog_description), fullContent),
+                    DetailRow(
+                        stringResource(Res.string.detail_dialog_tags),
+                        hubSkill.tags.orEmpty().joinToString(", "),
+                    ),
+                    DetailRow(stringResource(Res.string.detail_dialog_trust_level), hubSkill.trustLevel),
                 ),
             actions =
                 if (previewReady && state.isHubPreviewing) {
@@ -778,7 +812,7 @@ private fun HubSkillCard(
                             modifier = Modifier.size(18.dp),
                         )
                         Spacer(Modifier.width(4.dp))
-                        Text(stringResource(R.string.skills_hub_install))
+                        Text(stringResource(Res.string.skills_hub_install))
                     }
                 }
             }
@@ -810,7 +844,7 @@ fun SkillPreviewDialog(
                 ),
         ) {
             HermesScaffold(
-                title = { Text(stringResource(R.string.skills_preview_title, skillName)) },
+                title = { Text(stringResource(Res.string.skills_preview_title, skillName)) },
                 navigationIcon = NavIcon.Back(onBack = onDismiss),
             ) { padding ->
                 Box(
@@ -844,7 +878,7 @@ fun SkillPreviewDialog(
                         else -> {
                             EmptyState(
                                 icon = Icons.Filled.Extension,
-                                title = stringResource(R.string.skills_preview_empty),
+                                title = stringResource(Res.string.skills_preview_empty),
                             )
                         }
                     }
@@ -904,7 +938,7 @@ fun SkillEditorDialog(
                 ),
         ) {
             HermesScaffold(
-                title = { Text(stringResource(R.string.skills_edit_title, skillName)) },
+                title = { Text(stringResource(Res.string.skills_edit_title, skillName)) },
                 navigationIcon =
                     NavIcon.Back(
                         onBack = {
@@ -930,7 +964,7 @@ fun SkillEditorDialog(
                             } else {
                                 Icon(
                                     imageVector = Icons.Filled.Save,
-                                    contentDescription = stringResource(R.string.content_desc_save_changes),
+                                    contentDescription = stringResource(Res.string.content_desc_save_changes),
                                 )
                             }
                         }
@@ -961,7 +995,7 @@ fun SkillEditorDialog(
                                         color = MaterialTheme.colorScheme.onSurface,
                                     ),
                                 placeholder = {
-                                    Text(stringResource(R.string.skills_content_placeholder))
+                                    Text(stringResource(Res.string.skills_content_placeholder))
                                 },
                             )
                         }
@@ -974,8 +1008,8 @@ fun SkillEditorDialog(
     if (showDiscardConfirm) {
         AlertDialog(
             onDismissRequest = { showDiscardConfirm = false },
-            title = { Text(stringResource(R.string.skills_discard_title)) },
-            text = { Text(stringResource(R.string.skills_discard_message)) },
+            title = { Text(stringResource(Res.string.skills_discard_title)) },
+            text = { Text(stringResource(Res.string.skills_discard_message)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -983,12 +1017,12 @@ fun SkillEditorDialog(
                         onDismiss()
                     },
                 ) {
-                    Text(stringResource(R.string.action_discard))
+                    Text(stringResource(Res.string.action_discard))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDiscardConfirm = false }) {
-                    Text(stringResource(R.string.action_cancel))
+                    Text(stringResource(Res.string.action_cancel))
                 }
             },
         )

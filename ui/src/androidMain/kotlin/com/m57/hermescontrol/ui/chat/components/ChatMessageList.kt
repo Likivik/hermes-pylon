@@ -13,17 +13,19 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.Attachment
 import com.m57.hermescontrol.data.ws.PrivilegedRequestBinding
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.chat_empty_subtitle
+import com.m57.hermescontrol.generated.resources.chat_empty_title
 import com.m57.hermescontrol.ui.chat.ChatBubble
 import com.m57.hermescontrol.ui.chat.ChatMessage
 import com.m57.hermescontrol.ui.chat.ClarifyUi
 import com.m57.hermescontrol.ui.chat.ImageViewerModel
 import com.m57.hermescontrol.ui.chat.MessageRole
 import com.m57.hermescontrol.ui.common.EmptyState
+import org.jetbrains.compose.resources.stringResource
 
 val CHAT_LIST_VERTICAL_CONTENT_PADDING = 8.dp
 
@@ -83,8 +85,8 @@ fun ChatMessageList(
             contentAlignment = Alignment.Center,
         ) {
             EmptyState(
-                title = stringResource(R.string.chat_empty_title),
-                subtitle = stringResource(R.string.chat_empty_subtitle),
+                title = stringResource(Res.string.chat_empty_title),
+                subtitle = stringResource(Res.string.chat_empty_subtitle),
             )
         }
     } else {

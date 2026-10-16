@@ -19,6 +19,15 @@ import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.data.remote.parseForBuild
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.generated.resources.connect_error_401
+import com.m57.hermescontrol.generated.resources.connect_error_403
+import com.m57.hermescontrol.generated.resources.connect_error_connection_failed
+import com.m57.hermescontrol.generated.resources.connect_error_http_code
+import com.m57.hermescontrol.generated.resources.connect_error_refused
+import com.m57.hermescontrol.generated.resources.connect_error_resolve
+import com.m57.hermescontrol.generated.resources.connect_error_timeout
+import com.m57.hermescontrol.generated.resources.connect_error_token_required
+import com.m57.hermescontrol.generated.resources.connect_error_url_invalid
 import com.m57.hermescontrol.ui.common.reconcilePressureStatus
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers

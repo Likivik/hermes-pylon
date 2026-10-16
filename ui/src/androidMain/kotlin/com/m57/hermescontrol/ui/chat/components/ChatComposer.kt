@@ -55,7 +55,6 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
@@ -65,13 +64,20 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.Attachment
 import com.m57.hermescontrol.data.ws.CommandBlocklist
 import com.m57.hermescontrol.data.ws.CommandCatalog
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.chat_attach_remove_desc
+import com.m57.hermescontrol.generated.resources.chat_input_placeholder_not_connected
+import com.m57.hermescontrol.generated.resources.chat_input_placeholder_queue
+import com.m57.hermescontrol.generated.resources.chat_input_placeholder_type_message
+import com.m57.hermescontrol.generated.resources.chat_input_placeholder_waiting
+import com.m57.hermescontrol.generated.resources.chat_send_desc
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.chat.ChatInputPolicy
 import com.m57.hermescontrol.util.BidiUtils
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The chat input bar with a two-row layout: input+send on top,
@@ -232,19 +238,19 @@ fun ChatInputBar(
                     val placeholderText =
                         when {
                             !isConnected -> {
-                                stringResource(R.string.chat_input_placeholder_not_connected)
+                                stringResource(Res.string.chat_input_placeholder_not_connected)
                             }
 
                             ChatInputPolicy.showQueuePlaceholder(inputFieldValue.text, isAgentTyping) -> {
-                                stringResource(R.string.chat_input_placeholder_queue)
+                                stringResource(Res.string.chat_input_placeholder_queue)
                             }
 
                             isAgentTyping -> {
-                                stringResource(R.string.chat_input_placeholder_waiting)
+                                stringResource(Res.string.chat_input_placeholder_waiting)
                             }
 
                             else -> {
-                                stringResource(R.string.chat_input_placeholder_type_message)
+                                stringResource(Res.string.chat_input_placeholder_type_message)
                             }
                         }
 
@@ -364,7 +370,7 @@ fun ChatInputBar(
                                                             imageVector = Icons.AutoMirrored.Filled.Send,
                                                             contentDescription =
                                                                 stringResource(
-                                                                    R.string.chat_send_desc,
+                                                                    Res.string.chat_send_desc,
                                                                 ),
                                                         )
                                                     }
@@ -497,7 +503,7 @@ fun AttachmentChip(
             IconButton(onClick = onRemove, modifier = Modifier.size(18.dp)) {
                 Icon(
                     imageVector = Icons.Default.Close,
-                    contentDescription = stringResource(R.string.chat_attach_remove_desc),
+                    contentDescription = stringResource(Res.string.chat_attach_remove_desc),
                     modifier = Modifier.size(14.dp),
                 )
             }

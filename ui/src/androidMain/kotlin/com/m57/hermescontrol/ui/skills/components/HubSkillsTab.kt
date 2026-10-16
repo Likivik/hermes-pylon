@@ -38,13 +38,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.HubSkill
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.action_clear
+import com.m57.hermescontrol.generated.resources.detail_dialog_category
+import com.m57.hermescontrol.generated.resources.detail_dialog_description
+import com.m57.hermescontrol.generated.resources.detail_dialog_source
+import com.m57.hermescontrol.generated.resources.detail_dialog_tags
+import com.m57.hermescontrol.generated.resources.detail_dialog_trust_level
+import com.m57.hermescontrol.generated.resources.empty_action_retry_search
+import com.m57.hermescontrol.generated.resources.skills_hub_empty_results
+import com.m57.hermescontrol.generated.resources.skills_hub_install
+import com.m57.hermescontrol.generated.resources.skills_hub_search_button
+import com.m57.hermescontrol.generated.resources.skills_hub_search_hint
+import com.m57.hermescontrol.generated.resources.skills_hub_search_placeholder
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.DetailDialog
 import com.m57.hermescontrol.ui.common.DetailRow
@@ -53,6 +64,7 @@ import com.m57.hermescontrol.ui.common.ErrorState
 import com.m57.hermescontrol.ui.common.SkeletonListState
 import com.m57.hermescontrol.ui.common.listItemSpacing
 import com.m57.hermescontrol.ui.skills.SkillsUiState
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun HubBrowseView(
@@ -76,7 +88,7 @@ fun HubBrowseView(
                 Modifier
                     .fillMaxWidth()
                     .padding(horizontal = Spacing.sm, vertical = 6.dp),
-            placeholder = { Text(stringResource(R.string.skills_hub_search_placeholder)) },
+            placeholder = { Text(stringResource(Res.string.skills_hub_search_placeholder)) },
             trailingIcon = {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -88,7 +100,7 @@ fun HubBrowseView(
                         }) {
                             Icon(
                                 imageVector = Icons.Filled.Close,
-                                contentDescription = stringResource(R.string.action_clear),
+                                contentDescription = stringResource(Res.string.action_clear),
                             )
                         }
                     }
@@ -98,7 +110,7 @@ fun HubBrowseView(
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Search,
-                            contentDescription = stringResource(R.string.skills_hub_search_button),
+                            contentDescription = stringResource(Res.string.skills_hub_search_button),
                         )
                     }
                 }
@@ -131,8 +143,8 @@ fun HubBrowseView(
             state.hubResults.isEmpty() && hubQuery.isNotBlank() && !state.isHubSearching -> {
                 EmptyState(
                     icon = Icons.Filled.Extension,
-                    title = stringResource(R.string.skills_hub_empty_results),
-                    actionLabel = stringResource(R.string.empty_action_retry_search),
+                    title = stringResource(Res.string.skills_hub_empty_results),
+                    actionLabel = stringResource(Res.string.empty_action_retry_search),
                     onAction = { onSearch(hubQuery) },
                 )
             }
@@ -163,7 +175,7 @@ fun HubBrowseView(
             else -> {
                 EmptyState(
                     icon = Icons.Filled.Search,
-                    title = stringResource(R.string.skills_hub_search_hint),
+                    title = stringResource(Res.string.skills_hub_search_hint),
                 )
             }
         }
@@ -181,11 +193,14 @@ fun HubBrowseView(
             title = hubSkill.name,
             rows =
                 listOf(
-                    DetailRow(stringResource(R.string.detail_dialog_category), hubSkill.category),
-                    DetailRow(stringResource(R.string.detail_dialog_source), hubSkill.source),
-                    DetailRow(stringResource(R.string.detail_dialog_description), fullContent),
-                    DetailRow(stringResource(R.string.detail_dialog_tags), hubSkill.tags.orEmpty().joinToString(", ")),
-                    DetailRow(stringResource(R.string.detail_dialog_trust_level), hubSkill.trustLevel),
+                    DetailRow(stringResource(Res.string.detail_dialog_category), hubSkill.category),
+                    DetailRow(stringResource(Res.string.detail_dialog_source), hubSkill.source),
+                    DetailRow(stringResource(Res.string.detail_dialog_description), fullContent),
+                    DetailRow(
+                        stringResource(Res.string.detail_dialog_tags),
+                        hubSkill.tags.orEmpty().joinToString(", "),
+                    ),
+                    DetailRow(stringResource(Res.string.detail_dialog_trust_level), hubSkill.trustLevel),
                 ),
             actions =
                 if (previewReady && state.isHubPreviewing) {
@@ -282,7 +297,7 @@ private fun HubSkillCard(
                             modifier = Modifier.size(18.dp),
                         )
                         Spacer(Modifier.width(4.dp))
-                        Text(stringResource(R.string.skills_hub_install))
+                        Text(stringResource(Res.string.skills_hub_install))
                     }
                 }
             }

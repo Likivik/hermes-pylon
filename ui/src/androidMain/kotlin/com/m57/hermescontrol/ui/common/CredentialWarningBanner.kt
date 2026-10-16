@@ -13,10 +13,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.m57.hermescontrol.R
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.action_dismiss
+import com.m57.hermescontrol.generated.resources.providers_action_fix
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Banner shown when the backend reports a `credential_warning` (the mobile
@@ -51,13 +53,13 @@ fun CredentialWarningBanner(
         )
         TextButton(onClick = onFix) {
             Text(
-                text = stringResource(R.string.providers_action_fix),
+                text = stringResource(Res.string.providers_action_fix),
                 style = MaterialTheme.typography.labelSmall,
             )
         }
         TextButton(onClick = onDismiss) {
             Text(
-                text = stringResource(R.string.action_dismiss),
+                text = stringResource(Res.string.action_dismiss),
                 style = MaterialTheme.typography.labelSmall,
             )
         }

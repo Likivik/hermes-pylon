@@ -13,9 +13,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
-import com.m57.hermescontrol.R
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.settings_desc_auto_reconnect
+import com.m57.hermescontrol.generated.resources.settings_item_auto_reconnect
 import com.m57.hermescontrol.ui.settings.SectionCard
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun BehaviorSection(
@@ -30,11 +32,11 @@ fun BehaviorSection(
         ) {
             Column {
                 Text(
-                    text = stringResource(R.string.settings_item_auto_reconnect),
+                    text = stringResource(Res.string.settings_item_auto_reconnect),
                     style = MaterialTheme.typography.bodyLarge,
                 )
                 Text(
-                    text = stringResource(R.string.settings_desc_auto_reconnect),
+                    text = stringResource(Res.string.settings_desc_auto_reconnect),
                     style =
                         MaterialTheme.typography.bodySmall.copy(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -37,16 +37,33 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.OAuthProvider
 import com.m57.hermescontrol.data.model.OAuthStartResponse
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.action_cancel
+import com.m57.hermescontrol.generated.resources.action_close
+import com.m57.hermescontrol.generated.resources.action_done
+import com.m57.hermescontrol.generated.resources.providers_action_connect
+import com.m57.hermescontrol.generated.resources.providers_action_disconnect
+import com.m57.hermescontrol.generated.resources.providers_action_how_to_connect
+import com.m57.hermescontrol.generated.resources.providers_action_in_progress
+import com.m57.hermescontrol.generated.resources.providers_action_open_browser
+import com.m57.hermescontrol.generated.resources.providers_action_submit_code
+import com.m57.hermescontrol.generated.resources.providers_code_label
+import com.m57.hermescontrol.generated.resources.providers_device_code_hint
+import com.m57.hermescontrol.generated.resources.providers_empty_desc
+import com.m57.hermescontrol.generated.resources.providers_empty_title
+import com.m57.hermescontrol.generated.resources.providers_expires_in
+import com.m57.hermescontrol.generated.resources.providers_external_hint
+import com.m57.hermescontrol.generated.resources.providers_flow_success
+import com.m57.hermescontrol.generated.resources.providers_pkce_paste_hint
+import com.m57.hermescontrol.generated.resources.screen_providers
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.ui.common.EmptyState
 import com.m57.hermescontrol.ui.common.ErrorState
@@ -56,6 +73,7 @@ import com.m57.hermescontrol.ui.common.SkeletonListState
 import com.m57.hermescontrol.ui.common.ToastEffect
 import com.m57.hermescontrol.ui.common.listContentPadding
 import com.m57.hermescontrol.ui.common.listItemSpacing
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun ProvidersScreen(
@@ -94,7 +112,7 @@ fun ProvidersScreen(
     }
 
     HermesScaffold(
-        title = { Text(stringResource(R.string.screen_providers)) },
+        title = { Text(stringResource(Res.string.screen_providers)) },
         navigationIcon = onOpenDrawer?.let { NavIcon.Menu(it) },
         isRefreshing = state.isLoading,
         onRefresh = { viewModel.load() },
@@ -114,8 +132,8 @@ fun ProvidersScreen(
 
             state.providers.isEmpty() -> {
                 EmptyState(
-                    title = stringResource(R.string.providers_empty_title),
-                    subtitle = stringResource(R.string.providers_empty_desc),
+                    title = stringResource(Res.string.providers_empty_title),
+                    subtitle = stringResource(Res.string.providers_empty_desc),
                     modifier = Modifier.padding(paddingValues),
                 )
             }
@@ -200,7 +218,7 @@ private fun ProviderCard(
                             enabled = false,
                         ) {
                             Text(
-                                text = stringResource(R.string.providers_action_in_progress),
+                                text = stringResource(Res.string.providers_action_in_progress),
                                 style = MaterialTheme.typography.labelSmall,
                             )
                         }
@@ -211,7 +229,7 @@ private fun ProviderCard(
                                 enabled = !isActing,
                             ) {
                                 Text(
-                                    text = stringResource(R.string.providers_action_disconnect),
+                                    text = stringResource(Res.string.providers_action_disconnect),
                                     style = MaterialTheme.typography.labelSmall,
                                 )
                             }
@@ -233,9 +251,9 @@ private fun ProviderCard(
                             Text(
                                 text =
                                     if (isExternal) {
-                                        stringResource(R.string.providers_action_how_to_connect)
+                                        stringResource(Res.string.providers_action_how_to_connect)
                                     } else {
-                                        stringResource(R.string.providers_action_connect)
+                                        stringResource(Res.string.providers_action_connect)
                                     },
                                 style = MaterialTheme.typography.labelSmall,
                             )
@@ -267,31 +285,31 @@ private fun OAuthFlowDialog(
             when (state.flowPhase) {
                 OAuthFlowPhase.WAITING_CODE -> {
                     Button(onClick = onSubmitCode) {
-                        Text(stringResource(R.string.providers_action_submit_code))
+                        Text(stringResource(Res.string.providers_action_submit_code))
                     }
                 }
 
                 OAuthFlowPhase.DONE -> {
                     Button(onClick = onDismissFlow) {
-                        Text(stringResource(R.string.action_done))
+                        Text(stringResource(Res.string.action_done))
                     }
                 }
 
                 OAuthFlowPhase.ERROR -> {
                     Button(onClick = onDismissFlow) {
-                        Text(stringResource(R.string.action_close))
+                        Text(stringResource(Res.string.action_close))
                     }
                 }
 
                 OAuthFlowPhase.SHOW_CLI -> {
                     Button(onClick = onDismissFlow) {
-                        Text(stringResource(R.string.action_close))
+                        Text(stringResource(Res.string.action_close))
                     }
                 }
 
                 else -> {
                     TextButton(onClick = onCancel) {
-                        Text(stringResource(R.string.action_cancel))
+                        Text(stringResource(Res.string.action_cancel))
                     }
                 }
             }
@@ -299,7 +317,7 @@ private fun OAuthFlowDialog(
         dismissButton = {
             if (state.flowPhase == OAuthFlowPhase.WAITING_CODE) {
                 TextButton(onClick = onCancel) {
-                    Text(stringResource(R.string.action_cancel))
+                    Text(stringResource(Res.string.action_cancel))
                 }
             }
         },
@@ -335,7 +353,7 @@ private fun OAuthFlowDialog(
 
                     state.flowPhase == OAuthFlowPhase.DONE -> {
                         Text(
-                            text = stringResource(R.string.providers_flow_success),
+                            text = stringResource(Res.string.providers_flow_success),
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
@@ -357,7 +375,7 @@ private fun OAuthFlowDialog(
 private fun ExternalFlowContent(provider: OAuthProvider) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
-            text = stringResource(R.string.providers_external_hint),
+            text = stringResource(Res.string.providers_external_hint),
             style = MaterialTheme.typography.bodyMedium,
         )
         provider.cliCommand.takeIf { it.isNotBlank() }?.let { cmd ->
@@ -395,19 +413,19 @@ private fun PkceFlowContent(
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
-                text = stringResource(R.string.providers_action_open_browser),
+                text = stringResource(Res.string.providers_action_open_browser),
                 style = MaterialTheme.typography.labelSmall,
             )
         }
         Text(
-            text = stringResource(R.string.providers_pkce_paste_hint),
+            text = stringResource(Res.string.providers_pkce_paste_hint),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         OutlinedTextField(
             value = code,
             onValueChange = onCodeChange,
-            label = { Text(stringResource(R.string.providers_code_label)) },
+            label = { Text(stringResource(Res.string.providers_code_label)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
             isError = error != null,
@@ -432,7 +450,7 @@ private fun DeviceCodeFlowContent(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
-            text = stringResource(R.string.providers_device_code_hint),
+            text = stringResource(Res.string.providers_device_code_hint),
             style = MaterialTheme.typography.bodyMedium,
         )
         start?.userCode?.let { code ->
@@ -458,7 +476,7 @@ private fun DeviceCodeFlowContent(
         }
         if (expiresIn.isNotEmpty()) {
             Text(
-                text = stringResource(R.string.providers_expires_in, expiresIn),
+                text = stringResource(Res.string.providers_expires_in, expiresIn),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

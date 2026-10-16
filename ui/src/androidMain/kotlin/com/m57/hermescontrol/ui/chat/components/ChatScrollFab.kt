@@ -19,10 +19,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.m57.hermescontrol.R
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.content_desc_scroll_to_bottom
 import com.m57.hermescontrol.theme.Spacing
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Floating action button shown when the message list is not following the
@@ -68,7 +69,7 @@ fun BoxScope.ChatScrollToBottomFab(
             ) {
                 Icon(
                     imageVector = Icons.Filled.KeyboardArrowDown,
-                    contentDescription = stringResource(R.string.content_desc_scroll_to_bottom),
+                    contentDescription = stringResource(Res.string.content_desc_scroll_to_bottom),
                 )
             }
         }

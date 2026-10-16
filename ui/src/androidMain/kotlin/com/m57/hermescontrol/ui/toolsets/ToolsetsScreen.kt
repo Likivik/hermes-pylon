@@ -33,13 +33,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.Toolset
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.action_retry
+import com.m57.hermescontrol.generated.resources.content_desc_refresh
+import com.m57.hermescontrol.generated.resources.screen_toolsets
+import com.m57.hermescontrol.generated.resources.toolsets_empty_desc
+import com.m57.hermescontrol.generated.resources.toolsets_empty_title
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.DetailDialog
 import com.m57.hermescontrol.ui.common.EmptyState
@@ -52,6 +56,7 @@ import com.m57.hermescontrol.ui.common.ToastEffect
 import com.m57.hermescontrol.ui.common.listContentPadding
 import com.m57.hermescontrol.ui.common.listItemSpacing
 import com.m57.hermescontrol.ui.common.toDetailRows
+import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -81,7 +86,7 @@ fun ToolsetsScreen(
     ToastEffect(toastMessage = state.toastMessage, onClearToast = viewModel::clearToast)
 
     HermesScaffold(
-        title = { Text(stringResource(R.string.screen_toolsets)) },
+        title = { Text(stringResource(Res.string.screen_toolsets)) },
         navigationIcon = onOpenDrawer?.let { NavIcon.Menu(it) },
         isRefreshing = state.isLoading,
         onRefresh = { viewModel.loadToolsets() },
@@ -101,10 +106,10 @@ fun ToolsetsScreen(
 
             state.toolsets.isEmpty() -> {
                 EmptyState(
-                    title = stringResource(R.string.toolsets_empty_title),
-                    subtitle = stringResource(R.string.toolsets_empty_desc),
+                    title = stringResource(Res.string.toolsets_empty_title),
+                    subtitle = stringResource(Res.string.toolsets_empty_desc),
                     onAction = { viewModel.loadToolsets() },
-                    actionLabel = stringResource(R.string.content_desc_refresh),
+                    actionLabel = stringResource(Res.string.content_desc_refresh),
                     modifier = Modifier.padding(paddingValues),
                 )
             }
@@ -123,7 +128,7 @@ fun ToolsetsScreen(
                             IconButton(onClick = { viewModel.loadToolsets() }) {
                                 Icon(
                                     imageVector = Icons.Filled.Refresh,
-                                    contentDescription = stringResource(R.string.action_retry),
+                                    contentDescription = stringResource(Res.string.action_retry),
                                 )
                             }
                         }

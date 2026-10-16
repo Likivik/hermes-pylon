@@ -42,17 +42,55 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.CreateProfileRequest
 import com.m57.hermescontrol.data.model.McpServerConfigInput
 import com.m57.hermescontrol.data.model.ModelProvider
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.action_cancel
+import com.m57.hermescontrol.generated.resources.profiles_builder_action_add
+import com.m57.hermescontrol.generated.resources.profiles_builder_action_back
+import com.m57.hermescontrol.generated.resources.profiles_builder_action_create
+import com.m57.hermescontrol.generated.resources.profiles_builder_action_next
+import com.m57.hermescontrol.generated.resources.profiles_builder_label_description
+import com.m57.hermescontrol.generated.resources.profiles_builder_label_profile_name
+import com.m57.hermescontrol.generated.resources.profiles_builder_mcp_add
+import com.m57.hermescontrol.generated.resources.profiles_builder_mcp_args
+import com.m57.hermescontrol.generated.resources.profiles_builder_mcp_command
+import com.m57.hermescontrol.generated.resources.profiles_builder_mcp_dialog_title
+import com.m57.hermescontrol.generated.resources.profiles_builder_mcp_name
+import com.m57.hermescontrol.generated.resources.profiles_builder_mcp_none
+import com.m57.hermescontrol.generated.resources.profiles_builder_mcp_sse_url
+import com.m57.hermescontrol.generated.resources.profiles_builder_mcp_title
+import com.m57.hermescontrol.generated.resources.profiles_builder_mcp_transport
+import com.m57.hermescontrol.generated.resources.profiles_builder_mcp_transport_sse
+import com.m57.hermescontrol.generated.resources.profiles_builder_mcp_transport_stdio
+import com.m57.hermescontrol.generated.resources.profiles_builder_review_description
+import com.m57.hermescontrol.generated.resources.profiles_builder_review_mcp_none
+import com.m57.hermescontrol.generated.resources.profiles_builder_review_mcp_title
+import com.m57.hermescontrol.generated.resources.profiles_builder_review_model
+import com.m57.hermescontrol.generated.resources.profiles_builder_review_model_settings
+import com.m57.hermescontrol.generated.resources.profiles_builder_review_name
+import com.m57.hermescontrol.generated.resources.profiles_builder_review_provider
+import com.m57.hermescontrol.generated.resources.profiles_builder_review_skills_default
+import com.m57.hermescontrol.generated.resources.profiles_builder_review_skills_hub
+import com.m57.hermescontrol.generated.resources.profiles_builder_review_skills_local
+import com.m57.hermescontrol.generated.resources.profiles_builder_review_skills_title
+import com.m57.hermescontrol.generated.resources.profiles_builder_review_system_defaults
+import com.m57.hermescontrol.generated.resources.profiles_builder_step_identity
+import com.m57.hermescontrol.generated.resources.profiles_builder_step_indicator
+import com.m57.hermescontrol.generated.resources.profiles_builder_step_mcp
+import com.m57.hermescontrol.generated.resources.profiles_builder_step_model
+import com.m57.hermescontrol.generated.resources.profiles_builder_step_review
+import com.m57.hermescontrol.generated.resources.profiles_builder_step_skills
+import com.m57.hermescontrol.generated.resources.profiles_builder_title_model
+import com.m57.hermescontrol.generated.resources.profiles_builder_title_provider
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.profiles.ProfilesUiState
 import com.m57.hermescontrol.ui.profiles.ProfilesViewModel
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun ProfileBuilderView(
@@ -94,7 +132,7 @@ fun ProfileBuilderView(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = stringResource(R.string.profiles_builder_step_indicator, step),
+                text = stringResource(Res.string.profiles_builder_step_indicator, step),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
@@ -102,11 +140,11 @@ fun ProfileBuilderView(
             Text(
                 text =
                     when (step) {
-                        1 -> stringResource(R.string.profiles_builder_step_identity)
-                        2 -> stringResource(R.string.profiles_builder_step_model)
-                        3 -> stringResource(R.string.profiles_builder_step_skills)
-                        4 -> stringResource(R.string.profiles_builder_step_mcp)
-                        else -> stringResource(R.string.profiles_builder_step_review)
+                        1 -> stringResource(Res.string.profiles_builder_step_identity)
+                        2 -> stringResource(Res.string.profiles_builder_step_model)
+                        3 -> stringResource(Res.string.profiles_builder_step_skills)
+                        4 -> stringResource(Res.string.profiles_builder_step_mcp)
+                        else -> stringResource(Res.string.profiles_builder_step_review)
                     },
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
@@ -219,11 +257,11 @@ fun ProfileBuilderView(
         ) {
             if (step > 1) {
                 OutlinedButton(onClick = { step-- }) {
-                    Text(stringResource(R.string.profiles_builder_action_back))
+                    Text(stringResource(Res.string.profiles_builder_action_back))
                 }
             } else {
                 OutlinedButton(onClick = onCancel) {
-                    Text(stringResource(R.string.action_cancel))
+                    Text(stringResource(Res.string.action_cancel))
                 }
             }
 
@@ -236,7 +274,7 @@ fun ProfileBuilderView(
                             else -> true
                         },
                 ) {
-                    Text(stringResource(R.string.profiles_builder_action_next))
+                    Text(stringResource(Res.string.profiles_builder_action_next))
                 }
             } else {
                 Button(
@@ -262,7 +300,7 @@ fun ProfileBuilderView(
                             strokeWidth = 2.dp,
                         )
                     } else {
-                        Text(stringResource(R.string.profiles_builder_action_create))
+                        Text(stringResource(Res.string.profiles_builder_action_create))
                     }
                 }
             }
@@ -292,7 +330,7 @@ private fun IdentityStep(
         OutlinedTextField(
             value = name,
             onValueChange = onNameChange,
-            label = { Text(stringResource(R.string.profiles_builder_label_profile_name)) },
+            label = { Text(stringResource(Res.string.profiles_builder_label_profile_name)) },
             placeholder = { Text("my-agent-profile") },
             isError = nameError != null,
             supportingText = nameError?.let { { Text(it) } },
@@ -303,7 +341,7 @@ private fun IdentityStep(
         OutlinedTextField(
             value = description,
             onValueChange = onDescriptionChange,
-            label = { Text(stringResource(R.string.profiles_builder_label_description)) },
+            label = { Text(stringResource(Res.string.profiles_builder_label_description)) },
             placeholder = { Text("Describe the purpose of this profile") },
             modifier = Modifier.fillMaxWidth(),
             maxLines = 4,
@@ -327,7 +365,7 @@ private fun ModelStep(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
-            text = stringResource(R.string.profiles_builder_title_provider),
+            text = stringResource(Res.string.profiles_builder_title_provider),
             style = MaterialTheme.typography.titleSmall,
         )
         Row(
@@ -357,7 +395,7 @@ private fun ModelStep(
             val providerObj = providers.find { it.slug == selectedProvider }
             providerObj?.models?.let { models ->
                 Text(
-                    text = stringResource(R.string.profiles_builder_title_model),
+                    text = stringResource(Res.string.profiles_builder_title_model),
                     style = MaterialTheme.typography.titleSmall,
                 )
                 Column(
@@ -425,11 +463,11 @@ private fun McpStep(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = stringResource(R.string.profiles_builder_mcp_title),
+                text = stringResource(Res.string.profiles_builder_mcp_title),
                 style = MaterialTheme.typography.titleSmall,
             )
             Button(onClick = { showAddDialog = true }) {
-                Text(stringResource(R.string.profiles_builder_mcp_add))
+                Text(stringResource(Res.string.profiles_builder_mcp_add))
             }
         }
 
@@ -442,7 +480,7 @@ private fun McpStep(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = stringResource(R.string.profiles_builder_mcp_none),
+                    text = stringResource(Res.string.profiles_builder_mcp_none),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -526,7 +564,7 @@ private fun AddMcpDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.profiles_builder_mcp_dialog_title)) },
+        title = { Text(stringResource(Res.string.profiles_builder_mcp_dialog_title)) },
         text = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -534,14 +572,14 @@ private fun AddMcpDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text(stringResource(R.string.profiles_builder_mcp_name)) },
+                    label = { Text(stringResource(Res.string.profiles_builder_mcp_name)) },
                     placeholder = { Text("postgres-mcp") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                 )
 
                 Text(
-                    text = stringResource(R.string.profiles_builder_mcp_transport),
+                    text = stringResource(Res.string.profiles_builder_mcp_transport),
                     style = MaterialTheme.typography.labelMedium,
                 )
 
@@ -561,7 +599,7 @@ private fun AddMcpDialog(
                                 ButtonDefaults.outlinedButtonColors()
                             },
                     ) {
-                        Text(stringResource(R.string.profiles_builder_mcp_transport_sse))
+                        Text(stringResource(Res.string.profiles_builder_mcp_transport_sse))
                     }
 
                     OutlinedButton(
@@ -576,7 +614,7 @@ private fun AddMcpDialog(
                                 ButtonDefaults.outlinedButtonColors()
                             },
                     ) {
-                        Text(stringResource(R.string.profiles_builder_mcp_transport_stdio))
+                        Text(stringResource(Res.string.profiles_builder_mcp_transport_stdio))
                     }
                 }
 
@@ -584,7 +622,7 @@ private fun AddMcpDialog(
                     OutlinedTextField(
                         value = url,
                         onValueChange = { url = it },
-                        label = { Text(stringResource(R.string.profiles_builder_mcp_sse_url)) },
+                        label = { Text(stringResource(Res.string.profiles_builder_mcp_sse_url)) },
                         placeholder = { Text("https://mcp.example.com/sse") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
@@ -593,7 +631,7 @@ private fun AddMcpDialog(
                     OutlinedTextField(
                         value = command,
                         onValueChange = { command = it },
-                        label = { Text(stringResource(R.string.profiles_builder_mcp_command)) },
+                        label = { Text(stringResource(Res.string.profiles_builder_mcp_command)) },
                         placeholder = { Text("npx") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
@@ -601,7 +639,7 @@ private fun AddMcpDialog(
                     OutlinedTextField(
                         value = argsInput,
                         onValueChange = { argsInput = it },
-                        label = { Text(stringResource(R.string.profiles_builder_mcp_args)) },
+                        label = { Text(stringResource(Res.string.profiles_builder_mcp_args)) },
                         placeholder = {
                             Text("-y, @modelcontextprotocol/server-postgres")
                         },
@@ -635,12 +673,12 @@ private fun AddMcpDialog(
                             (transport == "stdio" && command.isNotBlank())
                     ),
             ) {
-                Text(stringResource(R.string.profiles_builder_action_add))
+                Text(stringResource(Res.string.profiles_builder_action_add))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
+                Text(stringResource(Res.string.action_cancel))
             }
         },
     )
@@ -667,7 +705,7 @@ private fun ReviewStep(
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(Spacing.md)) {
                 Text(
-                    text = stringResource(R.string.profiles_builder_review_name),
+                    text = stringResource(Res.string.profiles_builder_review_name),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -680,7 +718,7 @@ private fun ReviewStep(
                 if (description.isNotBlank()) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = stringResource(R.string.profiles_builder_review_description),
+                        text = stringResource(Res.string.profiles_builder_review_description),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -695,22 +733,22 @@ private fun ReviewStep(
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(Spacing.md)) {
                 Text(
-                    text = stringResource(R.string.profiles_builder_review_model_settings),
+                    text = stringResource(Res.string.profiles_builder_review_model_settings),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (provider.isNotBlank() && model.isNotBlank()) {
                     Text(
-                        text = stringResource(R.string.profiles_builder_review_provider, provider),
+                        text = stringResource(Res.string.profiles_builder_review_provider, provider),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     Text(
-                        text = stringResource(R.string.profiles_builder_review_model, model),
+                        text = stringResource(Res.string.profiles_builder_review_model, model),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 } else {
                     Text(
-                        text = stringResource(R.string.profiles_builder_review_system_defaults),
+                        text = stringResource(Res.string.profiles_builder_review_system_defaults),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
@@ -720,18 +758,18 @@ private fun ReviewStep(
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(Spacing.md)) {
                 Text(
-                    text = stringResource(R.string.profiles_builder_review_skills_title),
+                    text = stringResource(Res.string.profiles_builder_review_skills_title),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (useDefaultSkills) {
                     Text(
-                        text = stringResource(R.string.profiles_builder_review_skills_default),
+                        text = stringResource(Res.string.profiles_builder_review_skills_default),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 } else {
                     Text(
-                        text = stringResource(R.string.profiles_builder_review_skills_local, selectedSkills.size),
+                        text = stringResource(Res.string.profiles_builder_review_skills_local, selectedSkills.size),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
@@ -739,7 +777,7 @@ private fun ReviewStep(
                 if (addedHubSkills.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = stringResource(R.string.profiles_builder_review_skills_hub, addedHubSkills.size),
+                        text = stringResource(Res.string.profiles_builder_review_skills_hub, addedHubSkills.size),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
@@ -749,7 +787,7 @@ private fun ReviewStep(
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(Spacing.md)) {
                 Text(
-                    text = stringResource(R.string.profiles_builder_review_mcp_title),
+                    text = stringResource(Res.string.profiles_builder_review_mcp_title),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -762,7 +800,7 @@ private fun ReviewStep(
                     }
                 } else {
                     Text(
-                        text = stringResource(R.string.profiles_builder_review_mcp_none),
+                        text = stringResource(Res.string.profiles_builder_review_mcp_none),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }

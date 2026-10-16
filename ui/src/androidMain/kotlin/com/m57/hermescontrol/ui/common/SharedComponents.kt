@@ -35,13 +35,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import com.m57.hermescontrol.R
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.content_desc_clear_search
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.theme.LocalSpacing
+import org.jetbrains.compose.resources.stringResource
 
 // ── SectionHeader — sticky-ish section label for grouped content ────────
 
@@ -252,7 +253,7 @@ fun SearchBar(
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Close,
-                            contentDescription = stringResource(R.string.content_desc_clear_search),
+                            contentDescription = stringResource(Res.string.content_desc_clear_search),
                             modifier = Modifier.size(16.dp),
                         )
                     }

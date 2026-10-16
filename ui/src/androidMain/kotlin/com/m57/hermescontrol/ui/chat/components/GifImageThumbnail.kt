@@ -29,14 +29,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.remote.GatewayFileClient
 import com.m57.hermescontrol.data.remote.GatewayFileResult
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.gif_action_pause
+import com.m57.hermescontrol.generated.resources.gif_action_play
 import com.m57.hermescontrol.theme.Spacing
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun GifImageThumbnail(
@@ -49,8 +51,8 @@ fun GifImageThumbnail(
     gatewayFetcher: suspend (String, java.io.File) -> GatewayFileResult = GatewayFileClient::fetch,
 ) {
     val context = LocalContext.current
-    val playDescription = stringResource(R.string.gif_action_play)
-    val pauseDescription = stringResource(R.string.gif_action_pause)
+    val playDescription = stringResource(Res.string.gif_action_play)
+    val pauseDescription = stringResource(Res.string.gif_action_pause)
     var isPlaying by remember { mutableStateOf(true) }
     var animatableDrawable by remember { mutableStateOf<Animatable?>(null) }
     var resolvedModel by remember(model, gatewayPath) {

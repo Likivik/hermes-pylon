@@ -3,7 +3,6 @@ package com.m57.hermescontrol.ui.skills
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.HubSkill
 import com.m57.hermescontrol.data.model.SaveSkillContentRequest
 import com.m57.hermescontrol.data.model.Skill
@@ -13,6 +12,10 @@ import com.m57.hermescontrol.data.model.ToggleSkillRequest
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.skills_status_all
+import com.m57.hermescontrol.generated.resources.skills_status_disabled
+import com.m57.hermescontrol.generated.resources.skills_status_enabled
 import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.ui.common.safeLaunchLoad
 import kotlinx.coroutines.CoroutineDispatcher
@@ -24,6 +27,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.jetbrains.compose.resources.StringResource
 
 enum class SkillsViewMode {
     INSTALLED,
@@ -31,11 +35,11 @@ enum class SkillsViewMode {
 }
 
 enum class SkillFilter(
-    val labelRes: Int,
+    val labelRes: StringResource,
 ) {
-    ALL_STATUSES(R.string.skills_status_all),
-    ENABLED(R.string.skills_status_enabled),
-    DISABLED(R.string.skills_status_disabled),
+    ALL_STATUSES(Res.string.skills_status_all),
+    ENABLED(Res.string.skills_status_enabled),
+    DISABLED(Res.string.skills_status_disabled),
 }
 
 enum class CategoryFilter {

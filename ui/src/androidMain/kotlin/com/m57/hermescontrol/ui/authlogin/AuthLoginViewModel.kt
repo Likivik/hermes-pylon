@@ -18,6 +18,14 @@ import com.m57.hermescontrol.data.remote.parseForBuild
 import com.m57.hermescontrol.data.remote.resolve
 import com.m57.hermescontrol.data.remote.safeApiCall
 import com.m57.hermescontrol.data.ws.HermesWsClient
+import com.m57.hermescontrol.generated.resources.auth_login_error_password_required
+import com.m57.hermescontrol.generated.resources.auth_login_error_token_required
+import com.m57.hermescontrol.generated.resources.auth_login_error_unreachable
+import com.m57.hermescontrol.generated.resources.auth_login_error_username_required
+import com.m57.hermescontrol.generated.resources.connect_error_401
+import com.m57.hermescontrol.generated.resources.connect_error_403
+import com.m57.hermescontrol.generated.resources.connect_error_connection_failed
+import com.m57.hermescontrol.generated.resources.connect_error_http_code
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

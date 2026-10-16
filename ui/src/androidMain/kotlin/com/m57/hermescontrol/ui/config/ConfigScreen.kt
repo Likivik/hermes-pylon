@@ -53,7 +53,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -61,8 +60,29 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.ConfigSchemaResponse
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.config_action_reset
+import com.m57.hermescontrol.generated.resources.config_action_save
+import com.m57.hermescontrol.generated.resources.config_action_save_yaml
+import com.m57.hermescontrol.generated.resources.config_category_other
+import com.m57.hermescontrol.generated.resources.config_clear_value
+import com.m57.hermescontrol.generated.resources.config_invalid_json
+import com.m57.hermescontrol.generated.resources.config_load_failed
+import com.m57.hermescontrol.generated.resources.config_load_yaml_failed
+import com.m57.hermescontrol.generated.resources.config_mode_form
+import com.m57.hermescontrol.generated.resources.config_mode_yaml
+import com.m57.hermescontrol.generated.resources.config_no_category_fields
+import com.m57.hermescontrol.generated.resources.config_no_matches
+import com.m57.hermescontrol.generated.resources.config_no_search_results
+import com.m57.hermescontrol.generated.resources.config_path
+import com.m57.hermescontrol.generated.resources.config_pending_changes
+import com.m57.hermescontrol.generated.resources.config_reset_default
+import com.m57.hermescontrol.generated.resources.config_save_changes
+import com.m57.hermescontrol.generated.resources.config_screen_title
+import com.m57.hermescontrol.generated.resources.config_search_placeholder
+import com.m57.hermescontrol.generated.resources.config_search_results
+import com.m57.hermescontrol.generated.resources.config_yaml_editor_label
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.ErrorState
 import com.m57.hermescontrol.ui.common.ExposedDropdownField
@@ -74,6 +94,7 @@ import com.m57.hermescontrol.ui.common.ToastEffect
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
+import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -90,7 +111,7 @@ fun ConfigScreen(
     )
 
     HermesScaffold(
-        title = { Text(stringResource(R.string.config_screen_title)) },
+        title = { Text(stringResource(Res.string.config_screen_title)) },
         navigationIcon = onOpenDrawer?.let { NavIcon.Menu(it) },
         isRefreshing = state.isLoading,
         onRefresh = { viewModel.loadAll() },
@@ -102,7 +123,7 @@ fun ConfigScreen(
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Save,
-                        contentDescription = stringResource(R.string.config_save_changes),
+                        contentDescription = stringResource(Res.string.config_save_changes),
                     )
                 }
             }
@@ -115,7 +136,7 @@ fun ConfigScreen(
 
             state.errorMessage != null && state.values == null -> {
                 ErrorState(
-                    message = stringResource(R.string.config_load_failed, state.errorMessage.orEmpty()),
+                    message = stringResource(Res.string.config_load_failed, state.errorMessage.orEmpty()),
                     onRetry = { viewModel.loadAll() },
                     modifier = Modifier.padding(paddingValues),
                 )
@@ -173,7 +194,7 @@ private fun ConfigContent(
             // Path display
             state.path?.let { path ->
                 Text(
-                    text = stringResource(R.string.config_path, path),
+                    text = stringResource(Res.string.config_path, path),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = Spacing.sm),
@@ -196,7 +217,9 @@ private fun ConfigContent(
                         modifier = Modifier.padding(end = Spacing.xs),
                     )
                     Text(
-                        stringResource(if (state.yamlMode) R.string.config_mode_form else R.string.config_mode_yaml),
+                        stringResource(
+                            if (state.yamlMode) Res.string.config_mode_form else Res.string.config_mode_yaml,
+                        ),
                         fontWeight = FontWeight.Medium,
                     )
                 }
@@ -205,7 +228,7 @@ private fun ConfigContent(
                     SearchBar(
                         query = state.searchQuery,
                         onQueryChange = onSearchQueryChange,
-                        placeholder = stringResource(R.string.config_search_placeholder),
+                        placeholder = stringResource(Res.string.config_search_placeholder),
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -230,7 +253,7 @@ private fun ConfigContent(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            text = stringResource(R.string.config_pending_changes, state.modifiedKeys.size),
+                            text = stringResource(Res.string.config_pending_changes, state.modifiedKeys.size),
                             style = MaterialTheme.typography.bodySmall,
                         )
                         Button(
@@ -250,7 +273,7 @@ private fun ConfigContent(
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    stringResource(R.string.config_action_save),
+                                    stringResource(Res.string.config_action_save),
                                     style = MaterialTheme.typography.labelMedium,
                                 )
                             }
@@ -313,7 +336,7 @@ private fun YAMLEditor(
 
     if (loadError != null) {
         ErrorState(
-            message = stringResource(R.string.config_load_yaml_failed, loadError),
+            message = stringResource(Res.string.config_load_yaml_failed, loadError),
             onRetry = onRetry,
         )
         return
@@ -336,7 +359,7 @@ private fun YAMLEditor(
                     .fillMaxWidth()
                     .weight(1f),
             textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-            label = { Text(stringResource(R.string.config_yaml_editor_label)) },
+            label = { Text(stringResource(Res.string.config_yaml_editor_label)) },
             maxLines = Int.MAX_VALUE,
         )
 
@@ -359,7 +382,7 @@ private fun YAMLEditor(
                     modifier = Modifier.padding(end = Spacing.xs),
                 )
                 Text(
-                    stringResource(R.string.config_action_save_yaml),
+                    stringResource(Res.string.config_action_save_yaml),
                 )
             }
         }
@@ -457,7 +480,7 @@ private fun FormEditor(
             item(key = "search-meta") {
                 val count = visibleRows.size
                 Text(
-                    text = stringResource(R.string.config_search_results, count),
+                    text = stringResource(Res.string.config_search_results, count),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = Spacing.xs),
@@ -514,9 +537,9 @@ private fun FormEditor(
                     Text(
                         text =
                             if (isSearching) {
-                                stringResource(R.string.config_no_search_results)
+                                stringResource(Res.string.config_no_search_results)
                             } else {
-                                stringResource(R.string.config_no_category_fields)
+                                stringResource(Res.string.config_no_category_fields)
                             },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -549,7 +572,7 @@ private fun FormEditor(
                             contentDescription = null,
                             modifier = Modifier.padding(end = Spacing.xs),
                         )
-                        Text(stringResource(R.string.config_action_save))
+                        Text(stringResource(Res.string.config_action_save))
                     }
                 }
 
@@ -564,7 +587,7 @@ private fun FormEditor(
                             contentDescription = null,
                             modifier = Modifier.padding(end = Spacing.xs),
                         )
-                        Text(stringResource(R.string.config_action_reset))
+                        Text(stringResource(Res.string.config_action_reset))
                     }
                 }
             }
@@ -597,7 +620,7 @@ private fun ConfigTabs(
                         Text(
                             text =
                                 if (isSyntheticOtherCategory(category)) {
-                                    stringResource(R.string.config_category_other)
+                                    stringResource(Res.string.config_category_other)
                                 } else {
                                     category.replaceFirstChar { it.uppercase() }
                                 },
@@ -659,7 +682,7 @@ private fun ConfigFieldCard(
                         Text(
                             text =
                                 if (isSyntheticOtherCategory(row.category)) {
-                                    stringResource(R.string.config_category_other)
+                                    stringResource(Res.string.config_category_other)
                                 } else {
                                     row.category.replaceFirstChar { it.uppercase() }
                                 },
@@ -698,7 +721,7 @@ private fun ConfigFieldCard(
                 if (shouldShowFieldReset(row, defaultValue)) {
                     CompactIconButton(
                         icon = Icons.Filled.Refresh,
-                        contentDescription = stringResource(R.string.config_reset_default),
+                        contentDescription = stringResource(Res.string.config_reset_default),
                         onClick = onReset,
                     )
                 }
@@ -706,7 +729,7 @@ private fun ConfigFieldCard(
                 if (field?.clearable == true && row.valueText.isNotEmpty()) {
                     CompactIconButton(
                         icon = Icons.Filled.Clear,
-                        contentDescription = stringResource(R.string.config_clear_value),
+                        contentDescription = stringResource(Res.string.config_clear_value),
                         onClick = onClear,
                     )
                 }
@@ -912,7 +935,7 @@ private fun SearchableSelectField(
                 DropdownMenuItem(
                     text = {
                         Text(
-                            text = stringResource(R.string.config_no_matches),
+                            text = stringResource(Res.string.config_no_matches),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     },
@@ -998,7 +1021,7 @@ private fun JsonField(
         isError = invalid,
         supportingText =
             if (invalid) {
-                { Text(stringResource(R.string.config_invalid_json)) }
+                { Text(stringResource(Res.string.config_invalid_json)) }
             } else {
                 null
             },

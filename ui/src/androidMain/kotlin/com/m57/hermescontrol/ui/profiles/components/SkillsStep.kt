@@ -36,14 +36,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.HubSkill
 import com.m57.hermescontrol.data.model.Skill
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.profiles_builder_skills_added
+import com.m57.hermescontrol.generated.resources.profiles_builder_skills_default
+import com.m57.hermescontrol.generated.resources.profiles_builder_skills_default_desc
+import com.m57.hermescontrol.generated.resources.profiles_builder_skills_hub_title
+import com.m57.hermescontrol.generated.resources.profiles_builder_skills_local
+import com.m57.hermescontrol.generated.resources.profiles_builder_skills_search_hub
+import com.m57.hermescontrol.generated.resources.profiles_builder_skills_search_results
 import com.m57.hermescontrol.theme.Spacing
+import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,11 +83,11 @@ fun SkillsStep(
             Spacer(modifier = Modifier.width(8.dp))
             Column {
                 Text(
-                    text = stringResource(R.string.profiles_builder_skills_default),
+                    text = stringResource(Res.string.profiles_builder_skills_default),
                     style = MaterialTheme.typography.bodyLarge,
                 )
                 Text(
-                    text = stringResource(R.string.profiles_builder_skills_default_desc),
+                    text = stringResource(Res.string.profiles_builder_skills_default_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -91,7 +98,7 @@ fun SkillsStep(
 
         if (!useDefaultSkills) {
             Text(
-                text = stringResource(R.string.profiles_builder_skills_local),
+                text = stringResource(Res.string.profiles_builder_skills_local),
                 style = MaterialTheme.typography.titleSmall,
             )
             LazyColumn(
@@ -146,7 +153,7 @@ fun SkillsStep(
         } else {
             // Browse and add Skills from Hermes Hub
             Text(
-                text = stringResource(R.string.profiles_builder_skills_hub_title),
+                text = stringResource(Res.string.profiles_builder_skills_hub_title),
                 style = MaterialTheme.typography.titleSmall,
             )
 
@@ -157,7 +164,7 @@ fun SkillsStep(
                 OutlinedTextField(
                     value = hubSearchQuery,
                     onValueChange = { hubSearchQuery = it },
-                    label = { Text(stringResource(R.string.profiles_builder_skills_search_hub)) },
+                    label = { Text(stringResource(Res.string.profiles_builder_skills_search_hub)) },
                     modifier = Modifier.weight(1f),
                     singleLine = true,
                 )
@@ -179,7 +186,7 @@ fun SkillsStep(
 
             if (addedHubSkills.isNotEmpty()) {
                 Text(
-                    text = stringResource(R.string.profiles_builder_skills_added),
+                    text = stringResource(Res.string.profiles_builder_skills_added),
                     style = MaterialTheme.typography.labelMedium,
                 )
                 LazyColumn(
@@ -222,7 +229,7 @@ fun SkillsStep(
 
             if (hubSearchResults.isNotEmpty()) {
                 Text(
-                    text = stringResource(R.string.profiles_builder_skills_search_results),
+                    text = stringResource(Res.string.profiles_builder_skills_search_results),
                     style = MaterialTheme.typography.labelMedium,
                 )
                 LazyColumn(

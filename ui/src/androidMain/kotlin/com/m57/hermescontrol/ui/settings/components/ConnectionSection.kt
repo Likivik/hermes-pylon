@@ -32,17 +32,22 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.config.resolveBaseUrl
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.content_desc_delete_profile
+import com.m57.hermescontrol.generated.resources.settings_action_add_profile
+import com.m57.hermescontrol.generated.resources.settings_action_edit_profile
+import com.m57.hermescontrol.generated.resources.settings_action_test_connection
+import com.m57.hermescontrol.generated.resources.settings_saved_profiles
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.settings.SectionCard
 import com.m57.hermescontrol.ui.settings.SettingsUiState
 import com.m57.hermescontrol.ui.settings.SettingsViewModel
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun ConnectionSection(
@@ -55,7 +60,7 @@ fun ConnectionSection(
         // ── Saved profiles list ──────────────────────────────────
         if (state.profiles.isNotEmpty()) {
             Text(
-                text = stringResource(R.string.settings_saved_profiles, state.profiles.size),
+                text = stringResource(Res.string.settings_saved_profiles, state.profiles.size),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -123,7 +128,7 @@ fun ConnectionSection(
                             ) {
                                 Icon(
                                     imageVector = Icons.Filled.Edit,
-                                    contentDescription = stringResource(R.string.settings_action_edit_profile),
+                                    contentDescription = stringResource(Res.string.settings_action_edit_profile),
                                     modifier = Modifier.size(18.dp),
                                     tint =
                                         if (isActive) {
@@ -138,7 +143,7 @@ fun ConnectionSection(
                             ) {
                                 Icon(
                                     imageVector = Icons.Filled.Close,
-                                    contentDescription = stringResource(R.string.content_desc_delete_profile),
+                                    contentDescription = stringResource(Res.string.content_desc_delete_profile),
                                     tint = MaterialTheme.colorScheme.error,
                                     modifier = Modifier.size(18.dp),
                                 )
@@ -160,7 +165,7 @@ fun ConnectionSection(
                 modifier = Modifier.size(18.dp),
             )
             Spacer(modifier = Modifier.size(4.dp))
-            Text(stringResource(R.string.settings_action_add_profile))
+            Text(stringResource(Res.string.settings_action_add_profile))
         }
     }
 
@@ -237,7 +242,7 @@ fun TestConnectionButton(
                 strokeWidth = 2.dp,
             )
         } else {
-            Text(stringResource(R.string.settings_action_test_connection))
+            Text(stringResource(Res.string.settings_action_test_connection))
         }
     }
 }

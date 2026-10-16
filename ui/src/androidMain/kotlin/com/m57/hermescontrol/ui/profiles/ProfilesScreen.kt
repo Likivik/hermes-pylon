@@ -43,13 +43,39 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.m57.hermescontrol.R
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.action_cancel
+import com.m57.hermescontrol.generated.resources.action_ok
+import com.m57.hermescontrol.generated.resources.action_retry
+import com.m57.hermescontrol.generated.resources.content_desc_refresh
+import com.m57.hermescontrol.generated.resources.profiles_action_activate
+import com.m57.hermescontrol.generated.resources.profiles_action_clone
+import com.m57.hermescontrol.generated.resources.profiles_action_edit_description
+import com.m57.hermescontrol.generated.resources.profiles_action_edit_soul
+import com.m57.hermescontrol.generated.resources.profiles_action_set_model
+import com.m57.hermescontrol.generated.resources.profiles_badge_auto_generated
+import com.m57.hermescontrol.generated.resources.profiles_content_desc_active
+import com.m57.hermescontrol.generated.resources.profiles_description_placeholder
+import com.m57.hermescontrol.generated.resources.profiles_empty_desc
+import com.m57.hermescontrol.generated.resources.profiles_empty_title
+import com.m57.hermescontrol.generated.resources.profiles_label_description_input
+import com.m57.hermescontrol.generated.resources.profiles_label_model
+import com.m57.hermescontrol.generated.resources.profiles_label_model_input
+import com.m57.hermescontrol.generated.resources.profiles_label_new_name_input
+import com.m57.hermescontrol.generated.resources.profiles_label_path
+import com.m57.hermescontrol.generated.resources.profiles_label_provider
+import com.m57.hermescontrol.generated.resources.profiles_label_provider_input
+import com.m57.hermescontrol.generated.resources.profiles_label_skills
+import com.m57.hermescontrol.generated.resources.profiles_title_clone
+import com.m57.hermescontrol.generated.resources.profiles_title_edit_description
+import com.m57.hermescontrol.generated.resources.profiles_title_edit_soul
+import com.m57.hermescontrol.generated.resources.profiles_title_set_model
+import com.m57.hermescontrol.generated.resources.screen_profiles
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.EmptyState
 import com.m57.hermescontrol.ui.common.ErrorState
@@ -59,6 +85,7 @@ import com.m57.hermescontrol.ui.common.SkeletonListState
 import com.m57.hermescontrol.ui.common.ToastEffect
 import com.m57.hermescontrol.ui.profiles.components.ProfileBuilderView
 import com.m57.hermescontrol.ui.profiles.components.validateProfileName
+import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -94,7 +121,7 @@ fun ProfilesScreen(
                 if (isBuildingProfile) {
                     "Create Profile"
                 } else {
-                    stringResource(R.string.screen_profiles)
+                    stringResource(Res.string.screen_profiles)
                 },
             )
         },
@@ -147,10 +174,10 @@ fun ProfilesScreen(
 
                 state.profiles.isEmpty() -> {
                     EmptyState(
-                        title = stringResource(R.string.profiles_empty_title),
-                        subtitle = stringResource(R.string.profiles_empty_desc),
+                        title = stringResource(Res.string.profiles_empty_title),
+                        subtitle = stringResource(Res.string.profiles_empty_desc),
                         onAction = { viewModel.loadProfiles() },
-                        actionLabel = stringResource(R.string.content_desc_refresh),
+                        actionLabel = stringResource(Res.string.content_desc_refresh),
                         modifier = Modifier.padding(paddingValues),
                     )
                 }
@@ -167,7 +194,7 @@ fun ProfilesScreen(
                                 Text(text = state.errorMessage ?: "", color = MaterialTheme.colorScheme.error)
                                 Spacer(modifier = Modifier.height(16.dp))
                                 Button(onClick = { viewModel.loadProfiles() }) {
-                                    Text(stringResource(R.string.action_retry))
+                                    Text(stringResource(Res.string.action_retry))
                                 }
                             }
                         } else {
@@ -217,7 +244,7 @@ fun ProfilesScreen(
                                                         if (!profileDescription.isNullOrBlank()) {
                                                             profileDescription.toString()
                                                         } else {
-                                                            stringResource(R.string.profiles_description_placeholder)
+                                                            stringResource(Res.string.profiles_description_placeholder)
                                                         }
                                                     val isPlaceholder = profileDescription.isNullOrBlank()
                                                     Spacer(modifier = Modifier.height(4.dp))
@@ -252,7 +279,7 @@ fun ProfilesScreen(
                                                             Text(
                                                                 text =
                                                                     stringResource(
-                                                                        R.string.profiles_badge_auto_generated,
+                                                                        Res.string.profiles_badge_auto_generated,
                                                                     ),
                                                                 color = MaterialTheme.colorScheme.onErrorContainer,
                                                                 style = MaterialTheme.typography.labelSmall,
@@ -266,7 +293,7 @@ fun ProfilesScreen(
                                                         imageVector = Icons.Filled.Check,
                                                         contentDescription =
                                                             stringResource(
-                                                                R.string.profiles_content_desc_active,
+                                                                Res.string.profiles_content_desc_active,
                                                             ),
                                                         tint = MaterialTheme.colorScheme.primary,
                                                         modifier = Modifier.padding(start = Spacing.sm),
@@ -285,7 +312,7 @@ fun ProfilesScreen(
                                                     Text(
                                                         text =
                                                             stringResource(
-                                                                R.string.profiles_label_model,
+                                                                Res.string.profiles_label_model,
                                                                 profile.model ?: "None",
                                                             ),
                                                         style = MaterialTheme.typography.bodyMedium,
@@ -293,7 +320,7 @@ fun ProfilesScreen(
                                                     Text(
                                                         text =
                                                             stringResource(
-                                                                R.string.profiles_label_provider,
+                                                                Res.string.profiles_label_provider,
                                                                 profile.provider ?: "None",
                                                             ),
                                                         style = MaterialTheme.typography.bodySmall,
@@ -302,7 +329,7 @@ fun ProfilesScreen(
                                                     Text(
                                                         text =
                                                             stringResource(
-                                                                R.string.profiles_label_skills,
+                                                                Res.string.profiles_label_skills,
                                                                 profile.skill_count ?: 0,
                                                             ),
                                                         style = MaterialTheme.typography.bodySmall,
@@ -310,7 +337,7 @@ fun ProfilesScreen(
                                                     )
                                                     profile.path?.let {
                                                         Text(
-                                                            text = stringResource(R.string.profiles_label_path, it),
+                                                            text = stringResource(Res.string.profiles_label_path, it),
                                                             style = MaterialTheme.typography.bodySmall,
                                                             color =
                                                                 MaterialTheme.colorScheme.onSurfaceVariant.copy(
@@ -331,7 +358,7 @@ fun ProfilesScreen(
                                                             .fillMaxWidth()
                                                             .padding(bottom = Spacing.sm),
                                                 ) {
-                                                    Text(stringResource(R.string.profiles_action_activate))
+                                                    Text(stringResource(Res.string.profiles_action_activate))
                                                 }
                                             }
 
@@ -353,7 +380,7 @@ fun ProfilesScreen(
                                                         modifier = Modifier.width(16.dp),
                                                     )
                                                     Spacer(modifier = Modifier.width(4.dp))
-                                                    Text(stringResource(R.string.profiles_action_edit_soul))
+                                                    Text(stringResource(Res.string.profiles_action_edit_soul))
                                                 }
 
                                                 Button(
@@ -364,7 +391,7 @@ fun ProfilesScreen(
                                                     },
                                                     modifier = Modifier.padding(end = Spacing.sm),
                                                 ) {
-                                                    Text(stringResource(R.string.profiles_action_set_model))
+                                                    Text(stringResource(Res.string.profiles_action_set_model))
                                                 }
 
                                                 var showMenu by remember { mutableStateOf(false) }
@@ -385,7 +412,7 @@ fun ProfilesScreen(
                                                             text = {
                                                                 Text(
                                                                     stringResource(
-                                                                        R.string.profiles_action_edit_description,
+                                                                        Res.string.profiles_action_edit_description,
                                                                     ),
                                                                 )
                                                             },
@@ -398,7 +425,7 @@ fun ProfilesScreen(
                                                         DropdownMenuItem(
                                                             text = {
                                                                 Text(
-                                                                    stringResource(R.string.profiles_action_clone),
+                                                                    stringResource(Res.string.profiles_action_clone),
                                                                 )
                                                             },
                                                             onClick = {
@@ -434,7 +461,7 @@ fun ProfilesScreen(
                 Text(
                     text =
                         stringResource(
-                            R.string.profiles_title_edit_soul,
+                            Res.string.profiles_title_edit_soul,
                             soulEditProfileName.orEmpty(),
                         ),
                 )
@@ -470,7 +497,7 @@ fun ProfilesScreen(
                     },
                     enabled = !state.isLoadingSoul,
                 ) {
-                    Text(stringResource(R.string.action_ok))
+                    Text(stringResource(Res.string.action_ok))
                 }
             },
             dismissButton = {
@@ -480,7 +507,7 @@ fun ProfilesScreen(
                         viewModel.closeSoulDialog()
                     },
                 ) {
-                    Text(stringResource(R.string.action_cancel))
+                    Text(stringResource(Res.string.action_cancel))
                 }
             },
         )
@@ -493,7 +520,7 @@ fun ProfilesScreen(
                 Text(
                     text =
                         stringResource(
-                            R.string.profiles_title_set_model,
+                            Res.string.profiles_title_set_model,
                             modelEditProfileName.orEmpty(),
                         ),
                 )
@@ -505,14 +532,14 @@ fun ProfilesScreen(
                     OutlinedTextField(
                         value = tempModelProvider,
                         onValueChange = { tempModelProvider = it },
-                        label = { Text(stringResource(R.string.profiles_label_provider_input)) },
+                        label = { Text(stringResource(Res.string.profiles_label_provider_input)) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                     )
                     OutlinedTextField(
                         value = tempModelName,
                         onValueChange = { tempModelName = it },
-                        label = { Text(stringResource(R.string.profiles_label_model_input)) },
+                        label = { Text(stringResource(Res.string.profiles_label_model_input)) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                     )
@@ -528,14 +555,14 @@ fun ProfilesScreen(
                         modelEditProfileName = null
                     },
                 ) {
-                    Text(stringResource(R.string.action_ok))
+                    Text(stringResource(Res.string.action_ok))
                 }
             },
             dismissButton = {
                 TextButton(
                     onClick = { modelEditProfileName = null },
                 ) {
-                    Text(stringResource(R.string.action_cancel))
+                    Text(stringResource(Res.string.action_cancel))
                 }
             },
         )
@@ -548,7 +575,7 @@ fun ProfilesScreen(
                 Text(
                     text =
                         stringResource(
-                            R.string.profiles_title_clone,
+                            Res.string.profiles_title_clone,
                             cloneProfileName.orEmpty(),
                         ),
                 )
@@ -558,7 +585,7 @@ fun ProfilesScreen(
                 OutlinedTextField(
                     value = newCloneName,
                     onValueChange = { newCloneName = it },
-                    label = { Text(stringResource(R.string.profiles_label_new_name_input)) },
+                    label = { Text(stringResource(Res.string.profiles_label_new_name_input)) },
                     isError = errorMsg != null,
                     supportingText = errorMsg?.let { { Text(it) } },
                     modifier = Modifier.fillMaxWidth(),
@@ -578,14 +605,14 @@ fun ProfilesScreen(
                     },
                     enabled = newCloneName.isNotBlank() && validateProfileName(newCloneName) == null,
                 ) {
-                    Text(stringResource(R.string.profiles_action_clone))
+                    Text(stringResource(Res.string.profiles_action_clone))
                 }
             },
             dismissButton = {
                 TextButton(
                     onClick = { cloneProfileName = null },
                 ) {
-                    Text(stringResource(R.string.action_cancel))
+                    Text(stringResource(Res.string.action_cancel))
                 }
             },
         )
@@ -598,7 +625,7 @@ fun ProfilesScreen(
                 Text(
                     text =
                         stringResource(
-                            R.string.profiles_title_edit_description,
+                            Res.string.profiles_title_edit_description,
                             descEditProfileName.orEmpty(),
                         ),
                 )
@@ -607,7 +634,7 @@ fun ProfilesScreen(
                 OutlinedTextField(
                     value = tempDescription,
                     onValueChange = { tempDescription = it },
-                    label = { Text(stringResource(R.string.profiles_label_description_input)) },
+                    label = { Text(stringResource(Res.string.profiles_label_description_input)) },
                     modifier = Modifier.fillMaxWidth(),
                     maxLines = 4,
                 )
@@ -622,14 +649,14 @@ fun ProfilesScreen(
                         descEditProfileName = null
                     },
                 ) {
-                    Text(stringResource(R.string.action_ok))
+                    Text(stringResource(Res.string.action_ok))
                 }
             },
             dismissButton = {
                 TextButton(
                     onClick = { descEditProfileName = null },
                 ) {
-                    Text(stringResource(R.string.action_cancel))
+                    Text(stringResource(Res.string.action_cancel))
                 }
             },
         )

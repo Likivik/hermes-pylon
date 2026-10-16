@@ -22,17 +22,24 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.m57.hermescontrol.R
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.action_cancel
+import com.m57.hermescontrol.generated.resources.action_discard
+import com.m57.hermescontrol.generated.resources.content_desc_save_changes
+import com.m57.hermescontrol.generated.resources.skills_content_placeholder
+import com.m57.hermescontrol.generated.resources.skills_discard_message
+import com.m57.hermescontrol.generated.resources.skills_discard_title
+import com.m57.hermescontrol.generated.resources.skills_edit_title
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.HermesScaffold
 import com.m57.hermescontrol.ui.common.LoadingState
 import com.m57.hermescontrol.ui.common.NavIcon
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun SkillEditorDialog(
@@ -82,7 +89,7 @@ fun SkillEditorDialog(
                 ),
         ) {
             HermesScaffold(
-                title = { Text(stringResource(R.string.skills_edit_title, skillName)) },
+                title = { Text(stringResource(Res.string.skills_edit_title, skillName)) },
                 navigationIcon =
                     NavIcon.Back(
                         onBack = {
@@ -108,7 +115,7 @@ fun SkillEditorDialog(
                             } else {
                                 Icon(
                                     imageVector = Icons.Filled.Save,
-                                    contentDescription = stringResource(R.string.content_desc_save_changes),
+                                    contentDescription = stringResource(Res.string.content_desc_save_changes),
                                 )
                             }
                         }
@@ -139,7 +146,7 @@ fun SkillEditorDialog(
                                         color = MaterialTheme.colorScheme.onSurface,
                                     ),
                                 placeholder = {
-                                    Text(stringResource(R.string.skills_content_placeholder))
+                                    Text(stringResource(Res.string.skills_content_placeholder))
                                 },
                             )
                         }
@@ -152,8 +159,8 @@ fun SkillEditorDialog(
     if (showDiscardConfirm) {
         AlertDialog(
             onDismissRequest = { showDiscardConfirm = false },
-            title = { Text(stringResource(R.string.skills_discard_title)) },
-            text = { Text(stringResource(R.string.skills_discard_message)) },
+            title = { Text(stringResource(Res.string.skills_discard_title)) },
+            text = { Text(stringResource(Res.string.skills_discard_message)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -161,12 +168,12 @@ fun SkillEditorDialog(
                         onDismiss()
                     },
                 ) {
-                    Text(stringResource(R.string.action_discard))
+                    Text(stringResource(Res.string.action_discard))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDiscardConfirm = false }) {
-                    Text(stringResource(R.string.action_cancel))
+                    Text(stringResource(Res.string.action_cancel))
                 }
             },
         )

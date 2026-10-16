@@ -41,12 +41,39 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.PluginInfo
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.common_cancel
+import com.m57.hermescontrol.generated.resources.common_save
+import com.m57.hermescontrol.generated.resources.content_desc_refresh
+import com.m57.hermescontrol.generated.resources.plugins_action_install
+import com.m57.hermescontrol.generated.resources.plugins_action_remove
+import com.m57.hermescontrol.generated.resources.plugins_action_uninstall
+import com.m57.hermescontrol.generated.resources.plugins_action_update
+import com.m57.hermescontrol.generated.resources.plugins_auth_command_hint
+import com.m57.hermescontrol.generated.resources.plugins_auth_required
+import com.m57.hermescontrol.generated.resources.plugins_context_engine_label
+import com.m57.hermescontrol.generated.resources.plugins_dashboard_slots
+import com.m57.hermescontrol.generated.resources.plugins_empty_desc
+import com.m57.hermescontrol.generated.resources.plugins_empty_title
+import com.m57.hermescontrol.generated.resources.plugins_enable_after_install
+import com.m57.hermescontrol.generated.resources.plugins_force_reinstall
+import com.m57.hermescontrol.generated.resources.plugins_hide_from_sidebar
+import com.m57.hermescontrol.generated.resources.plugins_install_heading
+import com.m57.hermescontrol.generated.resources.plugins_install_hint
+import com.m57.hermescontrol.generated.resources.plugins_memory_provider_label
+import com.m57.hermescontrol.generated.resources.plugins_no_desc
+import com.m57.hermescontrol.generated.resources.plugins_orphan_heading
+import com.m57.hermescontrol.generated.resources.plugins_provider_defaults
+import com.m57.hermescontrol.generated.resources.plugins_providers_heading
+import com.m57.hermescontrol.generated.resources.plugins_providers_hint
+import com.m57.hermescontrol.generated.resources.plugins_remove_confirm_text
+import com.m57.hermescontrol.generated.resources.plugins_remove_confirm_title
+import com.m57.hermescontrol.generated.resources.plugins_show_in_sidebar
+import com.m57.hermescontrol.generated.resources.screen_plugins
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.DetailDialog
@@ -61,6 +88,7 @@ import com.m57.hermescontrol.ui.common.ToastEffect
 import com.m57.hermescontrol.ui.common.listContentPadding
 import com.m57.hermescontrol.ui.common.listItemSpacing
 import com.m57.hermescontrol.ui.common.toDetailRows
+import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -92,11 +120,11 @@ fun PluginsScreen(
     if (state.removeConfirmPlugin != null) {
         AlertDialog(
             onDismissRequest = { viewModel.cancelRemovePlugin() },
-            title = { Text(stringResource(R.string.plugins_remove_confirm_title)) },
+            title = { Text(stringResource(Res.string.plugins_remove_confirm_title)) },
             text = {
                 Text(
                     stringResource(
-                        R.string.plugins_remove_confirm_text,
+                        Res.string.plugins_remove_confirm_text,
                         state.removeConfirmPlugin ?: "",
                     ),
                 )
@@ -106,12 +134,12 @@ fun PluginsScreen(
                     onClick = { viewModel.confirmRemovePlugin() },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
                 ) {
-                    Text(stringResource(R.string.plugins_action_remove))
+                    Text(stringResource(Res.string.plugins_action_remove))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.cancelRemovePlugin() }) {
-                    Text(stringResource(R.string.common_cancel))
+                    Text(stringResource(Res.string.common_cancel))
                 }
             },
         )
@@ -137,10 +165,10 @@ fun PluginsScreen(
 
             state.plugins.isEmpty() && state.orphanPlugins.isEmpty() -> {
                 EmptyState(
-                    title = stringResource(R.string.plugins_empty_title),
-                    subtitle = stringResource(R.string.plugins_empty_desc),
+                    title = stringResource(Res.string.plugins_empty_title),
+                    subtitle = stringResource(Res.string.plugins_empty_desc),
                     onAction = { viewModel.loadPlugins() },
-                    actionLabel = stringResource(R.string.content_desc_refresh),
+                    actionLabel = stringResource(Res.string.content_desc_refresh),
                     modifier = Modifier.padding(paddingValues),
                 )
             }
@@ -187,7 +215,7 @@ fun PluginsScreen(
                         item(key = "orphan-header") {
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = stringResource(R.string.plugins_orphan_heading),
+                                text = stringResource(Res.string.plugins_orphan_heading),
                                 style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(vertical = Spacing.sm),
@@ -219,7 +247,7 @@ fun PluginsScaffold(
     content: @Composable (PaddingValues) -> Unit,
 ) {
     HermesScaffold(
-        title = { Text(stringResource(R.string.screen_plugins)) },
+        title = { Text(stringResource(Res.string.screen_plugins)) },
         navigationIcon = onOpenDrawer?.let { NavIcon.Menu(it) },
         isRefreshing = isRefreshing,
         onRefresh = onReload,
@@ -233,17 +261,17 @@ private fun ProviderSelectionSection(
     state: PluginsUiState,
     viewModel: PluginsViewModel,
 ) {
-    val providerDefaultsLabel = stringResource(R.string.plugins_provider_defaults)
+    val providerDefaultsLabel = stringResource(Res.string.plugins_provider_defaults)
 
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(Spacing.md)) {
             Text(
-                text = stringResource(R.string.plugins_providers_heading),
+                text = stringResource(Res.string.plugins_providers_heading),
                 style = MaterialTheme.typography.titleMedium,
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = stringResource(R.string.plugins_providers_hint),
+                text = stringResource(Res.string.plugins_providers_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -251,12 +279,12 @@ private fun ProviderSelectionSection(
 
             // Memory provider dropdown
             Text(
-                text = stringResource(R.string.plugins_memory_provider_label),
+                text = stringResource(Res.string.plugins_memory_provider_label),
                 style = MaterialTheme.typography.labelMedium,
             )
             Spacer(modifier = Modifier.height(4.dp))
             ExposedDropdownField(
-                label = stringResource(R.string.plugins_memory_provider_label),
+                label = stringResource(Res.string.plugins_memory_provider_label),
                 options =
                     listOf(
                         providerDefaultsLabel,
@@ -280,12 +308,12 @@ private fun ProviderSelectionSection(
 
             // Context engine dropdown
             Text(
-                text = stringResource(R.string.plugins_context_engine_label),
+                text = stringResource(Res.string.plugins_context_engine_label),
                 style = MaterialTheme.typography.labelMedium,
             )
             Spacer(modifier = Modifier.height(4.dp))
             ExposedDropdownField(
-                label = stringResource(R.string.plugins_context_engine_label),
+                label = stringResource(Res.string.plugins_context_engine_label),
                 options = listOf("compressor") + state.contextOptions.map { it.name },
                 selectedValue = state.contextEngine,
                 onOptionSelected = { viewModel.updateContextEngine(it) },
@@ -304,7 +332,7 @@ private fun ProviderSelectionSection(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                 }
-                Text(stringResource(R.string.common_save))
+                Text(stringResource(Res.string.common_save))
             }
         }
     }
@@ -319,12 +347,12 @@ private fun InstallSection(
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(Spacing.md)) {
             Text(
-                text = stringResource(R.string.plugins_install_heading),
+                text = stringResource(Res.string.plugins_install_heading),
                 style = MaterialTheme.typography.titleMedium,
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = stringResource(R.string.plugins_install_hint),
+                text = stringResource(Res.string.plugins_install_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -354,7 +382,7 @@ private fun InstallSection(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = stringResource(R.string.plugins_force_reinstall),
+                        text = stringResource(Res.string.plugins_force_reinstall),
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -366,7 +394,7 @@ private fun InstallSection(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = stringResource(R.string.plugins_enable_after_install),
+                        text = stringResource(Res.string.plugins_enable_after_install),
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -392,7 +420,7 @@ private fun InstallSection(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                 }
-                Text(stringResource(R.string.plugins_action_install))
+                Text(stringResource(Res.string.plugins_action_install))
             }
         }
     }
@@ -449,7 +477,7 @@ private fun PluginCard(
 
             // Description
             Text(
-                text = plugin.description ?: stringResource(R.string.plugins_no_desc),
+                text = plugin.description ?: stringResource(Res.string.plugins_no_desc),
                 style = MaterialTheme.typography.bodyMedium,
             )
 
@@ -468,7 +496,7 @@ private fun PluginCard(
                 )
                 if (plugin.authRequired) {
                     Text(
-                        text = stringResource(R.string.plugins_auth_required),
+                        text = stringResource(Res.string.plugins_auth_required),
                         style = MaterialTheme.typography.labelSmall,
                         color = statusColors.error,
                     )
@@ -480,7 +508,7 @@ private fun PluginCard(
                 if (slots.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = stringResource(R.string.plugins_dashboard_slots, slots.joinToString(", ")),
+                        text = stringResource(Res.string.plugins_dashboard_slots, slots.joinToString(", ")),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -492,7 +520,7 @@ private fun PluginCard(
             if (plugin.authRequired && authCommand != null) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = stringResource(R.string.plugins_auth_command_hint, authCommand),
+                    text = stringResource(Res.string.plugins_auth_command_hint, authCommand),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -517,9 +545,9 @@ private fun PluginCard(
                                 if (plugin.userHidden) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                                 contentDescription =
                                     if (plugin.userHidden) {
-                                        stringResource(R.string.plugins_show_in_sidebar)
+                                        stringResource(Res.string.plugins_show_in_sidebar)
                                     } else {
-                                        stringResource(R.string.plugins_hide_from_sidebar)
+                                        stringResource(Res.string.plugins_hide_from_sidebar)
                                     },
                                 modifier = Modifier.size(18.dp),
                             )
@@ -533,7 +561,7 @@ private fun PluginCard(
                             onClick = { viewModel.updatePlugin(plugin.name) },
                             enabled = !busy,
                         ) {
-                            Text(stringResource(R.string.plugins_action_update))
+                            Text(stringResource(Res.string.plugins_action_update))
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                     }
@@ -554,7 +582,7 @@ private fun PluginCard(
                                 modifier = Modifier.size(16.dp),
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text(stringResource(R.string.plugins_action_uninstall))
+                            Text(stringResource(Res.string.plugins_action_uninstall))
                         }
                     }
                 } else {
@@ -562,7 +590,7 @@ private fun PluginCard(
                         onClick = { viewModel.activatePlugin(plugin) },
                         enabled = !busy,
                     ) {
-                        Text(stringResource(R.string.plugins_action_install))
+                        Text(stringResource(Res.string.plugins_action_install))
                     }
                 }
             }

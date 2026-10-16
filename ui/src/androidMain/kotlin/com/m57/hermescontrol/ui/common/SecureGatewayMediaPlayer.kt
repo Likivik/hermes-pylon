@@ -33,7 +33,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -42,8 +41,13 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.remote.GatewayFileClient
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.media_player_close
+import com.m57.hermescontrol.generated.resources.media_player_error
+import com.m57.hermescontrol.generated.resources.media_player_pause
+import com.m57.hermescontrol.generated.resources.media_player_play
+import com.m57.hermescontrol.generated.resources.media_player_seek
 import com.m57.hermescontrol.theme.Spacing
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -52,6 +56,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import org.jetbrains.compose.resources.stringResource
 import java.util.Locale
 
 fun shouldAutoStartMedia(state: Lifecycle.State): Boolean = state.isAtLeast(Lifecycle.State.STARTED)
@@ -145,7 +150,7 @@ private fun MediaInitializationDialog(
             ) {
                 if (error) {
                     Text(
-                        text = stringResource(R.string.media_player_error),
+                        text = stringResource(Res.string.media_player_error),
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.weight(1f),
                     )
@@ -154,7 +159,7 @@ private fun MediaInitializationDialog(
                     Text(text = request.title, modifier = Modifier.weight(1f))
                 }
                 IconButton(onClick = onClose) {
-                    Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.media_player_close))
+                    Icon(Icons.Filled.Close, contentDescription = stringResource(Res.string.media_player_close))
                 }
             }
         }
@@ -174,7 +179,7 @@ private fun ReadySecureGatewayMediaPlayer(
     var duration by remember(request) { mutableIntStateOf(0) }
     var error by remember(request) { mutableStateOf(false) }
     var seeking by remember(request) { mutableStateOf(false) }
-    val seekDescription = stringResource(R.string.media_player_seek)
+    val seekDescription = stringResource(Res.string.media_player_seek)
     val player =
         remember(request, dataSource) {
             MediaPlayer().apply {
@@ -254,7 +259,7 @@ private fun ReadySecureGatewayMediaPlayer(
                         modifier = Modifier.weight(1f),
                     )
                     IconButton(onClick = onClose) {
-                        Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.media_player_close))
+                        Icon(Icons.Filled.Close, contentDescription = stringResource(Res.string.media_player_close))
                     }
                 }
 
@@ -300,7 +305,7 @@ private fun ReadySecureGatewayMediaPlayer(
                 }
                 if (error) {
                     Text(
-                        text = stringResource(R.string.media_player_error),
+                        text = stringResource(Res.string.media_player_error),
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
@@ -345,7 +350,7 @@ private fun ReadySecureGatewayMediaPlayer(
                             imageVector = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                             contentDescription =
                                 stringResource(
-                                    if (playing) R.string.media_player_pause else R.string.media_player_play,
+                                    if (playing) Res.string.media_player_pause else Res.string.media_player_play,
                                 ),
                         )
                     }

@@ -21,12 +21,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.m57.hermescontrol.R
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.landing_action_auth_login
+import com.m57.hermescontrol.generated.resources.landing_subtitle
+import com.m57.hermescontrol.generated.resources.landing_title
 import com.m57.hermescontrol.theme.Spacing
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun LandingScreen(
@@ -68,7 +71,7 @@ fun LandingScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = stringResource(R.string.landing_title),
+                text = stringResource(Res.string.landing_title),
                 style =
                     MaterialTheme.typography.displayMedium.copy(
                         fontWeight = FontWeight.Bold,
@@ -78,7 +81,7 @@ fun LandingScreen(
             )
 
             Text(
-                text = stringResource(R.string.landing_subtitle),
+                text = stringResource(Res.string.landing_subtitle),
                 style =
                     MaterialTheme.typography.bodyLarge.copy(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -93,7 +96,7 @@ fun LandingScreen(
                 modifier = Modifier.fillMaxWidth().height(56.dp),
             ) {
                 Text(
-                    text = stringResource(R.string.landing_action_auth_login),
+                    text = stringResource(Res.string.landing_action_auth_login),
                     style = MaterialTheme.typography.titleMedium,
                 )
             }

@@ -158,7 +158,7 @@ kotlin {
                 // top-level `compose.resources { }` block at the bottom of
                 // this file — without `publicResClass = true` the generated
                 // class is `internal` and unreachable from other modules.
-                implementation(compose.components.resources)
+                api(compose.components.resources)
                 // Phase 1: depends on the multiplatform data model + HTTP primitives
                 // that already live in :shared.
                 api(project(":shared"))
@@ -254,6 +254,29 @@ tasks.matching {
 
 ktlint {
     version.set(libs.versions.ktlintEngine.get())
+    // Compose Resources generates Kotlin under build/generated/ (Res.kt plus the
+    // per-platform resource collectors) in a style ktlint rejects - object names,
+    // indentation, import order. The files are machine-generated and not ours to
+    // style. NOTE: this lambda form excludes the common generated class, but NOT
+    // `androidMainResourceCollectors/`, because the Compose plugin registers that
+    // directory as a source root after ktlint's filter is applied. The string
+    // pattern form (`exclude("**/build/generated/**")`) excludes nothing at all and
+    // makes this worse. Open issue: the collectors dir still needs a real exclusion.
+    filter {
+        exclude { it.file.path.contains("/build/generated/") }
+    }
+}
+
+// Compose Resources registers its generated Kotlin under build/generated/ as an
+// AGP/Android source root, which ktlint's `filter` block does not reach (it covers
+// the KMP-level source sets only - which is why Res.kt was excluded but
+// androidMainResourceCollectors/ was not). Exclude the generated tree on the lint
+// tasks themselves; they are SourceTasks, so this actually applies. Without it the
+// gate fails on machine-written files that we do not control the style of.
+tasks.matching { it.name.startsWith("ktlint") }.configureEach {
+    if (this is SourceTask) {
+        exclude("**/build/generated/**")
+    }
 }
 
 // Compose Resources — Phase 2. Generates the typed `Res` accessor from

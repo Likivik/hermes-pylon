@@ -38,14 +38,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.MessagingPlatform
 import com.m57.hermescontrol.data.model.MessagingPlatformUpdate
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.action_cancel
+import com.m57.hermescontrol.generated.resources.channels_action_configure
+import com.m57.hermescontrol.generated.resources.channels_action_test
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.channels.ConfigureForm
+import org.jetbrains.compose.resources.stringResource
 
 private enum class StatusRole { SUCCESS, WARNING, ERROR, NEUTRAL }
 
@@ -196,7 +199,7 @@ fun PlatformCard(
                         Spacer(modifier = Modifier.width(4.dp))
                     }
                     Text(
-                        text = stringResource(R.string.channels_action_test),
+                        text = stringResource(Res.string.channels_action_test),
                         style = MaterialTheme.typography.labelSmall,
                     )
                 }
@@ -207,9 +210,9 @@ fun PlatformCard(
                     Text(
                         text =
                             if (showConfigureForm) {
-                                stringResource(R.string.action_cancel)
+                                stringResource(Res.string.action_cancel)
                             } else {
-                                stringResource(R.string.channels_action_configure)
+                                stringResource(Res.string.channels_action_configure)
                             },
                         style = MaterialTheme.typography.labelSmall,
                     )
@@ -284,7 +287,7 @@ fun PlatformCard(
             },
             dismissButton = {
                 TextButton(onClick = { showRemoveConfirm = false }) {
-                    Text(stringResource(R.string.action_cancel))
+                    Text(stringResource(Res.string.action_cancel))
                 }
             },
         )

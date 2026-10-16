@@ -38,7 +38,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -50,6 +49,9 @@ import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.local.AuthSessionState
 import com.m57.hermescontrol.data.ws.ConnectionStatus
 import com.m57.hermescontrol.data.ws.HermesWsClient
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.nav_drawer_subtitle
+import com.m57.hermescontrol.generated.resources.nav_drawer_title
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.ui.common.DisableDrawerGestures
 import com.m57.hermescontrol.ui.common.DrawerGestureController
@@ -62,6 +64,7 @@ import com.m57.hermescontrol.ui.settings.SettingsConnectionPage
 import com.m57.hermescontrol.ui.settings.SettingsLanguagePage
 import com.m57.hermescontrol.ui.settings.SettingsViewModel
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
 import com.m57.hermescontrol.ui.authlogin.AuthLoginScreen as AuthLoginScreenContent
 import com.m57.hermescontrol.ui.landing.LandingScreen as LandingScreenContent
 
@@ -211,7 +214,7 @@ fun MainNavigation() {
                         modifier = Modifier.padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 2.dp),
                     ) {
                         Text(
-                            text = stringResource(R.string.nav_drawer_title),
+                            text = stringResource(Res.string.nav_drawer_title),
                             style =
                                 MaterialTheme.typography.headlineSmall.copy(
                                     fontWeight = FontWeight.Bold,
@@ -227,7 +230,7 @@ fun MainNavigation() {
                         )
                     }
                     Text(
-                        text = stringResource(R.string.nav_drawer_subtitle),
+                        text = stringResource(Res.string.nav_drawer_subtitle),
                         modifier = Modifier.padding(start = 16.dp, bottom = 8.dp, end = 16.dp),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

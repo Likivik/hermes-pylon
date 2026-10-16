@@ -40,11 +40,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.m57.hermescontrol.R
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.subagent_status_cancelled
+import com.m57.hermescontrol.generated.resources.subagent_status_completed
+import com.m57.hermescontrol.generated.resources.subagent_status_failed
+import com.m57.hermescontrol.generated.resources.subagent_status_pending
+import com.m57.hermescontrol.generated.resources.subagent_status_running
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.chat.SubagentIndicator
 import com.m57.hermescontrol.ui.chat.TodoItem
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Inspection sheet displaying active & completed subagent tasks and agent todos.
@@ -203,19 +209,19 @@ fun TodoInspectionCard(
                         Triple(
                             Icons.Filled.CheckCircle,
                             statusColors.success,
-                            R.string.subagent_status_completed,
+                            Res.string.subagent_status_completed,
                         )
                     todo.isInProgress ->
                         Triple(
                             Icons.Filled.Autorenew,
                             MaterialTheme.colorScheme.primary,
-                            R.string.subagent_status_running,
+                            Res.string.subagent_status_running,
                         )
                     todo.isCancelled ->
                         Triple(
                             Icons.Filled.Cancel,
                             statusColors.warning,
-                            R.string.subagent_status_cancelled,
+                            Res.string.subagent_status_cancelled,
                         )
                     else ->
                         Triple(
@@ -223,7 +229,7 @@ fun TodoInspectionCard(
                             MaterialTheme.colorScheme.onSurfaceVariant.copy(
                                 alpha = 0.5f,
                             ),
-                            R.string.subagent_status_pending,
+                            Res.string.subagent_status_pending,
                         )
                 }
             Icon(
@@ -268,19 +274,19 @@ fun InspectionItemCard(indicator: SubagentIndicator) {
                             Triple(
                                 Icons.Filled.CheckCircle,
                                 statusColors.success,
-                                R.string.subagent_status_completed,
+                                Res.string.subagent_status_completed,
                             )
                         indicator.isFailed ->
                             Triple(
                                 Icons.Filled.Cancel,
                                 statusColors.error,
-                                R.string.subagent_status_failed,
+                                Res.string.subagent_status_failed,
                             )
                         else ->
                             Triple(
                                 Icons.Filled.Autorenew,
                                 MaterialTheme.colorScheme.primary,
-                                R.string.subagent_status_running,
+                                Res.string.subagent_status_running,
                             )
                     }
                 Icon(

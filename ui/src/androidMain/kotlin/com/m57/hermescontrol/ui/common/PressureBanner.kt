@@ -14,20 +14,28 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.DiskPressureStatus
 import com.m57.hermescontrol.data.model.MemoryPressureStatus
 import com.m57.hermescontrol.data.model.StatusResponse
 import com.m57.hermescontrol.data.model.normalizePressureValue
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.pressure_banner_disk_critical
+import com.m57.hermescontrol.generated.resources.pressure_banner_disk_elevated
+import com.m57.hermescontrol.generated.resources.pressure_banner_disk_free_suffix
+import com.m57.hermescontrol.generated.resources.pressure_banner_memory_critical
+import com.m57.hermescontrol.generated.resources.pressure_banner_memory_elevated
+import com.m57.hermescontrol.generated.resources.pressure_banner_memory_oom
+import com.m57.hermescontrol.generated.resources.pressure_banner_severity_error
+import com.m57.hermescontrol.generated.resources.pressure_banner_severity_warning
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.theme.onColorFor
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Worst-first severity of the host-health advisory (mirrors the desktop
@@ -122,25 +130,25 @@ fun PressureBanner(
     val message =
         when (trigger) {
             PressureTrigger.DISK_CRITICAL ->
-                stringResource(R.string.pressure_banner_disk_critical) +
+                stringResource(Res.string.pressure_banner_disk_critical) +
                     diskFreeSuffix(disk)
 
             PressureTrigger.DISK_ELEVATED ->
-                stringResource(R.string.pressure_banner_disk_elevated) +
+                stringResource(Res.string.pressure_banner_disk_elevated) +
                     diskFreeSuffix(disk)
 
             PressureTrigger.MEMORY_CRITICAL ->
-                stringResource(R.string.pressure_banner_memory_critical)
+                stringResource(Res.string.pressure_banner_memory_critical)
 
             PressureTrigger.OOM_RESTART ->
-                stringResource(R.string.pressure_banner_memory_oom)
+                stringResource(Res.string.pressure_banner_memory_oom)
 
             PressureTrigger.MEMORY_ELEVATED ->
-                stringResource(R.string.pressure_banner_memory_elevated)
+                stringResource(Res.string.pressure_banner_memory_elevated)
         }
     val severity =
         stringResource(
-            if (critical) R.string.pressure_banner_severity_error else R.string.pressure_banner_severity_warning,
+            if (critical) Res.string.pressure_banner_severity_error else Res.string.pressure_banner_severity_warning,
         )
 
     Surface(
@@ -178,5 +186,5 @@ fun PressureBanner(
 @Composable
 private fun diskFreeSuffix(disk: DiskPressureStatus?): String {
     val freeMb = disk?.free_mb ?: return ""
-    return stringResource(R.string.pressure_banner_disk_free_suffix, freeMb)
+    return stringResource(Res.string.pressure_banner_disk_free_suffix, freeMb)
 }
