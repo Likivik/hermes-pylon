@@ -9,7 +9,6 @@ import android.util.Base64OutputStream
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.local.AuthSessionState
 import com.m57.hermescontrol.data.local.HermesDatabase
@@ -42,6 +41,7 @@ import com.m57.hermescontrol.data.ws.WsEvent
 import com.m57.hermescontrol.data.ws.WsMethods
 import com.m57.hermescontrol.data.ws.toAny
 import com.m57.hermescontrol.data.ws.toJsonElement
+import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.attachment_chooser_open
 import com.m57.hermescontrol.generated.resources.attachment_error_access_denied
 import com.m57.hermescontrol.generated.resources.attachment_error_missing_gateway_path
@@ -56,6 +56,7 @@ import com.m57.hermescontrol.generated.resources.chat_model_switch_session_chang
 import com.m57.hermescontrol.generated.resources.chat_new_session_failed
 import com.m57.hermescontrol.generated.resources.chat_privileged_not_acknowledged
 import com.m57.hermescontrol.ui.common.SecureMediaOpenRoute
+import com.m57.hermescontrol.ui.common.StringResolver
 import com.m57.hermescontrol.ui.common.routeAttachmentOpen
 import com.m57.hermescontrol.util.nowMillis
 import kotlinx.coroutines.Dispatchers
@@ -147,6 +148,7 @@ private data class ResumeFence(
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class ChatViewModel(
     application: Application,
+    private val resolver: StringResolver,
     private val startCleanup: Boolean,
     repo: ChatPersistenceRepository =
         ChatPersistenceRepository(
@@ -167,7 +169,10 @@ class ChatViewModel(
     },
     selectedProfileIds: kotlinx.coroutines.flow.Flow<String> = AuthManager.selectedProfileIdFlow,
 ) : AndroidViewModel(application) {
-    constructor(application: Application) : this(application, startCleanup = true)
+    constructor(
+        application: Application,
+        resolver: StringResolver,
+    ) : this(application, resolver, startCleanup = true)
 
     // ── Internal state ───────────────────────────────────────────────────
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -2239,12 +2244,11 @@ class ChatViewModel(
                     sendSessionCreate(generation = generation, attempt = attempt + 1)
                 } else {
                     Log.w(TAG, "session.create gave up after $attempt attempts")
+                    val msg = resolver.get(Res.string.chat_new_session_failed)
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            errorMessage =
-                                getApplication<Application>()
-                                    .getString(R.string.chat_new_session_failed),
+                            errorMessage = msg,
                         )
                     }
                 }
@@ -2482,14 +2486,18 @@ class ChatViewModel(
     fun confirmModelSwitch() {
         val pending = _uiState.value.modelSwitchConfirmation ?: return
         if (runtimeSessionId != pending.sessionId) {
-            _uiState.update {
-                it.copy(
-                    modelSwitchConfirmation = null,
-                    errorMessage =
-                        getApplication<Application>().getString(
-                            R.string.chat_model_switch_session_changed,
-                        ),
-                )
+            // `resolver.get` is `suspend`; the `onClick` surface this
+            // method is wired to is not, so we hoist the message
+            // resolution into a one-shot launch before publishing the
+            // error.
+            viewModelScope.launch {
+                val msg = resolver.get(Res.string.chat_model_switch_session_changed)
+                _uiState.update {
+                    it.copy(
+                        modelSwitchConfirmation = null,
+                        errorMessage = msg,
+                    )
+                }
             }
             return
         }
@@ -2513,13 +2521,14 @@ class ChatViewModel(
     ) {
         val sessionId = runtimeSessionId
         if (sessionId == null) {
-            _uiState.update {
-                it.copy(
-                    errorMessage =
-                        getApplication<Application>().getString(
-                            R.string.chat_model_switch_no_session,
-                        ),
-                )
+            // `resolver.get` is `suspend`; this method is wired to
+            // non-suspend UI surfaces, so we resolve the error in a
+            // one-shot launch before publishing it.
+            viewModelScope.launch {
+                val msg = resolver.get(Res.string.chat_model_switch_no_session)
+                _uiState.update {
+                    it.copy(errorMessage = msg)
+                }
             }
             return
         }
@@ -2542,9 +2551,7 @@ class ChatViewModel(
                     val message =
                         (resultMap["confirm_message"] as? String)
                             ?.takeIf { it.isNotBlank() }
-                            ?: getApplication<Application>().getString(
-                                R.string.chat_model_confirm_default_message,
-                            )
+                            ?: resolver.get(Res.string.chat_model_confirm_default_message)
                     _uiState.update {
                         if (runtimeSessionId != sessionId) return@update it
                         it.copy(
@@ -2578,14 +2585,11 @@ class ChatViewModel(
                 }
                 if (recordUsage) recordAcceptedSlash("/model")
             } catch (e: HermesWsClient.HermesRpcException) {
+                val msg = resolver.get(Res.string.chat_model_switch_failed, e.message ?: "")
                 _uiState.update {
                     if (runtimeSessionId != sessionId) return@update it
                     it.copy(
-                        errorMessage =
-                            getApplication<Application>().getString(
-                                R.string.chat_model_switch_failed,
-                                e.message,
-                            ),
+                        errorMessage = msg,
                         modelSwitchConfirmation = null,
                     )
                 }
@@ -3347,11 +3351,17 @@ class ChatViewModel(
             SecureMediaOpenRoute.DownloadAndOpen -> Unit
         }
         if (attachment.source == AttachmentSource.LOCAL) {
-            // Best-effort direct open of the picked content URI.
-            runCatching { openWithView(ctx, android.net.Uri.parse(attachment.uri), attachment.mimeType) }
-                .onSuccess { return }
-                .onFailure { /* fall through to local cache-copy below */ }
-            viewModelScope.launch(Dispatchers.IO) {
+            // Best-effort direct open of the picked content URI. The
+            // `openWithView` body is now `suspend` (it consults the
+            // StringResolver for the chooser title), so wrap the
+            // attempt in a one-shot launch when the surrounding code
+            // is not already in a coroutine.
+            viewModelScope.launch {
+                runCatching { openWithView(ctx, android.net.Uri.parse(attachment.uri), attachment.mimeType) }
+                    .onSuccess { return@launch }
+                    .onFailure { /* fall through to local cache-copy below */ }
+                // Local cache-copy fallback. (Re-entered here on
+                // failure only — `onSuccess` returns above.)
                 val localFile =
                     runCatching {
                         val uri = android.net.Uri.parse(attachment.uri)
@@ -3371,7 +3381,7 @@ class ChatViewModel(
                             cacheFile = localCache,
                         )
                     }.getOrElse {
-                        showOpenError(R.string.attachment_error_open, attachment.name)
+                        showOpenError(Res.string.attachment_error_open, attachment.name)
                         return@launch
                     }
                 openBytes(ctx, localFile)
@@ -3380,7 +3390,12 @@ class ChatViewModel(
         }
         val path =
             attachment.gatewayPath ?: run {
-                showOpenError(R.string.attachment_error_missing_gateway_path, attachment.name)
+                viewModelScope.launch {
+                    showOpenError(
+                        Res.string.attachment_error_missing_gateway_path,
+                        attachment.name,
+                    )
+                }
                 return
             }
         viewModelScope.launch {
@@ -3392,23 +3407,23 @@ class ChatViewModel(
                     }
 
                     is GatewayFileResult.NotFound -> {
-                        showOpenError(R.string.attachment_error_not_found, attachment.name)
+                        showOpenError(Res.string.attachment_error_not_found, attachment.name)
                     }
 
                     is GatewayFileResult.Forbidden -> {
-                        showOpenError(R.string.attachment_error_access_denied, attachment.name)
+                        showOpenError(Res.string.attachment_error_access_denied, attachment.name)
                     }
 
                     is GatewayFileResult.TooLarge -> {
-                        showOpenError(R.string.attachment_error_too_large, attachment.name)
+                        showOpenError(Res.string.attachment_error_too_large, attachment.name)
                     }
 
                     is GatewayFileResult.Unauthorized -> {
-                        showOpenError(R.string.attachment_error_session_expired, attachment.name)
+                        showOpenError(Res.string.attachment_error_session_expired, attachment.name)
                     }
 
                     is GatewayFileResult.Failure -> {
-                        showOpenError(R.string.attachment_error_open, attachment.name)
+                        showOpenError(Res.string.attachment_error_open, attachment.name)
                     }
                 }
             } finally {
@@ -3420,7 +3435,7 @@ class ChatViewModel(
     }
 
     /** Open bytes written to a cache file via FileProvider + ACTION_VIEW. */
-    private fun openBytes(
+    private suspend fun openBytes(
         ctx: android.content.Context,
         file: GatewayFile,
     ) {
@@ -3432,11 +3447,15 @@ class ChatViewModel(
                     file.cacheFile,
                 )
             openWithView(ctx, uri, file.mimeType)
-        }.onFailure { showOpenError(R.string.attachment_error_open, file.name) }
+        }.onFailure {
+            // `showOpenError` is `suspend`; the `runCatching.onFailure`
+            // lambda is not, so we bridge through a one-shot launch.
+            showOpenError(Res.string.attachment_error_open, file.name)
+        }
     }
 
     /** Fire an ACTION_VIEW intent; throws if no activity can handle the type. */
-    private fun openWithView(
+    private suspend fun openWithView(
         ctx: android.content.Context,
         uri: android.net.Uri,
         mimeType: String,
@@ -3456,10 +3475,16 @@ class ChatViewModel(
                     addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
+            // The chooser title still needs a localized label. The
+            // StringResolver seam is `suspend`; with this method
+            // already suspend, the resolver call drops in naturally
+            // and we no longer need a `runBlocking` on the main
+            // thread.
+            val title = resolver.get(Res.string.attachment_chooser_open)
             val chooser =
                 android.content.Intent.createChooser(
                     fallbackIntent,
-                    ctx.getString(R.string.attachment_chooser_open),
+                    title,
                 ).apply {
                     addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
@@ -3467,11 +3492,15 @@ class ChatViewModel(
         }
     }
 
-    private fun showOpenError(
-        @androidx.annotation.StringRes resourceId: Int,
+    private suspend fun showOpenError(
+        key: org.jetbrains.compose.resources.StringResource,
         vararg args: Any,
     ) {
-        val message = getApplication<Application>().getString(resourceId, *args)
+        // Same pattern as the other Context-facing call sites in this
+        // ViewModel: read the localized text through the StringResolver
+        // seam (backed by Compose Resources) instead of calling
+        // `getApplication<Application>().getString(R.string.x)`.
+        val message = resolver.get(key, *args)
         _uiState.update { it.copy(openError = message) }
     }
 
@@ -4351,8 +4380,7 @@ class ChatViewModel(
      * submitted value; `errorMessage` is durable UI state. So sudo and secret
      * failures never render the throwable — only this constant.
      */
-    private fun privilegedFailureMessage(): String =
-        getApplication<Application>().getString(R.string.chat_privileged_not_acknowledged)
+    private suspend fun privilegedFailureMessage(): String = resolver.get(Res.string.chat_privileged_not_acknowledged)
 
     /**
      * Bind a privileged event to the exact request it can answer.

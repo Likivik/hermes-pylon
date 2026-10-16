@@ -8,7 +8,6 @@ import android.content.Intent
 import android.net.Uri
 import android.util.Log
 import androidx.core.content.FileProvider
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.local.ChatMessageEntity
 import com.m57.hermescontrol.data.local.HermesDatabase
@@ -27,9 +26,15 @@ import com.m57.hermescontrol.data.ws.PrivilegedRequestBinding
 import com.m57.hermescontrol.data.ws.ServerRequestBinding
 import com.m57.hermescontrol.data.ws.WsEvent
 import com.m57.hermescontrol.data.ws.WsMethods
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.attachment_error_not_found
+import com.m57.hermescontrol.generated.resources.chat_model_switch_failed
+import com.m57.hermescontrol.generated.resources.chat_new_session_failed
+import com.m57.hermescontrol.generated.resources.chat_privileged_not_acknowledged
 import com.m57.hermescontrol.ui.chat.fakes.FakeChatMessageDao
 import com.m57.hermescontrol.ui.chat.fakes.FakeChatPersistenceRepository
 import com.m57.hermescontrol.ui.chat.fakes.FakeSlashUsageStore
+import com.m57.hermescontrol.ui.common.FakeStringResolver
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -80,6 +85,7 @@ class ChatViewModelTest {
     private val mockEventsFlow = MutableSharedFlow<WsEvent>(extraBufferCapacity = 64)
     private val mockConnectionStatus = MutableStateFlow(ConnectionStatus.DISCONNECTED)
     private lateinit var app: Application
+    private lateinit var resolver: FakeStringResolver
     private lateinit var fakeRepo: FakeChatPersistenceRepository
     private lateinit var fakeSlashUsageStore: FakeSlashUsageStore
     private lateinit var mockApi: com.m57.hermescontrol.data.remote.HermesGatewayApi
@@ -112,11 +118,9 @@ class ChatViewModelTest {
         mockkObject(HermesDatabase)
 
         app = mockk(relaxed = true)
-        every { app.getString(R.string.chat_model_switch_failed, any()) } answers {
-            val formatArgs = arg<Array<out Any>>(1)
-            "Failed to switch model: ${formatArgs.first()}"
-        }
-        every { app.getString(R.string.chat_privileged_not_acknowledged) } returns PRIVILEGED_FAILURE_TEXT
+        resolver = FakeStringResolver()
+        resolver.stub(Res.string.chat_model_switch_failed, "Failed to switch model: %1\$s")
+        resolver.stub(Res.string.chat_privileged_not_acknowledged, PRIVILEGED_FAILURE_TEXT)
         fakeRepo = FakeChatPersistenceRepository()
         fakeSlashUsageStore = FakeSlashUsageStore()
         every { AuthManager.getSelectedProfileId() } returns "profile-a"
@@ -245,7 +249,7 @@ class ChatViewModelTest {
 
     /** Create a ViewModel with the fake repo injected directly. */
     private fun createViewModel(startCleanup: Boolean = false): ChatViewModel =
-        ChatViewModel(app, startCleanup, fakeRepo, fakeSlashUsageStore, testDispatcher)
+        ChatViewModel(app, resolver, startCleanup, fakeRepo, fakeSlashUsageStore, testDispatcher)
 
     /**
      * Create ViewModel, simulate GatewayReady, feed SESSION_CREATE result,
@@ -761,6 +765,7 @@ class ChatViewModelTest {
             val viewModel =
                 ChatViewModel(
                     app,
+                    resolver,
                     false,
                     fakeRepo,
                     fakeSlashUsageStore,
@@ -3456,7 +3461,7 @@ class ChatViewModelTest {
                     }
                 }
             coEvery { mockApi.getSessionMessages(any(), any(), any(), true, any()) } returns serverMessages("server")
-            val viewModel = ChatViewModel(app, false, delayedRepo, fakeSlashUsageStore, testDispatcher)
+            val viewModel = ChatViewModel(app, resolver, false, delayedRepo, fakeSlashUsageStore, testDispatcher)
 
             viewModel.switchSession("session-a")
             runCurrent()
@@ -3491,6 +3496,7 @@ class ChatViewModelTest {
             val viewModel =
                 ChatViewModel(
                     app,
+                    resolver,
                     false,
                     delayedRepo,
                     fakeSlashUsageStore,
@@ -5379,9 +5385,7 @@ class ChatViewModelTest {
             coEvery {
                 GatewayFileClient.fetch(any(), any())
             } returns GatewayFileResult.NotFound
-            every {
-                app.getString(R.string.attachment_error_not_found, "missing.pdf")
-            } returns "File not found on gateway: missing.pdf"
+            resolver.stub(Res.string.attachment_error_not_found, "File not found on gateway: missing.pdf")
 
             val viewModel = createViewModel()
             val attachment =
@@ -5418,6 +5422,7 @@ class ChatViewModelTest {
     private fun createViewModelWithCreateRetry(): ChatViewModel =
         ChatViewModel(
             app,
+            resolver,
             false,
             fakeRepo,
             fakeSlashUsageStore,
@@ -5452,9 +5457,7 @@ class ChatViewModelTest {
     @Test
     fun `session create surfaces an error once its attempts are spent`() =
         runTest {
-            every {
-                app.getString(R.string.chat_new_session_failed)
-            } returns "Couldn't start a new chat."
+            resolver.stub(Res.string.chat_new_session_failed, "Couldn't start a new chat.")
 
             val viewModel = createViewModelWithCreateRetry()
             advanceUntilIdle()

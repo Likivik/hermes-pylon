@@ -2,12 +2,10 @@
 
 package com.m57.hermescontrol.ui.authlogin
 
-import android.app.Application
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.config.ConnectionProfile
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.local.AuthSessionState
@@ -18,6 +16,7 @@ import com.m57.hermescontrol.data.remote.parseForBuild
 import com.m57.hermescontrol.data.remote.resolve
 import com.m57.hermescontrol.data.remote.safeApiCall
 import com.m57.hermescontrol.data.ws.HermesWsClient
+import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.auth_login_error_password_required
 import com.m57.hermescontrol.generated.resources.auth_login_error_token_required
 import com.m57.hermescontrol.generated.resources.auth_login_error_unreachable
@@ -26,6 +25,7 @@ import com.m57.hermescontrol.generated.resources.connect_error_401
 import com.m57.hermescontrol.generated.resources.connect_error_403
 import com.m57.hermescontrol.generated.resources.connect_error_connection_failed
 import com.m57.hermescontrol.generated.resources.connect_error_http_code
+import com.m57.hermescontrol.ui.common.StringResolver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -69,7 +69,7 @@ data class AuthLoginUiState(
 )
 
 class AuthLoginViewModel(
-    private val app: Application,
+    private val resolver: StringResolver,
 ) : ViewModel() {
     private val _uiState =
         MutableStateFlow(
@@ -181,17 +181,18 @@ class AuthLoginViewModel(
                 withContext(Dispatchers.IO) {
                     probeDashboardInternal(endpoint)
                 }
+            val unreachableMsg =
+                if (result == null) {
+                    resolver.get(Res.string.auth_login_error_unreachable)
+                } else {
+                    null
+                }
             _uiState.update {
                 it.copy(
                     probing = false,
                     authMode = result?.authMode,
                     token = result?.extractedToken ?: it.token,
-                    errorMessage =
-                        if (result == null) {
-                            app.getString(R.string.auth_login_error_unreachable)
-                        } else {
-                            null
-                        },
+                    errorMessage = unreachableMsg,
                 )
             }
         }
@@ -370,8 +371,9 @@ class AuthLoginViewModel(
         token: String,
     ): String? {
         if (token.isBlank()) {
+            val msg = resolver.get(Res.string.auth_login_error_token_required)
             _uiState.update {
-                it.copy(isLoading = false, errorMessage = app.getString(R.string.auth_login_error_token_required))
+                it.copy(isLoading = false, errorMessage = msg)
             }
             return null
         }
@@ -393,22 +395,22 @@ class AuthLoginViewModel(
                     when (val err = result.error) {
                         is com.m57.hermescontrol.data.remote.NetworkError.Http -> {
                             when (err.code) {
-                                401 -> app.getString(R.string.connect_error_401)
-                                403 -> app.getString(R.string.connect_error_403)
-                                else -> app.getString(R.string.connect_error_http_code, err.code)
+                                401 -> resolver.get(Res.string.connect_error_401)
+                                403 -> resolver.get(Res.string.connect_error_403)
+                                else -> resolver.get(Res.string.connect_error_http_code, err.code)
                             }
                         }
 
                         is com.m57.hermescontrol.data.remote.NetworkError.AuthExpired -> {
-                            app.getString(R.string.connect_error_401)
+                            resolver.get(Res.string.connect_error_401)
                         }
 
                         is com.m57.hermescontrol.data.remote.NetworkError.Connection -> {
-                            app.getString(R.string.connect_error_connection_failed, err.cause.message ?: "")
+                            resolver.get(Res.string.connect_error_connection_failed, err.cause.message ?: "")
                         }
 
                         is com.m57.hermescontrol.data.remote.NetworkError.Unknown -> {
-                            app.getString(R.string.connect_error_connection_failed, err.cause.message ?: "")
+                            resolver.get(Res.string.connect_error_connection_failed, err.cause.message ?: "")
                         }
                     }
                 _uiState.update { it.copy(isLoading = false, errorMessage = msg) }
@@ -421,20 +423,22 @@ class AuthLoginViewModel(
      * Authenticate with basic auth. The shared CookieJar captures the dashboard
      * session; [HermesWsClient] mints a one-use ticket for each handshake.
      */
-    private fun connectBasicAuth(
+    private suspend fun connectBasicAuth(
         endpoint: ServerEndpoint,
         username: String,
         password: String,
     ): ConnectResult? {
         if (username.isBlank()) {
+            val msg = resolver.get(Res.string.auth_login_error_username_required)
             _uiState.update {
-                it.copy(isLoading = false, errorMessage = app.getString(R.string.auth_login_error_username_required))
+                it.copy(isLoading = false, errorMessage = msg)
             }
             return null
         }
         if (password.isBlank()) {
+            val msg = resolver.get(Res.string.auth_login_error_password_required)
             _uiState.update {
-                it.copy(isLoading = false, errorMessage = app.getString(R.string.auth_login_error_password_required))
+                it.copy(isLoading = false, errorMessage = msg)
             }
             return null
         }
@@ -463,11 +467,11 @@ class AuthLoginViewModel(
                 if (!loginResp.isSuccessful) {
                     val msg =
                         when (loginResp.code) {
-                            401 -> app.getString(R.string.connect_error_401)
-                            403 -> app.getString(R.string.connect_error_403)
+                            401 -> resolver.get(Res.string.connect_error_401)
+                            403 -> resolver.get(Res.string.connect_error_403)
                             else ->
-                                app.getString(
-                                    R.string.connect_error_http_code,
+                                resolver.get(
+                                    Res.string.connect_error_http_code,
                                     loginResp.code,
                                 )
                         }
@@ -482,10 +486,11 @@ class AuthLoginViewModel(
             // CookieJar (issue #470) attached to OkHttpProvider.probe.
             return ConnectResult()
         } catch (e: Exception) {
+            val msg = resolver.get(Res.string.connect_error_connection_failed, e.message ?: "")
             _uiState.update {
                 it.copy(
                     isLoading = false,
-                    errorMessage = app.getString(R.string.connect_error_connection_failed, e.message ?: ""),
+                    errorMessage = msg,
                 )
             }
             return null
@@ -494,8 +499,8 @@ class AuthLoginViewModel(
 }
 
 class AuthLoginViewModelFactory(
-    private val app: Application,
+    private val resolver: StringResolver,
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel> create(modelClass: Class<T>): T = AuthLoginViewModel(app) as T
+    override fun <T : ViewModel> create(modelClass: Class<T>): T = AuthLoginViewModel(resolver) as T
 }

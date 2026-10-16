@@ -2,12 +2,13 @@
 
 package com.m57.hermescontrol.ui.authlogin
 
-import android.app.Application
 import android.util.Log
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.local.AuthSessionState
 import com.m57.hermescontrol.data.remote.OkHttpProvider
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.auth_login_error_unreachable
+import com.m57.hermescontrol.ui.common.FakeStringResolver
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
@@ -28,7 +29,7 @@ import java.io.IOException
 
 class AuthLoginViewModelTest {
     private lateinit var viewModel: AuthLoginViewModel
-    private val app = mockk<Application>(relaxed = true)
+    private val resolver = FakeStringResolver()
 
     @Before
     fun setup() {
@@ -44,9 +45,14 @@ class AuthLoginViewModelTest {
         every { Log.w(any<String>(), any<String>()) } returns 0
         every { Log.d(any<String>(), any<String>()) } returns 0
 
-        every { app.getString(R.string.auth_login_error_unreachable) } returns "Dashboard unreachable"
+        // The ViewModel now reads its localized strings through the
+        // StringResolver seam. Stub the one message this test exercises
+        // (`auth_login_error_unreachable` after a failed probe). Other
+        // test files in this module use the same FakeStringResolver for
+        // their own keys.
+        resolver.stub(Res.string.auth_login_error_unreachable, "Dashboard unreachable")
 
-        viewModel = AuthLoginViewModel(app)
+        viewModel = AuthLoginViewModel(resolver)
     }
 
     @After

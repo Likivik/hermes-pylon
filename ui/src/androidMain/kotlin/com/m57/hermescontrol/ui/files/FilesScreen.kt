@@ -60,7 +60,6 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.ManagedFileEntry
 import com.m57.hermescontrol.data.remote.readBytesLimited
 import com.m57.hermescontrol.generated.resources.Res
@@ -114,6 +113,21 @@ import java.util.Date
 private val filesContentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
 private val filesItemSpacing = Arrangement.spacedBy(8.dp)
 
+/**
+ * Resolves a [FilesUiText] inside a `@Composable` by reading the
+ * underlying `StringResource` key through Compose's resource pipeline.
+ * Substitutes the captured [FilesUiText.args] the same way
+ * `Context.getString(Int, vararg)` did, so `%1$s` / `%2$d` placeholders
+ * line up with the original `R.string.*` definitions.
+ */
+@Composable
+private fun filesText(text: FilesUiText): String =
+    if (text.args.isEmpty()) {
+        stringResource(text.key)
+    } else {
+        stringResource(text.key, *text.args.toTypedArray())
+    }
+
 @Composable
 fun FilesScreen(
     modifier: Modifier = Modifier,
@@ -151,14 +165,14 @@ fun FilesScreen(
                             if (it is CancellationException) throw it
                             viewModel.showToast(
                                 FilesUiText(
-                                    R.string.files_error_read_selected,
+                                    Res.string.files_error_read_selected,
                                     listOf(it.message.orEmpty()),
                                 ),
                             )
                             return@launch
                         }
                     if (bytes == null) {
-                        viewModel.showToast(FilesUiText(R.string.files_error_selected_unavailable_or_too_large))
+                        viewModel.showToast(FilesUiText(Res.string.files_error_selected_unavailable_or_too_large))
                         return@launch
                     }
                     viewModel.uploadFile(fileName, bytes, mimeType)
@@ -173,7 +187,7 @@ fun FilesScreen(
     val hasEntries = state.entries.isNotEmpty()
 
     ToastEffect(
-        toastMessage = state.toastMessage?.resolve(context),
+        toastMessage = state.toastMessage?.let { filesText(it) },
         onClearToast = viewModel::clearToast,
     )
 
@@ -260,7 +274,7 @@ fun FilesScreen(
 
                 state.errorMessage != null && !hasEntries -> {
                     ErrorState(
-                        message = state.errorMessage?.resolve(context).orEmpty(),
+                        message = state.errorMessage?.let { filesText(it) }.orEmpty(),
                         onRetry = viewModel::refresh,
                         modifier = Modifier.padding(paddingValues),
                     )
@@ -590,7 +604,7 @@ private fun openManagedFile(
                             if (it is CancellationException) throw it
                             viewModel.showToast(
                                 FilesUiText(
-                                    R.string.files_error_open,
+                                    Res.string.files_error_open,
                                     listOf(it.message.orEmpty()),
                                 ),
                             )
@@ -599,7 +613,7 @@ private fun openManagedFile(
                     runCatching { context.startActivity(intent) }.onFailure {
                         viewModel.showToast(
                             FilesUiText(
-                                R.string.files_error_open,
+                                Res.string.files_error_open,
                                 listOf(it.message.orEmpty()),
                             ),
                         )
@@ -611,23 +625,23 @@ private fun openManagedFile(
                 val message =
                     when (val error = result.error) {
                         is com.m57.hermescontrol.data.remote.NetworkError.AuthExpired ->
-                            FilesUiText(R.string.files_error_session_expired)
+                            FilesUiText(Res.string.files_error_session_expired)
 
                         is com.m57.hermescontrol.data.remote.NetworkError.Http ->
                             when (error.code) {
-                                403 -> FilesUiText(R.string.files_error_access_forbidden)
-                                404 -> FilesUiText(R.string.files_error_not_found)
-                                413 -> FilesUiText(R.string.files_error_too_large_to_open)
+                                403 -> FilesUiText(Res.string.files_error_access_forbidden)
+                                404 -> FilesUiText(Res.string.files_error_not_found)
+                                413 -> FilesUiText(Res.string.files_error_too_large_to_open)
                                 else ->
                                     FilesUiText(
-                                        R.string.files_error_open_failed,
+                                        Res.string.files_error_open_failed,
                                         listOf(error.message),
                                     )
                             }
 
                         else ->
                             FilesUiText(
-                                R.string.files_error_open_failed,
+                                Res.string.files_error_open_failed,
                                 listOf(error.message),
                             )
                     }

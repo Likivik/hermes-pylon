@@ -2,7 +2,6 @@
 
 package com.m57.hermescontrol.ui.connect
 
-import android.app.Application
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -48,7 +47,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -75,6 +73,7 @@ import com.m57.hermescontrol.generated.resources.nav_drawer_subtitle
 import com.m57.hermescontrol.generated.resources.notif_title
 import com.m57.hermescontrol.generated.resources.settings_field_token
 import com.m57.hermescontrol.theme.Spacing
+import com.m57.hermescontrol.ui.common.ComposeResourcesStringResolver
 import com.m57.hermescontrol.ui.common.PressureBanner
 import org.jetbrains.compose.resources.stringResource
 
@@ -86,8 +85,11 @@ fun ConnectScreen(
         viewModel(
             factory =
                 run {
-                    val app = LocalContext.current.applicationContext as Application
-                    ConnectViewModelFactory(app)
+                    // The ViewModel no longer needs an `Application` —
+                    // it just needs a `StringResolver`. The shared
+                    // Compose-Resources backed instance is fine here:
+                    // there's nothing to mock out for production.
+                    ConnectViewModelFactory(ComposeResourcesStringResolver.Default.shared)
                 },
         ),
 ) {
