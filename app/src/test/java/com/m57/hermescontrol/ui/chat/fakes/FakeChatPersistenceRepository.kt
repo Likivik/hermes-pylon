@@ -14,7 +14,7 @@ import com.m57.hermescontrol.ui.chat.RoomChatMessageStore
  * ```
  * val fakeRepo = FakeChatPersistenceRepository()
  * fakeRepo.dao.addMessageDirect(someEntity)
- * val vm = ChatViewModel(app, startCleanup, fakeRepo)
+ * val vm = ChatViewModel(app, resolver, startCleanup, fakeRepo)
  * ```
  */
 internal open class FakeChatPersistenceRepository(

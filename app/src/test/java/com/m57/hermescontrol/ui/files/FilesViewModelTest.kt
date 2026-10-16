@@ -1,12 +1,13 @@
 package com.m57.hermescontrol.ui.files
 
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.ManagedFileEntry
 import com.m57.hermescontrol.data.remote.GatewayFile
 import com.m57.hermescontrol.data.remote.GatewayFileClient
 import com.m57.hermescontrol.data.remote.GatewayFileResult
 import com.m57.hermescontrol.data.remote.NetworkError
 import com.m57.hermescontrol.data.remote.NetworkResult
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.files_error_folder_name_required
 import io.mockk.coEvery
 import io.mockk.mockkObject
 import io.mockk.unmockkObject
@@ -47,9 +48,14 @@ class FilesViewModelTest {
         viewModel.openCreateDir()
         viewModel.createDir()
 
+        // After the migration to Compose Resources, the ViewModel no
+        // longer holds an Android `R.string` Int — it carries the
+        // generated `StringResource` key directly so the screen can
+        // resolve it through `stringResource(Res.string.x)` at render
+        // time. Compare keys, not resource ids.
         assertEquals(
-            R.string.files_error_folder_name_required,
-            viewModel.uiState.value.toastMessage?.resourceId,
+            Res.string.files_error_folder_name_required,
+            viewModel.uiState.value.toastMessage?.key,
         )
     }
 

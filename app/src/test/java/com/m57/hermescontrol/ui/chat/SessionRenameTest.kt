@@ -4,7 +4,6 @@ package com.m57.hermescontrol.ui.chat
 
 import android.app.Application
 import android.util.Log
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.local.HermesDatabase
 import com.m57.hermescontrol.data.remote.ApiClient
@@ -15,8 +14,11 @@ import com.m57.hermescontrol.data.ws.HermesWsClient
 import com.m57.hermescontrol.data.ws.JsonRpcError
 import com.m57.hermescontrol.data.ws.WsEvent
 import com.m57.hermescontrol.data.ws.WsMethods
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.chat_model_switch_failed
 import com.m57.hermescontrol.ui.chat.fakes.FakeChatPersistenceRepository
 import com.m57.hermescontrol.ui.chat.fakes.FakeSlashUsageStore
+import com.m57.hermescontrol.ui.common.FakeStringResolver
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -63,6 +65,7 @@ class SessionRenameTest {
     private val mockEventsFlow = MutableSharedFlow<WsEvent>(extraBufferCapacity = 64)
     private val mockConnectionStatus = MutableStateFlow(ConnectionStatus.DISCONNECTED)
     private lateinit var app: Application
+    private lateinit var resolver: FakeStringResolver
     private lateinit var fakeRepo: FakeChatPersistenceRepository
     private lateinit var fakeSlashUsageStore: FakeSlashUsageStore
     private lateinit var mockApi: com.m57.hermescontrol.data.remote.HermesGatewayApi
@@ -97,10 +100,8 @@ class SessionRenameTest {
         mockkObject(HermesDatabase)
 
         app = mockk(relaxed = true)
-        every { app.getString(R.string.chat_model_switch_failed, any()) } answers {
-            val formatArgs = arg<Array<out Any>>(1)
-            "Failed to switch model: ${formatArgs.first()}"
-        }
+        resolver = FakeStringResolver()
+        resolver.stub(Res.string.chat_model_switch_failed, "Failed to switch model: %1\$s")
         fakeRepo = FakeChatPersistenceRepository()
         fakeSlashUsageStore = FakeSlashUsageStore()
         every { AuthManager.getSelectedProfileId() } returns "profile-a"
@@ -175,7 +176,7 @@ class SessionRenameTest {
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private fun createViewModel(): ChatViewModel =
-        ChatViewModel(app, false, fakeRepo, fakeSlashUsageStore, testDispatcher)
+        ChatViewModel(app, resolver, false, fakeRepo, fakeSlashUsageStore, testDispatcher)
 
     /**
      * Create the ViewModel, emit GatewayReady, then create one session

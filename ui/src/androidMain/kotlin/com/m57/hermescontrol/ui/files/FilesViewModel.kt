@@ -1,9 +1,7 @@
 package com.m57.hermescontrol.ui.files
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.model.ManagedDirectoryCreate
 import com.m57.hermescontrol.data.model.ManagedFileActionResponse
 import com.m57.hermescontrol.data.model.ManagedFileDelete
@@ -14,6 +12,7 @@ import com.m57.hermescontrol.data.remote.GatewayFileResult
 import com.m57.hermescontrol.data.remote.NetworkError
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.files_error_create_folder
 import com.m57.hermescontrol.generated.resources.files_error_delete
 import com.m57.hermescontrol.generated.resources.files_error_folder_name_required
@@ -33,6 +32,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.jetbrains.compose.resources.StringResource
 
 data class FilesUiState(
     val currentPath: String = "",
@@ -53,11 +53,9 @@ data class FilesUiState(
 )
 
 data class FilesUiText(
-    val resourceId: Int,
-    val args: List<String> = emptyList(),
-) {
-    fun resolve(context: Context): String = context.getString(resourceId, *args.toTypedArray())
-}
+    val key: StringResource,
+    val args: List<Any> = emptyList(),
+)
 
 /** Decoded file ready to be written to disk and opened on-device. */
 data class DownloadedFile(
@@ -103,7 +101,7 @@ class FilesViewModel(
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        errorMessage = FilesUiText(R.string.files_error_list, listOf(errorMsg)),
+                        errorMessage = FilesUiText(Res.string.files_error_list, listOf(errorMsg)),
                     )
                 }
             },
@@ -140,11 +138,11 @@ class FilesViewModel(
         val name = _uiState.value.newDirName.trim()
         val base = _uiState.value.currentPath
         if (name.isBlank()) {
-            _uiState.update { it.copy(toastMessage = FilesUiText(R.string.files_error_folder_name_required)) }
+            _uiState.update { it.copy(toastMessage = FilesUiText(Res.string.files_error_folder_name_required)) }
             return
         }
         if (name.contains("/")) {
-            _uiState.update { it.copy(toastMessage = FilesUiText(R.string.files_error_folder_name_slash)) }
+            _uiState.update { it.copy(toastMessage = FilesUiText(Res.string.files_error_folder_name_slash)) }
             return
         }
         val target = if (base.isBlank()) name else "$base/$name"
@@ -158,8 +156,8 @@ class FilesViewModel(
                 }
             handleActionResult(
                 result,
-                R.string.files_status_folder_created,
-                R.string.files_error_create_folder,
+                Res.string.files_status_folder_created,
+                Res.string.files_error_create_folder,
             )
         }
     }
@@ -188,8 +186,8 @@ class FilesViewModel(
                 }
             handleActionResult(
                 result,
-                R.string.files_status_file_uploaded,
-                R.string.files_error_upload_file,
+                Res.string.files_status_file_uploaded,
+                Res.string.files_error_upload_file,
             )
         }
     }
@@ -227,7 +225,7 @@ class FilesViewModel(
                     _uiState.update {
                         it.copy(
                             busyPaths = cleared,
-                            toastMessage = FilesUiText(R.string.files_status_deleted, listOf(target.name)),
+                            toastMessage = FilesUiText(Res.string.files_status_deleted, listOf(target.name)),
                         )
                     }
                     refresh()
@@ -239,7 +237,7 @@ class FilesViewModel(
                             busyPaths = cleared,
                             toastMessage =
                                 FilesUiText(
-                                    R.string.files_error_delete,
+                                    Res.string.files_error_delete,
                                     listOf(result.error.message),
                                 ),
                         )
@@ -290,8 +288,8 @@ class FilesViewModel(
 
     private fun handleActionResult(
         result: NetworkResult<ManagedFileActionResponse>,
-        successMessageId: Int,
-        errorMessageId: Int,
+        successKey: StringResource,
+        errorKey: StringResource,
     ) {
         when (result) {
             is NetworkResult.Success -> {
@@ -299,7 +297,7 @@ class FilesViewModel(
                     it.copy(
                         isLoading = false,
                         isUploading = false,
-                        toastMessage = FilesUiText(successMessageId),
+                        toastMessage = FilesUiText(successKey),
                     )
                 }
                 refresh()
@@ -312,7 +310,7 @@ class FilesViewModel(
                         isUploading = false,
                         toastMessage =
                             FilesUiText(
-                                errorMessageId,
+                                errorKey,
                                 listOf(result.error.message),
                             ),
                     )

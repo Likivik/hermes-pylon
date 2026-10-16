@@ -2,11 +2,9 @@
 
 package com.m57.hermescontrol.ui.connect
 
-import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.m57.hermescontrol.R
 import com.m57.hermescontrol.data.config.ConnectionProfile
 import com.m57.hermescontrol.data.config.resolveBaseUrl
 import com.m57.hermescontrol.data.local.AuthManager
@@ -19,6 +17,7 @@ import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.data.remote.parseForBuild
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.connect_error_401
 import com.m57.hermescontrol.generated.resources.connect_error_403
 import com.m57.hermescontrol.generated.resources.connect_error_connection_failed
@@ -28,6 +27,7 @@ import com.m57.hermescontrol.generated.resources.connect_error_resolve
 import com.m57.hermescontrol.generated.resources.connect_error_timeout
 import com.m57.hermescontrol.generated.resources.connect_error_token_required
 import com.m57.hermescontrol.generated.resources.connect_error_url_invalid
+import com.m57.hermescontrol.ui.common.StringResolver
 import com.m57.hermescontrol.ui.common.reconcilePressureStatus
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -53,8 +53,19 @@ data class ConnectUiState(
     val status: StatusResponse? = null,
 )
 
+/**
+ * ViewModel for the connect screen.
+ *
+ * Locale-aware error messages used to come from `Application.getString(Int)`.
+ * They are now read through a [StringResolver] backed by Compose Resources,
+ * so this VM no longer touches `Context` or `R.string` at all. The
+ * resolver's `get` is `suspend`, so call sites that are not already
+ * inside a coroutine (the `connect()` early-return validation paths)
+ * spawn a small `viewModelScope.launch { ... }` to capture the text
+ * before populating `_uiState`.
+ */
 class ConnectViewModel(
-    private val app: Application,
+    private val resolver: StringResolver,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ConnectUiState())
@@ -182,13 +193,23 @@ class ConnectViewModel(
     fun connect() {
         val state = _uiState.value
         if (state.token.isBlank()) {
-            _uiState.update { it.copy(errorMessage = app.getString(R.string.connect_error_token_required)) }
+            // `resolver.get` is `suspend`; the early-return path is not
+            // inside a coroutine, so we hoist into a one-shot launch
+            // that captures the resolved text and then writes it into
+            // the UI state.
+            viewModelScope.launch {
+                val msg = resolver.get(Res.string.connect_error_token_required)
+                _uiState.update { it.copy(errorMessage = msg) }
+            }
             return
         }
         val endpoint =
             runCatching { ServerEndpoint.parseForBuild(state.baseUrl) }.getOrNull()
         if (endpoint == null) {
-            _uiState.update { it.copy(errorMessage = app.getString(R.string.connect_error_url_invalid)) }
+            viewModelScope.launch {
+                val msg = resolver.get(Res.string.connect_error_url_invalid)
+                _uiState.update { it.copy(errorMessage = msg) }
+            }
             return
         }
 
@@ -294,15 +315,15 @@ class ConnectViewModel(
                                         if (AuthManager.getSelectedProfileId() != null) {
                                             AuthManager.setProfileToken(AuthManager.getSelectedProfileId()!!, null)
                                         }
-                                        app.getString(R.string.connect_error_401)
+                                        resolver.get(Res.string.connect_error_401)
                                     }
 
                                     403 -> {
-                                        app.getString(R.string.connect_error_403)
+                                        resolver.get(Res.string.connect_error_403)
                                     }
 
                                     else -> {
-                                        String.format(app.getString(R.string.connect_error_http_code), err.code)
+                                        resolver.get(Res.string.connect_error_http_code, err.code)
                                     }
                                 }
                             }
@@ -312,7 +333,7 @@ class ConnectViewModel(
                                 if (AuthManager.getSelectedProfileId() != null) {
                                     AuthManager.setProfileToken(AuthManager.getSelectedProfileId()!!, null)
                                 }
-                                app.getString(R.string.connect_error_401)
+                                resolver.get(Res.string.connect_error_401)
                             }
 
                             is NetworkError.Connection -> {
@@ -322,26 +343,26 @@ class ConnectViewModel(
                                         "timeout",
                                         true,
                                     ) -> {
-                                        app.getString(R.string.connect_error_timeout)
+                                        resolver.get(Res.string.connect_error_timeout)
                                     }
 
                                     causeMessage.contains(
                                         "refused",
                                         true,
                                     ) -> {
-                                        app.getString(R.string.connect_error_refused)
+                                        resolver.get(Res.string.connect_error_refused)
                                     }
 
                                     causeMessage.contains(
                                         "resolve",
                                         true,
                                     ) -> {
-                                        app.getString(R.string.connect_error_resolve)
+                                        resolver.get(Res.string.connect_error_resolve)
                                     }
 
                                     else -> {
-                                        String.format(
-                                            app.getString(R.string.connect_error_connection_failed),
+                                        resolver.get(
+                                            Res.string.connect_error_connection_failed,
                                             err.cause.message ?: "",
                                         )
                                     }
@@ -355,26 +376,26 @@ class ConnectViewModel(
                                         "timeout",
                                         true,
                                     ) -> {
-                                        app.getString(R.string.connect_error_timeout)
+                                        resolver.get(Res.string.connect_error_timeout)
                                     }
 
                                     causeMessage.contains(
                                         "refused",
                                         true,
                                     ) -> {
-                                        app.getString(R.string.connect_error_refused)
+                                        resolver.get(Res.string.connect_error_refused)
                                     }
 
                                     causeMessage.contains(
                                         "resolve",
                                         true,
                                     ) -> {
-                                        app.getString(R.string.connect_error_resolve)
+                                        resolver.get(Res.string.connect_error_resolve)
                                     }
 
                                     else -> {
-                                        String.format(
-                                            app.getString(R.string.connect_error_connection_failed),
+                                        resolver.get(
+                                            Res.string.connect_error_connection_failed,
                                             err.cause.message ?: "",
                                         )
                                     }
@@ -389,8 +410,8 @@ class ConnectViewModel(
 }
 
 class ConnectViewModelFactory(
-    private val app: Application,
+    private val resolver: StringResolver,
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel> create(modelClass: Class<T>): T = ConnectViewModel(app) as T
+    override fun <T : ViewModel> create(modelClass: Class<T>): T = ConnectViewModel(resolver) as T
 }
