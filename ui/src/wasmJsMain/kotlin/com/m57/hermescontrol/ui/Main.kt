@@ -10,6 +10,8 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.ComposeViewport
+import kotlinx.browser.document
+import org.jetbrains.skiko.wasm.onWasmReady
 import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.app_name
 import com.m57.hermescontrol.generated.resources.landing_title
@@ -35,8 +37,18 @@ import org.jetbrains.compose.resources.stringResource
  */
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
-    ComposeViewport {
-        PylonWebEntry()
+    // `onWasmReady` is required: the DOM has to exist before ComposeViewport can
+    // append its canvas. In CMP 1.12.2 `viewportContainer` is an `Element`, NOT the
+    // container-id String the original API took - passing a String is a compile
+    // error ("actual type is 'String', but 'Element' was expected").
+    //
+    // ComposeViewport sizes the canvas to the container, and Compose injects no CSS
+    // of its own, so `html, body` must have an explicit size in index.html or the
+    // canvas has zero area and the page renders blank.
+    onWasmReady {
+        ComposeViewport(viewportContainer = document.body!!) {
+            PylonWebEntry()
+        }
     }
 }
 
