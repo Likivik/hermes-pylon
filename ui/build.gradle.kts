@@ -1,7 +1,15 @@
 // `:ui` — Phase 1 of the Compose Multiplatform migration.
 //
-// Targets android + jvm. Only `androidMain` exists yet; `commonMain` is added
-// incrementally as more code moves. See `.hermes/plans/2026-10-15_135602-cmp-migration.md`.
+// Targets android + jvm + wasmJs (browser). Only `androidMain` carries real
+// screens yet; `commonMain` is the slim shared sliver (`CmpProof`,
+// `StringResolver`, the typed `Res` accessor) that every target compiles
+// against. The desktop (`jvm`) and web (`wasmJs`) entry points are minimal
+// proofs: `application { Window { ... } }` and `ComposeViewport { ... }`
+// each render `CmpProof` plus a `stringResource(Res.string.…)` read, which
+// is enough to exercise the Compose runtime and the Compose Resources
+// pipeline end-to-end on each new toolchain without depending on the
+// Android-only collaborators that live in `androidMain`. See
+// `.hermes/plans/2026-10-15_135602-cmp-migration.md`.
 //
 // This module owns the Compose UI tree, the Room database (schemas under
 // `ui/schemas/`), the OkHttp/WS network collaborators, encryption helpers,
@@ -113,6 +121,37 @@ room {
 kotlin {
     jvmToolchain(21)
 
+    // Reuse the system node/yarn toolchain set up for `:shared` rather than
+    // letting the Kotlin wasm plugin pull them from project-level Ivy repos
+    // (which FAIL_ON_PROJECT_REPOS rejects). `rootProject.enableSystemToolchainForWasm()`
+    // is invoked from `:shared/build.gradle.kts`; the callback fires once
+    // the WasmNodeJsRootPlugin is applied to the root, which any module with a
+    // `wasmJs` block triggers, so no second call is needed here.
+    @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
+    wasmJs {
+        browser {
+            // `binaries.executable()` is the CMP plugin's switch for a
+            // webpack-bundled Skiko runtime; without it
+            // `checkComposeUiTestConfigurationForWasmJs` (CMP-4906)
+            // refuses to wire up karma because the `runComposeUiTest`
+            // tests in `commonTest` would have no Skiko to drive.
+            // The `browser()` source-set is already chosen above, so the
+            // produced bundle is what karma actually loads in Firefox.
+            binaries.executable()
+            testTask {
+                useKarma {
+                    // CI runners ship Chrome; the dev boxes here do not, so
+                    // the browser is switchable: -PwasmTestBrowser=firefox.
+                    if (providers.gradleProperty("wasmTestBrowser").orNull == "firefox") {
+                        useFirefoxHeadless()
+                    } else {
+                        useChromeHeadless()
+                    }
+                }
+            }
+        }
+    }
+
     jvm()
 
     android {
@@ -180,6 +219,18 @@ kotlin {
         jvmTest {
             dependencies {
                 implementation(libs.skiko.awt.runtime.linux.x64)
+            }
+        }
+        // Compose desktop runtime — brings in `application { Window { ... } }`
+        // (from `androidx.compose.ui:ui`) on the current host's OS. Required
+        // for `ui/src/jvmMain/.../Main.kt`, which is the minimal entry point
+        // that proves the JVM toolchain end to end. `compose.desktop.currentOs`
+        // is the CMP plugin's per-OS alias (skiko-awt, linux-x64, etc.) so
+        // the jar the `compose.desktop { application { ... } }` block expects
+        // matches the host without a manual platform selector.
+        jvmMain {
+            dependencies {
+                implementation(compose.desktop.currentOs)
             }
         }
         androidMain {
@@ -250,6 +301,18 @@ tasks.matching {
         it.name == "kspAndroidMain"
 }.configureEach {
     dependsOn(generateBuildConfig)
+}
+
+// Compose Desktop application descriptor — generates `run`/`runDist`/`createDist`
+// tasks for `:ui` and points them at `MainKt.main()` in `ui/src/jvmMain/...`.
+// The four CMP desktop source-set names (`commonMain`, `desktopMain`, ...)
+// are intentionally NOT used here: this is a JVM target with Compose
+// desktop's `application` block, not the standalone desktop plugin's
+// source-set layout. `jvmMain` is where the entry lives.
+compose.desktop {
+    application {
+        mainClass = "com.m57.hermescontrol.ui.MainKt"
+    }
 }
 
 ktlint {
