@@ -32,6 +32,23 @@ interface LogSink {
         tag: String,
         message: String,
     )
+
+    /**
+     * Variants that carry a throwable. Default implementations fold it into the
+     * message so a sink does not have to exist for every target, while the
+     * Android sink still forwards a real stack trace to logcat.
+     */
+    fun w(
+        tag: String,
+        message: String,
+        throwable: Throwable?,
+    ) = w(tag, if (throwable == null) message else "$message: ${throwable.message}")
+
+    fun e(
+        tag: String,
+        message: String,
+        throwable: Throwable?,
+    ) = e(tag, if (throwable == null) message else "$message: ${throwable.message}")
 }
 
 /**

@@ -13,11 +13,13 @@ import com.m57.hermescontrol.data.local.ChatMessageEntity
 import com.m57.hermescontrol.data.local.HermesDatabase
 import com.m57.hermescontrol.data.model.Attachment
 import com.m57.hermescontrol.data.model.AttachmentSource
+import com.m57.hermescontrol.data.remote.AndroidAttachmentReader
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.GatewayFile
 import com.m57.hermescontrol.data.remote.GatewayFileClient
 import com.m57.hermescontrol.data.remote.GatewayFileResult
 import com.m57.hermescontrol.data.remote.GatewayResponse
+import com.m57.hermescontrol.data.remote.installAttachmentReader
 import com.m57.hermescontrol.data.session.ActiveSessionHolder
 import com.m57.hermescontrol.data.ws.ConnectionStatus
 import com.m57.hermescontrol.data.ws.HermesWsClient
@@ -34,6 +36,7 @@ import com.m57.hermescontrol.generated.resources.chat_privileged_not_acknowledge
 import com.m57.hermescontrol.ui.chat.fakes.FakeChatMessageDao
 import com.m57.hermescontrol.ui.chat.fakes.FakeChatPersistenceRepository
 import com.m57.hermescontrol.ui.chat.fakes.FakeSlashUsageStore
+import com.m57.hermescontrol.ui.chat.fakes.testChatEnvironment
 import com.m57.hermescontrol.ui.common.FakeStringResolver
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -118,6 +121,7 @@ class ChatViewModelTest {
         mockkObject(HermesDatabase)
 
         app = mockk(relaxed = true)
+        installAttachmentReader(AndroidAttachmentReader(app))
         resolver = FakeStringResolver()
         resolver.stub(Res.string.chat_model_switch_failed, "Failed to switch model: %1\$s")
         resolver.stub(Res.string.chat_privileged_not_acknowledged, PRIVILEGED_FAILURE_TEXT)
@@ -208,6 +212,7 @@ class ChatViewModelTest {
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+        installAttachmentReader(null)
         unmockkAll()
     }
 
@@ -249,7 +254,15 @@ class ChatViewModelTest {
 
     /** Create a ViewModel with the fake repo injected directly. */
     private fun createViewModel(startCleanup: Boolean = false): ChatViewModel =
-        ChatViewModel(app, resolver, startCleanup, fakeRepo, fakeSlashUsageStore, testDispatcher)
+        ChatViewModel(
+            testChatEnvironment(fakeSlashUsageStore),
+            resolver,
+            startCleanup,
+            fakeRepo,
+            fakeSlashUsageStore,
+            testDispatcher,
+            io = testDispatcher,
+        )
 
     /**
      * Create ViewModel, simulate GatewayReady, feed SESSION_CREATE result,
@@ -764,12 +777,13 @@ class ChatViewModelTest {
             every { AuthManager.getSelectedProfileId() } answers { selectedProfile.value }
             val viewModel =
                 ChatViewModel(
-                    app,
+                    testChatEnvironment(fakeSlashUsageStore),
                     resolver,
                     false,
                     fakeRepo,
                     fakeSlashUsageStore,
                     testDispatcher,
+                    io = testDispatcher,
                     selectedProfileId = { selectedProfile.value },
                     selectedProfileIds = selectedProfile,
                 )
@@ -3461,7 +3475,16 @@ class ChatViewModelTest {
                     }
                 }
             coEvery { mockApi.getSessionMessages(any(), any(), any(), true, any()) } returns serverMessages("server")
-            val viewModel = ChatViewModel(app, resolver, false, delayedRepo, fakeSlashUsageStore, testDispatcher)
+            val viewModel =
+                ChatViewModel(
+                    testChatEnvironment(fakeSlashUsageStore),
+                    resolver,
+                    false,
+                    delayedRepo,
+                    fakeSlashUsageStore,
+                    testDispatcher,
+                    io = testDispatcher,
+                )
 
             viewModel.switchSession("session-a")
             runCurrent()
@@ -3495,12 +3518,13 @@ class ChatViewModelTest {
                 java.io.IOException("offline")
             val viewModel =
                 ChatViewModel(
-                    app,
+                    testChatEnvironment(fakeSlashUsageStore),
                     resolver,
                     false,
                     delayedRepo,
                     fakeSlashUsageStore,
                     testDispatcher,
+                    io = testDispatcher,
                     selectedProfileId = { selectedProfile.value },
                     selectedProfileIds = selectedProfile,
                 )
@@ -5034,13 +5058,9 @@ class ChatViewModelTest {
             viewModel.sendMessage("Here is an image")
             advanceUntilIdle()
 
-            // Error path is logged so we can diagnose the failed read.
-            verify {
-                Log.e(
-                    any(),
-                    match { it.contains("SecurityException") },
-                )
-            }
+            // The failed read is logged by the platform AttachmentReader (see
+            // AndroidAttachmentReader), not by the ViewModel: the read moved behind
+            // that seam, so there is no Log.e call here to verify any more.
 
             // Graceful handling: the message is still sent even though the
             // attachment bytes couldn't be read (no crash, no lost message).
@@ -5349,7 +5369,20 @@ class ChatViewModelTest {
             every { app.applicationContext } returns app
             every { app.startActivity(capture(intentSlot)) } returns Unit
 
-            val viewModel = createViewModel()
+            val viewModel =
+                ChatViewModel(
+                    testChatEnvironment(
+                        slashUsageStore = fakeSlashUsageStore,
+                        attachmentOpener =
+                            AndroidAttachmentOpener(app, resolver, cacheDir.absolutePath),
+                    ),
+                    resolver,
+                    false,
+                    fakeRepo,
+                    fakeSlashUsageStore,
+                    testDispatcher,
+                    io = testDispatcher,
+                )
             val attachment =
                 Attachment(
                     uri = "unused",
@@ -5387,7 +5420,20 @@ class ChatViewModelTest {
             } returns GatewayFileResult.NotFound
             resolver.stub(Res.string.attachment_error_not_found, "File not found on gateway: missing.pdf")
 
-            val viewModel = createViewModel()
+            val viewModel =
+                ChatViewModel(
+                    testChatEnvironment(
+                        slashUsageStore = fakeSlashUsageStore,
+                        attachmentOpener =
+                            AndroidAttachmentOpener(app, resolver, cacheDir.absolutePath),
+                    ),
+                    resolver,
+                    false,
+                    fakeRepo,
+                    fakeSlashUsageStore,
+                    testDispatcher,
+                    io = testDispatcher,
+                )
             val attachment =
                 Attachment(
                     uri = "unused",
@@ -5421,13 +5467,14 @@ class ChatViewModelTest {
 
     private fun createViewModelWithCreateRetry(): ChatViewModel =
         ChatViewModel(
-            app,
+            testChatEnvironment(fakeSlashUsageStore),
             resolver,
             false,
             fakeRepo,
             fakeSlashUsageStore,
             testDispatcher,
             createRetryDelayMs,
+            io = testDispatcher,
         )
 
     @Test

@@ -23,8 +23,8 @@ import com.m57.hermescontrol.data.security.SecureStorage
 import com.m57.hermescontrol.data.theme.ThemePreference
 import com.m57.hermescontrol.data.theme.ThemePreset
 import com.m57.hermescontrol.data.ws.WsAuthConfig
+import com.m57.hermescontrol.util.ioDispatcher
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -105,7 +105,7 @@ object AuthManager : WsAuthConfig {
                     context.filesDir.resolve("server_store.json")
                 }
 
-            val scope = CoroutineScope(Dispatchers.IO)
+            val scope = CoroutineScope(ioDispatcher)
             appScope = scope
             val store = ServerStore(dataStore, scope)
             _serverStore = store

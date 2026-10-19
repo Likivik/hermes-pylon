@@ -19,7 +19,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
@@ -56,6 +55,7 @@ import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.ui.common.DisableDrawerGestures
 import com.m57.hermescontrol.ui.common.DrawerGestureController
 import com.m57.hermescontrol.ui.common.LocalDrawerGestureController
+import com.m57.hermescontrol.ui.icons.HermesSymbol
 import com.m57.hermescontrol.ui.settings.SettingsAboutPage
 import com.m57.hermescontrol.ui.settings.SettingsAppearancePage
 import com.m57.hermescontrol.ui.settings.SettingsBehaviorPage
@@ -255,7 +255,7 @@ fun MainNavigation() {
                             .filter { it.drawerSection == section }
                             .forEach { entry ->
                                 NavigationDrawerItem(
-                                    icon = { Icon(entry.icon, contentDescription = null) },
+                                    icon = { HermesSymbol(icon = entry.icon, contentDescription = null) },
                                     label = { Text(stringResource(entry.labelRes)) },
                                     selected = currentScreen == entry.key,
                                     onClick = {

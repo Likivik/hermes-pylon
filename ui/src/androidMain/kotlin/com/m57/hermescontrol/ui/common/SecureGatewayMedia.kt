@@ -1,62 +1,14 @@
 package com.m57.hermescontrol.ui.common
 
 import android.media.MediaDataSource
-import com.m57.hermescontrol.data.model.Attachment
-import com.m57.hermescontrol.data.model.AttachmentSource
-import com.m57.hermescontrol.data.model.ManagedFileEntry
 import com.m57.hermescontrol.data.remote.GatewayMediaRangeResult
 import com.m57.hermescontrol.data.remote.SeekableGatewayMediaReader
+import com.m57.hermescontrol.util.ioDispatcher
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
 import java.io.IOException
-import java.net.URLConnection
 import java.util.concurrent.atomic.AtomicLong
-
-sealed interface SecureMediaOpenRoute {
-    data class Player(val request: SecureGatewayMediaRequest) : SecureMediaOpenRoute
-
-    data object DownloadAndOpen : SecureMediaOpenRoute
-
-    data object OpenLocal : SecureMediaOpenRoute
-}
-
-fun routeAttachmentOpen(attachment: Attachment): SecureMediaOpenRoute {
-    if (attachment.source == AttachmentSource.LOCAL) return SecureMediaOpenRoute.OpenLocal
-    val path = attachment.gatewayPath ?: attachment.uri
-    val kind =
-        mediaKind(attachment.mimeType, path)
-            ?: return SecureMediaOpenRoute.DownloadAndOpen
-    return SecureMediaOpenRoute.Player(SecureGatewayMediaRequest(path, attachment.name, attachment.mimeType, kind))
-}
-
-fun routeManagedFileOpen(entry: ManagedFileEntry): SecureMediaOpenRoute {
-    val mimeType =
-        entry.mimeType?.takeIf { it.isNotBlank() }
-            ?: URLConnection.guessContentTypeFromName(entry.name).orEmpty()
-    val kind = mediaKind(mimeType, entry.path)
-    return if (kind != null) {
-        SecureMediaOpenRoute.Player(SecureGatewayMediaRequest(entry.path, entry.name, mimeType, kind))
-    } else {
-        SecureMediaOpenRoute.DownloadAndOpen
-    }
-}
-
-private fun mediaKind(
-    mimeType: String,
-    path: String,
-): SecureGatewayMediaKind? =
-    when {
-        mimeType.startsWith("audio/", ignoreCase = true) -> SecureGatewayMediaKind.AUDIO
-        mimeType.startsWith("video/", ignoreCase = true) -> SecureGatewayMediaKind.VIDEO
-        else ->
-            when (path.substringBefore('?').substringAfterLast('.').lowercase()) {
-                "mp3", "m4a", "aac", "ogg", "oga", "wav", "flac", "opus" -> SecureGatewayMediaKind.AUDIO
-                "mp4", "m4v", "webm", "3gp", "mkv" -> SecureGatewayMediaKind.VIDEO
-                else -> null
-            }
-    }
 
 /** Blocking range mapper used only on MediaPlayer's data-source worker threads. */
 class GatewayMediaDataReader(
@@ -89,7 +41,7 @@ class GatewayMediaDataReader(
         }
         val result =
             try {
-                runBlocking(Dispatchers.IO + readJob) { session.read(position, requested) }
+                runBlocking(ioDispatcher + readJob) { session.read(position, requested) }
             } catch (_: CancellationException) {
                 throw IOException("Media data source is closed")
             } finally {

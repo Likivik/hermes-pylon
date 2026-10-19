@@ -17,16 +17,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.CloudDownload
-import androidx.compose.material.icons.filled.Extension
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -63,6 +57,8 @@ import com.m57.hermescontrol.ui.common.EmptyState
 import com.m57.hermescontrol.ui.common.ErrorState
 import com.m57.hermescontrol.ui.common.SkeletonListState
 import com.m57.hermescontrol.ui.common.listItemSpacing
+import com.m57.hermescontrol.ui.icons.HermesIcon
+import com.m57.hermescontrol.ui.icons.HermesSymbol
 import com.m57.hermescontrol.ui.skills.SkillsUiState
 import org.jetbrains.compose.resources.stringResource
 
@@ -98,8 +94,8 @@ fun HubBrowseView(
                             onHubQueryChange("")
                             onClearSearch()
                         }) {
-                            Icon(
-                                imageVector = Icons.Filled.Close,
+                            HermesSymbol(
+                                icon = HermesIcon.Close,
                                 contentDescription = stringResource(Res.string.action_clear),
                             )
                         }
@@ -108,8 +104,8 @@ fun HubBrowseView(
                         onClick = { onSearch(hubQuery) },
                         enabled = hubQuery.isNotBlank(),
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.Search,
+                        HermesSymbol(
+                            icon = HermesIcon.Search,
                             contentDescription = stringResource(Res.string.skills_hub_search_button),
                         )
                     }
@@ -142,7 +138,7 @@ fun HubBrowseView(
 
             state.hubResults.isEmpty() && hubQuery.isNotBlank() && !state.isHubSearching -> {
                 EmptyState(
-                    icon = Icons.Filled.Extension,
+                    icon = "extension",
                     title = stringResource(Res.string.skills_hub_empty_results),
                     actionLabel = stringResource(Res.string.empty_action_retry_search),
                     onAction = { onSearch(hubQuery) },
@@ -174,7 +170,7 @@ fun HubBrowseView(
 
             else -> {
                 EmptyState(
-                    icon = Icons.Filled.Search,
+                    icon = "search",
                     title = stringResource(Res.string.skills_hub_search_hint),
                 )
             }
@@ -291,8 +287,8 @@ private fun HubSkillCard(
                             color = MaterialTheme.colorScheme.onPrimary,
                         )
                     } else {
-                        Icon(
-                            imageVector = Icons.Filled.CloudDownload,
+                        HermesSymbol(
+                            icon = HermesIcon.CloudDownload,
                             contentDescription = null,
                             modifier = Modifier.size(18.dp),
                         )

@@ -12,16 +12,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.OpenInBrowser
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -35,7 +29,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.VisualTransformation
@@ -73,6 +66,8 @@ import com.m57.hermescontrol.ui.common.SkeletonListState
 import com.m57.hermescontrol.ui.common.ToastEffect
 import com.m57.hermescontrol.ui.common.listContentPadding
 import com.m57.hermescontrol.ui.common.listItemSpacing
+import com.m57.hermescontrol.ui.icons.HermesIcon
+import com.m57.hermescontrol.ui.icons.HermesSymbol
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -182,8 +177,8 @@ private fun ProviderCard(
                     .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.Top,
         ) {
-            Icon(
-                imageVector = providerStatusIcon(provider),
+            HermesSymbol(
+                icon = providerStatusIcon(provider),
                 contentDescription = null,
                 tint = providerStatusColor(provider),
                 modifier = Modifier.size(20.dp),
@@ -406,8 +401,8 @@ private fun PkceFlowContent(
             onClick = { onOpenBrowser(authUrl) },
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Icon(
-                imageVector = Icons.Filled.OpenInBrowser,
+            HermesSymbol(
+                icon = HermesIcon.OpenInBrowser,
                 contentDescription = null,
                 modifier = Modifier.size(16.dp),
             )
@@ -506,11 +501,11 @@ private fun DeviceCodeFlowContent(
 
 // ── Status helpers ──────────────────────────────────────────────────────
 
-private fun providerStatusIcon(provider: OAuthProvider): ImageVector =
+private fun providerStatusIcon(provider: OAuthProvider): HermesIcon =
     when {
-        provider.status.loggedIn -> Icons.Filled.CheckCircle
-        provider.flow == "external" -> Icons.Filled.Link
-        else -> Icons.Filled.Warning
+        provider.status.loggedIn -> HermesIcon.CheckCircle
+        provider.flow == "external" -> HermesIcon.Link
+        else -> HermesIcon.Warning
     }
 
 @Composable

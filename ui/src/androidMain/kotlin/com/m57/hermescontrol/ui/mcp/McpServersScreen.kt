@@ -22,14 +22,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Key
-import androidx.compose.material.icons.filled.Science
-import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -37,7 +29,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -129,6 +120,8 @@ import com.m57.hermescontrol.ui.common.ToastEffect
 import com.m57.hermescontrol.ui.common.listContentPadding
 import com.m57.hermescontrol.ui.common.listItemSpacing
 import com.m57.hermescontrol.ui.common.toDetailRows
+import com.m57.hermescontrol.ui.icons.HermesIcon
+import com.m57.hermescontrol.ui.icons.HermesSymbol
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -182,8 +175,8 @@ fun McpServersScreen(
                 if (state.isTestingAll) {
                     CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                 } else {
-                    Icon(
-                        imageVector = Icons.Filled.Science,
+                    HermesSymbol(
+                        icon = HermesIcon.Science,
                         contentDescription = stringResource(Res.string.mcp_servers_action_test_all),
                     )
                 }
@@ -547,7 +540,11 @@ private fun ServerCard(
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Icon(Icons.Filled.Build, contentDescription = null, modifier = Modifier.size(12.dp))
+                                HermesSymbol(
+                                    icon = HermesIcon.Build,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(12.dp),
+                                )
                                 Spacer(modifier = Modifier.width(spacing.xs))
                                 Text(
                                     text = McpTokenEstimator.formatTokenOverhead(toolCount, estimate),
@@ -604,7 +601,7 @@ private fun ServerCard(
                     modifier = Modifier.fillMaxWidth(),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
                 ) {
-                    Icon(Icons.Filled.Key, contentDescription = null, modifier = Modifier.size(16.dp))
+                    HermesSymbol(icon = HermesIcon.Key, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(spacing.xs))
                     Text(stringResource(Res.string.mcp_servers_action_authorize))
                 }
@@ -627,13 +624,20 @@ private fun ServerCard(
                         Spacer(modifier = Modifier.width(spacing.xs))
                         Text(stringResource(Res.string.mcp_servers_status_testing), maxLines = 1)
                     } else {
-                        Icon(Icons.Filled.Science, contentDescription = null, modifier = Modifier.size(16.dp))
+                        HermesSymbol(
+                            icon = HermesIcon.Science,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                        )
                         Spacer(modifier = Modifier.width(spacing.xs))
                         Text(stringResource(Res.string.mcp_servers_action_test), maxLines = 1)
                     }
                 }
                 IconButton(onClick = { viewModel.deleteServer(server.name) }) {
-                    Icon(Icons.Filled.Delete, contentDescription = stringResource(Res.string.action_delete))
+                    HermesSymbol(
+                        icon = HermesIcon.Delete,
+                        contentDescription = stringResource(Res.string.action_delete),
+                    )
                 }
             }
 
@@ -642,7 +646,7 @@ private fun ServerCard(
                 onClick = { showEnv = !showEnv },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Icon(Icons.Filled.Storage, contentDescription = null, modifier = Modifier.size(16.dp))
+                HermesSymbol(icon = HermesIcon.Storage, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(spacing.xs))
                 Text(stringResource(Res.string.mcp_servers_env_vars))
             }
@@ -686,7 +690,11 @@ private fun EnvVarSection(
                     )
                 }
                 IconButton(onClick = { viewModel.removeEnvVar(server.name, key) }) {
-                    Icon(Icons.Filled.Close, contentDescription = "Remove", modifier = Modifier.size(16.dp))
+                    HermesSymbol(
+                        icon = HermesIcon.Close,
+                        contentDescription = "Remove",
+                        modifier = Modifier.size(16.dp),
+                    )
                 }
             }
         }
@@ -728,7 +736,7 @@ private fun EnvVarSection(
         }
     } else {
         TextButton(onClick = { viewModel.startEditingEnv(server) }) {
-            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(14.dp))
+            HermesSymbol(icon = HermesIcon.Add, contentDescription = null, modifier = Modifier.size(14.dp))
             Spacer(modifier = Modifier.width(spacing.xs))
             Text(stringResource(Res.string.mcp_servers_env_add))
         }

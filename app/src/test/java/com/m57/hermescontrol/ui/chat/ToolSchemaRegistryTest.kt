@@ -1,20 +1,19 @@
 package com.m57.hermescontrol.ui.chat
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Terminal
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ToolSchemaRegistryTest {
     @Test
-    fun `tool configs use material icons`() {
+    fun `tool configs use material symbol names`() {
+        // Icons are addressed by Material Symbols name rather than by ImageVector,
+        // because the shared UI renders them from a variable font on every target.
         assertEquals(
-            Icons.Filled.Terminal,
+            "terminal",
             ToolSchemaRegistry.getDisplayConfig("terminal").icon,
         )
         assertEquals(
-            Icons.Filled.Description,
+            "description",
             ToolSchemaRegistry.getDisplayConfig("read_file").icon,
         )
     }

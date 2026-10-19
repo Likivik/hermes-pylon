@@ -19,7 +19,6 @@ import com.m57.hermescontrol.generated.resources.skills_status_enabled
 import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.ui.common.safeLaunchLoad
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,6 +27,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.StringResource
+import com.m57.hermescontrol.util.ioDispatcher as ioDispatcher
 
 enum class SkillsViewMode {
     INSTALLED,
@@ -86,7 +86,7 @@ class SkillsViewModel(
     private val ioDispatcher: CoroutineDispatcher,
 ) : AndroidViewModel(application),
     ToastHost {
-    constructor(application: Application) : this(application, Dispatchers.IO)
+    constructor(application: Application) : this(application, ioDispatcher)
 
     private val _uiState = MutableStateFlow(SkillsUiState())
     val uiState: StateFlow<SkillsUiState> = _uiState.asStateFlow()

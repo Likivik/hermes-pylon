@@ -7,11 +7,13 @@ import coil.ImageLoaderFactory
 import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
 import com.m57.hermescontrol.data.local.AuthManager
+import com.m57.hermescontrol.data.remote.AndroidAttachmentReader
 import com.m57.hermescontrol.data.remote.AndroidNetworkMonitor
 import com.m57.hermescontrol.data.remote.DashboardSessionTokenRefresher
 import com.m57.hermescontrol.data.remote.HermesHttpConfig
 import com.m57.hermescontrol.data.remote.OkHttpProvider
 import com.m57.hermescontrol.data.remote.createHermesHttpClient
+import com.m57.hermescontrol.data.remote.installAttachmentReader
 import com.m57.hermescontrol.data.ws.HermesWsClient
 import com.m57.hermescontrol.data.ws.OkHttpWsTransport
 import com.m57.hermescontrol.ui.analytics.AnalyticsPreloader
@@ -40,6 +42,9 @@ class HermesControlApp :
         // Shared code logs through the :shared HermesLog facade; install the
         // android.util.Log-backed sink (and its BuildConfig.DEBUG flag) here.
         HermesLog.install(AndroidLogSink)
+        // Only Android can read a content:// attachment; install the reader here so
+        // shared chat code can request the bytes without holding a Context.
+        installAttachmentReader(AndroidAttachmentReader(this))
         // Issue #478: guarantee a "Default" profile is always selected so there is no
         // separate standalone/default code path anywhere in the app.
         AuthManager.ensureDefaultProfile()

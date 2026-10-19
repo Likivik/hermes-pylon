@@ -18,6 +18,7 @@ import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.chat_model_switch_failed
 import com.m57.hermescontrol.ui.chat.fakes.FakeChatPersistenceRepository
 import com.m57.hermescontrol.ui.chat.fakes.FakeSlashUsageStore
+import com.m57.hermescontrol.ui.chat.fakes.testChatEnvironment
 import com.m57.hermescontrol.ui.common.FakeStringResolver
 import io.mockk.coEvery
 import io.mockk.every
@@ -176,7 +177,15 @@ class SessionRenameTest {
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private fun createViewModel(): ChatViewModel =
-        ChatViewModel(app, resolver, false, fakeRepo, fakeSlashUsageStore, testDispatcher)
+        ChatViewModel(
+            testChatEnvironment(fakeSlashUsageStore),
+            resolver,
+            false,
+            fakeRepo,
+            fakeSlashUsageStore,
+            testDispatcher,
+            io = testDispatcher,
+        )
 
     /**
      * Create the ViewModel, emit GatewayReady, then create one session

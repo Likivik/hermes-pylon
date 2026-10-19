@@ -134,6 +134,15 @@ kotlin {
                 // for this target. Nothing here depends on OkHttp.
             }
         }
+
+        wasmJsMain {
+            dependencies {
+                // engine-defaults does resolve the browser Js engine for wasmJs,
+                // but only transitively — the web target then breaks silently if
+                // that resolution ever changes. Declare it, like androidMain does.
+                implementation(libs.ktor.client.js)
+            }
+        }
     }
 }
 

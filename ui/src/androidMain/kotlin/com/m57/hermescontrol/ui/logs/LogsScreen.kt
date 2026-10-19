@@ -18,17 +18,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.FileUpload
-import androidx.compose.material.icons.filled.HistoryEdu
-import androidx.compose.material.icons.filled.KeyboardDoubleArrowDown
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -81,6 +72,8 @@ import com.m57.hermescontrol.ui.common.NavIcon
 import com.m57.hermescontrol.ui.common.SearchBar
 import com.m57.hermescontrol.ui.common.SkeletonListState
 import com.m57.hermescontrol.ui.common.ToastEffect
+import com.m57.hermescontrol.ui.icons.HermesIcon
+import com.m57.hermescontrol.ui.icons.HermesSymbol
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 
@@ -148,8 +141,8 @@ fun LogsScreen(
         actions = {
             // Pause / Resume toggle
             IconButton(onClick = { pauseScroll = !pauseScroll }) {
-                Icon(
-                    imageVector = if (pauseScroll) Icons.Filled.PlayArrow else Icons.Filled.Pause,
+                HermesSymbol(
+                    icon = if (pauseScroll) HermesIcon.PlayArrow else HermesIcon.Pause,
                     contentDescription =
                         stringResource(
                             if (pauseScroll) Res.string.logs_action_resume else Res.string.logs_action_pause,
@@ -163,15 +156,15 @@ fun LogsScreen(
                 },
                 enabled = filteredLogs.isNotEmpty(),
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Share,
+                HermesSymbol(
+                    icon = HermesIcon.Share,
                     contentDescription = stringResource(Res.string.logs_action_export),
                 )
             }
             // Likivik patch: upload CrashWatcher app logs (crash/ANR) to Files
             IconButton(onClick = { viewModel.uploadAppLogs() }) {
-                Icon(
-                    imageVector = Icons.Filled.FileUpload,
+                HermesSymbol(
+                    icon = HermesIcon.FileUpload,
                     contentDescription = stringResource(Res.string.logs_action_upload),
                 )
             }
@@ -215,7 +208,7 @@ fun LogsScreen(
                     EmptyState(
                         title = stringResource(Res.string.logs_empty_title),
                         subtitle = stringResource(Res.string.logs_empty_desc),
-                        icon = Icons.Filled.HistoryEdu,
+                        icon = "history_edu",
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -281,8 +274,8 @@ fun LogsScreen(
                                     .padding(spacing.md),
                             containerColor = MaterialTheme.colorScheme.secondaryContainer,
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.KeyboardDoubleArrowDown,
+                            HermesSymbol(
+                                icon = HermesIcon.KeyboardDoubleArrowDown,
                                 contentDescription =
                                     stringResource(Res.string.logs_content_desc_jump_bottom),
                             )
@@ -384,8 +377,8 @@ private fun FilterChipRow(
                 leadingIcon =
                     if (isSelected) {
                         {
-                            Icon(
-                                imageVector = Icons.Filled.Check,
+                            HermesSymbol(
+                                icon = HermesIcon.Check,
                                 contentDescription = null,
                             )
                         }

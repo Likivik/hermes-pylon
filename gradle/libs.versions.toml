@@ -78,6 +78,16 @@ androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-te
 androidx-compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling"}
 androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest"}
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "androidxLifecycle" }
+# Multiplatform (KMP) builds of androidx.lifecycle — the same `androidx.lifecycle.*`
+# packages compiled for android/desktop/wasmJs. Google publishes wasmJs for
+# lifecycle-viewmodel but NOT for lifecycle-viewmodel-compose, so shared ViewModels
+# must use these. Never mix a group's artifact with the other's on one classpath:
+# both define androidx.lifecycle.ViewModel (duplicate-class failure on Android).
+jetbrains-lifecycle-runtime = { module = "org.jetbrains.androidx.lifecycle:lifecycle-runtime", version.ref = "androidxLifecycle" }
+jetbrains-lifecycle-runtime-compose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose", version.ref = "androidxLifecycle" }
+jetbrains-lifecycle-viewmodel = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel", version.ref = "androidxLifecycle" }
+jetbrains-lifecycle-viewmodel-compose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "androidxLifecycle" }
+jetbrains-lifecycle-viewmodel-navigation3 = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-navigation3", version.ref = "androidxLifecycle" }
 androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "androidxLifecycle" }
 androidx-lifecycle-runtime-ktx = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "androidxLifecycle" }
 androidx-test-core = { module = "androidx.test:core", version.ref = "androidxTest" }
@@ -152,6 +162,7 @@ ktor-client-engine-defaults = { module = "io.ktor:ktor-client-engine-defaults", 
 #   jvmMain (console)   -> ktor-client-cio    (no OkHttp dependency at all)
 ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
 ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
+ktor-client-js = { module = "io.ktor:ktor-client-js", version.ref = "ktor" }
 ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
 
 # Compose Multiplatform runtime — multiplatform republish of the Jetpack Compose

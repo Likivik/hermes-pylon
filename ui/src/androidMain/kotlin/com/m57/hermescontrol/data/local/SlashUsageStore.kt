@@ -6,7 +6,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.core.Serializer
 import androidx.datastore.dataStore
 import com.m57.hermescontrol.data.remote.OkHttpProvider
-import kotlinx.coroutines.Dispatchers
+import com.m57.hermescontrol.util.ioDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
@@ -44,11 +44,11 @@ private val Context.slashUsageDataStore: DataStore<SlashUsageState> by dataStore
     serializer = SlashUsageSerializer,
 )
 
-open class SlashUsageStore(
+open class AndroidSlashUsageStore(
     context: Context,
     private val dataStore: DataStore<SlashUsageState> = context.slashUsageDataStore,
-) {
-    open fun counts(profileId: String): Flow<Map<String, Int>> =
+) : SlashUsageStore {
+    override fun counts(profileId: String): Flow<Map<String, Int>> =
         dataStore.data
             .catch { exception ->
                 if (exception is CorruptionException) {
@@ -61,11 +61,11 @@ open class SlashUsageStore(
             }
             .map { it.countsByProfile[profileId].orEmpty() }
 
-    open suspend fun recordUse(
+    override suspend fun recordUse(
         profileId: String,
         command: String,
     ) {
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             dataStore.updateData { state ->
                 val profileCounts = state.countsByProfile[profileId].orEmpty()
                 state.copy(

@@ -39,4 +39,20 @@ object AndroidLogSink : LogSink {
     ) {
         Log.e(tag, message)
     }
+
+    override fun w(
+        tag: String,
+        message: String,
+        throwable: Throwable?,
+    ) {
+        Log.w(tag, message, throwable)
+    }
+
+    override fun e(
+        tag: String,
+        message: String,
+        throwable: Throwable?,
+    ) {
+        Log.e(tag, message, throwable)
+    }
 }

@@ -81,14 +81,14 @@ class FilesViewModelTest {
 
             viewModel.downloadFile(
                 ManagedFileEntry(name = "image.png", path = "/tmp/image.png"),
-                cacheDir,
+                cacheDir.absolutePath,
             ) { result = it }
             advanceUntilIdle()
 
             val downloaded = (result as NetworkResult.Success).data
             assertEquals("image.png", downloaded.name)
             assertEquals("image/png", downloaded.mimeType)
-            assertArrayEquals(bytes, downloaded.cacheFile.readBytes())
+            assertArrayEquals(bytes, java.io.File(downloaded.cachePath!!).readBytes())
             assertNull(viewModel.uiState.value.openingPath)
         }
 
@@ -106,7 +106,7 @@ class FilesViewModelTest {
 
             viewModel.downloadFile(
                 ManagedFileEntry(name = "large.bin", path = "/tmp/large.bin"),
-                cacheDir,
+                cacheDir.absolutePath,
             ) { result = it }
             advanceUntilIdle()
 

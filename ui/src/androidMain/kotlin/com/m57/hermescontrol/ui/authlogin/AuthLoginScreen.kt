@@ -18,15 +18,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -64,6 +58,8 @@ import com.m57.hermescontrol.generated.resources.auth_login_use_profile
 import com.m57.hermescontrol.generated.resources.auth_login_username_label
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.ComposeResourcesStringResolver
+import com.m57.hermescontrol.ui.icons.HermesIcon
+import com.m57.hermescontrol.ui.icons.HermesSymbol
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -123,8 +119,8 @@ fun AuthLoginScreen(
                 modifier = Modifier.size(64.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Bolt,
+                HermesSymbol(
+                    icon = HermesIcon.Bolt,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(48.dp),
@@ -160,8 +156,8 @@ fun AuthLoginScreen(
                         onClick = { viewModel.useExistingProfile(profile.id) },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.AccountCircle,
+                        HermesSymbol(
+                            icon = HermesIcon.AccountCircle,
                             contentDescription = null,
                             modifier = Modifier.size(18.dp),
                         )
@@ -233,12 +229,12 @@ fun AuthLoginScreen(
                         },
                     trailingIcon = {
                         IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                            Icon(
-                                imageVector =
+                            HermesSymbol(
+                                icon =
                                     if (passwordVisible) {
-                                        Icons.Filled.Visibility
+                                        HermesIcon.Visibility
                                     } else {
-                                        Icons.Filled.VisibilityOff
+                                        HermesIcon.VisibilityOff
                                     },
                                 contentDescription = null,
                             )

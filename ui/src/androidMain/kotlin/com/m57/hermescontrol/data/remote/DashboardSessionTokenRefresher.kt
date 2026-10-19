@@ -1,9 +1,9 @@
 package com.m57.hermescontrol.data.remote
 
 import com.m57.hermescontrol.data.local.AuthManager
+import com.m57.hermescontrol.util.ioDispatcher
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.runInterruptible
 import okhttp3.OkHttpClient
@@ -30,7 +30,7 @@ object DashboardSessionTokenRefresher {
     fun fetch(
         baseUrl: String,
         client: OkHttpClient,
-        dispatcher: CoroutineDispatcher = Dispatchers.IO,
+        dispatcher: CoroutineDispatcher = ioDispatcher,
     ): String? =
         try {
             val request =

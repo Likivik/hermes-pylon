@@ -1,0 +1,4531 @@
+// Modified from Hy4ri/hermes-mobile for this fork; see NOTICE.
+
+package com.m57.hermescontrol.ui.chat
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.m57.hermescontrol.AppEnvironment
+import com.m57.hermescontrol.data.local.AuthDefaults
+import com.m57.hermescontrol.data.local.AuthSessionState
+import com.m57.hermescontrol.data.local.PreferencesStore
+import com.m57.hermescontrol.data.local.SlashUsageStore
+import com.m57.hermescontrol.data.local.authStore
+import com.m57.hermescontrol.data.model.Attachment
+import com.m57.hermescontrol.data.model.AttachmentSource
+import com.m57.hermescontrol.data.model.ModelProvider
+import com.m57.hermescontrol.data.model.PinnedModel
+import com.m57.hermescontrol.data.model.SessionMessage
+import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.AuthPayloads
+import com.m57.hermescontrol.data.remote.HermesJson
+import com.m57.hermescontrol.data.remote.NetworkResult
+import com.m57.hermescontrol.data.remote.attachmentReader
+import com.m57.hermescontrol.data.remote.mediaStore
+import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.data.session.ActiveSessionHolder
+import com.m57.hermescontrol.data.ws.CommandBlocklist
+import com.m57.hermescontrol.data.ws.CommandCatalog
+import com.m57.hermescontrol.data.ws.ConnectionBinding
+import com.m57.hermescontrol.data.ws.ConnectionStatus
+import com.m57.hermescontrol.data.ws.HermesWsClient
+import com.m57.hermescontrol.data.ws.JsonRpcError
+import com.m57.hermescontrol.data.ws.PrivilegedRequestBinding
+import com.m57.hermescontrol.data.ws.ServerRequestBinding
+import com.m57.hermescontrol.data.ws.WsEvent
+import com.m57.hermescontrol.data.ws.WsMethods
+import com.m57.hermescontrol.data.ws.toAny
+import com.m57.hermescontrol.data.ws.toJsonElement
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.attachment_error_access_denied
+import com.m57.hermescontrol.generated.resources.attachment_error_missing_gateway_path
+import com.m57.hermescontrol.generated.resources.attachment_error_not_found
+import com.m57.hermescontrol.generated.resources.attachment_error_open
+import com.m57.hermescontrol.generated.resources.attachment_error_session_expired
+import com.m57.hermescontrol.generated.resources.attachment_error_too_large
+import com.m57.hermescontrol.generated.resources.chat_model_confirm_default_message
+import com.m57.hermescontrol.generated.resources.chat_model_switch_failed
+import com.m57.hermescontrol.generated.resources.chat_model_switch_no_session
+import com.m57.hermescontrol.generated.resources.chat_model_switch_session_changed
+import com.m57.hermescontrol.generated.resources.chat_new_session_failed
+import com.m57.hermescontrol.generated.resources.chat_privileged_not_acknowledged
+import com.m57.hermescontrol.ui.common.StringResolver
+import com.m57.hermescontrol.util.HermesLog
+import com.m57.hermescontrol.util.isRunningUnderTest
+import com.m57.hermescontrol.util.nowMillis
+import com.m57.hermescontrol.util.synchronizedOn
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.put
+import kotlin.concurrent.Volatile
+
+private const val TAG = "ChatViewModel"
+private const val MESSAGE_PAGE_SIZE = 150
+
+/**
+ * How long an unacknowledged `session.create` waits before it is retried.
+ *
+ * `session.create` is fire-and-forget: [HermesWsClient.send] can queue it for a
+ * later socket, or drop it outright once credentials were cleared. Chat cannot
+ * recover on its own from a dropped create — it has already discarded the old
+ * session id — so the request needs its own liveness deadline.
+ */
+private const val SESSION_CREATE_TIMEOUT_MS = 10_000L
+
+/** Total `session.create` attempts, including the first, before giving up. */
+private const val SESSION_CREATE_MAX_ATTEMPTS = 3
+
+/**
+ * Gateway error code for "agent does not support active-turn redirect"
+ * (hermes-agent `tui_gateway/server.py`, `session.redirect` handler).
+ */
+private const val REDIRECT_UNSUPPORTED_CODE = 4010
+private const val MAX_RETIRED_RESUME_REQUESTS = 64
+
+private data class PendingRpcRequest(
+    val method: String,
+    val resumeSessionId: String? = null,
+    val resumeFence: ResumeFence? = null,
+    /** Runtime session that initiated a branch, used to fence late responses. */
+    val branchSessionId: String? = null,
+    /** Session/text captured for a session.redirect so a 4010 rejection can resend. */
+    val redirectSessionId: String? = null,
+    val redirectText: String? = null,
+    val redirectConnectionBinding: ConnectionBinding? = null,
+    /** Attempt generation for a session.create, used to fence retried answers. */
+    val createGeneration: Long? = null,
+    /**
+     * Rename waiting on this resume: once the ack installs a live runtime
+     * session, `session.title` succeeds (the gateway resolves titles through
+     * the LIVE session map — storage ids 404 with 4001).
+     */
+    val pendingRenameTitle: String? = null,
+    val pendingRenameIcon: String? = null,
+    /** Runtime id a session.title was addressed to (error attribution). */
+    val titleTargetId: String? = null,
+    /** Stored id a session.delete is working on; also drives close-then-delete. */
+    val deleteSessionId: String? = null,
+    /** True when this resume exists only to learn a runtime sid for a refused delete. */
+    val closeAfterResume: Boolean = false,
+    /** True once a delete has been retried after closing — stops the recovery looping. */
+    val deleteRetried: Boolean = false,
+)
+
+private data class ResumeFence(
+    val storageSessionId: String,
+    val runtimeSessionId: String?,
+    val profileId: String,
+    val connectionBinding: ConnectionBinding,
+    val generation: Long,
+    val transcriptRevision: Long,
+)
+
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+class ChatViewModel(
+    environment: ChatEnvironment,
+    private val resolver: StringResolver,
+    private val startCleanup: Boolean,
+    repo: ChatPersistenceRepository = ChatPersistenceRepository(environment.messageStore),
+    slashUsageStore: SlashUsageStore = environment.slashUsageStore,
+    searchDispatcher: kotlinx.coroutines.CoroutineDispatcher = kotlinx.coroutines.Dispatchers.Default,
+    /**
+     * Retry delay for an unacknowledged `session.create`.
+     *
+     * `null` (production) means [SESSION_CREATE_TIMEOUT_MS], still subject to
+     * the historical unit-test skip. Tests inject a small value to opt into the
+     * retry path explicitly, so existing suites keep their previous timing.
+     */
+    private val sessionCreateRetryDelayMs: Long? = null,
+    private val selectedProfileId: () -> String = {
+        AppEnvironment.current.auth.getSelectedProfileId() ?: AuthDefaults.PROFILE_ID
+    },
+    selectedProfileIds: kotlinx.coroutines.flow.Flow<String> = AppEnvironment.current.auth.selectedProfileIdFlow,
+    private val preferences: PreferencesStore = environment.preferences,
+    private val attachmentOpener: AttachmentOpener = environment.attachmentOpener,
+    /** IO dispatcher for background work; injectable so tests can drive it deterministically. */
+    private val io: kotlinx.coroutines.CoroutineDispatcher = com.m57.hermescontrol.util.ioDispatcher,
+) : ViewModel() {
+    // ── Internal state ───────────────────────────────────────────────────
+    private val _uiState = MutableStateFlow(ChatUiState())
+
+    private val _streamingState = MutableStateFlow(StreamingState())
+
+    /**
+     * Maps an in-flight RPC id to the context needed to handle its result.
+     *
+     * A plain map, not `ConcurrentHashMap`: this ViewModel's state is confined to
+     * `viewModelScope` (the main dispatcher), and `java.util.concurrent` does not
+     * exist on every Kotlin target.
+     */
+    private val pendingRequests = mutableMapOf<String, PendingRpcRequest>()
+    private val resumeRequestLock = Any()
+    private val retiredResumeRequests = LinkedHashSet<String>()
+
+    /** Runtime TUI session returned by session.resume; Desktop storage keeps the original ID. */
+    private var runtimeSessionId: String? = null
+    private var loadedMessageOffset = 0
+    private var latestPaging = false
+    private var isSyncingMessages = false
+    private var syncCounter = 0L
+
+    @Volatile private var activeSyncOwner: Long? = null
+    private var syncJob: Job? = null
+    private var conversationGeneration = 0L
+    private val historyLoadJobs = mutableSetOf<Job>()
+    private var historyRefreshCounter = 0L
+
+    @Volatile private var activeHistoryRefreshOwner: Long? = null
+    private var historyRefreshJob: Job? = null
+    private var cacheLoadCounter = 0L
+
+    @Volatile private var activeCacheLoadOwner: Long? = null
+    private var cacheLoadJob: Job? = null
+    private var activeCacheMessageIds: Set<String> = emptySet()
+    private var olderLoadCounter = 0L
+
+    @Volatile private var activeOlderLoadOwner: Long? = null
+    private var olderLoadJob: Job? = null
+    val streamingState: StateFlow<StreamingState> = _streamingState.asStateFlow()
+
+    /** Tracks the auto-clear coroutine for reaction animations. */
+    private var reactionClearJob: Job? = null
+
+    /**
+     * Local expiry timers for live approval cards. Request ids can be reused,
+     * so timer ownership includes the message and complete transport binding.
+     */
+    private data class ApprovalTimerKey(
+        val messageId: String,
+        val binding: PrivilegedRequestBinding,
+    )
+
+    private val approvalExpiryJobs = mutableMapOf<ApprovalTimerKey, Job>()
+
+    private val wsClient = HermesWsClient
+
+    // ── Session persistence ──────────────────────────────────────────────
+    private val repo: ChatPersistenceRepository = repo
+    private val slashUsageStore: SlashUsageStore = slashUsageStore
+    private val slashUsageProfileIds = selectedProfileIds.distinctUntilChanged()
+    private val slashDispatcher = SlashCommandDispatcher()
+    private val searchDelegate =
+        ChatSearchDelegate(
+            scope = viewModelScope,
+            uiState = _uiState,
+            dispatcher = searchDispatcher,
+        )
+    private val attachmentsDelegate = ChatAttachmentsDelegate(uiState = _uiState)
+
+    /**
+     * Model options cached from GET /api/model/options so the in-session model
+     * picker (issue #589) opens instantly when the user types /model or taps the
+     * top-bar chip. Preloaded at GatewayReady; refreshed on open if empty.
+     */
+    private var cachedModelOptions: List<ModelProvider> = emptyList()
+
+    private val streamingController =
+        ChatStreamingController(
+            scope = viewModelScope,
+            uiState = _uiState,
+            streamingState = _streamingState,
+            isCurrentSession = { sessionId -> isCurrentSession(sessionId) },
+            isTestEnvironment = { isTestEnvironment() },
+        )
+
+    // ── Public state ─────────────────────────────────────────────────────
+
+    /**
+     * Combined UI state: merges internal state with the WS connection status
+     * flow so there is a single source of truth for connection state.
+     */
+    val uiState: StateFlow<ChatUiState> =
+        combine(
+            _uiState,
+            wsClient.connectionStatus,
+        ) { state, connStatus ->
+            state.copy(connectionStatus = connStatus)
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.Eagerly,
+            _uiState.value,
+        )
+
+    /**
+     * Session ID to resume when the WebSocket connects. Set synchronously by
+     * [ChatScreen] via `SideEffect` during composition — before any WS event
+     * can be processed. This prevents the race where [GatewayReady] fires
+     * before ChatScreen's `LaunchedEffect` can call [switchSession], causing
+     * [createNewSession] to create an empty chat that overwrites the
+     * notification session (issue #240).
+     */
+    var initialSessionId: String? = null
+
+    init {
+        refreshSettings()
+
+        viewModelScope.launch {
+            slashUsageProfileIds.flatMapLatest(slashUsageStore::counts).collect { counts ->
+                _uiState.update { it.copy(slashUsageCounts = counts) }
+            }
+        }
+
+        connectWebSocket(setLoading = false)
+        viewModelScope.launch {
+            wsClient.events.collect { event ->
+                try {
+                    handleWsEvent(event)
+                } catch (e: Exception) {
+                    HermesLog.e("ChatVM", "Uncaught in event loop", e)
+                    _uiState.update { it.copy(isLoading = false) }
+                }
+            }
+        }
+        // B7 (Jun 30 2026, kanban t_connection_loading): clear loading state on connection failure or status change
+        viewModelScope.launch {
+            wsClient.connectionStatus.collect { status ->
+                if (status == ConnectionStatus.DISCONNECTED ||
+                    status == ConnectionStatus.RECONNECTING ||
+                    status == ConnectionStatus.NO_NETWORK ||
+                    status == ConnectionStatus.AUTH_EXPIRED
+                ) {
+                    retireSync()
+                    _uiState.value.currentSessionId?.let(repo::invalidateReplacementWrites)
+                    conversationGeneration++
+                    invalidateResumeRequests()
+                    clearPrivilegedControls()
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            isSessionReady = false,
+                        )
+                    }
+                    // Fail any in-flight awaited RPCs so callers don't hang
+                    // across the disconnect (delegated to HermesWsClient, issue #526).
+                    wsClient.rejectAllPending()
+                }
+            }
+        }
+        if (wsClient.connectionStatus.value == ConnectionStatus.CONNECTED) {
+            // Deferred: when the WS is already CONNECTED mid-construction (fast
+            // e2e mock retry), handleGatewayReady would run before later-declared
+            // property initializers (the preferences store) execute —
+            // the lazy delegate is still null → NPE. Posting to viewModelScope
+            // runs it after construction completes, matching the async
+            // gateway.ready arrival in production.
+            // `launch` may run immediately on the main dispatcher while the
+            // constructor is still initializing later properties. Post one
+            // message-loop turn so all property initializers have completed.
+            // Dispatchers.Main (NOT viewModelScope's Main.immediate) so the body
+            // really is deferred one queue turn. Using the dispatcher instead of
+            // a Looper Handler keeps the ViewModel free of an android.os.Looper
+            // dependency, which a plain JVM unit test can then drive.
+            viewModelScope.launch(Dispatchers.Main) {
+                handleGatewayReady()
+            }
+        }
+    }
+
+    // ── Connection ───────────────────────────────────────────────────────
+
+    private fun connectWebSocket(setLoading: Boolean = false) {
+        // In loopback (token) mode the session token is the WS credential and
+        // must be present before connecting. In gated (ticket) mode the ticket
+        // is minted fresh by HermesWsClient.refreshWsTicketIfNeeded() from the
+        // persisted session cookie, so getToken() is expected to be empty here
+        // and must NOT block the connect (issue #640: chat showed "reconnect"
+        // immediately after basic-auth login because this guard returned early).
+        val isGated =
+            runCatching { authStore.isGatedMode() }
+                .getOrNull() ?: false
+        if (!isGated) {
+            val token = authStore.getToken() ?: return
+            if (token.isBlank()) return
+        }
+
+        // Don't disturb an already-working (or already-recovering) connection.
+        // HermesWsClient is a global singleton shared by every tab; the chat tab
+        // is recreated on every open, so calling connect() here must be a no-op
+        // unless the singleton is in a terminal state. Re-entering connect() while
+        // it is CONNECTING/RECONNECTING races the in-flight socket and can leave
+        // the status stuck on RECONNECTING (see HermesWsClient.connect).
+        val status = wsClient.connectionStatus.value
+        if (status == ConnectionStatus.CONNECTING ||
+            status == ConnectionStatus.RECONNECTING ||
+            status == ConnectionStatus.AUTH_EXPIRED
+        ) {
+            return
+        }
+
+        if (setLoading) {
+            _uiState.update { it.copy(isLoading = true) }
+        }
+
+        viewModelScope.launch(io) {
+            wsClient.connect()
+        }
+
+        // B7 (Jun 30 2026, kanban t_connection_loading): safety timeout to clear spinner if connection hangs
+        if (!isTestEnvironment()) {
+            viewModelScope.launch {
+                delay(10_000L)
+                if (_uiState.value.isLoading) {
+                    _uiState.update { it.copy(isLoading = false) }
+                }
+            }
+        }
+    }
+
+    // ── WS Event Handling ────────────────────────────────────────────────
+
+    private fun handleGatewayReady() {
+        _uiState.update { it.copy(isLoading = false) }
+        addSystemMessage("Connected to Hermes", transient = true)
+        loadSessions()
+        fetchCommandCatalog()
+        fetchModelContextLength()
+        preloadModelOptions()
+        val currentId = _uiState.value.currentSessionId
+        if (currentId != null) {
+            val resumeFence = captureResumeFence(currentId)
+            viewModelScope.launch(io) {
+                if (resumeFence != null && isResumeFenceCurrent(resumeFence)) {
+                    wsClient.send(
+                        WsMethods.SESSION_RESUME,
+                        mapOf("session_id" to currentId, "omit_messages" to true),
+                        onSent = { id -> trackResumeRequest(id, resumeFence) },
+                    )
+                }
+            }
+            loadSessionMessages(currentId)
+        } else {
+            val initial = initialSessionId
+            if (!initial.isNullOrBlank()) {
+                initialSessionId = null
+                switchSession(initial)
+            } else {
+                // Likivik patch: resume the last-open session across launches
+                // instead of creating a new one every cold open. If there is
+                // no last session, do NOT auto-create — leave the chat pane
+                // empty and let the user pick from the rail (which
+                // loadSessions() above populates). The send path is guarded
+                // on currentSessionId != null, so a null selection safely
+                // disables input until a session is chosen.
+                val last = lastSession()
+                if (!last.isNullOrBlank()) {
+                    switchSession(last)
+                }
+                // else: no auto-create. Stay on the empty state.
+            }
+        }
+    }
+
+    private fun handleWsEvent(event: WsEvent) {
+        val rpcId =
+            when (event) {
+                is WsEvent.RpcResult -> event.id
+                is WsEvent.RpcError -> event.id
+                else -> null
+            }
+        if (rpcId != null && consumeRetiredResumeRequest(rpcId)) return
+        val pending = rpcId?.let(pendingRequests::get)
+        // The fork's two utility resumes (`renameSession`, `startCloseThenDelete`)
+        // deliberately target a session that is NOT the currently selected one —
+        // the resume's only job is to learn a live runtime sid. The inner
+        // SESSION_RESUME dispatch already relaxes the fence's SESSION axis for
+        // them; the outer guard must do the same so a "stale-looking" fence
+        // (mismatched storageSessionId) isn't dropped before the ack handler
+        // can run. An absent fence is also tolerated for utility resumes — they
+        // were just sent by an explicit user action rather than restored.
+        if (pending?.method == WsMethods.SESSION_RESUME) {
+            val utilityResume = pending.pendingRenameTitle != null || pending.closeAfterResume
+            val fence = pending.resumeFence
+            if (fence == null) {
+                if (!utilityResume) {
+                    pendingRequests.remove(rpcId)
+                    return
+                }
+            } else if (!isResumeFenceCurrent(fence, allowSessionChange = utilityResume)) {
+                pendingRequests.remove(rpcId)
+                return
+            }
+        }
+        if (
+            pending?.method == WsMethods.SESSION_BRANCH &&
+            pending.branchSessionId != null &&
+            pending.branchSessionId != runtimeSessionId
+        ) {
+            pendingRequests.remove(rpcId)
+            return
+        }
+
+        val transitionSessionId =
+            when (event) {
+                is WsEvent.MessageStart -> event.sessionId
+                is WsEvent.MessageComplete -> event.sessionId
+                is WsEvent.MessageDone -> event.sessionId
+                is WsEvent.ToolStart -> event.sessionId
+                else -> null
+            }
+        if (transitionSessionId != null && !isCurrentSession(transitionSessionId)) {
+            return
+        }
+
+        when (event) {
+            is WsEvent.MessageStart,
+            is WsEvent.MessageComplete,
+            is WsEvent.MessageDone,
+            is WsEvent.ToolStart,
+            -> streamingController.flushPendingReasoning()
+
+            else -> Unit
+        }
+
+        // First, let the reducer compute the new state and any effects
+        val result =
+            ChatWsEventReducer.reduce(
+                _uiState.value,
+                _streamingState.value,
+                event,
+                runtimeSessionId ?: _uiState.value.currentSessionId,
+            )
+
+        // Apply the new state
+        _uiState.update { result.state }
+        _streamingState.update { result.streamingState }
+
+        // Process side-effects from the reducer
+        for (effect in result.effects) {
+            when (effect) {
+                is ReducerEffect.PersistMessage -> {
+                    val acceptedRevision = repo.replacementGeneration(effect.sessionId)
+                    viewModelScope.launch(io) {
+                        repo.persistMessage(effect.message, effect.sessionId, acceptedRevision)
+                    }
+                }
+
+                is ReducerEffect.CreateNewSession -> {
+                    createNewSession()
+                }
+
+                is ReducerEffect.LoadSessions -> {
+                    loadSessions()
+                }
+
+                is ReducerEffect.RefreshSessions -> {
+                    loadSessions()
+                }
+                is ReducerEffect.AttachHostMedia -> {
+                    // Issue #724: turn host-path MEDIA: directives into real
+                    // attachments (images inline, every other file tappable)
+                    // via the gateway /api/files/download endpoint. Works on a
+                    // remote phone too.
+                    val acceptedRevision = repo.replacementGeneration(effect.sessionId)
+                    viewModelScope.launch(io) {
+                        attachHostMedia(effect.sessionId, effect.messageId, acceptedRevision)
+                    }
+                }
+            }
+        }
+
+        // Handle complex events that need ViewModel-specific context
+        when (event) {
+            is WsEvent.ServerRequest -> handleServerRequest(event)
+
+            is WsEvent.ServerRequestCancelled -> handleServerRequestCancelled(event)
+
+            is WsEvent.GatewayReady -> {
+                handleGatewayReady()
+            }
+
+            is WsEvent.SessionInfo -> {
+                if (isCurrentSession(event.sessionId)) {
+                    val info = event.data
+
+                    val usage = info?.get("usage") as? Map<*, *>
+                    val model = (info?.get("model") as? String)?.trim().orEmpty()
+                    val provider = (info?.get("provider") as? String)?.trim().orEmpty()
+                    val reasoningEffort = (info?.get("reasoning_effort") as? String)?.trim()
+                    val terminalBackend = (info?.get("terminal_backend") as? String)?.trim()
+                    _uiState.update { state ->
+                        state.copy(
+                            currentSessionModel =
+                                if (model.isNotEmpty()) {
+                                    if (provider.isEmpty() || model.startsWith("$provider/")) {
+                                        model
+                                    } else {
+                                        "$provider/$model"
+                                    }
+                                } else {
+                                    state.currentSessionModel
+                                },
+                            reasoningLevel = reasoningEffort?.takeIf { it.isNotEmpty() },
+                            terminalBackend = terminalBackend?.takeIf { it.isNotEmpty() } ?: state.terminalBackend,
+                            contextUsage = parseContextUsage(usage, state.contextUsage),
+                        )
+                    }
+                }
+            }
+
+            is WsEvent.MessageToken -> {
+                streamingController.handleMessageToken(event)
+            }
+
+            is WsEvent.ThinkingDelta -> {
+                streamingController.handleThinkingDelta(event)
+            }
+
+            is WsEvent.ReasoningDelta -> {
+                streamingController.handleReasoningDelta(event)
+            }
+
+            is WsEvent.MessageStart -> {
+                streamingController.beginStreamingMessage()
+            }
+
+            is WsEvent.MessageComplete -> {
+                // Buffers cleared before reduce; ViewModel resets them after
+                streamingController.resetStreaming()
+                if (isCurrentSession(event.sessionId)) {
+                    // End of turn is when the gateway recomputes window
+                    // occupancy, so this frame carries the freshest gauge the
+                    // client will see before the next `session.info`.
+                    _uiState.update { state ->
+                        state.copy(contextUsage = parseContextUsage(event.usage, state.contextUsage))
+                    }
+                }
+            }
+
+            is WsEvent.MessageDone -> {
+                streamingController.resetStreaming()
+            }
+
+            is WsEvent.ToolStart -> {
+                // Reset streaming state when a tool starts
+                streamingController.resetStreaming()
+            }
+
+            is WsEvent.RpcResult -> {
+                handleRpcResult(event.id, event.result)
+            }
+
+            is WsEvent.RpcError -> {
+                handleRpcError(event.id, event.error)
+            }
+
+            is WsEvent.SessionUpdated -> {
+                loadSessions()
+            }
+
+            is WsEvent.SessionUsage -> {
+                if (isCurrentSession(event.sessionId)) {
+                    val usage =
+                        (event.data?.get("usage") as? Map<*, *>)
+                            ?: event.data
+                    _uiState.update { state ->
+                        state.copy(
+                            contextUsage =
+                                parseContextUsage(usage, state.contextUsage),
+                        )
+                    }
+                }
+            }
+
+            is WsEvent.ClarifyRequest -> {
+                _uiState.update {
+                    it.copy(
+                        isAgentTyping = false,
+                    )
+                }
+                _streamingState.update { StreamingState() }
+                streamingController.resetStreaming()
+            }
+
+            is WsEvent.ApprovalRequest -> {
+                handleApprovalRequest(event)
+            }
+
+            is WsEvent.SudoRequest -> {
+                handleSudoRequest(event)
+            }
+
+            is WsEvent.SudoExpire -> {
+                _uiState.update { state ->
+                    val expired =
+                        state.sudoPrompt?.binding?.let {
+                            expiryMatches(
+                                binding = it,
+                                requestId = event.requestId,
+                                sessionId = event.sessionId,
+                                profileId = event.sourceProfileId,
+                                generation = event.connectionGeneration,
+                            )
+                        } ?: false
+                    if (expired) state.copy(sudoPrompt = null) else state
+                }
+            }
+
+            is WsEvent.SecretRequest -> {
+                handleSecretRequest(event)
+            }
+
+            is WsEvent.SecretExpire -> {
+                _uiState.update { state ->
+                    val expired =
+                        state.secretPrompt?.binding?.let {
+                            expiryMatches(
+                                binding = it,
+                                requestId = event.requestId,
+                                sessionId = event.sessionId,
+                                profileId = event.sourceProfileId,
+                                generation = event.connectionGeneration,
+                            )
+                        } ?: false
+                    if (expired) state.copy(secretPrompt = null) else state
+                }
+            }
+
+            is WsEvent.PrivilegedRequestRejected -> {
+                // A privileged frame without a bindable request id. Never
+                // surfaced and never answered — the parser already dropped it.
+            }
+
+            is WsEvent.GatewayError -> {
+                // Reducer already set errorMessage; no extra VM work needed.
+            }
+
+            is WsEvent.BackgroundComplete -> {
+                // Reducer already set backgroundCompleteMessage; the UI observes
+                // it via a LaunchedEffect and triggers the snackbar.
+            }
+
+            is WsEvent.ReactionEvent -> {
+                // Cancel any previous auto-clear to avoid race (agy finding #1)
+                reactionClearJob?.cancel()
+                _uiState.update {
+                    it.copy(
+                        reactionKind = event.kind,
+                        reactionTriggerId = it.reactionTriggerId + 1L,
+                    )
+                }
+                // Auto-clear after the animation duration
+                reactionClearJob =
+                    viewModelScope.launch {
+                        delay(2_000L)
+                        _uiState.update { it.copy(reactionKind = null) }
+                    }
+            }
+
+            else -> { /* reducer handles these */ }
+        }
+    }
+
+    // ── Message streaming ────────────────────────────────────────────────
+
+    /**
+     * Checks if an incoming WS event belongs to the currently active
+     * session. Returns true if the event should be processed.
+     */
+    private fun isCurrentSession(eventSessionId: String?): Boolean {
+        // If the event has no session ID, process it (legacy compatibility)
+        if (eventSessionId == null) return true
+        return eventSessionId == runtimeSessionId || eventSessionId == _uiState.value.currentSessionId
+    }
+
+    // ── RPC response handling ────────────────────────────────────────────
+
+    @Suppress("UNCHECKED_CAST")
+    private fun handleRpcResult(
+        id: String,
+        result: Any?,
+    ) {
+        val request = pendingRequests.remove(id) ?: return
+        val method = request.method
+        when (method) {
+            WsMethods.SESSION_CREATE -> {
+                // A retried create can be answered twice, and a create issued
+                // before a session switch can be answered after it. Only the
+                // newest attempt may install a session.
+                val generation = request.createGeneration
+                if (generation != null && generation != sessionCreateCounter) {
+                    HermesLog.d(TAG, "Ignoring session.create result from a superseded attempt")
+                    return
+                }
+                val resultMap = result as? Map<String, Any?> ?: return
+                val runtimeId = resultMap["session_id"] as? String ?: return
+                val storageId = resultMap["stored_session_id"] as? String ?: runtimeId
+                // The request is answered — stand the retry deadline down.
+                sessionCreateJob?.cancel()
+                sessionCreateJob = null
+                runtimeSessionId = runtimeId
+                _uiState.update {
+                    it.copy(
+                        currentSessionId = storageId,
+                        isSessionReady = true,
+                        isLoading = false,
+                        messages = emptyList(),
+                        subagentIndicators = emptyList(),
+                        todos = emptyList(),
+                        chatTitle = "Hermes",
+                        currentSessionModel = null,
+                        terminalBackend = null,
+                        modelSwitchConfirmation = null,
+                    )
+                }
+                // Mirror the active session id app-wide so session-scoped
+                // drawer screens (e.g. Processes, issue #532) can issue
+                // session-scoped RPCs. See ActiveSessionHolder.
+                ActiveSessionHolder.set(runtimeId, storageId)
+                // Likivik patch: remember the freshly created session too.
+                persistLastSession(storageId)
+                _streamingState.update { StreamingState() }
+                addSystemMessage("Session created", persist = true)
+                loadSessions()
+            }
+
+            WsMethods.SESSION_BRANCH -> {
+                val resultMap = result as? Map<String, Any?> ?: return
+                val newId = resultMap["session_id"] as? String ?: return
+
+                val info = resultMap["info"] as? Map<*, *>
+                val usage = info?.get("usage") as? Map<*, *>
+
+                val model = (info?.get("model") as? String)?.trim().orEmpty()
+                val provider = (info?.get("provider") as? String)?.trim().orEmpty()
+                val reasoningEffort = (info?.get("reasoning_effort") as? String)?.trim()
+                val terminalBackend = (info?.get("terminal_backend") as? String)?.trim()
+                clearPrivilegedControls()
+                runtimeSessionId = newId
+                _uiState.update {
+                    it.copy(
+                        currentSessionId = newId,
+                        isSessionReady = true,
+                        isLoading = false,
+                        messages = emptyList(),
+                        subagentIndicators = emptyList(),
+                        todos = emptyList(),
+                        chatTitle = (resultMap["title"] as? String)?.takeIf { t -> t.isNotBlank() } ?: "Hermes",
+                        currentSessionModel =
+                            model.takeIf { it.isNotEmpty() }?.let { resolvedModel ->
+                                if (provider.isEmpty() || resolvedModel.startsWith("$provider/")) {
+                                    resolvedModel
+                                } else {
+                                    "$provider/$resolvedModel"
+                                }
+                            },
+                        reasoningLevel = reasoningEffort?.takeIf { it.isNotEmpty() },
+                        terminalBackend = terminalBackend?.takeIf { it.isNotEmpty() },
+                        // Never use the parent snapshot as the previous value:
+                        // the branch response carries child-scoped info.
+                        contextUsage = parseContextUsage(usage, previous = null),
+                    )
+                }
+                ActiveSessionHolder.set(newId)
+                _streamingState.update { StreamingState() }
+                addSystemMessage("Session branched", persist = true)
+                loadSessionMessages(newId)
+                loadSessions()
+            }
+
+            WsMethods.SESSION_LIST -> {
+                val resultMap = result as? Map<String, Any?> ?: return
+                val sessionsList = resultMap["sessions"] as? List<Map<String, Any?>> ?: return
+                val sessions =
+                    sessionsList.map { s ->
+                        SessionUi(
+                            id = s["id"] as? String ?: "",
+                            title = s["title"] as? String ?: "Untitled",
+                            messageCount = (s["message_count"] as? Double)?.toInt() ?: 0,
+                            lastActive = (s["started_at"] as? Double)?.toLong() ?: 0L,
+                        )
+                    }
+                HermesLog.i(
+                    "ChatVM",
+                    "session.list result processed: ${sessions.size} sessions: ${sessions.map { it.id }}",
+                )
+                _uiState.update { state ->
+                    val newTitle = sessions.find { s -> s.id == state.currentSessionId }?.title
+                    state.copy(
+                        sessions = sessions,
+                        chatTitle = newTitle ?: state.chatTitle,
+                        railRefreshing = false,
+                    )
+                }
+            }
+
+            WsMethods.SESSION_RESUME -> {
+                // Upstream fences resume acks so a stale answer cannot paint
+                // over a session the user has since left. The fork's two UTILITY
+                // resumes are a different shape: `renameSession` resumes purely
+                // to learn a live runtime sid so it can address session.title,
+                // and `startCloseThenDelete` does the same to close a runtime
+                // before retrying a refused delete. Both legitimately target a
+                // session that is NOT the selected one (a background rename), so
+                // the fence's session axis is relaxed for them — and an absent
+                // fence is tolerated, because such a request was just sent by an
+                // explicit user action rather than restored from a previous life.
+                val utilityResume = request.pendingRenameTitle != null || request.closeAfterResume
+                val resumeFence = request.resumeFence
+                if (resumeFence != null) {
+                    if (!isResumeFenceCurrent(resumeFence, allowSessionChange = utilityResume)) return
+                } else if (!utilityResume) {
+                    return
+                }
+                val resultMap = result as? Map<String, Any?>
+                val requestedSessionId = request.resumeSessionId
+                val selectedSessionId = _uiState.value.currentSessionId
+                // Delete recovery: session.delete was refused (4023) because the
+                // target is still LIVE server-side. This resume exists only to
+                // learn its runtime sid so we can close it, then retry the
+                // stored delete. Never touches the visible chat.
+                if (request.closeAfterResume) {
+                    val runtimeToClose = resultMap?.get("session_id") as? String
+                    val stored = request.deleteSessionId
+                    if (runtimeToClose != null && stored != null) {
+                        sendCloseSession(runtimeToClose, stored)
+                    } else {
+                        HermesLog.w(
+                            TAG,
+                            "delete recovery: resume ack gave no runtime id for stored=$stored",
+                        )
+                    }
+                    return
+                }
+                if (
+                    requestedSessionId != null &&
+                    selectedSessionId != requestedSessionId &&
+                    // Likivik patch: a rename-resume targets a rail item the
+                    // user ISN'T currently viewing. Never replace the active
+                    // chat for it, but do NOT drop it — the ack handler below
+                    // fires the queued session.title via the runtime id this
+                    // response carries (storage ids 4001 on session.title).
+                    request.pendingRenameTitle == null
+                ) {
+                    return
+                }
+                val sessionId =
+                    (resultMap?.get("resumed") as? String)
+                        ?: requestedSessionId
+                        ?: selectedSessionId
+                // Capture the PREVIOUS runtime id BEFORE the ack clobbers
+                // runtimeSessionId below. A current-session rename (resume
+                // fast-path) may ack WITHOUT session_id — we need the id the
+                // chat already holds to fire session.title on it.
+                val preAckRuntimeId = runtimeSessionId
+                runtimeSessionId = resultMap?.get("session_id") as? String
+
+                // Parse the session-scoped snapshot returned by the backend.
+                val infoMap = resultMap?.get("info") as? Map<*, *>
+                val model = infoMap?.get("model") as? String
+                val provider = infoMap?.get("provider") as? String
+                val reasoningEffort = infoMap?.get("reasoning_effort") as? String
+                val terminalBackend = infoMap?.get("terminal_backend") as? String
+                val usage = infoMap?.get("usage") as? Map<*, *>
+
+                // B8 (Jun 20 2026, kanban t_session_resume): do NOT reload
+                // cached messages here — switchSession() already did so before
+                // the WS round-trip. Calling loadCachedMessages() here would
+                // overwrite any message the user sent between switchSession() and
+                // the server ack, making the chat appear to go blank.
+                //
+                // Likivik patch: a rename-resume (pendingRenameTitle != null)
+                // MUST NOT hijack the UI onto the renamed background session —
+                // it only exists to obtain a runtime id. Keep the current view.
+                val renameOnly =
+                    request.pendingRenameTitle != null &&
+                        requestedSessionId != null &&
+                        selectedSessionId != requestedSessionId
+                if (!renameOnly) {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            currentSessionId = sessionId,
+                            isSessionReady = runtimeSessionId != null,
+                            currentSessionModel =
+                                if (model != null && provider != null) {
+                                    "$provider/$model"
+                                } else {
+                                    model ?: it.currentSessionModel
+                                },
+                            reasoningLevel =
+                                if (reasoningEffort.isNullOrEmpty()) {
+                                    null
+                                } else {
+                                    reasoningEffort
+                                },
+                            terminalBackend = terminalBackend?.trim()?.takeIf { it.isNotEmpty() },
+                            // `switchSession()` cleared the previous session's
+                            // reading. Hydrate only from this resume response.
+                            contextUsage = parseContextUsage(usage, previous = null),
+                        )
+                    }
+                }
+                if (!renameOnly) {
+                    // Mirror the active runtime session id app-wide (issue #532).
+                    ActiveSessionHolder.set(runtimeSessionId ?: sessionId, sessionId)
+                    // Seed the resume notice BEFORE hydrateResumeMessages. When the
+                    // ack's payload replaces the transcript (a cross-session
+                    // resume) the notice goes with it: the payload is the
+                    // authoritative history. When the ack carries no payload the
+                    // notice stands — one entry, and only one, per valid ack.
+                    addSystemMessage("Session resumed")
+                }
+                if (sessionId != null && !renameOnly) {
+                    hydrateResumeMessages(
+                        sessionId = sessionId,
+                        payload = resultMap?.get("messages"),
+                        replaceExisting =
+                            requestedSessionId != null &&
+                                requestedSessionId != sessionId,
+                    )
+                }
+                // A rename queued on this resume fires now that the runtime
+                // session is live.
+                //
+                // ADDRESSING (root-caused against the gateway source,
+                // tui_gateway/server.py `_sess_nowait`): `session.title` is a
+                // SESSION-SCOPED RPC — it resolves params["session_id"] as an
+                // EXACT key in the live `_sessions` map. That key is the RUNTIME
+                // sid (the ack's "session_id"), never the stored id. The ack's
+                // "session_key" is `_session_lookup_key` = agent.session_id =
+                // the STORED key, so addressing the title with it always missed
+                // and returned 4001 "session not found" — the rename silently
+                // never applied. Always address the RUNTIME sid.
+                //
+                // Fast-path acks (already-live session) may omit session_id;
+                // fall back to the cached runtime id ONLY for a current-session
+                // rename — for a background rename that id belongs to the
+                // session the user is viewing and would title the WRONG one.
+                val ackRuntimeId = runtimeSessionId
+                // Fallback to the cached runtime id ONLY for a current-session
+                // rename (renameOnly == false). For a BACKGROUND rename the
+                // cached id belongs to the session the user is viewing — using
+                // it would title the WRONG session. If such an ack carries no
+                // addressable id we send nothing (and log it) rather than
+                // mis-address.
+                val fallbackRuntimeId = if (!renameOnly) preAckRuntimeId else null
+                val liveRuntimeId = ackRuntimeId ?: fallbackRuntimeId
+                if (liveRuntimeId == null) {
+                    HermesLog.w(
+                        TAG,
+                        "rename-resume ack carried no session_id/session_key for " +
+                            "requested=$requestedSessionId (renameOnly=$renameOnly) — title not sent",
+                    )
+                }
+                val renameTarget = liveRuntimeId
+                if (renameTarget != null && request.pendingRenameTitle != null) {
+                    sendSessionTitle(renameTarget, request.pendingRenameTitle)
+                }
+            }
+
+            WsMethods.SESSION_CLOSE -> {
+                // Close-then-delete recovery: the runtime is down, so the stored
+                // delete can now succeed. Marked retried so a second refusal
+                // surfaces instead of looping.
+                request.deleteSessionId?.let { sendDeleteSession(it, retried = true) }
+            }
+
+            WsMethods.SESSION_INTERRUPT -> {
+                _uiState.update {
+                    it.copy(
+                        isAgentTyping = false,
+                    )
+                }
+                _streamingState.update { StreamingState() }
+                streamingController.resetStreaming()
+                addSystemMessage("Session interrupted")
+            }
+
+            WsMethods.COMMANDS_CATALOG -> {
+                val map = result as? Map<*, *> ?: return
+                val catalog = parseCommandCatalog(map)
+                if (catalog != null) {
+                    _uiState.update { it.copy(commandCatalog = catalog) }
+                }
+            }
+
+            WsMethods.COMMAND_DISPATCH -> {
+                handleDispatchResult(result)
+            }
+
+            WsMethods.APPROVAL_RESPOND -> {
+                val map = result as? Map<*, *>
+                val resolved = (map?.get("resolved") as? Number)?.toInt() ?: 0
+                if (resolved > 0) {
+                    addSystemMessage("Approval submitted")
+                }
+            }
+        }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun handleDispatchResult(result: Any?) {
+        val map = result as? Map<*, *> ?: return
+        val type = map["type"] as? String ?: return
+        when (type) {
+            "send" -> {
+                val message = map["message"] as? String ?: ""
+                submitPrompt(message)
+            }
+
+            "exec" -> {
+                val output = map["output"] as? String ?: map["message"] as? String ?: ""
+                addAssistantMessage(output)
+            }
+
+            "skill" -> {
+                val message = map["message"] as? String ?: ""
+                submitPrompt(message)
+            }
+
+            "plugin" -> {
+                val output = map["output"] as? String ?: ""
+                addAssistantMessage(output)
+            }
+
+            "alias" -> {
+                val target = map["target"] as? String ?: return
+                handleSlashCommand(target)
+            }
+
+            else -> {
+                val output = map["output"] as? String ?: map.toString()
+                addAssistantMessage(output)
+            }
+        }
+    }
+
+    private fun handleRpcError(
+        id: String,
+        error: Any?,
+    ) {
+        val request = pendingRequests.remove(id) ?: return
+        val method = request.method
+        val errorCode =
+            when (error) {
+                is JsonRpcError -> error.code
+                is Map<*, *> -> (error["code"] as? Number)?.toInt()
+                else -> null
+            }
+        val errorMsg =
+            when (error) {
+                is JsonRpcError -> error.message
+                is Map<*, *> -> error["message"] as? String ?: error.toString()
+                else -> error.toString()
+            }
+
+        // A gateway whose running agent cannot steer an in-flight turn answers
+        // session.redirect with 4010. The user's text is already on screen but
+        // was never delivered, so resend it as a normal prompt rather than
+        // surfacing an error and losing the message (issue #710).
+        if (method == WsMethods.SESSION_REDIRECT) {
+            val sessionId = request.redirectSessionId
+            val text = request.redirectText
+            val connectionBinding = request.redirectConnectionBinding
+            if (errorCode == REDIRECT_UNSUPPORTED_CODE &&
+                sessionId != null &&
+                !text.isNullOrBlank() &&
+                connectionBinding != null
+            ) {
+                HermesLog.d(TAG, "session.redirect unsupported — resending as prompt.submit")
+                // ChatWsEventReducer.onRpcError already ran for this event and
+                // parked a generic error banner. The rejection is recoverable,
+                // so clear it — the user should see the resent turn, not a
+                // failure they cannot act on.
+                _uiState.update { it.copy(errorMessage = null) }
+                viewModelScope.launch(io) {
+                    wsClient.sendMessageForConnection(
+                        binding = connectionBinding,
+                        sessionId = sessionId,
+                        text = text,
+                        onSent = { retryId -> trackRequest(retryId, WsMethods.PROMPT_SUBMIT) },
+                    )
+                }
+                return
+            }
+        }
+
+        // Surface error in UI (these are server-pushed RpcError for
+        // fire-and-forget RPCs — awaited RPCs handle their own failure
+        // via the HermesWsClient.request() deferred).
+        // 4023: the gateway refuses to delete a session whose runtime is still
+        // live. Close that runtime (learned via a resume) and retry the delete
+        // exactly once — `deleteRetried` stops this from looping.
+        if (method == WsMethods.SESSION_DELETE && errorCode == 4023) {
+            val stored = request.deleteSessionId
+            if (stored != null && !request.deleteRetried) {
+                HermesLog.i(TAG, "session.delete refused (still active) — closing runtime, then retrying: $stored")
+                _uiState.update { it.copy(errorMessage = null) }
+                startCloseThenDelete(stored)
+                return
+            }
+        }
+
+        // Failures of the rename/delete RPCs get an action-shaped message: the
+        // optimistic rail state reverts on the next session.list refresh, so the
+        // user has to know the server refused, and why.
+        if (method == WsMethods.SESSION_TITLE) {
+            HermesLog.e(TAG, "session.title failed ($errorCode): $errorMsg target=${request.titleTargetId}")
+            _uiState.update { it.copy(isLoading = false, errorMessage = "Rename failed: $errorMsg") }
+            return
+        }
+        if (method == WsMethods.SESSION_DELETE) {
+            HermesLog.e(TAG, "session.delete failed ($errorCode): $errorMsg target=${request.deleteSessionId}")
+            _uiState.update { it.copy(isLoading = false, errorMessage = "Delete failed: $errorMsg") }
+            return
+        }
+
+        // Likivik patch: a failed rename-resume means the rename is LOST —
+        // surface it (the optimistic rail title reverts on the next
+        // session.list refresh, so the user must know why).
+        if (request.pendingRenameTitle != null && method == WsMethods.SESSION_RESUME) {
+            HermesLog.e(TAG, "rename-resume failed ($errorCode): $errorMsg")
+        }
+
+        _uiState.update {
+            it.copy(
+                isLoading = false,
+                errorMessage = "Error ($method): $errorMsg",
+            )
+        }
+    }
+
+    // ── Send message ─────────────────────────────────────────────────────
+
+    /**
+     * Send a user prompt, uploading any pending attachments to the backend
+     * first via their dedicated RPC methods.
+     *
+     * Flow:
+     * 1. Snapshot pending attachments (then clear them from UI)
+     * 2. Add user message to UI + DB immediately (optimistic UX)
+     * 3. For each image → await `image.attach_bytes` (requires session_id)
+     * 4. For each file → await `file.attach` (requires session_id), collect @file: refs
+     * 5. Send `prompt.submit` with text + @file: refs — images auto-picked up by backend
+     */
+    fun sendMessage(text: String): Boolean {
+        val state = _uiState.value
+        if (!state.isSessionReady) return false
+        if (text.isBlank() && state.pendingAttachments.isEmpty()) return false
+        val storageSessionId = state.currentSessionId ?: return false
+        val agentSessionId = runtimeSessionId ?: return false
+        val dispatchGeneration = conversationGeneration
+        val dispatchConnection = wsClient.connectionBinding(selectedProfileId()) ?: return false
+
+        val trimmed = text.trim()
+        if (trimmed.startsWith("/", ignoreCase = true)) {
+            // Issue #589: a bare "/model" (no argument) opens the picker instead
+            // of requiring the user to hand-type the provider/model.
+            if (isModelPickerCommand(trimmed)) {
+                openModelPicker()
+                return true
+            }
+            handleSlashCommand(trimmed)
+            return true
+        }
+
+        // Snapshot + clear attachments so the input bar empties immediately
+        val attachments = _uiState.value.pendingAttachments.toList()
+        clearAttachments()
+
+        // Read the streaming flag BEFORE the optimistic update below sets
+        // isAgentTyping = true, otherwise every send would look mid-turn and
+        // route through session.redirect (issue #710).
+        val wasStreaming = _uiState.value.isAgentTyping
+
+        val userMessage =
+            ChatMessage(
+                role = MessageRole.USER,
+                content = text,
+                attachments = if (attachments.isNotEmpty()) attachments else null,
+            )
+
+        // Update UI immediately
+        _uiState.update { state ->
+            state.copy(
+                messages = state.messages + userMessage,
+                isAgentTyping = true,
+            )
+        }
+
+        // Persist under the original Desktop session ID.
+        val acceptedRevision = repo.replacementGeneration(storageSessionId)
+        viewModelScope.launch(io) {
+            repo.persistMessage(userMessage, storageSessionId, acceptedRevision)
+        }
+
+        // Upload attachments then submit prompt
+        viewModelScope.launch(io) {
+            val fileRefs = mutableListOf<String>()
+
+            for (attachment in attachments) {
+                val b64 = readContentUriBase64(attachment.uri)
+                if (b64 == null) {
+                    HermesLog.w(TAG, "Skipping unreadable attachment")
+                    continue
+                }
+
+                try {
+                    if (attachment.isImage) {
+                        // Await so the backend stages the image into
+                        // session["attached_images"] BEFORE prompt.submit runs
+                        // (a fire-and-forget send raced prompt.submit and the
+                        // image was dropped). Requires session_id or the gateway
+                        // 4001s "session not found" (desktop passes it too).
+                        val response =
+                            sendRpcAndAwait(
+                                method = WsMethods.IMAGE_ATTACH_BYTES,
+                                params =
+                                    mapOf(
+                                        "session_id" to agentSessionId,
+                                        "content_base64" to "data:${attachment.mimeType};base64,$b64",
+                                        "filename" to attachment.name,
+                                        "ext" to attachment.fileExtension,
+                                    ),
+                            )
+                        if (response != null) {
+                            val result = if (response is JsonElement) response.toAny() else response
+                            val ok = (result as? Map<*, *>)?.get("attached") as? Boolean
+                            if (ok != true) {
+                                HermesLog.w(TAG, "Image attachment request failed")
+                            }
+                        }
+                    } else {
+                        // Await the @file: ref text so we can embed it in the prompt.
+                        // file.attach also requires session_id or the gateway 4001s
+                        // "session not found" (same resolver as image.attach_bytes).
+                        sendRpcAndAwait(
+                            method = WsMethods.FILE_ATTACH,
+                            params =
+                                mapOf(
+                                    "session_id" to agentSessionId,
+                                    "data_url" to "data:${attachment.mimeType};base64,$b64",
+                                    "name" to attachment.name,
+                                ),
+                        )?.let { response ->
+                            val result = if (response is JsonElement) response.toAny() else response
+                            val refText = (result as? Map<*, *>)?.get("ref_text") as? String
+                            if (!refText.isNullOrBlank()) fileRefs.add(refText)
+                        }
+                    }
+                } catch (e: Exception) {
+                    HermesLog.e(TAG, "Failed to upload attachment (${e::class.simpleName})")
+                    _uiState.update {
+                        it.copy(errorMessage = "Upload failed: ${attachment.name}")
+                    }
+                }
+            }
+
+            // Build prompt text — prepend @file: refs for non-image files
+            val fullText =
+                if (fileRefs.isEmpty()) {
+                    text
+                } else {
+                    fileRefs.joinToString("\n") +
+                        if (text.isNotBlank()) "\n\n$text" else ""
+                }
+
+            // Attachment preparation can suspend while the active conversation
+            // changes. Fence by generation as well as ID so switching away and
+            // back to the same session cannot dispatch the stale prompt.
+            if (dispatchGeneration != conversationGeneration) return@launch
+
+            // While a turn is still streaming and the prompt carries no
+            // attachments, steer the in-flight turn via session.redirect
+            // instead of queueing a second prompt.submit (issue #710).
+            // session.redirect is text-only, so any attachment send stays on
+            // the normal path. A backend that cannot redirect answers 4010;
+            // handleRpcError re-sends the text as a normal prompt so the
+            // typed message is never silently lost.
+            if (wasStreaming && attachments.isEmpty()) {
+                wsClient.sendRedirectForConnection(
+                    binding = dispatchConnection,
+                    sessionId = agentSessionId,
+                    text = fullText,
+                    onSent = { id ->
+                        trackRedirectRequest(id, agentSessionId, fullText, dispatchConnection)
+                    },
+                )
+            } else {
+                wsClient.sendMessageForConnection(
+                    binding = dispatchConnection,
+                    sessionId = agentSessionId,
+                    text = fullText,
+                    onSent = { id -> trackRequest(id, WsMethods.PROMPT_SUBMIT) },
+                )
+            }
+        }
+        return true
+    }
+
+    /**
+     * Read an attachment reference and encode it to base64 for the gateway payload.
+     *
+     * The platform reader is installed by the host; on a target without one this
+     * returns null and the attachment is skipped rather than failing the send.
+     */
+    private suspend fun readContentUriBase64(uriString: String): String? = attachmentReader?.readBase64(uriString)
+
+    /**
+     * Send a JSON-RPC call and suspend until the response arrives, delegating
+     * the deferred + 120s timeout to [HermesWsClient.request] (issue #526).
+     * Throws [HermesWsClient.HermesRpcException] on RPC error, or
+     * [kotlinx.coroutines.TimeoutCancellationException] if the server never
+     * answers within the timeout.
+     */
+    private suspend fun sendRpcAndAwait(
+        method: String,
+        params: Map<String, Any>,
+    ): Any? = HermesWsClient.request(method, params).await()
+
+    // ── Attachment management ─────────────────────────────────────────────
+
+    /**
+     * Add a picked file as a pending attachment.
+     * [uri] should be a content:// URI string; the ViewModel will read
+     * the content and encode it for sending.
+     */
+    fun addAttachment(
+        uri: String,
+        name: String,
+        mimeType: String,
+        size: Long,
+    ) = attachmentsDelegate.addAttachment(uri, name, mimeType, size)
+
+    fun addAttachments(attachments: List<Attachment>) = attachmentsDelegate.addAttachments(attachments)
+
+    fun removeAttachment(index: Int) = attachmentsDelegate.removeAttachment(index)
+
+    fun clearAttachments() = attachmentsDelegate.clearAttachments()
+
+    private fun handleSlashCommand(command: String) {
+        val result = slashDispatcher.dispatch(command)
+        val displayContent =
+            if (result is SlashResult.QueuePrompt) result.displayContent else command
+        val userMsg = ChatMessage(role = MessageRole.USER, content = displayContent)
+        val sessionId = _uiState.value.currentSessionId
+
+        _uiState.update { it.copy(messages = it.messages + userMsg) }
+
+        // Persist — OUTSIDE update{}
+        if (sessionId != null) {
+            val acceptedRevision = repo.replacementGeneration(sessionId)
+            viewModelScope.launch(io) {
+                repo.persistMessage(userMsg, sessionId, acceptedRevision)
+            }
+        }
+
+        // Block desktop/CLI-only + TUI-only commands that don't function on
+        // mobile (issue #576, deliverable #3). These are also hidden from the
+        // suggestion menu, but a user can still type one — intercept it here
+        // (before any RPC fires) with a clear message instead of a doomed call.
+        if (CommandBlocklist.contains(command)) {
+            addAssistantMessage(
+                "${command.split(" ", limit = 2)[0]} is not supported on mobile",
+            )
+            return
+        }
+
+        when (result) {
+            is SlashResult.Interrupt -> {
+                interruptSession { recordAcceptedSlash(command) }
+            }
+
+            is SlashResult.NewSession -> {
+                createNewSession(onDispatched = { recordAcceptedSlash(command) })
+            }
+
+            is SlashResult.SessionBranch -> {
+                branchSession(command) { recordAcceptedSlash(command) }
+            }
+
+            is SlashResult.ModelSwitch -> {
+                handleModelSwitch(command, recordUsage = true)
+            }
+
+            is SlashResult.OpenHistory -> {
+                _uiState.update { it.copy(openHistoryRequested = true) }
+                recordAcceptedSlash(command)
+            }
+
+            is SlashResult.QueuePrompt -> {
+                handleQueueCommand(command)
+            }
+
+            is SlashResult.Undo -> {
+                handleUndoCommand(result.count, command)
+            }
+
+            is SlashResult.RpcDispatch -> {
+                dispatchViaRpc(command)
+            }
+        }
+    }
+
+    private data class UndoFence(
+        val storageSessionId: String,
+        val runtimeSessionId: String,
+        val profileId: String,
+        val connectionBinding: ConnectionBinding,
+        val generation: Long,
+        val persistenceGeneration: Long,
+    )
+
+    private data class HistoryLoadFence(
+        val storageSessionId: String,
+        val runtimeSessionId: String?,
+        val profileId: String,
+        val connectionBinding: ConnectionBinding,
+        val generation: Long,
+        val transcriptRevision: Long,
+    )
+
+    private data class CacheLoadFence(
+        val storageSessionId: String,
+        val runtimeSessionId: String?,
+        val profileId: String,
+        val generation: Long,
+    )
+
+    private fun captureCacheLoadFence(sessionId: String) =
+        CacheLoadFence(
+            storageSessionId = sessionId,
+            runtimeSessionId = runtimeSessionId,
+            profileId = selectedProfileId(),
+            generation = conversationGeneration,
+        )
+
+    private fun isCacheLoadCurrent(
+        fence: CacheLoadFence,
+        owner: Long,
+    ): Boolean =
+        activeCacheLoadOwner == owner &&
+            fence.generation == conversationGeneration &&
+            fence.profileId == selectedProfileId() &&
+            fence.storageSessionId == _uiState.value.currentSessionId &&
+            fence.runtimeSessionId == runtimeSessionId
+
+    private fun captureHistoryLoadFence(sessionId: String): HistoryLoadFence? {
+        val profileId = selectedProfileId()
+        val connectionBinding = wsClient.connectionBinding(profileId) ?: return null
+        return HistoryLoadFence(
+            storageSessionId = sessionId,
+            runtimeSessionId = runtimeSessionId,
+            profileId = profileId,
+            connectionBinding = connectionBinding,
+            generation = conversationGeneration,
+            transcriptRevision = repo.replacementGeneration(sessionId),
+        )
+    }
+
+    private fun isHistoryLoadFenceCurrent(fence: HistoryLoadFence): Boolean =
+        fence.generation == conversationGeneration &&
+            fence.profileId == selectedProfileId() &&
+            fence.storageSessionId == _uiState.value.currentSessionId &&
+            fence.runtimeSessionId == runtimeSessionId &&
+            fence.transcriptRevision == repo.replacementGeneration(fence.storageSessionId) &&
+            wsClient.isConnectionBindingCurrent(fence.connectionBinding)
+
+    private fun isHistoryRefreshCurrent(
+        fence: HistoryLoadFence,
+        owner: Long,
+    ): Boolean = activeHistoryRefreshOwner == owner && isHistoryLoadFenceCurrent(fence)
+
+    private fun invalidateHistoryRefresh() {
+        retireSync()
+        retireCacheLoad()
+        activeHistoryRefreshOwner = null
+        historyRefreshCounter++
+        historyRefreshJob?.cancel()
+        historyRefreshJob = null
+    }
+
+    private fun retireCacheLoad() {
+        activeCacheLoadOwner = null
+        cacheLoadCounter++
+        cacheLoadJob?.cancel()
+        cacheLoadJob = null
+        activeCacheMessageIds = emptySet()
+    }
+
+    private fun launchHistoryLoad(block: suspend () -> Unit): Job {
+        val job = viewModelScope.launch { block() }
+        synchronizedOn(historyLoadJobs) { historyLoadJobs += job }
+        job.invokeOnCompletion { synchronizedOn(historyLoadJobs) { historyLoadJobs -= job } }
+        return job
+    }
+
+    private fun invalidateHistoryLoads(sessionId: String) {
+        invalidateHistoryRefresh()
+        repo.invalidateReplacementWrites(sessionId)
+        invalidateResumeRequests()
+        val jobs = synchronizedOn(historyLoadJobs) { historyLoadJobs.toList().also { historyLoadJobs.clear() } }
+        jobs.forEach(Job::cancel)
+    }
+
+    private fun handleUndoCommand(
+        count: String,
+        command: String,
+    ) {
+        val storageSessionId = _uiState.value.currentSessionId ?: return
+        val agentSessionId = runtimeSessionId ?: return
+        val profileId = selectedProfileId()
+        val connectionBinding = wsClient.connectionBinding(profileId) ?: return
+        val fence =
+            UndoFence(
+                storageSessionId = storageSessionId,
+                runtimeSessionId = agentSessionId,
+                profileId = profileId,
+                connectionBinding = connectionBinding,
+                generation = conversationGeneration,
+                persistenceGeneration = repo.replacementGeneration(storageSessionId),
+            )
+        viewModelScope.launch(io) {
+            try {
+                val result =
+                    wsClient
+                        .requestForConnection(
+                            fence.connectionBinding,
+                            WsMethods.COMMAND_DISPATCH,
+                            mapOf("name" to "undo", "arg" to count, "session_id" to agentSessionId),
+                        ).await()
+                if (!isUndoFenceCurrent(fence)) return@launch
+                recordAcceptedSlash(command)
+                handleUndoResult(result, fence)
+            } catch (e: Exception) {
+                if (isUndoFenceCurrent(fence)) {
+                    addAssistantMessage(e.message ?: "Failed to undo.")
+                }
+            }
+        }
+    }
+
+    private fun isUndoFenceCurrent(fence: UndoFence): Boolean =
+        fence.generation == conversationGeneration &&
+            fence.profileId == selectedProfileId() &&
+            fence.storageSessionId == _uiState.value.currentSessionId &&
+            fence.runtimeSessionId == runtimeSessionId &&
+            wsClient.isConnectionBindingCurrent(fence.connectionBinding)
+
+    private suspend fun handleUndoResult(
+        result: Any?,
+        fence: UndoFence,
+    ) {
+        val map = result as? Map<*, *> ?: return
+        if (map["type"] != "prefill") {
+            if (isUndoFenceCurrent(fence)) handleDispatchResult(result)
+            return
+        }
+        val prefill = map["message"] as? String ?: ""
+        val notice = (map["notice"] as? String).orEmpty().ifBlank { "Rewound conversation" }
+        invalidateHistoryLoads(fence.storageSessionId)
+        val authoritativeFence =
+            fence.copy(persistenceGeneration = repo.replacementGeneration(fence.storageSessionId))
+        val transcript = fetchCompleteSessionHistory(authoritativeFence) ?: return
+        if (!isUndoFenceCurrent(authoritativeFence)) return
+        val feedback = ChatMessage(role = MessageRole.SYSTEM, content = notice)
+        val reconciled = transcript + feedback
+        if (
+            !repo.replaceMessagesIfCurrent(
+                reconciled,
+                fence.storageSessionId,
+                authoritativeFence.persistenceGeneration,
+            )
+        ) {
+            return
+        }
+        if (!isUndoFenceCurrent(authoritativeFence)) return
+        loadedMessageOffset = 0
+        latestPaging = true
+        _uiState.update { state ->
+            if (!isUndoFenceCurrent(fence)) return@update state
+            state.copy(
+                messages = reconciled,
+                todos = restoredTodos(emptyList(), transcript),
+                hasOlderMessages = false,
+                isLoadingOlder = false,
+                pendingPrefillText = prefill.takeIf { it.isNotBlank() },
+            )
+        }
+    }
+
+    private suspend fun fetchCompleteSessionHistory(fence: UndoFence): List<ChatMessage>? {
+        val pages = mutableListOf<List<ChatMessage>>()
+        var offset = 0
+        while (true) {
+            if (!isUndoFenceCurrent(fence)) return null
+            val result = fetchMessagePage(fence.storageSessionId, offset, MESSAGE_PAGE_SIZE, order = "latest")
+            if (!isUndoFenceCurrent(fence)) return null
+            if (result !is NetworkResult.Success) return null
+            val pagination = result.data.pagination
+            val effectiveOffset = pagination?.offset ?: offset
+            pages += mapServerMessages(fence.storageSessionId, result.data.messages.orEmpty(), effectiveOffset)
+            val returned = pagination?.returned ?: result.data.messages.size
+            val total = pagination?.total
+            if (returned <= 0 ||
+                (total != null && effectiveOffset + returned >= total) ||
+                (total == null && returned < MESSAGE_PAGE_SIZE)
+            ) {
+                break
+            }
+            offset = effectiveOffset + returned
+        }
+        return if (isUndoFenceCurrent(fence)) pages.asReversed().flatten().distinctBy { it.id } else null
+    }
+
+    fun consumePendingPrefill() {
+        _uiState.update { it.copy(pendingPrefillText = null) }
+    }
+
+    private fun handleQueueCommand(command: String) {
+        val arg = command.split(" ", limit = 2).getOrElse(1) { "" }.trim()
+        if (arg.isBlank()) {
+            addAssistantMessage("usage: /queue <prompt>")
+            return
+        }
+        submitPrompt(
+            text = arg,
+            queued = true,
+            onDispatched = { recordAcceptedSlash(command) },
+        )
+    }
+
+    /**
+     * Fork the active conversation via the session.branch WS RPC (issue #533).
+     * The backend already supports session.branch; the mobile previously had
+     * no client surface, so `/fork` fell through to command.dispatch and 4018'd.
+     * The optional arg becomes the new branch's title.
+     */
+    private fun branchSession(
+        command: String,
+        onDispatched: (() -> Unit)? = null,
+    ) {
+        val sessionId = runtimeSessionId
+        if (sessionId == null) {
+            addAssistantMessage("No active session. Use `/new` to create one.")
+            return
+        }
+        val arg = command.split(" ", limit = 2).getOrElse(1) { "" }.trim()
+        val params = mutableMapOf<String, Any>("session_id" to sessionId)
+        if (arg.isNotBlank()) params["name"] = arg
+        viewModelScope.launch(io) {
+            wsClient.send(
+                WsMethods.SESSION_BRANCH,
+                params,
+                onSent = { id ->
+                    trackBranchRequest(id, sessionId)
+                    onDispatched?.invoke()
+                },
+            )
+        }
+    }
+
+    private fun dispatchViaRpc(command: String) {
+        val sessionId = runtimeSessionId
+        if (sessionId == null) {
+            addAssistantMessage("No active session. Use `/new` to create one.")
+            return
+        }
+        val parts = command.split(" ", limit = 2)
+        val name = parts[0].lowercase().removePrefix("/")
+        val arg = parts.getOrElse(1) { "" }
+        viewModelScope.launch(io) {
+            try {
+                // Primary path: command.dispatch handles quick/plugin/bundle/
+                // skill commands + a few hardcoded ones. It returns a hard 4018
+                // "not a ... command" for everything that lives only in the TUI
+                // slash worker (the 29 commands that 4018'd on mobile — issue
+                // #576). For those we fall back to slash.exec, which runs the
+                // full COMMAND_REGISTRY through the worker.
+                val result =
+                    wsClient
+                        .request(
+                            WsMethods.COMMAND_DISPATCH,
+                            mapOf("name" to name, "arg" to arg, "session_id" to sessionId),
+                        ).await()
+                recordAcceptedSlash(command)
+                handleDispatchResult(result)
+            } catch (e: HermesWsClient.HermesRpcException) {
+                val msg = e.message.orEmpty()
+                // Registry miss on command.dispatch: the backend emits exactly
+                // "not a quick/plugin/bundle/skill command: <name>" (tui_gateway
+                // server.py L12408). Match that precise phrase so unrelated
+                // errors can't accidentally trigger the slash.exec fallback.
+                if (msg.contains("not a quick/plugin/bundle/skill command")) {
+                    // Registry miss on command.dispatch -> retry via slash.exec,
+                    // which routes the full CLI command set through the worker.
+                    try {
+                        val result =
+                            wsClient
+                                .request(
+                                    WsMethods.SLASH_EXEC,
+                                    mapOf(
+                                        "command" to "/$name${if (arg.isNotEmpty()) " $arg" else ""}",
+                                        "session_id" to sessionId,
+                                    ),
+                                ).await()
+                        recordAcceptedSlash(command)
+                        val output = (result as? Map<*, *>)?.get("output") as? String
+                        if (!output.isNullOrBlank()) addAssistantMessage(output)
+                    } catch (e2: HermesWsClient.HermesRpcException) {
+                        addAssistantMessage("/$name: ${e2.message}")
+                    }
+                } else {
+                    // Legit error from command.dispatch (busy, no history, etc.)
+                    addAssistantMessage("/$name: ${e.message}")
+                }
+            }
+        }
+    }
+
+    /**
+     * Hot-swap the current session's model via the backend's model-switch
+     * mechanism (issue #589).
+     *
+     * The TUI gateway's `prompt.submit` does NOT parse slash commands (it would
+     * make the LLM treat "/model ..." as a chat message), and `command.dispatch`
+     * only knows quick/plugin/bundle/skill commands (4018s on /model). The
+     * correct RPC is `config.set` with `key="model"` — the gateway (server.py
+     * `config.set`, L10253) routes `key=="model"` straight to `_apply_model_switch`
+     * using the same `_sessions.get(session_id)` lookup that the working
+     * `command.dispatch` uses.
+     *
+     * IMPORTANT: `config.set` key=model passes the value DIRECTLY to
+     * `parse_model_flags` (it does NOT strip a leading "/model" like slash.exec /
+     * prompt.submit do). So we strip the "/model" prefix here and send the bare
+     * spec `parse_model_flags` understands:
+     *   `<model> --provider <slug> --session`
+     * (matching the TUI client's `modelValueForConfigSet`).
+     */
+    private fun handleModelSwitch(
+        command: String,
+        recordUsage: Boolean,
+    ) {
+        // Strip a leading "/model" (and any following whitespace) — config.set
+        // key=model expects the bare spec, not a slash command. Match the
+        // dispatcher's case-insensitive "/model" detection so a typed "/MODEL"
+        // (or any casing) doesn't forward the literal slash prefix to the
+        // backend, where parse_model_flags wouldn't recognize it.
+        val spec =
+            if (command.startsWith("/model", ignoreCase = true)) {
+                command.substring(6).trim()
+            } else {
+                command.trim()
+            }
+        applySessionModel(spec, recordUsage = recordUsage)
+    }
+
+    /**
+     * Submits [text] as a prompt to the current session via WS, without
+     * adding a duplicate user message. Used by [handleDispatchResult] when
+     * a slash command resolves to a normal user prompt.
+     */
+    private fun submitPrompt(
+        text: String,
+        queued: Boolean = false,
+        onDispatched: (() -> Unit)? = null,
+    ) {
+        if (text.isBlank()) return
+        val sessionId = runtimeSessionId ?: return
+        _uiState.update { it.copy(isAgentTyping = true) }
+        viewModelScope.launch(io) {
+            wsClient.sendMessage(
+                sessionId,
+                text,
+                onSent = { id ->
+                    trackRequest(id, WsMethods.PROMPT_SUBMIT)
+                    onDispatched?.invoke()
+                },
+                queued = queued,
+            )
+        }
+    }
+
+    private fun addAssistantMessage(text: String) {
+        val msg = ChatMessage(role = MessageRole.ASSISTANT, content = text)
+        _uiState.update { it.copy(messages = it.messages + msg) }
+
+        // Persist — OUTSIDE update{}
+        val sessionId = _uiState.value.currentSessionId
+        if (sessionId != null) {
+            val acceptedRevision = repo.replacementGeneration(sessionId)
+            viewModelScope.launch(io) {
+                repo.persistMessage(msg, sessionId, acceptedRevision)
+            }
+        }
+    }
+
+    // ── Session management ───────────────────────────────────────────────
+
+    fun interruptSession(onDispatched: (() -> Unit)? = null) {
+        val sessionId = runtimeSessionId ?: return
+        viewModelScope.launch(io) {
+            wsClient.send(
+                WsMethods.SESSION_INTERRUPT,
+                mapOf("session_id" to sessionId),
+                onSent = { id ->
+                    trackRequest(id, WsMethods.SESSION_INTERRUPT)
+                    onDispatched?.invoke()
+                },
+            )
+        }
+    }
+
+    private var sessionCreateCounter = 0L
+
+    /** Liveness timer for the newest unacknowledged `session.create`. */
+    private var sessionCreateJob: Job? = null
+    private var statusPillJob: Job? = null
+
+    // ── Likivik patch: pinned sessions for the rail ──
+    // Eagerly initialize this before init{} can receive a fast gateway.ready.
+    // A lazy delegate here can be observed as unassigned during construction.
+    private val _pinnedSessionIds =
+        MutableStateFlow(
+            preferences.getStringSet("pinned"),
+        )
+    val pinnedSessionIds: StateFlow<Set<String>> = _pinnedSessionIds.asStateFlow()
+
+    // ── Likivik patch: persisted rail order (drag-to-reorder). Stored as a
+    // comma-joined id string because SharedPreferences StringSet ordering is
+    // not guaranteed. homeOrder holds the full displayed order (pinned +
+    // fresh + stale, as last set by the rail). ──
+    private val _homeOrder = MutableStateFlow(loadHomeOrder())
+    val homeOrder: StateFlow<List<String>> = _homeOrder.asStateFlow()
+
+    private fun loadHomeOrder(): List<String> =
+        (
+            preferences.getString("home_order")?.takeIf { it.isNotBlank() }
+                ?.split(',')?.filter { it.isNotEmpty() }
+        ) ?: emptyList()
+
+    /** Persist the rail's full displayed order (pinned + fresh + stale). */
+    fun setRailOrder(order: List<String>) {
+        val clean = order.filter { it.isNotBlank() }
+        preferences.putString("home_order", clean.joinToString(","))
+        _homeOrder.value = clean
+    }
+
+    // ── Likivik patch: remember the last-open session so a fresh app launch
+    // resumes it instead of blindly creating a new one each time. ──
+    private fun persistLastSession(id: String) {
+        preferences.putString("last_session", id)
+    }
+
+    private fun lastSession(): String? = preferences.getString("last_session")?.takeIf { it.isNotBlank() }
+
+    // ── Likivik patch: per-session rail customization (icon emoji only; the
+    // name shown equals the real session title, renamed via session.title) ──
+    // RailMeta is a top-level model in ui/chat/RailMeta.kt.
+
+    private val _railMeta =
+        MutableStateFlow(
+            loadRailMeta(),
+        )
+    val railMeta: StateFlow<Map<String, RailMeta>> = _railMeta.asStateFlow()
+
+    private fun loadRailMeta(): Map<String, RailMeta> {
+        val all = preferences.allStrings()
+        val map = mutableMapOf<String, RailMeta>()
+        for ((key, value) in all) {
+            if (key.startsWith("icon_") && value is String) {
+                map[key.removePrefix("icon_")] = RailMeta(value.takeIf { it.isNotEmpty() })
+            }
+        }
+        return map
+    }
+
+    fun saveRailMeta(
+        sessionId: String,
+        icon: String?,
+    ) {
+        val cleanIcon = icon?.takeIf { it.isNotEmpty() }
+        if (cleanIcon == null) {
+            preferences.remove("icon_$sessionId")
+        } else {
+            preferences.putString("icon_$sessionId", cleanIcon)
+        }
+        _railMeta.value = _railMeta.value + (sessionId to RailMeta(cleanIcon))
+    }
+
+    /**
+     * Likivik patch: rename the session's real title on the server
+     * (`session.title`). The rail name equals the actual session name — this
+     * updates the header and every surface, not just the rail. Optionally sets
+     * a rail icon (local decoration) in the same go.
+     */
+    fun renameSession(
+        sessionId: String,
+        newTitle: String,
+        icon: String?,
+    ) {
+        saveRailMeta(sessionId, icon)
+        // Icon-only edit (empty title = keep current): no server round-trip.
+        val title = newTitle.trim().takeIf { it.isNotEmpty() }
+        if (title == null) return
+        // ALWAYS resume first — single deterministic path. The gateway reaps
+        // detached runtimes (WS grace reaper), so a session the app still
+        // considers "live" (cached runtime id) can already be reaped
+        // server-side: even CURRENT-session renames 4001 with a bare
+        // session.title ("detached/reaped runtime; client should resume the
+        // stored session" — the gateway's own guidance). Resume is idempotent:
+        // live sessions return the fast-path payload, detached ones are
+        // re-registered; the ack then fires the title by the stable
+        // session_key (storage id).
+        val renameResumeFence = captureResumeFence(sessionId)
+        wsClient.send(
+            WsMethods.SESSION_RESUME,
+            mapOf("session_id" to sessionId, "omit_messages" to true),
+            onSent = { id ->
+                pendingRequests[id] =
+                    PendingRpcRequest(
+                        method = WsMethods.SESSION_RESUME,
+                        resumeSessionId = sessionId,
+                        resumeFence = renameResumeFence,
+                        pendingRenameTitle = title,
+                        pendingRenameIcon = icon,
+                    )
+            },
+        )
+        // Reflect immediately in the local session list.
+        _uiState.update { state ->
+            state.copy(
+                sessions =
+                    state.sessions.map {
+                        if (it.id == sessionId) it.copy(title = title) else it
+                    },
+                chatTitle = if (state.currentSessionId == sessionId) title else state.chatTitle,
+            )
+        }
+    }
+
+    private fun sendSessionTitle(
+        runtimeSessionId: String,
+        title: String,
+    ) {
+        viewModelScope.launch(io) {
+            wsClient.send(
+                WsMethods.SESSION_TITLE,
+                mapOf("session_id" to runtimeSessionId, "title" to title),
+                // Tracked so a rejection is attributed to session.title and
+                // handled here instead of falling through to the reducer's raw
+                // JsonRpcError banner.
+                onSent = { id ->
+                    pendingRequests[id] =
+                        PendingRpcRequest(
+                            method = WsMethods.SESSION_TITLE,
+                            titleTargetId = runtimeSessionId,
+                        )
+                },
+            )
+        }
+    }
+
+    /**
+     * `session.delete` is refused with 4023 while the target is LIVE on the
+     * gateway (the agent's next flush would trip a foreign key), and
+     * `session.close` — like every session-scoped RPC — resolves an EXACT live
+     * runtime id (`_pop_session_by_id` pops the `_sessions` key). The stored id
+     * the rail holds is not that key, so resume it once to learn the runtime
+     * sid, close it, then retry the stored delete.
+     */
+    private fun startCloseThenDelete(storedId: String) {
+        val closeResumeFence = captureResumeFence(storedId)
+        wsClient.send(
+            WsMethods.SESSION_RESUME,
+            mapOf("session_id" to storedId, "omit_messages" to true),
+            onSent = { id ->
+                pendingRequests[id] =
+                    PendingRpcRequest(
+                        method = WsMethods.SESSION_RESUME,
+                        resumeSessionId = storedId,
+                        resumeFence = closeResumeFence,
+                        deleteSessionId = storedId,
+                        closeAfterResume = true,
+                    )
+            },
+        )
+    }
+
+    private fun sendCloseSession(
+        runtimeSessionId: String,
+        storedId: String,
+    ) {
+        wsClient.send(
+            WsMethods.SESSION_CLOSE,
+            mapOf("session_id" to runtimeSessionId),
+            onSent = { id ->
+                pendingRequests[id] =
+                    PendingRpcRequest(
+                        method = WsMethods.SESSION_CLOSE,
+                        deleteSessionId = storedId,
+                    )
+            },
+        )
+    }
+
+    private fun sendDeleteSession(
+        storedId: String,
+        retried: Boolean = false,
+    ) {
+        wsClient.send(
+            WsMethods.SESSION_DELETE,
+            mapOf("session_id" to storedId),
+            onSent = { id ->
+                pendingRequests[id] =
+                    PendingRpcRequest(
+                        method = WsMethods.SESSION_DELETE,
+                        deleteSessionId = storedId,
+                        deleteRetried = retried,
+                    )
+            },
+        )
+    }
+
+    fun togglePinSession(sessionId: String) {
+        val next =
+            if (sessionId in _pinnedSessionIds.value) {
+                _pinnedSessionIds.value - sessionId
+            } else {
+                _pinnedSessionIds.value + sessionId
+            }
+        preferences.putStringSet("pinned", next)
+        _pinnedSessionIds.value = next
+    }
+
+    /**
+     * Likivik patch: delete a session from the rail's long-press menu.
+     * Fire-and-forget over the WS socket, then drop it from the local list
+     * (and pins) immediately so the rail reflects reality without waiting
+     * for the next session.list round-trip.
+     */
+    fun deleteRailSession(sessionId: String) {
+        // session.delete takes the STORED id (it deletes the DB row and refuses
+        // only when that id belongs to a live runtime, 4023) — which is exactly
+        // what the rail holds from session.list.
+        sendDeleteSession(sessionId)
+        _pinnedSessionIds.value.let { pins ->
+            if (sessionId in pins) togglePinSession(sessionId)
+        }
+        _uiState.update { state ->
+            state.copy(sessions = state.sessions.filter { it.id != sessionId })
+        }
+    }
+
+    /**
+     * Ask the gateway for a fresh conversation.
+     *
+     * `session.create` is fire-and-forget over a socket that may be mid-drop.
+     * [HermesWsClient.send] queues the frame while the socket is down and drops
+     * it outright once credentials were cleared, and neither path reports back
+     * — so an unlucky tap could leave Chat with no session at all:
+     * `currentSessionId` and `runtimeSessionId` already discarded,
+     * `isSessionReady` false, Send disabled, and nothing in flight to recover
+     * it. That is the "leave the chat screen and come back a few times" state;
+     * re-entering only helped because a later `gateway.ready` happened to issue
+     * another create.
+     *
+     * The old code only cleared the spinner after ten seconds, which hid the
+     * symptom without producing a session. Retry the request on a deadline
+     * instead, and surface an actionable error once the attempts are spent.
+     */
+    fun createNewSession(
+        setLoading: Boolean = true,
+        onDispatched: (() -> Unit)? = null,
+    ) {
+        clearPrivilegedControls()
+        invalidateHistoryRefresh()
+        _uiState.value.currentSessionId?.let(repo::invalidateReplacementWrites)
+        conversationGeneration++
+        invalidateResumeRequests()
+        val generation = ++sessionCreateCounter
+        sessionCreateJob?.cancel()
+        sessionCreateJob = null
+        runtimeSessionId = null
+        loadedMessageOffset = 0
+        latestPaging = false
+        ActiveSessionHolder.set(null)
+        _uiState.update {
+            it.copy(
+                isLoading = setLoading,
+                currentSessionId = null,
+                isSessionReady = false,
+                messages = emptyList(),
+                subagentIndicators = emptyList(),
+                todos = emptyList(),
+                chatTitle = "Hermes",
+                currentSessionModel = null,
+                terminalBackend = null,
+                contextUsage = null,
+                showContextDetail = false,
+                pendingPrefillText = null,
+            )
+        }
+        _streamingState.update { StreamingState() }
+        streamingController.resetStreaming()
+        sendSessionCreate(generation = generation, attempt = 1, onDispatched = onDispatched)
+    }
+
+    /**
+     * Issue one `session.create` attempt and arm its liveness deadline.
+     *
+     * The deadline is fenced on [generation] so a superseded attempt can never
+     * retry on behalf of a newer one, and it stands down as soon as the session
+     * is ready — an ack, not a fixed sleep, ends the cycle.
+     */
+    private fun sendSessionCreate(
+        generation: Long,
+        attempt: Int,
+        onDispatched: (() -> Unit)? = null,
+    ) {
+        viewModelScope.launch(io) {
+            wsClient.send(
+                WsMethods.SESSION_CREATE,
+                params = mapOf("source" to "desktop"),
+                onSent = { id ->
+                    trackCreateRequest(id, generation)
+                    onDispatched?.invoke()
+                },
+            )
+        }
+
+        // Historical behavior: unit tests never armed the safety timer. Keep
+        // that unless a test opts into the retry path by injecting a delay.
+        val injectedDelay = sessionCreateRetryDelayMs
+        if (injectedDelay == null && isTestEnvironment()) return
+        val delayMs = injectedDelay ?: SESSION_CREATE_TIMEOUT_MS
+
+        sessionCreateJob =
+            viewModelScope.launch {
+                delay(delayMs)
+                if (generation != sessionCreateCounter) return@launch
+                if (_uiState.value.isSessionReady) return@launch
+                if (attempt < SESSION_CREATE_MAX_ATTEMPTS) {
+                    HermesLog.w(TAG, "session.create unacknowledged — retrying (attempt ${attempt + 1})")
+                    sendSessionCreate(generation = generation, attempt = attempt + 1)
+                } else {
+                    HermesLog.w(TAG, "session.create gave up after $attempt attempts")
+                    val msg = resolver.get(Res.string.chat_new_session_failed)
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = msg,
+                        )
+                    }
+                }
+            }
+    }
+
+    fun loadSessions() {
+        viewModelScope.launch(io) {
+            wsClient.send(
+                WsMethods.SESSION_LIST,
+                onSent = { id -> trackRequest(id, WsMethods.SESSION_LIST) },
+            )
+        }
+    }
+
+    /**
+     * User-triggered rail refresh (pull-to-refresh / the top-bar refresh icon).
+     * Re-lists sessions so the rail reflects SERVER truth — titles, deletions
+     * and ordering are all owned by the gateway, and the rename/delete paths
+     * update the rail optimistically.
+     */
+    fun refreshSessions() {
+        _uiState.update { it.copy(railRefreshing = true) }
+        loadSessions()
+    }
+
+    private fun fetchCommandCatalog() {
+        viewModelScope.launch(io) {
+            wsClient.send(
+                WsMethods.COMMANDS_CATALOG,
+                onSent = { id -> trackRequest(id, WsMethods.COMMANDS_CATALOG) },
+            )
+        }
+    }
+
+    /**
+     * Top up the context meter's denominator from `GET /api/model/info`.
+     *
+     * Only a fallback: it covers the window between opening a session and its
+     * first turn, before the gateway has pushed a live `context_max`. The
+     * numerator is never sourced from REST — see [ContextUsage].
+     */
+    private fun fetchModelContextLength() {
+        viewModelScope.launch(io) {
+            when (val result = safeApiCall { ApiClient.hermesApi.getModelInfo() }) {
+                is NetworkResult.Success -> {
+                    val length =
+                        result.data.effectiveContextLength
+                            ?: result.data.autoContextLength
+                    if (length != null && length > 0L) {
+                        _uiState.update {
+                            it.copy(
+                                modelContextLength = length,
+                                modelContextLengthModel = result.data.qualifiedModel,
+                            )
+                        }
+                    }
+                }
+
+                is NetworkResult.Failure -> Unit
+            }
+        }
+    }
+
+    /** Open the tappable context breakdown sheet. */
+    fun openContextDetail() {
+        _uiState.update { it.copy(showContextDetail = true) }
+    }
+
+    /** Dismiss the context breakdown sheet. */
+    fun closeContextDetail() {
+        _uiState.update { it.copy(showContextDetail = false) }
+    }
+
+    fun refreshCurrentSession() {
+        val sessionId = _uiState.value.currentSessionId ?: return
+        loadSessionMessages(sessionId)
+    }
+
+    fun refreshSettings() {
+        _uiState.update { state ->
+            state.copy(
+                typingEffectEnabled = authStore.isTypingEffectEnabled(),
+                typingEffectDelayMs = authStore.getTypingEffectDelayMs(),
+            )
+        }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun parseCommandCatalog(map: Map<*, *>): CommandCatalog? =
+        try {
+            val jsonElement = map.toJsonElement()
+            HermesJson.instance.decodeFromJsonElement<CommandCatalog>(jsonElement)
+        } catch (e: Exception) {
+            HermesLog.e(TAG, "Failed to parse command catalog (${e::class.simpleName})")
+            null
+        }
+
+    // ── In-session model picker (issue #589) ─────────────────────────────
+
+    /**
+     * Whether [command] should open the in-session model picker instead of being
+     * dispatched as a normal slash command. True for a bare `/model` (with no
+     * trailing model argument) — the picker supplies the argument interactively.
+     * A fully-typed `/model provider/model` is forwarded straight to the backend.
+     */
+    private fun isModelPickerCommand(command: String): Boolean {
+        val trimmed = command.trim()
+        if (!trimmed.startsWith("/", ignoreCase = true)) return false
+        val body = trimmed.removePrefix("/").trimStart()
+        // Must be exactly "model" with no argument (or just whitespace).
+        return body.equals("model", ignoreCase = true) ||
+            (
+                body.startsWith("model ", ignoreCase = true) &&
+                    body.substringAfter("model").trim().isEmpty()
+            )
+    }
+
+    /** Preload model options so the picker opens instantly (no spinner on /model). */
+    private fun preloadModelOptions() {
+        viewModelScope.launch(io) {
+            val result =
+                safeApiCall {
+                    ApiClient.hermesApi.getModelOptions(refresh = false)
+                }
+            when (result) {
+                is NetworkResult.Success -> {
+                    cachedModelOptions = result.data.providers.orEmpty()
+                    _uiState.update {
+                        it.copy(
+                            modelPickerProviders = cachedModelOptions,
+                            modelPickerPinned = authStore.getPinnedModels(),
+                            modelInventoryResolved = true,
+                        )
+                    }
+                }
+
+                is NetworkResult.Failure -> {
+                    _uiState.update { it.copy(modelInventoryResolved = true) }
+                }
+            }
+        }
+    }
+
+    /**
+     * Open the in-session model picker. Uses the preloaded options if available
+     * (instant open); otherwise shows a loading state and fetches them. The
+     * `/model` slash command is the supported session hot-swap mechanism per the
+     * backend contract (issue #589).
+     */
+    fun openModelPicker() {
+        val hasCached = cachedModelOptions.isNotEmpty()
+        _uiState.update {
+            it.copy(
+                showModelPicker = true,
+                modelPickerProviders = if (hasCached) cachedModelOptions else emptyList(),
+                modelPickerPinned = authStore.getPinnedModels(),
+                modelPickerLoading = !hasCached,
+            )
+        }
+        if (!hasCached) {
+            refreshModelOptions()
+        }
+    }
+
+    /** Re-fetch options (pull-to-refresh style) when the picker is already open. */
+    fun refreshModelOptions() {
+        _uiState.update { it.copy(modelPickerLoading = true) }
+        viewModelScope.launch(io) {
+            val result =
+                safeApiCall {
+                    ApiClient.hermesApi.getModelOptions(refresh = true)
+                }
+            when (result) {
+                is NetworkResult.Success -> {
+                    cachedModelOptions = result.data.providers.orEmpty()
+                    _uiState.update {
+                        it.copy(
+                            modelPickerProviders = cachedModelOptions,
+                            modelPickerLoading = false,
+                            modelInventoryResolved = true,
+                        )
+                    }
+                }
+
+                is NetworkResult.Failure -> {
+                    _uiState.update {
+                        it.copy(
+                            modelPickerLoading = false,
+                            modelInventoryResolved = true,
+                            errorMessage = "Failed to load models: ${result.error.message}",
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun closeModelPicker() {
+        _uiState.update { it.copy(showModelPicker = false, modelPickerLoading = false) }
+    }
+
+    fun togglePinModel(
+        providerSlug: String,
+        modelName: String,
+    ) {
+        val currentPinned = authStore.getPinnedModels().toMutableList()
+        val target = PinnedModel(providerSlug, modelName)
+        if (currentPinned.contains(target)) {
+            currentPinned.remove(target)
+        } else {
+            currentPinned.add(target)
+        }
+        authStore.savePinnedModels(currentPinned)
+        _uiState.update { it.copy(modelPickerPinned = currentPinned) }
+    }
+
+    /** Hot-swap only the current live session through the awaited config.set RPC. */
+    fun sendSlashModel(
+        provider: String,
+        model: String,
+    ) {
+        _uiState.update {
+            it.copy(
+                showModelPicker = false,
+                modelPickerLoading = false,
+            )
+        }
+        applySessionModel(
+            spec = "$model --provider $provider --session",
+            displayLabel = "$provider/$model",
+        )
+    }
+
+    fun confirmModelSwitch() {
+        val pending = _uiState.value.modelSwitchConfirmation ?: return
+        if (runtimeSessionId != pending.sessionId) {
+            // `resolver.get` is `suspend`; the `onClick` surface this
+            // method is wired to is not, so we hoist the message
+            // resolution into a one-shot launch before publishing the
+            // error.
+            viewModelScope.launch {
+                val msg = resolver.get(Res.string.chat_model_switch_session_changed)
+                _uiState.update {
+                    it.copy(
+                        modelSwitchConfirmation = null,
+                        errorMessage = msg,
+                    )
+                }
+            }
+            return
+        }
+        _uiState.update { it.copy(modelSwitchConfirmation = null) }
+        applySessionModel(
+            spec = pending.spec,
+            displayLabel = pending.displayLabel,
+            confirmExpensive = true,
+        )
+    }
+
+    fun cancelModelSwitchConfirmation() {
+        _uiState.update { it.copy(modelSwitchConfirmation = null) }
+    }
+
+    private fun applySessionModel(
+        spec: String,
+        displayLabel: String? = null,
+        confirmExpensive: Boolean = false,
+        recordUsage: Boolean = false,
+    ) {
+        val sessionId = runtimeSessionId
+        if (sessionId == null) {
+            // `resolver.get` is `suspend`; this method is wired to
+            // non-suspend UI surfaces, so we resolve the error in a
+            // one-shot launch before publishing it.
+            viewModelScope.launch {
+                val msg = resolver.get(Res.string.chat_model_switch_no_session)
+                _uiState.update {
+                    it.copy(errorMessage = msg)
+                }
+            }
+            return
+        }
+
+        viewModelScope.launch(io) {
+            val params =
+                mutableMapOf<String, Any>(
+                    "session_id" to sessionId,
+                    "key" to "model",
+                    "value" to spec,
+                )
+            if (confirmExpensive) {
+                params["confirm_expensive_model"] = true
+            }
+
+            try {
+                val result = wsClient.request(WsMethods.CONFIG_SET, params).await()
+                val resultMap = result as? Map<*, *>
+                if (resultMap?.get("confirm_required") == true) {
+                    val message =
+                        (resultMap["confirm_message"] as? String)
+                            ?.takeIf { it.isNotBlank() }
+                            ?: resolver.get(Res.string.chat_model_confirm_default_message)
+                    _uiState.update {
+                        if (runtimeSessionId != sessionId) return@update it
+                        it.copy(
+                            modelSwitchConfirmation =
+                                ModelSwitchConfirmation(
+                                    message = message,
+                                    spec = spec,
+                                    displayLabel = displayLabel,
+                                    sessionId = sessionId,
+                                ),
+                        )
+                    }
+                    return@launch
+                }
+
+                val provider = resultMap?.get("provider") as? String
+                val model = resultMap?.get("model") as? String
+                val confirmedLabel =
+                    if (!provider.isNullOrBlank() && !model.isNullOrBlank()) {
+                        "$provider/$model"
+                    } else {
+                        displayLabel
+                    }
+                _uiState.update {
+                    if (runtimeSessionId != sessionId) return@update it
+                    it.copy(
+                        currentSessionModel = confirmedLabel ?: it.currentSessionModel,
+                        contextUsage = it.contextUsage?.copy(maxTokens = null),
+                        modelSwitchConfirmation = null,
+                    )
+                }
+                if (recordUsage) recordAcceptedSlash("/model")
+            } catch (e: HermesWsClient.HermesRpcException) {
+                val msg = resolver.get(Res.string.chat_model_switch_failed, e.message ?: "")
+                _uiState.update {
+                    if (runtimeSessionId != sessionId) return@update it
+                    it.copy(
+                        errorMessage = msg,
+                        modelSwitchConfirmation = null,
+                    )
+                }
+            }
+        }
+    }
+
+    private fun recordAcceptedSlash(command: String) {
+        val commandName = command.split(" ", limit = 2)[0].lowercase()
+        viewModelScope.launch {
+            slashUsageStore.recordUse(selectedProfileId(), commandName)
+        }
+    }
+
+    fun consumeOpenHistoryRequest() {
+        _uiState.update { it.copy(openHistoryRequested = false) }
+    }
+
+    /**
+     * Set the reasoning effort level for the current session.
+     *
+     * Updates the UI optimistically and sends a `config.set` RPC to the
+     * backend. The level applies per-session via the runtime session ID.
+     * If [level] is null it resets to the model's default.
+     *
+     * @param level One of "low", "medium", "high", or null for default.
+     */
+    fun setReasoningLevel(level: String?) {
+        _uiState.update { it.copy(reasoningLevel = level) }
+        val sessionId = runtimeSessionId ?: return
+        if (level == null) return // null = model default, no need to send WS
+        viewModelScope.launch(io) {
+            wsClient.send(
+                WsMethods.CONFIG_SET,
+                mapOf(
+                    "key" to "reasoning",
+                    "value" to level,
+                    "session_id" to sessionId,
+                ),
+                onSent = { id -> trackRequest(id, WsMethods.CONFIG_SET) },
+            )
+        }
+    }
+
+    fun switchSession(sessionId: String) {
+        if (sessionId == _uiState.value.currentSessionId) return
+
+        clearPrivilegedControls()
+        invalidateHistoryRefresh()
+        _uiState.value.currentSessionId?.let(repo::invalidateReplacementWrites)
+        conversationGeneration++
+        invalidateResumeRequests()
+        // A pending session.create belongs to the conversation the user just
+        // left. Retiring the generation makes any late answer inert, and the
+        // timer must go with it or it would retry a create into this session.
+        sessionCreateCounter++
+        sessionCreateJob?.cancel()
+        sessionCreateJob = null
+
+        // Reset streaming and pagination state before resuming the Desktop session.
+        runtimeSessionId = null
+        loadedMessageOffset = 0
+        latestPaging = false
+        streamingController.resetStreaming()
+        _uiState.update {
+            val title = it.sessions.find { s -> s.id == sessionId }?.title ?: "Hermes"
+            it.copy(
+                isLoading = false,
+                isSessionReady = false,
+                isLoadingOlder = false,
+                hasOlderMessages = false,
+                currentSessionId = sessionId,
+                // A switch owns a fresh transcript: clear the previous session's
+                // messages here. `loadCachedMessages(sessionId)` below repaints
+                // from Room immediately, so the wipe is not a blank flash.
+                messages = emptyList(),
+                subagentIndicators = emptyList(),
+                todos = emptyList(),
+                chatTitle = title,
+                showSessionPicker = false,
+                isAgentTyping = false,
+                currentSessionModel = null,
+                terminalBackend = null,
+                modelSwitchConfirmation = null,
+                // The gauge is per-session occupancy; carrying the previous
+                // session's fill into a new one would misreport it until the
+                // first turn lands.
+                contextUsage = null,
+                showContextDetail = false,
+                pendingPrefillText = null,
+            )
+        }
+        // Mirror the active session id app-wide (issue #532).
+        ActiveSessionHolder.set(sessionId)
+        // Likivik patch: remember this as the last-open session for next launch.
+        persistLastSession(sessionId)
+        _streamingState.update { StreamingState() }
+        // Likivik patch: paint from Room cache immediately instead of staring at
+        // a blank loading screen while the network round-trip completes. The
+        // authoritative refresh below (loadSessionMessages) converges the view.
+        loadCachedMessages(sessionId)
+        val resumeFence = captureResumeFence(sessionId)
+        viewModelScope.launch {
+            // Resume the selected desktop session, then load its complete transcript.
+            launch(io) {
+                if (resumeFence != null && isResumeFenceCurrent(resumeFence)) {
+                    wsClient.send(
+                        WsMethods.SESSION_RESUME,
+                        mapOf("session_id" to sessionId, "omit_messages" to true),
+                        onSent = { id -> trackResumeRequest(id, resumeFence) },
+                    )
+                }
+            }
+            loadSessionMessages(sessionId)
+            loadSessions()
+        }
+    }
+
+    private fun loadCachedMessages(sessionId: String) {
+        val fence = captureCacheLoadFence(sessionId)
+        val owner = ++cacheLoadCounter
+        activeCacheLoadOwner = owner
+        cacheLoadJob?.cancel()
+        cacheLoadJob =
+            launchHistoryLoad {
+                val cachedMessages = repo.loadMessages(sessionId)
+                _uiState.update { state ->
+                    // Cache is only a blank-transcript fallback. A live, resume,
+                    // or server mutation that wins the race owns the transcript.
+                    if (isCacheLoadCurrent(fence, owner) && state.messages.isEmpty()) {
+                        activeCacheMessageIds = cachedMessages.mapTo(mutableSetOf()) { it.id }
+                        state.copy(
+                            messages = cachedMessages,
+                            todos = restoredTodos(state.todos, cachedMessages),
+                            // Likivik patch v2: do NOT clear isLoading here — the
+                            // network fetch (loadSessionMessages) owns the loading
+                            // state. Clearing it raced the fetch completion and
+                            // left freshly-switched sessions stuck on "empty chat".
+                            isLoading = state.isLoading,
+                        )
+                    } else {
+                        state
+                    }
+                }
+                if (activeCacheLoadOwner == owner) cacheLoadJob = null
+            }
+    }
+
+    private fun loadSessionMessages(sessionId: String) {
+        // A full refresh supersedes any incremental sync. Retire it before the
+        // repository FIFO barrier and refresh-fence capture so a sync already
+        // queued for persistence cannot become authoritative afterward.
+        retireSync()
+        retireOlderLoad()
+        val owner = ++historyRefreshCounter
+        activeHistoryRefreshOwner = owner
+        historyRefreshJob?.cancel()
+        retireCacheLoad()
+        val baselineMessageIds = _uiState.value.messages.mapTo(mutableSetOf()) { it.id }
+        _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+        loadCachedMessages(sessionId)
+        historyRefreshJob =
+            launchHistoryLoad {
+                try {
+                    withContext(io) {
+                        repo.awaitSessionOperations(sessionId)
+                    }
+                    if (activeHistoryRefreshOwner != owner) return@launchHistoryLoad
+                    val fence = captureHistoryLoadFence(sessionId) ?: return@launchHistoryLoad
+                    if (!isHistoryRefreshCurrent(fence, owner)) return@launchHistoryLoad
+                    val latestResult =
+                        fetchMessagePage(
+                            sessionId,
+                            offset = 0,
+                            limit = MESSAGE_PAGE_SIZE,
+                            order = "latest",
+                        )
+                    if (!isHistoryRefreshCurrent(fence, owner)) return@launchHistoryLoad
+                    val useLatestPaging: Boolean
+                    val (result, requestedOffset) =
+                        if (
+                            latestResult is NetworkResult.Success &&
+                            latestResult.data.pagination?.order == "latest"
+                        ) {
+                            useLatestPaging = true
+                            latestResult to 0
+                        } else if (latestResult is NetworkResult.Success) {
+                            useLatestPaging = false
+                            val messageCount =
+                                fetchServerMessageCount(sessionId, fence, owner)
+                                    ?: return@launchHistoryLoad
+                            val offset = (messageCount - MESSAGE_PAGE_SIZE).coerceAtLeast(0)
+                            if (!isHistoryRefreshCurrent(fence, owner)) return@launchHistoryLoad
+                            fetchMessagePage(sessionId, offset, MESSAGE_PAGE_SIZE) to offset
+                        } else {
+                            useLatestPaging = false
+                            latestResult to 0
+                        }
+                    if (!isHistoryRefreshCurrent(fence, owner)) return@launchHistoryLoad
+                    latestPaging = useLatestPaging
+                    when (result) {
+                        is NetworkResult.Success -> {
+                            val offset = result.data.pagination?.offset ?: requestedOffset
+                            val chatMessages =
+                                mapServerMessages(
+                                    sessionId,
+                                    result.data.messages.orEmpty(),
+                                    offset,
+                                    useLatestPaging,
+                                )
+                            val persisted =
+                                withContext(io) {
+                                    repo.persistMessagesIfCurrent(
+                                        chatMessages,
+                                        sessionId,
+                                        fence.transcriptRevision,
+                                    ) {
+                                        isHistoryRefreshCurrent(fence, owner)
+                                    }
+                                }
+                            if (!persisted || !isHistoryRefreshCurrent(fence, owner)) return@launchHistoryLoad
+                            val cachedMessageIds = activeCacheMessageIds
+                            retireCacheLoad()
+                            _uiState.update { state ->
+                                if (!isHistoryRefreshCurrent(fence, owner)) return@update state
+                                val hasResumeHistory = state.messages.any { it.id.startsWith("resume-$sessionId-") }
+                                if (chatMessages.isEmpty() && hasResumeHistory) {
+                                    state.copy(isLoading = false, isLoadingOlder = false)
+                                } else {
+                                    val authoritativeIds = chatMessages.mapTo(mutableSetOf()) { it.id }
+                                    val newerMessages =
+                                        state.messages.filter { message ->
+                                            message.id !in baselineMessageIds &&
+                                                message.id !in cachedMessageIds &&
+                                                message.id !in authoritativeIds
+                                        }
+                                    val refreshedMessages = chatMessages + newerMessages
+                                    val hasOlder =
+                                        if (useLatestPaging) {
+                                            val returned = result.data.pagination?.returned ?: chatMessages.size
+                                            returned >= MESSAGE_PAGE_SIZE && chatMessages.isNotEmpty()
+                                        } else {
+                                            offset > 0 && chatMessages.isNotEmpty()
+                                        }
+                                    state.copy(
+                                        messages = refreshedMessages,
+                                        todos = restoredTodos(state.todos, refreshedMessages),
+                                        isLoading = false,
+                                        hasOlderMessages = hasOlder,
+                                        isLoadingOlder = false,
+                                    )
+                                }
+                            }
+                            if (isHistoryRefreshCurrent(fence, owner)) {
+                                val hasRestHistory =
+                                    _uiState.value.messages.any { serverMessageIndex(it.id, sessionId) != null }
+                                if (chatMessages.isNotEmpty() && hasRestHistory) loadedMessageOffset = offset
+                            }
+                        }
+
+                        is NetworkResult.Failure -> {
+                            _uiState.update {
+                                if (!isHistoryRefreshCurrent(fence, owner)) return@update it
+                                it.copy(
+                                    isLoading = false,
+                                    isLoadingOlder = false,
+                                    errorMessage = "Failed to load messages: ${result.error.message}",
+                                )
+                            }
+                        }
+                    }
+                } finally {
+                    if (activeHistoryRefreshOwner == owner) historyRefreshJob = null
+                }
+            }
+    }
+
+    fun loadOlderMessages() {
+        val state = _uiState.value
+        val sessionId = state.currentSessionId ?: return
+        if (!state.hasOlderMessages || state.isLoadingOlder) return
+        if (!latestPaging && loadedMessageOffset <= 0) return
+        val oldOffset = loadedMessageOffset
+        val newOffset =
+            if (latestPaging) oldOffset + MESSAGE_PAGE_SIZE else (oldOffset - MESSAGE_PAGE_SIZE).coerceAtLeast(0)
+        val limit = if (latestPaging) MESSAGE_PAGE_SIZE else oldOffset - newOffset
+        val useLatestPaging = latestPaging
+        val fence = captureHistoryLoadFence(sessionId) ?: return
+        val owner = ++olderLoadCounter
+        activeOlderLoadOwner = owner
+        _uiState.update { it.copy(isLoadingOlder = true) }
+        olderLoadJob =
+            launchHistoryLoad {
+                try {
+                    val result =
+                        fetchMessagePage(
+                            sessionId,
+                            newOffset,
+                            limit,
+                            order = if (useLatestPaging) "latest" else null,
+                        )
+                    if (result !is NetworkResult.Success || !isOlderLoadCurrent(fence, owner)) {
+                        return@launchHistoryLoad
+                    }
+                    val effectiveOffset = result.data.pagination?.offset ?: newOffset
+                    val older =
+                        mapServerMessages(
+                            sessionId,
+                            result.data.messages.orEmpty(),
+                            effectiveOffset,
+                            useLatestPaging,
+                        )
+                    val persisted =
+                        withContext(io) {
+                            repo.persistMessagesIfCurrent(
+                                older,
+                                sessionId,
+                                fence.transcriptRevision,
+                            ) {
+                                isOlderLoadCurrent(fence, owner)
+                            }
+                        }
+                    if (!persisted || !isOlderLoadCurrent(fence, owner)) return@launchHistoryLoad
+                    _uiState.update { current ->
+                        if (!isOlderLoadCurrent(fence, owner)) return@update current
+                        loadedMessageOffset = effectiveOffset
+                        val mergedMessages = (older + current.messages).distinctBy { it.id }
+                        val hasOlder =
+                            if (useLatestPaging) {
+                                val returned = result.data.pagination?.returned ?: older.size
+                                returned >= limit && older.isNotEmpty()
+                            } else {
+                                effectiveOffset > 0 && older.isNotEmpty()
+                            }
+                        current.copy(
+                            messages = mergedMessages,
+                            todos = restoredTodos(current.todos, mergedMessages),
+                            hasOlderMessages = hasOlder,
+                        )
+                    }
+                } finally {
+                    releaseOlderLoad(owner)
+                }
+            }
+    }
+
+    private fun isOlderLoadCurrent(
+        fence: HistoryLoadFence,
+        owner: Long,
+    ): Boolean = activeOlderLoadOwner == owner && isHistoryLoadFenceCurrent(fence)
+
+    private fun retireOlderLoad() {
+        val owner = activeOlderLoadOwner ?: return
+        if (activeOlderLoadOwner != owner) return
+        activeOlderLoadOwner = null
+        olderLoadJob?.cancel()
+        olderLoadJob = null
+        _uiState.update { it.copy(isLoadingOlder = false) }
+    }
+
+    private fun releaseOlderLoad(owner: Long) {
+        if (activeOlderLoadOwner != owner) return
+        activeOlderLoadOwner = null
+        olderLoadJob = null
+        _uiState.update { it.copy(isLoadingOlder = false) }
+    }
+
+    fun syncCurrentSession() {
+        val state = _uiState.value
+        val sessionId = state.currentSessionId ?: return
+        if (isSyncingMessages || state.isLoading || state.isLoadingOlder || state.isAgentTyping ||
+            _streamingState.value.streamingMessage != null
+        ) {
+            return
+        }
+        val nextOffset =
+            if (latestPaging) {
+                0
+            } else {
+                state.messages
+                    .mapNotNull { serverMessageIndex(it.id, sessionId) }
+                    .maxOrNull()
+                    ?.plus(1)
+                    ?: loadedMessageOffset
+            }
+        val fence = captureHistoryLoadFence(sessionId) ?: return
+        val owner = ++syncCounter
+        activeSyncOwner = owner
+        isSyncingMessages = true
+        syncJob =
+            launchHistoryLoad {
+                try {
+                    val result =
+                        fetchMessagePage(
+                            sessionId,
+                            nextOffset,
+                            MESSAGE_PAGE_SIZE,
+                            order = if (latestPaging) "latest" else null,
+                        )
+                    if (!isSyncCurrent(fence, owner)) return@launchHistoryLoad
+                    when (result) {
+                        is NetworkResult.Success -> {
+                            if (!isSyncCurrent(fence, owner)) return@launchHistoryLoad
+                            val incoming = mapServerMessages(sessionId, result.data.messages.orEmpty(), nextOffset)
+                            if (!isSyncCurrent(fence, owner)) return@launchHistoryLoad
+                            if (incoming.isEmpty()) return@launchHistoryLoad
+                            val persisted =
+                                withContext(io) {
+                                    repo.persistMessagesIfCurrent(
+                                        incoming,
+                                        sessionId,
+                                        fence.transcriptRevision,
+                                    ) {
+                                        isSyncCurrent(fence, owner)
+                                    }
+                                }
+                            if (!persisted || !isSyncCurrent(fence, owner)) return@launchHistoryLoad
+                            _uiState.update { current ->
+                                if (!isSyncCurrent(fence, owner)) return@update current
+                                val merged =
+                                    mergeSyncedMessages(
+                                        current = current.messages,
+                                        incoming = incoming,
+                                        isServerMessage = { id ->
+                                            serverMessageIndex(id, sessionId) != null
+                                        },
+                                    )
+                                if (sameMessages(current.messages, merged)) {
+                                    current
+                                } else {
+                                    current.copy(
+                                        messages = merged,
+                                        todos = restoredTodos(current.todos, merged),
+                                    )
+                                }
+                            }
+                        }
+
+                        is NetworkResult.Failure -> {}
+                    }
+                } finally {
+                    releaseSync(owner)
+                }
+            }
+    }
+
+    private fun isSyncCurrent(
+        fence: HistoryLoadFence,
+        owner: Long,
+    ): Boolean = activeSyncOwner == owner && isHistoryLoadFenceCurrent(fence)
+
+    private fun retireSync() {
+        activeSyncOwner = null
+        syncCounter++
+        syncJob?.cancel()
+        syncJob = null
+        isSyncingMessages = false
+    }
+
+    private fun releaseSync(owner: Long) {
+        if (activeSyncOwner != owner) return
+        activeSyncOwner = null
+        syncJob = null
+        isSyncingMessages = false
+    }
+
+    private fun restoredTodos(
+        currentTodos: List<TodoItem>,
+        messages: List<ChatMessage>,
+    ): List<TodoItem> = hydrateTodosFromMessages(messages).ifEmpty { currentTodos }
+
+    private suspend fun fetchServerMessageCount(
+        sessionId: String,
+        fence: HistoryLoadFence,
+        owner: Long,
+    ): Int? {
+        if (!isHistoryRefreshCurrent(fence, owner)) return null
+        val known =
+            _uiState.value.sessions
+                .find { it.id == sessionId }
+                ?.messageCount
+        if (known != null) return known.takeIf { isHistoryRefreshCurrent(fence, owner) }
+        val result =
+            withContext(io) {
+                safeApiCall { ApiClient.hermesApi.getSessions(limit = 500, offset = 0, order = "recent") }
+            }
+        if (result is NetworkResult.Success) {
+            if (!isHistoryRefreshCurrent(fence, owner)) return null
+            val sessions = result.data.sessions.orEmpty()
+            val count = sessions.find { it.id == sessionId }?.message_count
+            if (count != null) {
+                _uiState.update { current ->
+                    if (!isHistoryRefreshCurrent(fence, owner)) return@update current
+                    current.copy(
+                        sessions =
+                            current.sessions.map {
+                                if (it.id == sessionId) it.copy(messageCount = count) else it
+                            },
+                    )
+                }
+                return count.takeIf { isHistoryRefreshCurrent(fence, owner) }
+            }
+        }
+        return (_uiState.value.messages.size).takeIf { isHistoryRefreshCurrent(fence, owner) }
+    }
+
+    private suspend fun fetchMessagePage(
+        sessionId: String,
+        offset: Int,
+        limit: Int,
+        order: String? = null,
+    ) = withContext(io) {
+        safeApiCall {
+            ApiClient.hermesApi.getSessionMessages(
+                sessionId = sessionId,
+                limit = limit,
+                offset = offset,
+                includeCompacted = true,
+                order = order,
+            )
+        }
+    }
+
+    private fun mapServerMessages(
+        sessionId: String,
+        messages: List<SessionMessage>,
+        offset: Int,
+        useLatestPaging: Boolean = latestPaging,
+    ): List<ChatMessage> =
+        ServerMessageMapper.map(
+            sessionId = sessionId,
+            messages = messages,
+            existingMessages = _uiState.value.messages,
+            offset = offset,
+            useLatestPaging = useLatestPaging,
+            nowMillis = nowMillis(),
+        )
+
+    private fun hydrateResumeMessages(
+        sessionId: String,
+        payload: Any?,
+        replaceExisting: Boolean,
+    ) {
+        val rawMessages = payload as? List<*> ?: return
+        val resumedMessages =
+            rawMessages.mapIndexedNotNull { index, item ->
+                val message =
+                    item as? Map<*, *> ?: return@mapIndexedNotNull null
+                val roleName = (message["role"] as? String)?.lowercase()
+                val role =
+                    when (roleName) {
+                        "user" -> MessageRole.USER
+                        "system" -> MessageRole.SYSTEM
+                        "tool" -> MessageRole.TOOL
+                        "assistant" -> MessageRole.ASSISTANT
+                        else -> return@mapIndexedNotNull null
+                    }
+                val content =
+                    (message["text"] as? String)
+                        ?: (message["content"] as? String)
+                        ?: if (role == MessageRole.TOOL) {
+                            (message["context"] as? String)
+                                ?.takeIf { it.isNotBlank() }
+                                ?: (message["name"] as? String).orEmpty()
+                        } else {
+                            ""
+                        }
+                if (content.isBlank()) return@mapIndexedNotNull null
+                val reasoning =
+                    (message["reasoning"] as? String)
+                        ?: (message["reasoning_text"] as? String).orEmpty()
+                val timestampSeconds =
+                    when (val timestamp = message["timestamp"]) {
+                        is Number -> timestamp.toDouble()
+                        is String -> timestamp.toDoubleOrNull()
+                        else -> null
+                    }
+                val mediaItems =
+                    if (role == MessageRole.ASSISTANT) {
+                        HostMediaExtractor.extract(content)
+                    } else {
+                        emptyList()
+                    }
+                val attachments =
+                    mediaItems
+                        .map { item ->
+                            Attachment(
+                                uri = item.path,
+                                name = mediaNameFromPath(item.path),
+                                mimeType = mediaMimeForPath(item.path),
+                                size = 0,
+                                gatewayPath = item.path,
+                                source = AttachmentSource.GATEWAY,
+                            )
+                        }.takeIf { it.isNotEmpty() }
+                ChatMessage(
+                    id = "resume-$sessionId-$index",
+                    role = role,
+                    content =
+                        if (mediaItems.isEmpty()) {
+                            content
+                        } else {
+                            HostMediaExtractor.strip(content)
+                        },
+                    reasoningText = reasoning,
+                    attachments = attachments,
+                    timestamp =
+                        timestampSeconds
+                            ?.times(1000)
+                            ?.toLong()
+                            ?: nowMillis() + index,
+                    isStreaming = false,
+                    toolName =
+                        if (role == MessageRole.TOOL) {
+                            (message["tool_name"] as? String)
+                                ?: (message["name"] as? String)
+                        } else {
+                            null
+                        },
+                    toolCallId =
+                        if (role == MessageRole.TOOL) {
+                            (message["tool_call_id"] as? String)
+                                ?: (message["tool_id"] as? String)
+                        } else {
+                            null
+                        },
+                    displayKind = message["display_kind"] as? String,
+                    toolStatus = if (role == MessageRole.TOOL) ToolStatus.COMPLETED else null,
+                )
+            }
+        if (resumedMessages.isEmpty()) return
+
+        _uiState.update { state ->
+            if (state.currentSessionId != sessionId) return@update state
+            val hasTranscript =
+                !replaceExisting &&
+                    state.messages.any { message ->
+                        serverMessageIndex(message.id, sessionId) != null ||
+                            message.role != MessageRole.SYSTEM
+                    }
+            if (hasTranscript) {
+                state.copy(isLoading = false)
+            } else {
+                state.copy(
+                    messages = resumedMessages,
+                    isLoading = false,
+                    hasOlderMessages = false,
+                    isLoadingOlder = false,
+                )
+            }
+        }
+        val hasResumeHistory =
+            _uiState.value.messages.any {
+                it.id.startsWith("resume-$sessionId-")
+            }
+        if (hasResumeHistory) {
+            loadedMessageOffset = 0
+        }
+    }
+
+    // ── Issue #724: attach host-path MEDIA: files as real attachments ────
+    //
+    // The gateway's WebSocket stream delivers the raw `MEDIA:<path>` directive.
+    // We retain the path as opaque gateway state and fetch through
+    // [GatewayFileClient], which uses the normal authenticated Retrofit client.
+    // The directive text is stripped from the message body. Pure parsing lives
+    // in [HostMediaExtractor].
+
+    /**
+     * ViewModel-side handler for [ReducerEffect.AttachHostMedia]: find the local
+     * message by id, convert any `MEDIA:<path>` directives into [Attachment]s
+     * (via the authenticated gateway client) and strip them from the text. Role,
+     * reasoning, timestamp and existing attachments are preserved; new gateway
+     * attachments are appended. Idempotent — skips if gateway attachments for
+     * the same paths already exist.
+     */
+    private suspend fun attachHostMedia(
+        sessionId: String,
+        messageId: String,
+        acceptedRevision: Long,
+    ) {
+        val current = _uiState.value.messages.find { it.id == messageId } ?: return
+        val content = current.content
+        val items = HostMediaExtractor.extract(content)
+        if (items.isEmpty()) {
+            repo.persistMessage(current, sessionId, acceptedRevision)
+            return
+        }
+
+        val existingPaths =
+            current.attachments
+                .orEmpty()
+                .mapNotNull { it.gatewayPath }
+                .toSet()
+        val newAttachments =
+            items.mapNotNull { item ->
+                val path = mediaStore.normalizePath(item.path) ?: return@mapNotNull null
+                if (path in existingPaths) return@mapNotNull null
+                Attachment(
+                    uri = path,
+                    name = mediaNameFromPath(item.path),
+                    mimeType = mediaMimeForPath(item.path),
+                    size = 0,
+                    gatewayPath = path,
+                    source = AttachmentSource.GATEWAY,
+                )
+            }
+        if (newAttachments.isEmpty()) {
+            repo.persistMessage(current, sessionId, acceptedRevision)
+            return
+        }
+
+        val updatedMessage =
+            current.copy(
+                content = HostMediaExtractor.strip(content),
+                attachments =
+                    (current.attachments.orEmpty() + newAttachments)
+                        .distinctBy { it.gatewayPath ?: it.uri },
+            )
+        _uiState.update { state ->
+            state.copy(
+                messages =
+                    state.messages.map { msg ->
+                        if (msg.id == messageId) updatedMessage else msg
+                    },
+            )
+        }
+        repo.persistMessage(updatedMessage, sessionId, acceptedRevision)
+    }
+
+    /**
+     * Open an attachment when its chip/thumbnail is tapped.
+     *
+     * - LOCAL (user-picked) files: open the original `content://` URI
+     *   directly via [android.content.Intent.ACTION_VIEW] — the resolver
+     *   already grants read access for the picked document. If that fails
+     *   (e.g. the permission lapsed), we copy to cache and retry via
+     *   FileProvider so the tap is never a silent no-op.
+     * - GATEWAY audio/video: hand a profile-fenced range session to the in-app
+     *   player, without materializing the full file or exposing credentials.
+     * - Other GATEWAY (agent `MEDIA:`) files: fetch the bytes via
+     *   [GatewayFileClient], write them to a cache file, and open with
+     *   [android.content.Intent.ACTION_VIEW] through FileProvider.
+     *
+     * Failures surface through [ChatUiState.openError] (non-blocking
+     * snackbar); the tap is never swallowed.
+     */
+    fun openAttachment(attachment: Attachment) {
+        viewModelScope.launch {
+            val outcome =
+                attachmentOpener.open(attachment) { path ->
+                    _uiState.update { it.copy(openingAttachmentPath = path) }
+                }
+            when (outcome) {
+                is AttachmentOpenOutcome.PlayMedia ->
+                    _uiState.update { it.copy(mediaPlayerRequest = outcome.request) }
+
+                AttachmentOpenOutcome.Handled -> Unit
+
+                is AttachmentOpenOutcome.Failed ->
+                    showOpenError(
+                        when (outcome.error) {
+                            AttachmentOpenError.OPEN -> Res.string.attachment_error_open
+                            AttachmentOpenError.NOT_FOUND -> Res.string.attachment_error_not_found
+                            AttachmentOpenError.ACCESS_DENIED -> Res.string.attachment_error_access_denied
+                            AttachmentOpenError.TOO_LARGE -> Res.string.attachment_error_too_large
+                            AttachmentOpenError.SESSION_EXPIRED -> Res.string.attachment_error_session_expired
+                            AttachmentOpenError.MISSING_GATEWAY_PATH -> Res.string.attachment_error_missing_gateway_path
+                        },
+                        outcome.name,
+                    )
+            }
+        }
+    }
+
+    private suspend fun showOpenError(
+        key: org.jetbrains.compose.resources.StringResource,
+        vararg args: Any,
+    ) {
+        // Same pattern as the other Context-facing call sites in this
+        // ViewModel: read the localized text through the StringResolver
+        // seam (backed by Compose Resources) instead of calling
+        // `getApplication<Application>().getString(R.string.x)`.
+        val message = resolver.get(key, *args)
+        _uiState.update { it.copy(openError = message) }
+    }
+
+    fun clearOpenError() {
+        _uiState.update { it.copy(openError = null) }
+    }
+
+    fun closeMediaPlayer() {
+        _uiState.update { it.copy(mediaPlayerRequest = null) }
+    }
+
+    private fun serverMessageIndex(
+        id: String,
+        sessionId: String,
+    ): Int? = id.removePrefix("rest-$sessionId-").takeIf { it != id }?.toIntOrNull()
+
+    fun sameMessages(
+        left: List<ChatMessage>,
+        right: List<ChatMessage>,
+    ): Boolean =
+        left.size == right.size &&
+            left.zip(right).all { (a, b) ->
+                a.id == b.id &&
+                    a.role == b.role &&
+                    a.content == b.content &&
+                    a.reasoningText == b.reasoningText &&
+                    a.attachments == b.attachments &&
+                    a.toolName == b.toolName &&
+                    a.toolCallId == b.toolCallId &&
+                    a.toolStatus == b.toolStatus &&
+                    a.displayKind == b.displayKind
+            }
+
+    // ── UI actions ───────────────────────────────────────────────────────
+
+    /**
+     * Dismiss the active clarify prompt and reject it (tell the agent no answer
+     * was given).
+     *
+     * The backend's clarify tool blocks the agent thread waiting for a response
+     * (CLI timeout is 120s). A silent dismiss would leave the agent hanging
+     * until that timeout, so we send a cancel sentinel
+     * ([CLARIFY_DISMISS_RESPONSE]) over `clarify.respond` to unblock it.
+     *
+     * This is a *reject*, not an instruction to proceed — the agent is told no
+     * answer was provided and should re-ask or back off, NOT charge ahead.
+     *
+     * Unlike [respondToClarify] we do NOT append a user chat bubble: a dismiss
+     * is not something the user typed, so faking a USER message would be
+     * dishonest. We instead surface a short SYSTEM note so the dismissal is
+     * visible in the transcript.
+     */
+    fun dismissClarify() {
+        val state = _uiState.value
+        // Hoisted: smart casts do not cross module boundaries, and
+        // ChatUiState now lives in :shared.
+        val currentSessionId = state.currentSessionId
+        if (currentSessionId == null) return
+        val runtimeId = runtimeSessionId ?: return
+        val expected = state.clarifyRequest ?: return
+        val requestId = expected.clarifyId ?: return
+        val profileId = expected.sourceProfileId ?: return
+        val generation = expected.connectionGeneration ?: return
+        if (expected.sessionId != runtimeId) return
+        viewModelScope.launch(io) {
+            expected.serverRequestBinding?.let { serverBinding ->
+                if (wsClient.respondToServerRequest(serverBinding, buildJsonObject {})) {
+                    if (replaceClarifyIfCurrent(expected, null)) {
+                        addSystemMessage("Clarify dismissed — no answer sent", persist = true)
+                    }
+                }
+                return@launch
+            }
+            val dismissedIds = mutableSetOf<String>()
+            for (question in expected.resolvedQuestions) {
+                if (!clarifyRequestIsCurrent(expected, currentSessionId, runtimeId)) break
+                val sent =
+                    wsClient.respondToClarify(
+                        sessionId = runtimeId,
+                        clarifyRequestId = requestId,
+                        questionId = expected.wireQuestionId(question),
+                        answer = CLARIFY_DISMISS_RESPONSE,
+                        sourceProfileId = profileId,
+                        sourceConnectionGeneration = generation,
+                    )
+                if (!sent) break
+                dismissedIds += question.qid
+            }
+            if (dismissedIds.isEmpty()) return@launch
+
+            val remaining = expected.resolvedQuestions.filterNot { it.qid in dismissedIds }
+            val completedCurrentRequest =
+                replaceClarifyIfCurrent(expected, expected.withRemainingQuestions(remaining))
+            if (completedCurrentRequest && remaining.isEmpty()) {
+                addSystemMessage("Clarify dismissed — no answer sent", persist = true)
+            }
+        }
+    }
+
+    fun respondToClarify(option: String) {
+        val clarify = _uiState.value.clarifyRequest ?: return
+        val qid = clarify.questionId ?: clarify.questions.singleOrNull()?.qid
+        respondToClarifyBatch(clarify, mapOf((qid ?: "q0") to option))
+    }
+
+    fun respondToClarifyBatch(
+        expected: ClarifyUi,
+        answers: Map<String, String>,
+    ) {
+        val state = _uiState.value
+        val sessionId = state.currentSessionId ?: return
+        val runtimeId = runtimeSessionId ?: return
+        val profileId = expected.sourceProfileId ?: return
+        val generation = expected.connectionGeneration ?: return
+        if (state.clarifyRequest != expected ||
+            expected.sessionId != runtimeId
+        ) {
+            return
+        }
+        val questions = expected.resolvedQuestions
+        val normalized = answers.mapValues { it.value.trim() }.filterValues { it.isNotEmpty() }
+        if (normalized.isEmpty() || normalized.keys.any { answerId -> questions.none { it.qid == answerId } }) return
+        val requestId = expected.clarifyId ?: return
+        val acceptedRevision = repo.replacementGeneration(sessionId)
+        viewModelScope.launch(io) {
+            expected.serverRequestBinding?.let { serverBinding ->
+                val merged = normalized + expected.lockedAnswers
+                val result =
+                    if (expected.questions.isNotEmpty()) {
+                        buildJsonObject {
+                            put("answers", buildJsonObject { merged.forEach { (id, answer) -> put(id, answer) } })
+                        }
+                    } else {
+                        buildJsonObject { put("answer", normalized.values.first()) }
+                    }
+                if (!wsClient.respondToServerRequest(serverBinding, result)) return@launch
+                val displayAnswer = normalized.values.joinToString("\n")
+                val userMessage = ChatMessage(role = MessageRole.USER, content = displayAnswer)
+                if (replaceClarifyIfCurrent(expected, null)) {
+                    _uiState.update { it.copy(messages = it.messages + userMessage, isAgentTyping = true) }
+                    repo.persistMessage(userMessage, sessionId, acceptedRevision)
+                }
+                return@launch
+            }
+            val answeredIds = mutableSetOf<String>()
+            for (question in questions) {
+                val answer = normalized[question.qid] ?: continue
+                if (!clarifyRequestIsCurrent(expected, sessionId, runtimeId)) break
+                val sent =
+                    wsClient.respondToClarify(
+                        sessionId = runtimeId,
+                        clarifyRequestId = requestId,
+                        questionId = expected.wireQuestionId(question),
+                        answer = answer,
+                        sourceProfileId = profileId,
+                        sourceConnectionGeneration = generation,
+                    )
+                if (!sent) break
+                answeredIds += question.qid
+            }
+            if (answeredIds.isEmpty()) return@launch
+
+            val remaining = questions.filterNot { it.qid in answeredIds }
+            val displayAnswer =
+                questions.filter { it.qid in answeredIds }.joinToString(
+                    "\n",
+                ) { normalized.getValue(it.qid) }
+            val userMessage = ChatMessage(role = MessageRole.USER, content = displayAnswer)
+            _uiState.update { current ->
+                if (current.clarifyRequest == expected) {
+                    current.copy(
+                        clarifyRequest = expected.withRemainingQuestions(remaining),
+                        messages = current.messages + userMessage,
+                        isAgentTyping = remaining.isEmpty(),
+                    ).let { updated ->
+                        if (remaining.isEmpty()) updated.copy(clarifyRequest = null) else updated
+                    }
+                } else {
+                    current
+                }
+            }
+            if (_uiState.value.messages.any { it.id == userMessage.id }) {
+                repo.persistMessage(userMessage, sessionId, acceptedRevision)
+            }
+        }
+    }
+
+    private fun ClarifyUi.wireQuestionId(question: ClarifyQuestionUi): String? =
+        if (questions.isNotEmpty()) question.qid else questionId
+
+    private fun clarifyRequestIsCurrent(
+        expected: ClarifyUi,
+        sessionId: String,
+        runtimeId: String,
+    ): Boolean =
+        _uiState.value.clarifyRequest == expected &&
+            _uiState.value.currentSessionId == sessionId &&
+            runtimeSessionId == runtimeId
+
+    private fun replaceClarifyIfCurrent(
+        expected: ClarifyUi,
+        replacement: ClarifyUi?,
+    ): Boolean {
+        while (true) {
+            val current = _uiState.value
+            if (current.clarifyRequest != expected) return false
+            if (_uiState.compareAndSet(current, current.copy(clarifyRequest = replacement))) return true
+        }
+    }
+
+    private fun ClarifyUi.withRemainingQuestions(remaining: List<ClarifyQuestionUi>): ClarifyUi? =
+        when {
+            remaining.isEmpty() -> null
+            questions.isEmpty() -> this
+            else -> copy(questions = remaining)
+        }
+
+    fun clearError() {
+        _uiState.update { it.copy(errorMessage = null) }
+    }
+
+    fun clearBackgroundComplete() {
+        _uiState.update { it.copy(backgroundCompleteMessage = null) }
+    }
+
+    // ── Approval flow ───────────────────────────────────────────────────
+
+    private fun handleServerRequest(request: WsEvent.ServerRequest) {
+        val sessionId = request.params["session_id"] as? String ?: return
+        val binding =
+            privilegedBinding(
+                request.id,
+                sessionId,
+                request.sourceProfileId,
+                request.connectionGeneration,
+            ) ?: return
+        when (request.method) {
+            "sudo" -> {
+                val serverBinding =
+                    ServerRequestBinding(request.id, sessionId, binding.profileId, binding.connectionGeneration)
+                _uiState.update { state ->
+                    if (state.sudoPrompt?.serverRequestBinding == serverBinding) {
+                        state
+                    } else {
+                        state.copy(
+                            sudoPrompt = SudoPromptUi(binding = binding, serverRequestBinding = serverBinding),
+                            isAgentTyping = false,
+                        )
+                    }
+                }
+            }
+            "secret" -> {
+                val serverBinding =
+                    ServerRequestBinding(request.id, sessionId, binding.profileId, binding.connectionGeneration)
+                _uiState.update { state ->
+                    if (state.secretPrompt?.serverRequestBinding == serverBinding) {
+                        state
+                    } else {
+                        state.copy(
+                            secretPrompt =
+                                SecretPromptUi(
+                                    binding = binding,
+                                    envVar = request.params["env_var"] as? String,
+                                    prompt = request.params["prompt"] as? String,
+                                    serverRequestBinding = serverBinding,
+                                ),
+                            isAgentTyping = false,
+                        )
+                    }
+                }
+            }
+            "vault.code", "vault.unlock_prompt", "vault.save_login" -> {
+                val serverBinding =
+                    ServerRequestBinding(request.id, sessionId, binding.profileId, binding.connectionGeneration)
+                _uiState.update { state ->
+                    val prompt = state.vaultPrompt
+                    if (prompt?.binding == serverBinding && prompt.method == request.method) {
+                        state
+                    } else {
+                        state.copy(
+                            vaultPrompt =
+                                VaultPromptUi(
+                                    binding = serverBinding,
+                                    method = request.method,
+                                    title = request.params["title"] as? String,
+                                    prompt = request.params["prompt"] as? String,
+                                    identifier = request.params["identifier"] as? String,
+                                    requestedOrigin =
+                                        (request.params["origin"] as? String)
+                                            ?: (request.params["site"] as? String),
+                                ),
+                            isAgentTyping = false,
+                        )
+                    }
+                }
+            }
+            "approval" -> {
+                val serverBinding =
+                    ServerRequestBinding(request.id, sessionId, binding.profileId, binding.connectionGeneration)
+                val duplicate =
+                    _uiState.value.messages.any {
+                        it.approvalInfo?.serverRequestBinding == serverBinding
+                    }
+                if (duplicate) return
+                _uiState.update { state ->
+                    state.copy(
+                        messages =
+                            state.messages.filterNot {
+                                val prior = it.approvalInfo?.serverRequestBinding
+                                prior?.requestId == request.id && prior != serverBinding
+                            },
+                    )
+                }
+                handleApprovalRequest(
+                    WsEvent.ApprovalRequest(
+                        command = request.params["command"] as? String,
+                        description = request.params["description"] as? String,
+                        patternKeys = (request.params["pattern_keys"] as? List<*>)?.filterIsInstance<String>(),
+                        sessionId = sessionId,
+                        requestId = request.params["request_id"] as? String ?: request.id,
+                        timeoutSeconds = (request.params["timeout_seconds"] as? Number)?.toDouble() ?: 120.0,
+                        sourceProfileId = binding.profileId,
+                        connectionGeneration = binding.connectionGeneration,
+                        serverRequestId = request.id,
+                    ),
+                )
+            }
+            "clarify" -> {
+                val locked =
+                    (request.params["answers"] as? Map<*, *>)?.entries
+                        ?.mapNotNull { (k, v) -> if (k is String && v is String) k to v else null }?.toMap().orEmpty()
+                val questions =
+                    (request.params["questions"] as? List<*>)?.mapIndexedNotNull { index, raw ->
+                        val map = raw as? Map<*, *> ?: return@mapIndexedNotNull null
+                        val text = map["question"] as? String ?: return@mapIndexedNotNull null
+                        WsEvent.ClarifyQuestion(
+                            qid = map["qid"] as? String ?: "q$index",
+                            question = text,
+                            choices = (map["choices"] as? List<*>)?.filterIsInstance<String>().orEmpty(),
+                            multiSelect = map["multi_select"] as? Boolean ?: false,
+                        )
+                    }.orEmpty()
+                val first = questions.firstOrNull()
+                val current = _uiState.value.clarifyRequest
+                val serverBinding =
+                    ServerRequestBinding(request.id, sessionId, binding.profileId, binding.connectionGeneration)
+                if (current?.serverRequestBinding == serverBinding) {
+                    if (!request.replayed || current.questions.isNotEmpty()) return
+                }
+                handleWsEvent(
+                    WsEvent.ClarifyRequest(
+                        text = first?.question ?: request.params["question"] as? String,
+                        options = first?.choices ?: (request.params["choices"] as? List<*>)?.filterIsInstance<String>(),
+                        clarifyId = request.params["request_id"] as? String ?: request.id,
+                        sessionId = sessionId,
+                        questionId = first?.qid,
+                        multiSelect = first?.multiSelect ?: false,
+                        questions = questions,
+                        sourceProfileId = binding.profileId,
+                        connectionGeneration = binding.connectionGeneration,
+                        serverRequestId = request.id,
+                        lockedAnswers = locked,
+                    ),
+                )
+            }
+        }
+    }
+
+    private fun handleServerRequestCancelled(event: WsEvent.ServerRequestCancelled) {
+        if (event.sourceProfileId != selectedProfileId() || event.connectionGeneration == null) return
+        when (event.method) {
+            "approval" ->
+                _uiState.update { state ->
+                    state.copy(
+                        messages =
+                            state.messages.map { message ->
+                                val binding = message.approvalInfo?.serverRequestBinding
+                                if (binding?.requestId == event.id &&
+                                    binding.runtimeSessionId == event.sessionId &&
+                                    binding.profileId == event.sourceProfileId &&
+                                    binding.connectionGeneration == event.connectionGeneration
+                                ) {
+                                    message.copy(
+                                        approvalInfo = null,
+                                    )
+                                } else {
+                                    message
+                                }
+                            },
+                    )
+                }
+            "clarify" ->
+                _uiState.update { state ->
+                    val binding = state.clarifyRequest?.serverRequestBinding
+                    if (binding?.requestId == event.id &&
+                        binding.runtimeSessionId == event.sessionId &&
+                        binding.profileId == event.sourceProfileId &&
+                        binding.connectionGeneration == event.connectionGeneration
+                    ) {
+                        state.copy(
+                            clarifyRequest = null,
+                        )
+                    } else {
+                        state
+                    }
+                }
+            "vault.code", "vault.unlock_prompt", "vault.save_login" ->
+                _uiState.update { state ->
+                    val prompt = state.vaultPrompt
+                    if (prompt?.method == event.method && serverCancellationMatches(prompt.binding, event)) {
+                        state.copy(vaultPrompt = null)
+                    } else {
+                        state
+                    }
+                }
+            "sudo" ->
+                _uiState.update { state ->
+                    if (serverCancellationMatches(state.sudoPrompt?.serverRequestBinding, event)) {
+                        state.copy(sudoPrompt = null)
+                    } else {
+                        state
+                    }
+                }
+            "secret" ->
+                _uiState.update { state ->
+                    if (serverCancellationMatches(state.secretPrompt?.serverRequestBinding, event)) {
+                        state.copy(secretPrompt = null)
+                    } else {
+                        state
+                    }
+                }
+        }
+    }
+
+    private fun serverCancellationMatches(
+        binding: ServerRequestBinding?,
+        event: WsEvent.ServerRequestCancelled,
+    ): Boolean =
+        binding?.requestId == event.id &&
+            binding.runtimeSessionId == event.sessionId &&
+            binding.profileId == event.sourceProfileId &&
+            binding.connectionGeneration == event.connectionGeneration
+
+    private fun clearPrivilegedControls() {
+        approvalExpiryJobs.values.forEach(Job::cancel)
+        approvalExpiryJobs.clear()
+        _uiState.update { state ->
+            state.copy(
+                messages = state.messages.map { message -> message.copy(approvalInfo = null) },
+                sudoPrompt = null,
+                secretPrompt = null,
+                vaultPrompt = null,
+            )
+        }
+    }
+
+    private fun handleApprovalRequest(event: WsEvent.ApprovalRequest) {
+        val binding =
+            privilegedBinding(
+                requestId = event.requestId,
+                eventSessionId = event.sessionId,
+                profileId = event.sourceProfileId,
+                generation = event.connectionGeneration,
+            ) ?: return
+        val description = event.description ?: event.command ?: "Unknown command"
+        val content = "**Approval Required**\n$description"
+        val msg =
+            ChatMessage(
+                role = MessageRole.SYSTEM,
+                content = content,
+                approvalInfo =
+                    ApprovalInfo(
+                        command = event.command,
+                        description = event.description,
+                        patternKeys = event.patternKeys,
+                        privilegedBinding = binding,
+                        serverRequestBinding =
+                            event.serverRequestId?.let {
+                                ServerRequestBinding(
+                                    it,
+                                    binding.runtimeSessionId,
+                                    binding.profileId,
+                                    binding.connectionGeneration,
+                                )
+                            },
+                    ),
+            )
+        _uiState.update { state ->
+            state.copy(
+                messages = state.messages + msg,
+                isAgentTyping = false,
+            )
+        }
+        scheduleApprovalExpiry(msg.id, binding, event.timeoutSeconds)
+    }
+
+    /**
+     * Retire the controls once the gateway's own approval deadline has elapsed
+     * locally. The gateway publishes the exact lifetime its waiting thread uses
+     * (`timeout_seconds`), so the buttons disappear when the request they would
+     * answer is already gone, rather than lingering and resolving nothing.
+     */
+    private fun scheduleApprovalExpiry(
+        messageId: String,
+        binding: PrivilegedRequestBinding,
+        timeoutSeconds: Double,
+    ) {
+        val key = ApprovalTimerKey(messageId, binding)
+        val job =
+            viewModelScope.launch {
+                delay((timeoutSeconds * 1_000.0).toLong().coerceAtLeast(1L))
+                // Conditional remove: only drop the entry if it is still this attempt's job.
+                if (approvalExpiryJobs[key] === coroutineContext[Job]) approvalExpiryJobs.remove(key)
+                clearApprovalControls(messageId, binding)
+            }
+        approvalExpiryJobs.put(key, job)?.cancel()
+    }
+
+    /** Approve exactly once. Session-wide and permanent allows are not offered. */
+    fun respondToApproval(
+        messageId: String,
+        binding: PrivilegedRequestBinding,
+        action: String,
+    ) {
+        val choice =
+            when (action) {
+                "approve" -> "once"
+                "deny" -> "deny"
+                // "session" / "always" are deliberately unreachable: a phone
+                // cannot show what a standing allow would later authorize.
+                else -> return
+            }
+        submitApproval(messageId, binding, WsMethods.APPROVAL_RESPOND, mapOf("choice" to choice))
+    }
+
+    /** Explicit Cancel — a typed `approval.cancel`, not a denial and not a dismissal. */
+    fun cancelApproval(
+        messageId: String,
+        binding: PrivilegedRequestBinding,
+    ) {
+        submitApproval(messageId, binding, WsMethods.APPROVAL_CANCEL, emptyMap())
+    }
+
+    private fun submitApproval(
+        messageId: String,
+        binding: PrivilegedRequestBinding,
+        method: String,
+        params: Map<String, String>,
+    ) {
+        if (!claimApprovalSubmission(messageId, binding)) return
+
+        viewModelScope.launch(io) {
+            val serverBinding =
+                _uiState.value.messages.firstOrNull { it.id == messageId }
+                    ?.approvalInfo?.serverRequestBinding
+            var failureMessage: String? = null
+            val accepted =
+                if (serverBinding != null) {
+                    wsClient.respondToServerRequest(
+                        serverBinding,
+                        buildJsonObject {
+                            put(
+                                "choice",
+                                params["choice"] ?: if (method == WsMethods.APPROVAL_CANCEL) "deny" else "once",
+                            )
+                            put("all", false)
+                        },
+                    ).also { if (!it) failureMessage = "Request was not accepted" }
+                } else {
+                    runCatching {
+                        wsClient.privilegedRequest(method = method, binding = binding, params = params).await()
+                    }.fold(
+                        onSuccess = { true },
+                        onFailure = {
+                            failureMessage = it.message
+                            false
+                        },
+                    )
+                }
+            if (accepted) {
+                approvalExpiryJobs.remove(ApprovalTimerKey(messageId, binding))?.cancel()
+                clearApprovalControls(messageId, binding)
+            } else {
+                restoreApprovalControls(messageId, binding, failureMessage)
+            }
+        }
+    }
+
+    private fun claimApprovalSubmission(
+        messageId: String,
+        binding: PrivilegedRequestBinding,
+    ): Boolean {
+        while (true) {
+            val state = _uiState.value
+            var matched = false
+            val messages =
+                state.messages.map { message ->
+                    val info = message.approvalInfo
+                    if (message.id == messageId && info?.privilegedBinding == binding && !info.isSubmitting) {
+                        matched = true
+                        message.copy(approvalInfo = info.copy(isSubmitting = true))
+                    } else {
+                        message
+                    }
+                }
+            if (!matched) return false
+            if (_uiState.compareAndSet(state, state.copy(messages = messages))) return true
+        }
+    }
+
+    private fun restoreApprovalControls(
+        messageId: String,
+        binding: PrivilegedRequestBinding,
+        errorMessage: String?,
+    ) {
+        _uiState.update { state ->
+            state.copy(
+                messages =
+                    state.messages.map { message ->
+                        val info = message.approvalInfo
+                        if (message.id == messageId && info?.privilegedBinding == binding) {
+                            message.copy(approvalInfo = info.copy(isSubmitting = false))
+                        } else {
+                            message
+                        }
+                    },
+                errorMessage = errorMessage,
+            )
+        }
+    }
+
+    private fun clearApprovalControls(
+        messageId: String,
+        binding: PrivilegedRequestBinding,
+    ) {
+        _uiState.update { state ->
+            state.copy(
+                messages =
+                    state.messages.map { message ->
+                        if (message.id == messageId && message.approvalInfo?.privilegedBinding == binding) {
+                            message.copy(approvalInfo = null)
+                        } else {
+                            message
+                        }
+                    },
+            )
+        }
+    }
+
+    // ── Sudo / secret prompt flow (issue #524) ──────────────────────────
+
+    /**
+     * The agent needs the user's sudo password. Previously dropped → agent
+     * hung forever. Now we surface a secure dialog and reply via sudo.respond.
+     */
+    private fun handleSudoRequest(event: WsEvent.SudoRequest) {
+        val binding =
+            privilegedBinding(
+                requestId = event.requestId,
+                eventSessionId = event.sessionId,
+                profileId = event.sourceProfileId,
+                generation = event.connectionGeneration,
+            ) ?: return
+        _uiState.update {
+            it.copy(
+                sudoPrompt = SudoPromptUi(binding),
+                isAgentTyping = false,
+            )
+        }
+    }
+
+    /**
+     * The agent needs a secret value (token/password). Previously dropped →
+     * agent hung forever. Now we surface a secure dialog and reply via
+     * secret.respond.
+     */
+    private fun handleSecretRequest(event: WsEvent.SecretRequest) {
+        val binding =
+            privilegedBinding(
+                requestId = event.requestId,
+                eventSessionId = event.sessionId,
+                profileId = event.sourceProfileId,
+                generation = event.connectionGeneration,
+            ) ?: return
+        _uiState.update {
+            it.copy(
+                secretPrompt = SecretPromptUi(binding, event.envVar, event.prompt),
+                isAgentTyping = false,
+            )
+        }
+    }
+
+    /**
+     * Back gesture or a tap outside the dialog. Deliberately a no-op: an
+     * incidental dismissal is neither an answer nor a cancellation, and hiding
+     * the dialog would strand a gateway thread that is still blocked. The user
+     * cancels through the explicit Cancel action.
+     */
+    fun dismissSudo() = Unit
+
+    /** Ordinary dismissal of the secret dialog. A no-op, for the same reason as [dismissSudo]. */
+    fun dismissSecret() = Unit
+
+    /** Send the user's sudo password back to the gateway on its exact bound request. */
+    fun respondToSudo(password: String) {
+        val prompt = _uiState.value.sudoPrompt ?: return
+        if (password.isBlank()) return
+        submitSudo(prompt, WsMethods.SUDO_RESPOND, mapOf("password" to password))
+    }
+
+    /** Explicit Cancel — a typed `sudo.cancel`, awaited, never a silent dismissal. */
+    fun cancelSudo() {
+        val prompt = _uiState.value.sudoPrompt ?: return
+        submitSudo(prompt, WsMethods.SUDO_CANCEL, emptyMap())
+    }
+
+    /** Send the user's secret value back to the gateway on its exact bound request. */
+    fun respondToSecret(value: String) {
+        val prompt = _uiState.value.secretPrompt ?: return
+        if (value.isBlank()) return
+        submitSecret(prompt, WsMethods.SECRET_RESPOND, mapOf("value" to value))
+    }
+
+    /** Explicit Cancel — a typed `secret.cancel`, awaited, never a silent dismissal. */
+    fun cancelSecret() {
+        val prompt = _uiState.value.secretPrompt ?: return
+        submitSecret(prompt, WsMethods.SECRET_CANCEL, emptyMap())
+    }
+
+    fun respondToVault(value: String) {
+        val prompt = _uiState.value.vaultPrompt ?: return
+        if (value.isBlank()) return
+        submitVault(prompt, value)
+    }
+
+    fun respondToVaultLogin(
+        identifier: String,
+        password: String,
+    ) {
+        val prompt = _uiState.value.vaultPrompt ?: return
+        if (prompt.method != "vault.save_login" ||
+            !prompt.hasValidRequestedOrigin ||
+            identifier.isBlank() ||
+            password.isBlank()
+        ) {
+            return
+        }
+        submitVault(
+            prompt,
+            buildJsonObject {
+                put("identifier", identifier)
+                put("password", password)
+            }.toString(),
+        )
+    }
+
+    fun cancelVault() {
+        _uiState.value.vaultPrompt?.let { submitVault(it, "") }
+    }
+
+    fun dismissVault() = Unit
+
+    private fun submitVault(
+        expected: VaultPromptUi,
+        value: String,
+    ) {
+        val claimed = expected.copy(isSubmitting = true)
+        while (true) {
+            val state = _uiState.value
+            if (state.vaultPrompt != expected || expected.isSubmitting) return
+            if (_uiState.compareAndSet(state, state.copy(vaultPrompt = claimed))) break
+        }
+        viewModelScope.launch(io) {
+            val accepted = wsClient.respondToServerRequest(claimed.binding, buildJsonObject { put("value", value) })
+            _uiState.update { state ->
+                if (state.vaultPrompt != claimed) {
+                    state
+                } else if (accepted) {
+                    state.copy(vaultPrompt = null)
+                } else {
+                    state.copy(
+                        vaultPrompt = claimed.copy(isSubmitting = false),
+                        errorMessage = privilegedFailureMessage(),
+                    )
+                }
+            }
+        }
+    }
+
+    private fun submitSudo(
+        prompt: SudoPromptUi,
+        method: String,
+        params: Map<String, String>,
+    ) {
+        val claimed = claimSudoSubmission(prompt) ?: return
+        viewModelScope.launch(io) {
+            val accepted =
+                claimed.serverRequestBinding?.let {
+                    wsClient.respondToServerRequest(
+                        it,
+                        buildJsonObject { put("value", params["password"].orEmpty()) },
+                    )
+                } ?: runCatching {
+                    wsClient.privilegedRequest(method = method, binding = claimed.binding, params = params).await()
+                }.isSuccess
+            if (accepted) {
+                _uiState.update { if (it.sudoPrompt == claimed) it.copy(sudoPrompt = null) else it }
+            } else {
+                _uiState.update {
+                    if (it.sudoPrompt == claimed) {
+                        it.copy(
+                            sudoPrompt = claimed.copy(isSubmitting = false),
+                            errorMessage = privilegedFailureMessage(),
+                        )
+                    } else {
+                        it
+                    }
+                }
+            }
+        }
+    }
+
+    private fun claimSudoSubmission(expected: SudoPromptUi): SudoPromptUi? {
+        val claimed = expected.copy(isSubmitting = true)
+        while (true) {
+            val state = _uiState.value
+            if (state.sudoPrompt != expected || expected.isSubmitting) return null
+            if (_uiState.compareAndSet(state, state.copy(sudoPrompt = claimed))) return claimed
+        }
+    }
+
+    private fun submitSecret(
+        prompt: SecretPromptUi,
+        method: String,
+        params: Map<String, String>,
+    ) {
+        val claimed = claimSecretSubmission(prompt) ?: return
+        viewModelScope.launch(io) {
+            val accepted =
+                claimed.serverRequestBinding?.let {
+                    wsClient.respondToServerRequest(
+                        it,
+                        buildJsonObject { put("value", params["value"].orEmpty()) },
+                    )
+                } ?: runCatching {
+                    wsClient.privilegedRequest(method = method, binding = claimed.binding, params = params).await()
+                }.isSuccess
+            if (accepted) {
+                _uiState.update { if (it.secretPrompt == claimed) it.copy(secretPrompt = null) else it }
+            } else {
+                _uiState.update {
+                    if (it.secretPrompt == claimed) {
+                        it.copy(
+                            secretPrompt = claimed.copy(isSubmitting = false),
+                            errorMessage = privilegedFailureMessage(),
+                        )
+                    } else {
+                        it
+                    }
+                }
+            }
+        }
+    }
+
+    private fun claimSecretSubmission(expected: SecretPromptUi): SecretPromptUi? {
+        val claimed = expected.copy(isSubmitting = true)
+        while (true) {
+            val state = _uiState.value
+            if (state.secretPrompt != expected || expected.isSubmitting) return null
+            if (_uiState.compareAndSet(state, state.copy(secretPrompt = claimed))) return claimed
+        }
+    }
+
+    /**
+     * Fixed failure text for the two secret-bearing verbs.
+     *
+     * A gateway error string is attacker- or bug-reachable and could echo the
+     * submitted value; `errorMessage` is durable UI state. So sudo and secret
+     * failures never render the throwable — only this constant.
+     */
+    private suspend fun privilegedFailureMessage(): String = resolver.get(Res.string.chat_privileged_not_acknowledged)
+
+    /**
+     * Bind a privileged event to the exact request it can answer.
+     *
+     * Every component has to be present and current at dispatch: the opaque
+     * request id, the runtime session showing the request, the profile whose
+     * connection delivered it, and that connection's generation. Anything
+     * missing or stale yields `null`, and the caller drops the event rather than
+     * surfacing controls that would resolve some other request.
+     */
+    private fun privilegedBinding(
+        requestId: String,
+        eventSessionId: String?,
+        profileId: String?,
+        generation: Int?,
+    ): PrivilegedRequestBinding? {
+        if (requestId.isBlank()) return null
+        if (generation == null) return null
+        if (profileId.isNullOrBlank() || profileId != selectedProfileId()) return null
+        val runtimeId = eventSessionId?.takeIf { it.isNotBlank() } ?: return null
+        if (runtimeId != runtimeSessionId) return null
+        return PrivilegedRequestBinding(
+            requestId = requestId,
+            runtimeSessionId = runtimeId,
+            profileId = profileId,
+            connectionGeneration = generation,
+        )
+    }
+
+    /**
+     * A server expiry clears a live prompt only when it names that same exact
+     * request on the same session, profile, and socket generation.
+     */
+    private fun expiryMatches(
+        binding: PrivilegedRequestBinding,
+        requestId: String,
+        sessionId: String?,
+        profileId: String?,
+        generation: Int?,
+    ): Boolean =
+        requestId == binding.requestId &&
+            profileId == binding.profileId &&
+            generation == binding.connectionGeneration &&
+            !sessionId.isNullOrBlank() &&
+            sessionId == binding.runtimeSessionId
+
+    fun reconnect() {
+        retireSync()
+        AuthSessionState.markAuthenticated()
+        _uiState.update {
+            it.copy(
+                isLoading = true,
+                errorMessage = null,
+            )
+        }
+        viewModelScope.launch(io) {
+            wsClient.rejectAllPending()
+            wsClient.disconnect()
+        }
+        viewModelScope.launch {
+            delay(500)
+            connectWebSocket(setLoading = true)
+        }
+    }
+
+    fun relogin(
+        username: String,
+        password: String,
+        onResult: (Boolean, String?) -> Unit,
+    ) {
+        viewModelScope.launch(io) {
+            val endpoint =
+                try {
+                    authStore.endpoint()
+                } catch (e: IllegalArgumentException) {
+                    withContext(Dispatchers.Main) {
+                        onResult(false, e.message)
+                    }
+                    return@launch
+                }
+            val jsonBody = AuthPayloads.passwordLogin(username, password)
+
+            try {
+                val status = ApiClient.postJson(path = "auth/password-login", jsonBody = jsonBody)
+                if (status !in 200..299) {
+                    val msg =
+                        when (status) {
+                            401 -> "Invalid username or password (401)"
+                            403 -> "Forbidden (403)"
+                            else -> "HTTP error code: $status"
+                        }
+                    withContext(Dispatchers.Main) {
+                        onResult(false, msg)
+                    }
+                    return@launch
+                }
+
+                // The login response updated the shared CookieJar. Keep the
+                // one-use WebSocket ticket out of persistent token state;
+                // reconnect() lets HermesWsClient mint it for the handshake.
+                authStore.setToken(null)
+                authStore.setWsAuthParam("ticket")
+                AuthSessionState.markAuthenticated()
+
+                withContext(Dispatchers.Main) {
+                    onResult(true, null)
+                    reconnect()
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                withContext(Dispatchers.Main) {
+                    onResult(false, "Connection failed: ${e.message}")
+                }
+            }
+        }
+    }
+
+    private fun addSystemMessage(
+        text: String,
+        persist: Boolean = false,
+        transient: Boolean = false,
+    ) {
+        // Likivik patch: connection/resume noise ("Session resumed", "Connected
+        // to Hermes") used to be appended as list items, which bumped the whole
+        // chat via tail-follow scrolling. These are surfaced as a transient
+        // status pill instead and never enter the message list.
+        if (transient) {
+            _uiState.update { it.copy(statusPill = text) }
+            statusPillJob?.cancel()
+            statusPillJob =
+                viewModelScope.launch {
+                    kotlinx.coroutines.delay(2500)
+                    _uiState.update { it.copy(statusPill = null) }
+                }
+            return
+        }
+        val msg = ChatMessage(role = MessageRole.SYSTEM, content = text)
+        val sessionId = _uiState.value.currentSessionId
+
+        _uiState.update { it.copy(messages = it.messages + msg) }
+
+        // Persist — OUTSIDE update{}
+        if (persist && sessionId != null) {
+            val acceptedRevision = repo.replacementGeneration(sessionId)
+            viewModelScope.launch(io) {
+                repo.persistMessage(msg, sessionId, acceptedRevision)
+            }
+        }
+    }
+
+    // ── Pending request tracking ─────────────────────────────────────────
+
+    private fun trackRequest(
+        id: String,
+        method: String,
+    ) {
+        pendingRequests[id] = PendingRpcRequest(method)
+    }
+
+    /**
+     * Track a `session.redirect` alongside the text it carried, so a `4010`
+     * rejection (running agent cannot be redirected) can resend the same text
+     * as a normal prompt instead of dropping it.
+     */
+    private fun trackRedirectRequest(
+        id: String,
+        sessionId: String,
+        text: String,
+        connectionBinding: ConnectionBinding,
+    ) {
+        pendingRequests[id] =
+            PendingRpcRequest(
+                method = WsMethods.SESSION_REDIRECT,
+                redirectSessionId = sessionId,
+                redirectText = text,
+                redirectConnectionBinding = connectionBinding,
+            )
+    }
+
+    private fun captureResumeFence(sessionId: String): ResumeFence? {
+        val profileId = selectedProfileId()
+        val binding = wsClient.connectionBinding(profileId) ?: return null
+        return ResumeFence(
+            storageSessionId = sessionId,
+            runtimeSessionId = runtimeSessionId,
+            profileId = profileId,
+            connectionBinding = binding,
+            generation = conversationGeneration,
+            transcriptRevision = repo.replacementGeneration(sessionId),
+        )
+    }
+
+    private fun isResumeFenceCurrent(
+        fence: ResumeFence,
+        allowRuntimeChange: Boolean = false,
+        allowSessionChange: Boolean = false,
+    ): Boolean =
+        fence.generation == conversationGeneration &&
+            fence.profileId == selectedProfileId() &&
+            (allowSessionChange || fence.storageSessionId == _uiState.value.currentSessionId) &&
+            (allowRuntimeChange || fence.runtimeSessionId == runtimeSessionId) &&
+            fence.transcriptRevision == repo.replacementGeneration(fence.storageSessionId) &&
+            wsClient.isConnectionBindingCurrent(fence.connectionBinding)
+
+    private fun trackResumeRequest(
+        id: String,
+        fence: ResumeFence,
+    ) {
+        synchronizedOn(resumeRequestLock) {
+            invalidateResumeRequestsLocked()
+            pendingRequests[id] =
+                PendingRpcRequest(
+                    method = WsMethods.SESSION_RESUME,
+                    resumeSessionId = fence.storageSessionId,
+                    resumeFence = fence,
+                )
+        }
+    }
+
+    private fun invalidateResumeRequests() {
+        synchronizedOn(resumeRequestLock) {
+            invalidateResumeRequestsLocked()
+        }
+    }
+
+    private fun invalidateResumeRequestsLocked() {
+        val superseded =
+            pendingRequests.entries
+                .filter { (_, request) -> request.method == WsMethods.SESSION_RESUME }
+                .map { it.key }
+        for (id in superseded) {
+            retiredResumeRequests += id
+            while (retiredResumeRequests.size > MAX_RETIRED_RESUME_REQUESTS) {
+                retiredResumeRequests.remove(retiredResumeRequests.first())
+            }
+            pendingRequests.remove(id)
+        }
+    }
+
+    private fun consumeRetiredResumeRequest(id: String): Boolean =
+        synchronizedOn(resumeRequestLock) {
+            retiredResumeRequests.remove(id)
+        }
+
+    /**
+     * Track a `session.create` alongside the attempt generation that issued it,
+     * so a late answer from a superseded attempt cannot install itself over a
+     * newer session, and so an answered attempt can stand its retry timer down.
+     */
+    private fun trackCreateRequest(
+        id: String,
+        generation: Long,
+    ) {
+        pendingRequests[id] =
+            PendingRpcRequest(
+                method = WsMethods.SESSION_CREATE,
+                createGeneration = generation,
+            )
+    }
+
+    private fun trackBranchRequest(
+        id: String,
+        sessionId: String,
+    ) {
+        pendingRequests[id] =
+            PendingRpcRequest(
+                method = WsMethods.SESSION_BRANCH,
+                branchSessionId = sessionId,
+            )
+    }
+
+    // ── Search ────────────────────────────────────────────────────────────
+    // Compatibility façade: stable public API around ChatSearchDelegate.
+    // These thin delegates keep ChatViewModel's public surface intact while
+    // the search logic now lives in the delegate. Safe to remove once all
+    // callers migrate directly to the delegate.
+
+    fun toggleSearch() = searchDelegate.toggleSearch()
+
+    fun setSearchQuery(query: String) = searchDelegate.setSearchQuery(query)
+
+    fun navigateSearchMatch(direction: Int) = searchDelegate.navigateSearchMatch(direction)
+
+    fun clearSearch() = searchDelegate.clearSearch()
+
+    private var isTestEnv: Boolean? = null
+
+    private fun isTestEnvironment(): Boolean = isTestEnv ?: isRunningUnderTest().also { isTestEnv = it }
+
+    // ── Lifecycle ─────────────────────────────────────────────────────────
+
+    override fun onCleared() {
+        super.onCleared()
+        // PERF-16: Don't disconnect the global HermesWsClient singleton when
+        // leaving the Chat screen — it's used by background notification reply.
+    }
+
+    companion object {
+    }
+}

@@ -12,6 +12,7 @@ import com.m57.hermescontrol.data.ws.WsEvent
 import com.m57.hermescontrol.data.ws.WsMethods
 import com.m57.hermescontrol.ui.chat.fakes.FakeChatPersistenceRepository
 import com.m57.hermescontrol.ui.chat.fakes.FakeSlashUsageStore
+import com.m57.hermescontrol.ui.chat.fakes.testChatEnvironment
 import com.m57.hermescontrol.ui.common.FakeStringResolver
 import io.mockk.every
 import io.mockk.mockk
@@ -124,7 +125,7 @@ class SlashCommandDispatchRpcTest {
     private suspend fun TestScope.createViewModelWithSession(): Pair<ChatViewModel, String> {
         val vm =
             ChatViewModel(
-                app,
+                testChatEnvironment(fakeSlashUsageStore),
                 resolver,
                 false,
                 fakeRepo,

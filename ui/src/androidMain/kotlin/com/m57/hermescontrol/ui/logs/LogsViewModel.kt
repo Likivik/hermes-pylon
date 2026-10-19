@@ -2,13 +2,13 @@ package com.m57.hermescontrol.ui.logs
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.m57.hermescontrol.AppEnvironment
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.safeApiCall
 import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.ui.common.safeLaunchLoad
 import io.kseongbin.stacktrace.CrashLogger
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.m57.hermescontrol.util.ioDispatcher as ioDispatcher
 
 /**
  * Server-side log filters, mirroring the desktop dashboard's LogsPage
@@ -39,7 +40,7 @@ data class LogsUiState(
 )
 
 class LogsViewModel(
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val ioDispatcher: CoroutineDispatcher = AppEnvironment.current.io,
 ) :
     ViewModel(),
         ToastHost {

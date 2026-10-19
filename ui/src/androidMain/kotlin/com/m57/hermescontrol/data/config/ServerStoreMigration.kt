@@ -3,7 +3,6 @@
 package com.m57.hermescontrol.data.config
 
 import android.content.Context
-import android.util.Log
 import androidx.datastore.core.DataMigration
 import com.m57.hermescontrol.data.model.PinnedModel
 import com.m57.hermescontrol.data.remote.OkHttpProvider
@@ -11,6 +10,7 @@ import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.data.security.LegacySecurePreferences
 import com.m57.hermescontrol.data.theme.ThemePreference
 import com.m57.hermescontrol.data.theme.ThemePreset
+import com.m57.hermescontrol.util.HermesLog
 import kotlinx.serialization.decodeFromString
 
 class ServerStoreMigration(
@@ -44,7 +44,7 @@ class ServerStoreMigration(
 
     override suspend fun migrate(currentData: ServerStoreState): ServerStoreState {
         val prefs = getPrefs() ?: return currentData
-        Log.d("ServerStoreMigration", "Migrating legacy preferences to DataStore...")
+        HermesLog.d("ServerStoreMigration", "Migrating legacy preferences to DataStore...")
 
         val host = prefs.getString("host", "127.0.0.1") ?: "127.0.0.1"
         val port = prefs.getInt("port", 9119)
@@ -122,7 +122,7 @@ class ServerStoreMigration(
     override suspend fun cleanUp() {
         val prefs = getPrefs() ?: return
         prefs.edit().putBoolean(KEY_MIGRATED, true).apply()
-        Log.d("ServerStoreMigration", "Migration cleanup complete.")
+        HermesLog.d("ServerStoreMigration", "Migration cleanup complete.")
     }
 
     private fun getPrefs(): android.content.SharedPreferences? = LegacySecurePreferences(context).auth()
