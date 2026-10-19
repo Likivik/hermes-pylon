@@ -53,11 +53,13 @@
         }, 500);
       })();
     </script>
-    <!-- The Kotlin wasmJs plugin does NOT generate an index.html for this task, so
-         this file has to reference the bundle itself. Name is
-         <rootProject.name>-<module>.mjs -> HermesControl-ui.mjs, served at the root
-         alongside HermesControl-ui.wasm and skiko.wasm. -->
-    <script type="module" src="HermesControl-ui.mjs" onerror="window.__bootlog && window.__bootlog('MODULE SCRIPT FAILED TO LOAD: HermesControl-ui.mjs')"></script>
+    <!-- The dev server serves the webpack bundle, not the raw Kotlin loader.
+         webpack.config entry chunk is "main" -> output filename "ui.js" (UMD,
+         library "ui"), produced from kotlin/HermesControl-ui.mjs. Loading that
+         .mjs directly skips webpack, so bare npm specifiers like
+         "@js-joda/core" never resolve and the page dies at boot. Plain script,
+         no type="module": the output libraryTarget is umd. -->
+    <script src="ui.js" onerror="window.__bootlog && window.__bootlog('MODULE SCRIPT FAILED TO LOAD: ui.js')"></script>
     <script>window.__bootlog && window.__bootlog('module script tag executed (module graph may still be loading)');</script>
 </body>
 </html>
