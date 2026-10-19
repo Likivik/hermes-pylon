@@ -3,8 +3,6 @@ package com.m57.hermescontrol.ui.common
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Code
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
@@ -24,7 +22,9 @@ class BotAvatarTest {
 
     @Test
     fun `icons are strictly allowlisted`() {
-        assertEquals(Icons.Filled.Code, resolveAvatarIcon("code"))
+        // resolveAvatarIcon returns a Material Symbols name now, not an ImageVector,
+        // so the allowlist is checked against the symbol catalogue by name.
+        assertEquals("code", resolveAvatarIcon("code"))
         assertNull(resolveAvatarIcon("terminal"))
         assertNull(resolveAvatarIcon("https://example.invalid/icon"))
     }

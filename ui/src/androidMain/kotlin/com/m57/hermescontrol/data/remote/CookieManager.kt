@@ -5,8 +5,8 @@ package com.m57.hermescontrol.data.remote
 import android.content.Context
 import com.m57.hermescontrol.data.security.SecretStore
 import com.m57.hermescontrol.data.security.SecureStorage
+import com.m57.hermescontrol.util.ioDispatcher
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -29,7 +29,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
  * including HTTPS prefix variants.
  */
 object CookieManager {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + ioDispatcher)
 
     @Volatile private var jar: PersistentCookieJar? = null
 

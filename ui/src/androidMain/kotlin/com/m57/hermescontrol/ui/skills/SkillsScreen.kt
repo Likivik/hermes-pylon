@@ -20,21 +20,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.CloudDownload
-import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Extension
-import androidx.compose.material.icons.filled.Save
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -112,6 +103,8 @@ import com.m57.hermescontrol.ui.common.SkeletonListState
 import com.m57.hermescontrol.ui.common.ToastEffect
 import com.m57.hermescontrol.ui.common.listItemSpacing
 import com.m57.hermescontrol.ui.common.toDetailRows
+import com.m57.hermescontrol.ui.icons.HermesIcon
+import com.m57.hermescontrol.ui.icons.HermesSymbol
 import org.jetbrains.compose.resources.stringResource
 
 const val CATEGORY_ALL = "All"
@@ -262,8 +255,8 @@ fun SkillsScaffold(
         actions = {
             if (onUpdateFromHub != null) {
                 IconButton(onClick = onUpdateFromHub) {
-                    Icon(
-                        imageVector = Icons.Filled.CloudDownload,
+                    HermesSymbol(
+                        icon = HermesIcon.CloudDownload,
                         contentDescription = stringResource(Res.string.content_desc_update_skills_hub),
                     )
                 }
@@ -387,7 +380,7 @@ private fun InstalledSkillsView(
 
             filteredSkills.isEmpty() -> {
                 EmptyState(
-                    icon = Icons.Filled.Extension,
+                    icon = "extension",
                     title = stringResource(Res.string.skills_empty_message),
                     actionLabel = stringResource(Res.string.empty_action_browse_hub),
                     onAction = onBrowseHub,
@@ -515,8 +508,8 @@ private fun SkillCard(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         IconButton(onClick = onAction) {
-                            Icon(
-                                imageVector = Icons.Filled.Edit,
+                            HermesSymbol(
+                                icon = HermesIcon.Edit,
                                 contentDescription = stringResource(Res.string.content_desc_edit_skill),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -532,8 +525,8 @@ private fun SkillCard(
                                 )
                             } else {
                                 val statusColors = LocalHermesStatusColors.current
-                                Icon(
-                                    imageVector = Icons.Filled.CloudOff,
+                                HermesSymbol(
+                                    icon = HermesIcon.CloudOff,
                                     contentDescription = stringResource(Res.string.content_desc_uninstall_skill),
                                     tint = statusColors.error,
                                 )
@@ -547,8 +540,8 @@ private fun SkillCard(
                         horizontalArrangement = Arrangement.End,
                     ) {
                         IconButton(onClick = onAction) {
-                            Icon(
-                                imageVector = Icons.Filled.Edit,
+                            HermesSymbol(
+                                icon = HermesIcon.Edit,
                                 contentDescription = stringResource(Res.string.content_desc_edit_skill),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -617,8 +610,8 @@ private fun HubBrowseView(
                             onHubQueryChange("")
                             onClearSearch()
                         }) {
-                            Icon(
-                                imageVector = Icons.Filled.Close,
+                            HermesSymbol(
+                                icon = HermesIcon.Close,
                                 contentDescription = stringResource(Res.string.action_clear),
                             )
                         }
@@ -627,8 +620,8 @@ private fun HubBrowseView(
                         onClick = { onSearch(hubQuery) },
                         enabled = hubQuery.isNotBlank(),
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.Search,
+                        HermesSymbol(
+                            icon = HermesIcon.Search,
                             contentDescription = stringResource(Res.string.skills_hub_search_button),
                         )
                     }
@@ -661,7 +654,7 @@ private fun HubBrowseView(
 
             state.hubResults.isEmpty() && hubQuery.isNotBlank() && !state.isHubSearching -> {
                 EmptyState(
-                    icon = Icons.Filled.Extension,
+                    icon = "extension",
                     title = stringResource(Res.string.skills_hub_empty_results),
                 )
             }
@@ -691,7 +684,7 @@ private fun HubBrowseView(
 
             else -> {
                 EmptyState(
-                    icon = Icons.Filled.Search,
+                    icon = "search",
                     title = stringResource(Res.string.skills_hub_search_hint),
                 )
             }
@@ -806,8 +799,8 @@ private fun HubSkillCard(
                             color = MaterialTheme.colorScheme.onPrimary,
                         )
                     } else {
-                        Icon(
-                            imageVector = Icons.Filled.CloudDownload,
+                        HermesSymbol(
+                            icon = HermesIcon.CloudDownload,
                             contentDescription = null,
                             modifier = Modifier.size(18.dp),
                         )
@@ -877,7 +870,7 @@ fun SkillPreviewDialog(
 
                         else -> {
                             EmptyState(
-                                icon = Icons.Filled.Extension,
+                                icon = "extension",
                                 title = stringResource(Res.string.skills_preview_empty),
                             )
                         }
@@ -962,8 +955,8 @@ fun SkillEditorDialog(
                                     color = MaterialTheme.colorScheme.onSurface,
                                 )
                             } else {
-                                Icon(
-                                    imageVector = Icons.Filled.Save,
+                                HermesSymbol(
+                                    icon = HermesIcon.Save,
                                     contentDescription = stringResource(Res.string.content_desc_save_changes),
                                 )
                             }

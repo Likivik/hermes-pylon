@@ -19,7 +19,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
@@ -56,6 +55,7 @@ import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.ui.common.DisableDrawerGestures
 import com.m57.hermescontrol.ui.common.DrawerGestureController
 import com.m57.hermescontrol.ui.common.LocalDrawerGestureController
+import com.m57.hermescontrol.ui.icons.HermesSymbol
 import com.m57.hermescontrol.ui.settings.SettingsAboutPage
 import com.m57.hermescontrol.ui.settings.SettingsAppearancePage
 import com.m57.hermescontrol.ui.settings.SettingsBehaviorPage
@@ -95,7 +95,7 @@ private fun appEntryProvider(
         DisableDrawerGestures()
     }
 
-    ScreenRegistry.ALL_SCREENS.forEach { screen ->
+    screenGraph().screens.forEach { screen ->
         addEntryProvider(clazz = screen.key::class) {
             screen.content(sessionId, openDrawer)
         }
@@ -237,7 +237,7 @@ fun MainNavigation() {
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
-                    for (section in DrawerSection.entries) {
+                    for ((section, entries) in screenGraph().drawer()) {
                         Text(
                             text = stringResource(section.titleRes).uppercase(),
                             modifier =
@@ -251,25 +251,23 @@ fun MainNavigation() {
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontWeight = FontWeight.SemiBold,
                         )
-                        ScreenRegistry.ALL_SCREENS
-                            .filter { it.drawerSection == section }
-                            .forEach { entry ->
-                                NavigationDrawerItem(
-                                    icon = { Icon(entry.icon, contentDescription = null) },
-                                    label = { Text(stringResource(entry.labelRes)) },
-                                    selected = currentScreen == entry.key,
-                                    onClick = {
-                                        scope.launch { drawerState.close() }
-                                        NavigationController.navigateTo(entry.key)
-                                    },
-                                    colors =
-                                        NavigationDrawerItemDefaults.colors(
-                                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                            selectedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                            selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        ),
-                                )
-                            }
+                        entries.forEach { entry ->
+                            NavigationDrawerItem(
+                                icon = { HermesSymbol(icon = entry.icon, contentDescription = null) },
+                                label = { Text(stringResource(entry.labelRes)) },
+                                selected = currentScreen == entry.key,
+                                onClick = {
+                                    scope.launch { drawerState.close() }
+                                    NavigationController.navigateTo(entry.key)
+                                },
+                                colors =
+                                    NavigationDrawerItemDefaults.colors(
+                                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                        selectedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    ),
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))

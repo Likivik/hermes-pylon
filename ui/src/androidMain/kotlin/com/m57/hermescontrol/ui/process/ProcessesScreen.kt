@@ -11,15 +11,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Memory
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -33,7 +28,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -62,6 +56,8 @@ import com.m57.hermescontrol.ui.common.SkeletonListState
 import com.m57.hermescontrol.ui.common.ToastEffect
 import com.m57.hermescontrol.ui.common.listContentPadding
 import com.m57.hermescontrol.ui.common.listItemSpacing
+import com.m57.hermescontrol.ui.icons.HermesIcon
+import com.m57.hermescontrol.ui.icons.HermesSymbol
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -92,7 +88,7 @@ fun ProcessesScreen(
                 EmptyState(
                     title = stringResource(Res.string.processes_no_session_title),
                     subtitle = stringResource(Res.string.processes_no_session_desc),
-                    icon = Icons.Filled.Memory,
+                    icon = "memory",
                 )
             }
 
@@ -111,7 +107,7 @@ fun ProcessesScreen(
                 EmptyState(
                     title = stringResource(Res.string.processes_empty_title),
                     subtitle = stringResource(Res.string.processes_empty_desc),
-                    icon = Icons.Filled.Memory,
+                    icon = "memory",
                 )
             }
 
@@ -183,8 +179,8 @@ private fun ProcessCard(
                     .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.Top,
         ) {
-            Icon(
-                imageVector = process.statusIcon(),
+            HermesSymbol(
+                icon = process.statusIcon(),
                 contentDescription = null,
                 tint = process.statusColor(statusColors),
                 modifier = Modifier.size(20.dp),
@@ -227,8 +223,8 @@ private fun ProcessCard(
                         onClick = onKill,
                         modifier = Modifier.size(36.dp),
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.Stop,
+                        HermesSymbol(
+                            icon = HermesIcon.Stop,
                             contentDescription = stringResource(Res.string.processes_kill_cd),
                             tint = statusColors.error,
                         )
@@ -270,7 +266,7 @@ private fun formatUptime(seconds: Int): String {
     }
 }
 
-private fun ProcessInfo.statusIcon(): ImageVector = if (isRunning) Icons.Filled.PlayArrow else Icons.Filled.Memory
+private fun ProcessInfo.statusIcon(): HermesIcon = if (isRunning) HermesIcon.PlayArrow else HermesIcon.Memory
 
 @Composable
 private fun ProcessInfo.statusColor(statusColors: com.m57.hermescontrol.theme.HermesStatusColors): Color =

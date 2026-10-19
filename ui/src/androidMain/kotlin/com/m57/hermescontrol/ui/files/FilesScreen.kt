@@ -21,15 +21,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.CreateNewFolder
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.Upload
-import androidx.compose.material.icons.outlined.AttachFile
-import androidx.compose.material.icons.outlined.Description
-import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -38,7 +29,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -101,9 +91,11 @@ import com.m57.hermescontrol.ui.common.SecureMediaOpenRoute
 import com.m57.hermescontrol.ui.common.SkeletonListState
 import com.m57.hermescontrol.ui.common.ToastEffect
 import com.m57.hermescontrol.ui.common.routeManagedFileOpen
+import com.m57.hermescontrol.ui.icons.HermesIcon
+import com.m57.hermescontrol.ui.icons.HermesSymbol
+import com.m57.hermescontrol.util.ioDispatcher
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.stringResource
@@ -156,7 +148,7 @@ fun FilesScreen(
                 scope.launch {
                     val bytes =
                         runCatching {
-                            withContext(Dispatchers.IO) {
+                            withContext(ioDispatcher) {
                                 context.contentResolver.openInputStream(uri)?.use { stream ->
                                     stream.readBytesLimited()
                                 }
@@ -207,8 +199,8 @@ fun FilesScreen(
             onDismissRequest = viewModel::dismissDelete,
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Filled.Delete,
+                    HermesSymbol(
+                        icon = HermesIcon.Delete,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(20.dp),
@@ -252,15 +244,15 @@ fun FilesScreen(
         actions = {
             if (state.parentPath != null) {
                 IconButton(onClick = viewModel::navigateUp) {
-                    Icon(
-                        imageVector = Icons.Filled.ArrowUpward,
+                    HermesSymbol(
+                        icon = HermesIcon.ArrowUpward,
                         contentDescription = stringResource(Res.string.files_action_up),
                     )
                 }
             }
             IconButton(onClick = { uploadLauncher.launch("*/*") }) {
-                Icon(
-                    imageVector = Icons.Filled.Upload,
+                HermesSymbol(
+                    icon = HermesIcon.Upload,
                     contentDescription = stringResource(Res.string.files_action_upload),
                 )
             }
@@ -308,7 +300,7 @@ fun FilesScreen(
                         if (state.parentPath != null) {
                             item(key = "up") {
                                 FileRow(
-                                    icon = Icons.Filled.ArrowUpward,
+                                    icon = HermesIcon.ArrowUpward,
                                     name = "..",
                                     subtitle = stringResource(Res.string.files_action_up),
                                     isBusy = false,
@@ -354,8 +346,8 @@ fun FilesScreen(
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             ) {
-                Icon(
-                    imageVector = Icons.Filled.CreateNewFolder,
+                HermesSymbol(
+                    icon = HermesIcon.CreateNewFolder,
                     contentDescription = stringResource(Res.string.files_action_new_folder),
                 )
             }
@@ -419,8 +411,8 @@ private fun BreadcrumbBar(
 @Composable
 private fun FileRow(
     entry: ManagedFileEntry? = null,
-    icon: androidx.compose.ui.graphics.vector.ImageVector =
-        entry?.let { fileIcon(it) } ?: Icons.Filled.Folder,
+    icon: HermesIcon =
+        entry?.let { fileIcon(it) } ?: HermesIcon.Folder,
     name: String = entry?.name ?: "",
     subtitle: String? = null,
     isBusy: Boolean,
@@ -446,8 +438,8 @@ private fun FileRow(
                     .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                imageVector = icon,
+            HermesSymbol(
+                icon = icon,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(28.dp),
@@ -477,8 +469,8 @@ private fun FileRow(
                 )
             } else if (onDelete != null && entry != null && !entry.isDirectory) {
                 IconButton(onClick = onDelete) {
-                    Icon(
-                        imageVector = Icons.Filled.Delete,
+                    HermesSymbol(
+                        icon = HermesIcon.Delete,
                         contentDescription = stringResource(Res.string.files_action_delete_named, entry.name),
                         tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(20.dp),
@@ -529,12 +521,12 @@ private fun CreateDirDialog(
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-private fun fileIcon(entry: ManagedFileEntry): androidx.compose.ui.graphics.vector.ImageVector =
+private fun fileIcon(entry: ManagedFileEntry): HermesIcon =
     when {
-        entry.isDirectory -> Icons.Filled.Folder
-        entry.mimeType?.startsWith("image/") == true -> Icons.Outlined.Image
-        entry.mimeType?.startsWith("text/") == true -> Icons.Outlined.Description
-        else -> Icons.Outlined.AttachFile
+        entry.isDirectory -> HermesIcon.Folder
+        entry.mimeType?.startsWith("image/") == true -> HermesIcon.Image
+        entry.mimeType?.startsWith("text/") == true -> HermesIcon.Description
+        else -> HermesIcon.AttachFile
     }
 
 @Composable
@@ -577,7 +569,7 @@ private fun openManagedFile(
     scope: CoroutineScope,
     launchDownloadedFile: ((DownloadedFile) -> Unit)? = null,
 ) {
-    viewModel.downloadFile(entry, File(context.cacheDir, "gateway_media")) { result ->
+    viewModel.downloadFile(entry, File(context.cacheDir, "gateway_media").absolutePath) { result ->
         when (result) {
             is com.m57.hermescontrol.data.remote.NetworkResult.Success -> {
                 val data = result.data
@@ -588,12 +580,12 @@ private fun openManagedFile(
                 scope.launch {
                     val intent =
                         runCatching {
-                            withContext(Dispatchers.IO) {
+                            withContext(ioDispatcher) {
                                 val uri =
                                     FileProvider.getUriForFile(
                                         context,
                                         "${context.packageName}.fileprovider",
-                                        data.cacheFile,
+                                        File(data.cachePath ?: error("no cache path for ${data.name}")),
                                     )
                                 Intent(Intent.ACTION_VIEW).apply {
                                     setDataAndType(uri, data.mimeType)

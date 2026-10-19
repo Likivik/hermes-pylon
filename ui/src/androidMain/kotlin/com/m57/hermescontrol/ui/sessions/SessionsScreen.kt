@@ -32,23 +32,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.CallSplit
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.SelectAll
-import androidx.compose.material.icons.filled.Terminal
-import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -57,7 +40,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -76,7 +58,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
@@ -89,9 +70,10 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.m57.hermescontrol.AppEnvironment
 import com.m57.hermescontrol.ChatScreen
 import com.m57.hermescontrol.NavigationController
-import com.m57.hermescontrol.data.local.AuthManager
+import com.m57.hermescontrol.data.local.AuthDefaults
 import com.m57.hermescontrol.data.model.SessionInfo
 import com.m57.hermescontrol.data.model.SessionLiveStatus
 import com.m57.hermescontrol.data.model.SessionSearchResult
@@ -161,6 +143,9 @@ import com.m57.hermescontrol.ui.common.StatusBadge
 import com.m57.hermescontrol.ui.common.StatusBadgeType
 import com.m57.hermescontrol.ui.common.ToastEffect
 import com.m57.hermescontrol.ui.common.listItemSpacing
+import com.m57.hermescontrol.ui.icons.HermesIcon
+import com.m57.hermescontrol.ui.icons.HermesSymbol
+import com.m57.hermescontrol.ui.icons.MaterialSymbol
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -179,12 +164,12 @@ private const val AUTO_LOAD_THRESHOLD = 6
 /**
  * Maps a session source string to a Material icon for visual identification.
  */
-private fun sourceIcon(source: String?): ImageVector? =
+private fun sourceIcon(source: String?): HermesIcon? =
     when (source?.lowercase()) {
-        "telegram", "tg" -> Icons.AutoMirrored.Filled.Send
-        "web", "dashboard" -> Icons.Filled.Language
-        "api", "rest" -> Icons.Filled.Code
-        "cli", "terminal" -> Icons.Filled.Terminal
+        "telegram", "tg" -> HermesIcon.Send
+        "web", "dashboard" -> HermesIcon.Language
+        "api", "rest" -> HermesIcon.Code
+        "cli", "terminal" -> HermesIcon.Terminal
         else -> null
     }
 
@@ -366,7 +351,7 @@ fun SessionsScreen(
     viewModel: SessionsViewModel? = null,
 ) {
     val activeProfileId =
-        AuthManager.getSelectedProfileId() ?: AuthManager.DEFAULT_PROFILE_ID
+        AppEnvironment.current.auth.getSelectedProfileId() ?: AuthDefaults.PROFILE_ID
     val screenViewModel =
         viewModel
             ?: androidx.lifecycle.viewmodel.compose.viewModel(
@@ -599,8 +584,8 @@ fun SessionsScreen(
                 )
                 Spacer(modifier = Modifier.width(Spacing.sm))
                 IconButton(onClick = { screenViewModel.toggleSelecting() }) {
-                    Icon(
-                        imageVector = if (state.isSelecting) Icons.Filled.Close else Icons.Filled.SelectAll,
+                    HermesSymbol(
+                        icon = if (state.isSelecting) HermesIcon.Close else HermesIcon.SelectAll,
                         contentDescription =
                             if (state.isSelecting) {
                                 stringResource(Res.string.content_desc_exit_selection)
@@ -638,7 +623,7 @@ fun SessionsScreen(
                                                 Res.string.sessions_search_empty_desc,
                                                 state.searchQuery,
                                             ),
-                                        icon = Icons.Filled.Search,
+                                        icon = "search",
                                     )
                                 }
 
@@ -745,7 +730,7 @@ fun SessionsScreen(
                                         Res.string.history_empty_desc
                                     },
                                 ),
-                            icon = Icons.Filled.History,
+                            icon = "history",
                             // Automation runs are started by the scheduler, never from chat.
                             actionLabel =
                                 if (isAutomations) {
@@ -773,13 +758,13 @@ fun SessionsScreen(
                                     StatCard(
                                         label = stringResource(Res.string.sessions_stat_total),
                                         value = if (state.isLoadingStats) "…" else state.stats.total.toString(),
-                                        icon = Icons.Filled.History,
+                                        icon = "history",
                                         modifier = Modifier.weight(1f).fillMaxHeight(),
                                     )
                                     StatCard(
                                         label = stringResource(Res.string.sessions_stat_messages),
                                         value = if (state.isLoadingStats) "…" else state.stats.messages.toString(),
-                                        icon = Icons.Filled.CheckCircle,
+                                        icon = "check_circle",
                                         accentColor = statusColors.success,
                                         modifier = Modifier.weight(1f).fillMaxHeight(),
                                     )
@@ -796,8 +781,8 @@ fun SessionsScreen(
                                             contentAlignment = Alignment.Center,
                                         ) {
                                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                Icon(
-                                                    imageVector = Icons.Filled.DeleteSweep,
+                                                HermesSymbol(
+                                                    icon = HermesIcon.DeleteSweep,
                                                     contentDescription = null,
                                                     tint = statusColors.warning,
                                                     modifier = Modifier.size(20.dp),
@@ -897,7 +882,7 @@ fun SessionsScreen(
                                                 stringResource(
                                                     Res.string.sessions_section_pinned,
                                                 ),
-                                            icon = Icons.Filled.PushPin,
+                                            icon = "push_pin",
                                         )
                                     }
                                     items(
@@ -913,7 +898,7 @@ fun SessionsScreen(
                                                     stringResource(
                                                         Res.string.sessions_section_recent,
                                                     ),
-                                                icon = Icons.Filled.History,
+                                                icon = "history",
                                             )
                                         }
                                     }
@@ -1026,12 +1011,12 @@ fun SessionsScreen(
                                 }
                             },
                         ) {
-                            Icon(
-                                imageVector =
+                            HermesSymbol(
+                                icon =
                                     if (allVisibleSessionsSelected) {
-                                        Icons.Filled.Close
+                                        HermesIcon.Close
                                     } else {
-                                        Icons.Filled.SelectAll
+                                        HermesIcon.SelectAll
                                     },
                                 contentDescription = null,
                                 modifier = Modifier.size(18.dp),
@@ -1062,8 +1047,8 @@ fun SessionsScreen(
                                     color = statusColors.onError,
                                 )
                             } else {
-                                Icon(
-                                    imageVector = Icons.Filled.Delete,
+                                HermesSymbol(
+                                    icon = HermesIcon.Delete,
                                     contentDescription = null,
                                     modifier = Modifier.size(18.dp),
                                 )
@@ -1086,7 +1071,7 @@ fun SessionsScreen(
 @Composable
 private fun SessionSectionHeader(
     title: String,
-    icon: ImageVector,
+    icon: String,
 ) {
     Row(
         modifier =
@@ -1096,9 +1081,10 @@ private fun SessionSectionHeader(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Icon(
-            imageVector = icon,
+        MaterialSymbol(
+            name = icon,
             contentDescription = null,
+            size = 16.dp,
             modifier = Modifier.size(16.dp),
             tint = MaterialTheme.colorScheme.primary,
         )
@@ -1138,12 +1124,12 @@ private fun AutomationGroupHeader(
                 .padding(horizontal = 4.dp, vertical = spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            imageVector =
+        HermesSymbol(
+            icon =
                 if (expanded) {
-                    Icons.Filled.KeyboardArrowDown
+                    HermesIcon.KeyboardArrowDown
                 } else {
-                    Icons.AutoMirrored.Filled.KeyboardArrowRight
+                    HermesIcon.KeyboardArrowRight
                 },
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
@@ -1189,12 +1175,12 @@ private fun SessionPinButton(
                 .size(32.dp)
                 .testTag("session_pin_$sessionId"),
     ) {
-        Icon(
-            imageVector =
+        HermesSymbol(
+            icon =
                 if (isPinned) {
-                    Icons.Filled.PushPin
+                    HermesIcon.PushPin
                 } else {
-                    Icons.Outlined.PushPin
+                    HermesIcon.PushPin
                 },
             contentDescription =
                 stringResource(
@@ -1293,8 +1279,8 @@ private fun SessionCard(
             }
 
             if (isFork && forkDepth > 0 && !isSelecting) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.CallSplit,
+                HermesSymbol(
+                    icon = HermesIcon.CallSplit,
                     contentDescription =
                         stringResource(
                             Res.string.sessions_fork_indicator,
@@ -1315,8 +1301,8 @@ private fun SessionCard(
 
             // Source icon
             if (srcIcon != null && !isSelecting) {
-                Icon(
-                    imageVector = srcIcon,
+                HermesSymbol(
+                    icon = srcIcon,
                     contentDescription = sourceLabel(session.source),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp),
@@ -1383,8 +1369,8 @@ private fun SessionCard(
                             onClick = onDelete,
                             modifier = Modifier.size(32.dp),
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.Delete,
+                            HermesSymbol(
+                                icon = HermesIcon.Delete,
                                 contentDescription = stringResource(Res.string.action_delete),
                                 modifier = Modifier.size(16.dp),
                                 tint = statusColors.error,
@@ -1492,8 +1478,8 @@ private fun SearchResultCard(
                 ) {
                     val srcIcon = sourceIcon(session.source)
                     if (srcIcon != null && !isSelecting) {
-                        Icon(
-                            imageVector = srcIcon,
+                        HermesSymbol(
+                            icon = srcIcon,
                             contentDescription = sourceLabel(session.source),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(16.dp),
@@ -1586,8 +1572,8 @@ private fun SearchResultCard(
                             onClick = onDelete,
                             modifier = Modifier.size(32.dp),
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.Delete,
+                            HermesSymbol(
+                                icon = HermesIcon.Delete,
                                 contentDescription = stringResource(Res.string.action_delete),
                                 modifier = Modifier.size(16.dp),
                                 tint = statusColors.error,

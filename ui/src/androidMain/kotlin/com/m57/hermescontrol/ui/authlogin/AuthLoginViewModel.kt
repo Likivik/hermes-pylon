@@ -2,13 +2,12 @@
 
 package com.m57.hermescontrol.ui.authlogin
 
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.m57.hermescontrol.data.config.ConnectionProfile
-import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.local.AuthSessionState
+import com.m57.hermescontrol.data.local.authStore
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.AuthPayloads
 import com.m57.hermescontrol.data.remote.ServerEndpoint
@@ -26,7 +25,8 @@ import com.m57.hermescontrol.generated.resources.connect_error_403
 import com.m57.hermescontrol.generated.resources.connect_error_connection_failed
 import com.m57.hermescontrol.generated.resources.connect_error_http_code
 import com.m57.hermescontrol.ui.common.StringResolver
-import kotlinx.coroutines.Dispatchers
+import com.m57.hermescontrol.util.HermesLog
+import com.m57.hermescontrol.util.ioDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -74,7 +74,7 @@ class AuthLoginViewModel(
     private val _uiState =
         MutableStateFlow(
             AuthLoginUiState(
-                baseUrl = AuthManager.getBaseUrl(),
+                baseUrl = authStore.getBaseUrl(),
             ),
         )
     val uiState: StateFlow<AuthLoginUiState> = _uiState.asStateFlow()
@@ -84,10 +84,10 @@ class AuthLoginViewModel(
     }
 
     fun loadLoggedInProfiles() {
-        val allProfiles = AuthManager.getConnectionProfiles()
+        val allProfiles = authStore.getConnectionProfiles()
         val loggedIn =
             allProfiles.filter { profile ->
-                val token = AuthManager.getProfileToken(profile.id)
+                val token = authStore.getProfileToken(profile.id)
                 !token.isNullOrBlank()
             }
         _uiState.update { it.copy(loggedInProfiles = loggedIn) }
@@ -96,11 +96,11 @@ class AuthLoginViewModel(
     fun useExistingProfile(profileId: String) {
         if (AuthSessionState.signInRequired.value) return
 
-        val profileChanged = profileId != AuthManager.getSelectedProfileId()
+        val profileChanged = profileId != authStore.getSelectedProfileId()
         if (profileChanged) {
             HermesWsClient.disconnect(clearPendingMessages = true)
         }
-        AuthManager.setSelectedProfileId(profileId)
+        authStore.setSelectedProfileId(profileId)
         ApiClient.rebuild()
         if (profileChanged) {
             HermesWsClient.connect()
@@ -178,7 +178,7 @@ class AuthLoginViewModel(
 
         viewModelScope.launch {
             val result =
-                withContext(Dispatchers.IO) {
+                withContext(ioDispatcher) {
                     probeDashboardInternal(endpoint)
                 }
             val unreachableMsg =
@@ -226,7 +226,7 @@ class AuthLoginViewModel(
                     response.isSuccessful
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "Status probe failed (${e.javaClass.simpleName})")
+                HermesLog.w(TAG, "Status probe failed (${e.javaClass.simpleName})")
                 return null // Dashboard unreachable
             }
 
@@ -247,7 +247,7 @@ class AuthLoginViewModel(
                         location?.contains("/login", ignoreCase = true) == true
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "SPA probe failed (${e.javaClass.simpleName})")
+                HermesLog.w(TAG, "SPA probe failed (${e.javaClass.simpleName})")
                 false
             }
 
@@ -269,10 +269,10 @@ class AuthLoginViewModel(
                 val tokenMatch = Regex("""__HERMES_SESSION_TOKEN__\s*=\s*"([^"]+)"""").find(body)
                 extractedToken = tokenMatch?.groupValues?.getOrNull(1)
                 if (extractedToken == null) {
-                    Log.w(TAG, "SPA has no __HERMES_SESSION_TOKEN__ — mode might require both auth")
+                    HermesLog.w(TAG, "SPA has no __HERMES_SESSION_TOKEN__ — mode might require both auth")
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "SPA token extraction failed (${e.javaClass.simpleName})")
+                HermesLog.w(TAG, "SPA token extraction failed (${e.javaClass.simpleName})")
             }
         }
 
@@ -313,7 +313,7 @@ class AuthLoginViewModel(
 
         viewModelScope.launch {
             val result =
-                withContext(Dispatchers.IO) {
+                withContext(ioDispatcher) {
                     when (state.authMode) {
                         DashboardAuthMode.TOKEN_ONLY -> {
                             val token = connectTokenOnly(endpoint, state.token)
@@ -339,20 +339,20 @@ class AuthLoginViewModel(
                 // Stop the old transport before mutating application auth state.
                 HermesWsClient.disconnect(clearPendingMessages = true)
                 AuthSessionState.markAuthenticated()
-                AuthManager.setBaseUrl(endpoint.baseUrl.toString())
+                authStore.setBaseUrl(endpoint.baseUrl.toString())
                 if (state.authMode == DashboardAuthMode.TOKEN_ONLY) {
-                    AuthManager.setToken(result.loopbackToken)
+                    authStore.setToken(result.loopbackToken)
                     // Loopback mode — no session cookie; ensure any stale one
                     // is cleared so the jar only sends the Bearer token.
-                    AuthManager.setSessionCookie(null)
-                    AuthManager.setWsAuthParam("token")
+                    authStore.setSessionCookie(null)
+                    authStore.setWsAuthParam("token")
                 } else {
                     // Gated (BASIC_AUTH / ALL): the session cookie was captured
                     // automatically by the shared CookieJar during the login
                     // call (issue #470), so we keep it and switch the WS auth
                     // param to a fresh, handshake-local ticket.
-                    AuthManager.setToken(null)
-                    AuthManager.setWsAuthParam("ticket")
+                    authStore.setToken(null)
+                    authStore.setWsAuthParam("ticket")
                 }
                 ApiClient.rebuild()
                 // A previous failed session may have left the singleton in

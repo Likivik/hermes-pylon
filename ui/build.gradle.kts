@@ -93,8 +93,16 @@ val generateBuildConfig =
         inputs.property("versionCode", versionCodeVal)
         inputs.property("gitSha", gitShaVal)
         outputs.dir(buildConfigOutDir)
+        // Configuration-cache safe: the action reads its inputs/outputs off the
+        // task instead of capturing script-scope values (`buildConfigOutDir` is a
+        // Provider, but the lambda also closed over `versionNameVal` and friends,
+        // which Gradle reports as "Gradle script object references"). Reading
+        // `inputs.properties` keeps the action free of build-script state.
         doLast {
-            val pkgDir = buildConfigOutDir.get().asFile.resolve("com/m57/hermescontrol")
+            val generatedVersionName = inputs.properties.getValue("versionName") as String
+            val generatedVersionCode = inputs.properties.getValue("versionCode") as Int
+            val generatedGitSha = inputs.properties.getValue("gitSha") as String
+            val pkgDir = outputs.files.singleFile.resolve("com/m57/hermescontrol")
             pkgDir.mkdirs()
             val lines =
                 listOf(
@@ -103,9 +111,9 @@ val generateBuildConfig =
                     "",
                     "/** Stand-in for the AGP-generated BuildConfig (KMP libraries get none). */",
                     "object BuildConfig {",
-                    "    const val VERSION_NAME: String = \"$versionNameVal\"",
-                    "    const val VERSION_CODE: Int = $versionCodeVal",
-                    "    const val GIT_SHA: String = \"$gitShaVal\"",
+                    "    const val VERSION_NAME: String = \"$generatedVersionName\"",
+                    "    const val VERSION_CODE: Int = $generatedVersionCode",
+                    "    const val GIT_SHA: String = \"$generatedGitSha\"",
                     "    const val DEBUG: Boolean = true",
                     "    const val ALLOW_CLEARTEXT: Boolean = true",
                     "}",
@@ -198,9 +206,29 @@ kotlin {
                 // this file — without `publicResClass = true` the generated
                 // class is `internal` and unreachable from other modules.
                 api(compose.components.resources)
+                // Multiplatform lifecycle (KMP builds of androidx.lifecycle): ViewModel,
+                // viewModelScope, viewModel() and collectAsStateWithLifecycle in shared code.
+                api(libs.jetbrains.lifecycle.runtime)
+                api(libs.jetbrains.lifecycle.runtime.compose)
+                api(libs.jetbrains.lifecycle.viewmodel)
+                api(libs.jetbrains.lifecycle.viewmodel.compose)
+                // LaTeX rendering — publishes wasm-js/jvm/android variants.
+                api(libs.latex.base)
+                api(libs.latex.parser)
+                api(libs.latex.renderer)
+                // Emoji models + Material3 picker — publishes wasm-js/jvm/android variants.
+                api(libs.emoji.kt)
+                api(libs.emoji.compose)
                 // Phase 1: depends on the multiplatform data model + HTTP primitives
                 // that already live in :shared.
                 api(project(":shared"))
+                // :shared keeps kotlinx-serialization as `implementation`, so its Json
+                // types are not exported. Shared ViewModels build JsonElement payloads.
+                api(libs.kotlinx.serialization.json)
+                // Drag-to-reorder for the session rail. `reorderable-wasm-js:3.1.0`
+                // publishes a real klib (verified on Maven Central), so this is no
+                // longer Android-only.
+                api(libs.reorderable)
             }
         }
         commonTest {
@@ -231,6 +259,26 @@ kotlin {
         jvmMain {
             dependencies {
                 implementation(compose.desktop.currentOs)
+                // Same reason as the wasmJs block below: :shared keeps ktor-client-core
+                // as `implementation`, so it is not on :ui's jvm classpath. The desktop
+                // ApiClient actual builds a gateway client and therefore needs it.
+                implementation(libs.ktor.client.core)
+            }
+        }
+        // The wasmJs entry calls `createHermesHttpClient()` from `:shared`'s
+        // `HermesHttpClient.kt`. `:shared` declares `ktor-client-core` as
+        // `implementation` in its commonMain, so it is NOT exported on
+        // `:shared`'s API surface and therefore not visible to `:ui`'s
+        // wasmJs compile classpath (`./gradlew :ui:dependencies
+        // --configuration wasmJsCompileClasspath` shows only Compose +
+        // `:shared` itself). Add it here so the wasmJs source set can
+        // resolve `io.ktor.client.HttpClient`. The engine itself
+        // (`ktor-client-js`) is intentionally NOT added here — picking a
+        // wasmJs Ktor engine is a parent decision. See the
+        // .hermes/plans/2026-10-19_*.md notes.
+        wasmJsMain {
+            dependencies {
+                implementation(libs.ktor.client.core)
             }
         }
         androidMain {
@@ -257,15 +305,9 @@ kotlin {
                 api(libs.okhttp.logging)
                 api(libs.ktor.client.core)
                 api(libs.kotlinx.serialization.json)
-                api(libs.emoji.kt)
-                api(libs.emoji.compose)
-                api(libs.reorderable)
                 api(libs.crashwatcher)
 
-                // Native Compose LaTeX rendering
-                api(libs.latex.base)
-                api(libs.latex.parser)
-                api(libs.latex.renderer)
+                // LaTeX + emoji now come from commonMain (multiplatform artifacts).
 
                 // Image loading
                 api(libs.coil.compose)

@@ -3,8 +3,8 @@ package com.m57.hermescontrol.data.remote
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.local.AuthSessionState
 import com.m57.hermescontrol.util.GatewayPath
+import com.m57.hermescontrol.util.ioDispatcher
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -131,7 +131,7 @@ object GatewayFileClient {
         scope: MediaCacheScope,
         canPublish: () -> Boolean = { true },
     ): GatewayFileResult =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             val normalized =
                 normalizePath(path)
                     ?: return@withContext GatewayFileResult.Failure(

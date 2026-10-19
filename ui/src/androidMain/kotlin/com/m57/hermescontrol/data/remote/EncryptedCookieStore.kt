@@ -4,7 +4,7 @@ import android.content.Context
 import com.m57.hermescontrol.data.security.SecretStore
 import com.m57.hermescontrol.data.security.SecureBlobException
 import com.m57.hermescontrol.data.security.SecureStorage
-import kotlinx.coroutines.Dispatchers
+import com.m57.hermescontrol.util.ioDispatcher
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -41,7 +41,7 @@ interface CookieStore {
 /**
  * Encrypted, per-server cookie persistence backed by independent atomic
  * Android Keystore AES-GCM blobs. Cookies are serialized with kotlinx.serialization
- * and written on [Dispatchers.IO].
+ * and written on [ioDispatcher].
  *
  * Legacy migration: the pre-#470 code stored a single raw
  * `hermes_session_at` value in `AuthManager`'s prefs under
@@ -66,13 +66,13 @@ class EncryptedCookieStore constructor(
     override suspend fun save(
         serverId: String,
         cookies: List<Cookie>,
-    ) = withContext(Dispatchers.IO) {
+    ) = withContext(ioDispatcher) {
         val serialized = cookies.map { it.serialize() }
         storage.putString(SecureStorage.cookieKey(keyFor(serverId)), json.encodeToString(serialized))
     }
 
     override suspend fun load(serverId: String): List<Cookie> =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             val scopedKey = SecureStorage.cookieKey(keyFor(serverId))
             var raw = storage.getString(scopedKey)
             val foldMarker = SecureStorage.authKey("${LEGACY_SESSION_COOKIE_KEY}_folded")
@@ -103,13 +103,13 @@ class EncryptedCookieStore constructor(
         }
 
     override suspend fun clear(serverId: String) =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             storage.putString(SecureStorage.cookieKey(keyFor(serverId)), null)
             suppressLegacyCookieFallback()
         }
 
     override suspend fun clearAll() =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             storage.deletePrefix(SecureStorage.cookiePrefix())
             suppressLegacyCookieFallback()
         }

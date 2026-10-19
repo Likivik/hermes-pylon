@@ -1,0 +1,167 @@
+package com.m57.hermescontrol.theme
+
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
+import com.m57.hermescontrol.data.theme.ThemePreference
+import com.m57.hermescontrol.data.theme.ThemePreset
+import com.m57.hermescontrol.theme.presets.AmoledDarkColorScheme
+import com.m57.hermescontrol.theme.presets.AmoledDarkStatusColors
+import com.m57.hermescontrol.theme.presets.AmoledLightColorScheme
+import com.m57.hermescontrol.theme.presets.AmoledLightStatusColors
+import com.m57.hermescontrol.theme.presets.CatppuccinDarkColorScheme
+import com.m57.hermescontrol.theme.presets.CatppuccinDarkStatusColors
+import com.m57.hermescontrol.theme.presets.CatppuccinLightColorScheme
+import com.m57.hermescontrol.theme.presets.CatppuccinLightStatusColors
+import com.m57.hermescontrol.theme.presets.DefaultDarkColorScheme
+import com.m57.hermescontrol.theme.presets.DefaultDarkStatusColors
+import com.m57.hermescontrol.theme.presets.DefaultLightColorScheme
+import com.m57.hermescontrol.theme.presets.DefaultLightStatusColors
+import com.m57.hermescontrol.theme.presets.GruvboxDarkColorScheme
+import com.m57.hermescontrol.theme.presets.GruvboxDarkStatusColors
+import com.m57.hermescontrol.theme.presets.GruvboxLightColorScheme
+import com.m57.hermescontrol.theme.presets.GruvboxLightStatusColors
+import com.m57.hermescontrol.theme.presets.MonochromeDarkColorScheme
+import com.m57.hermescontrol.theme.presets.MonochromeDarkStatusColors
+import com.m57.hermescontrol.theme.presets.MonochromeLightColorScheme
+import com.m57.hermescontrol.theme.presets.MonochromeLightStatusColors
+import com.m57.hermescontrol.theme.presets.NeonNoirDarkColorScheme
+import com.m57.hermescontrol.theme.presets.NeonNoirDarkStatusColors
+import com.m57.hermescontrol.theme.presets.NeonNoirLightColorScheme
+import com.m57.hermescontrol.theme.presets.NeonNoirLightStatusColors
+
+/**
+ * Platform seam for Material You dynamic colour schemes.
+ *
+ * On Android 12+ (API 31+) we can derive a [ColorScheme] from the user's
+ * wallpaper. Everywhere else — older Android, JVM desktop, wasmJs browser —
+ * dynamic colour is not available, so the actuals return `null` and the
+ * theme falls back to the preset's resolved scheme.
+ *
+ * The `darkTheme` flag lets each actual pick the appropriate dark vs
+ * light wallpaper-derived scheme without the common code having to know
+ * about Android's `Build.VERSION_CODES.S`, `LocalContext`, or the
+ * platform-side `dynamic{Black,Light}ColorScheme` factories.
+ */
+@Composable
+expect fun dynamicColorSchemeOrNull(darkTheme: Boolean): ColorScheme?
+
+val LocalThemePreference = compositionLocalOf { ThemePreference.SYSTEM }
+val LocalThemePreset = compositionLocalOf { ThemePreset.DEFAULT }
+val LocalChatFontScale = compositionLocalOf { 1.0f }
+private val LocalChatBaseDensity = compositionLocalOf<Density?> { null }
+
+fun effectiveChatDensity(
+    systemDensity: Float,
+    systemFontScale: Float,
+    chatFontScale: Float,
+): Density = Density(systemDensity, systemFontScale * chatFontScale)
+
+@Composable
+fun ChatFontScale(content: @Composable () -> Unit) {
+    val systemDensity = LocalDensity.current
+    val chatFontScale = LocalChatFontScale.current
+    CompositionLocalProvider(
+        LocalChatBaseDensity provides systemDensity,
+        LocalDensity provides
+            effectiveChatDensity(
+                systemDensity = systemDensity.density,
+                systemFontScale = systemDensity.fontScale,
+                chatFontScale = chatFontScale,
+            ),
+        content = content,
+    )
+}
+
+@Composable
+fun WithoutChatFontScale(content: @Composable () -> Unit) {
+    val density = LocalChatBaseDensity.current ?: LocalDensity.current
+    CompositionLocalProvider(
+        LocalDensity provides density,
+        content = content,
+    )
+}
+
+/**
+ * Resolve the Material 3 [ColorScheme] for a preset + dark flag.
+ *
+ * Every preset exports both a dark and light scheme. AMOLED's light scheme is
+ * an explicit alias of the brand default light scheme.
+ */
+private fun resolveColorScheme(
+    preset: ThemePreset,
+    darkTheme: Boolean,
+) = when (preset) {
+    ThemePreset.DEFAULT -> if (darkTheme) DefaultDarkColorScheme else DefaultLightColorScheme
+    ThemePreset.MONOCHROME -> if (darkTheme) MonochromeDarkColorScheme else MonochromeLightColorScheme
+    ThemePreset.GRUVBOX -> if (darkTheme) GruvboxDarkColorScheme else GruvboxLightColorScheme
+    ThemePreset.CATPPUCCIN -> if (darkTheme) CatppuccinDarkColorScheme else CatppuccinLightColorScheme
+    ThemePreset.AMOLED -> if (darkTheme) AmoledDarkColorScheme else AmoledLightColorScheme
+    ThemePreset.NEON_NOIR -> if (darkTheme) NeonNoirDarkColorScheme else NeonNoirLightColorScheme
+}
+
+/**
+ * Resolve the semantic status colors for a preset + dark flag.
+ *
+ * Every preset exports both a dark and light status set. MONOCHROME and AMOLED
+ * alias the brand default status colors (they have no bespoke semantic set).
+ */
+private fun resolveStatusColors(
+    preset: ThemePreset,
+    darkTheme: Boolean,
+) = when (preset) {
+    ThemePreset.DEFAULT -> if (darkTheme) DefaultDarkStatusColors else DefaultLightStatusColors
+    ThemePreset.MONOCHROME -> if (darkTheme) MonochromeDarkStatusColors else MonochromeLightStatusColors
+    ThemePreset.GRUVBOX -> if (darkTheme) GruvboxDarkStatusColors else GruvboxLightStatusColors
+    ThemePreset.CATPPUCCIN -> if (darkTheme) CatppuccinDarkStatusColors else CatppuccinLightStatusColors
+    ThemePreset.AMOLED -> if (darkTheme) AmoledDarkStatusColors else AmoledLightStatusColors
+    ThemePreset.NEON_NOIR -> if (darkTheme) NeonNoirDarkStatusColors else NeonNoirLightStatusColors
+}
+
+@Composable
+fun HermesControlTheme(
+    themePreference: ThemePreference = LocalThemePreference.current,
+    useDynamicColors: Boolean = false,
+    themePreset: ThemePreset = ThemePreset.DEFAULT,
+    chatFontScale: Float = 1.0f,
+    content: @Composable () -> Unit,
+) {
+    val darkTheme =
+        when (themePreference) {
+            ThemePreference.SYSTEM -> isSystemInDarkTheme()
+            ThemePreference.LIGHT -> false
+            ThemePreference.DARK -> true
+        }
+
+    val dynamicAvailable = useDynamicColors && dynamicColorSchemeOrNull(darkTheme) != null
+    val colorScheme =
+        if (dynamicAvailable) {
+            // Safe: `dynamicAvailable` was computed from the platform actual.
+            dynamicColorSchemeOrNull(darkTheme)!!
+        } else {
+            resolveColorScheme(themePreset, darkTheme)
+        }
+
+    val statusColors = resolveStatusColors(themePreset, darkTheme)
+
+    CompositionLocalProvider(
+        LocalThemePreference provides themePreference,
+        LocalThemePreset provides themePreset,
+        LocalChatFontScale provides chatFontScale,
+        LocalHermesStatusColors provides statusColors,
+        LocalSpacing provides SpacingDefaults,
+        LocalMotion provides MotionDefaults,
+    ) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            shapes = HermesShapes,
+            content = content,
+        )
+    }
+}

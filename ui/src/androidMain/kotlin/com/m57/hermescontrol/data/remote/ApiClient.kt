@@ -5,6 +5,12 @@ package com.m57.hermescontrol.data.remote
 import com.m57.hermescontrol.BuildConfig
 import com.m57.hermescontrol.data.local.AuthManager
 import io.ktor.client.HttpClient
+import io.ktor.client.plugins.timeout
+import io.ktor.client.request.request
+import io.ktor.client.request.setBody
+import io.ktor.http.ContentType
+import io.ktor.http.HttpMethod
+import io.ktor.http.contentType
 import okhttp3.Authenticator
 import okhttp3.CookieJar
 import okhttp3.Interceptor
@@ -21,7 +27,7 @@ import okhttp3.logging.HttpLoggingInterceptor
  * and Ktor drives the same objects. That is what lets the REST surface move to
  * the multiplatform floor without changing session behaviour.
  */
-object ApiClient {
+actual object ApiClient {
     @Volatile
     private var client: HttpClient? = null
 
@@ -29,7 +35,7 @@ object ApiClient {
     private var gateway: HermesGatewayApi? = null
 
     /** The current [HermesGatewayApi] instance. Lazily created on first access. */
-    val hermesApi: HermesGatewayApi
+    actual val hermesApi: HermesGatewayApi
         get() =
             gateway ?: synchronized(this) {
                 gateway ?: buildGateway().also { gateway = it }
@@ -44,14 +50,42 @@ object ApiClient {
      * connection pool. Dropping the reference is enough; the underlying stack is
      * owned by [OkHttpProvider] and is also serving the WebSocket client.
      */
-    fun rebuild() {
+    actual fun rebuild() {
         synchronized(this) {
             client = null
             gateway = null
         }
     }
 
+    actual suspend fun postJson(
+        path: String,
+        jsonBody: String,
+        timeoutMillis: Long,
+    ): Int {
+        hermesApi // ensures the shared client exists
+        val http = client ?: error("gateway client not built")
+        val baseUrl = AuthManager.endpointForBuild().baseUrl.toString()
+        val response =
+            http.request(
+                baseUrl.toString().trimEnd('/') + "/" + path.trimStart('/'),
+            ) {
+                method = HttpMethod.Post
+                contentType(ContentType.Application.Json)
+                setBody(jsonBody)
+                timeout {
+                    requestTimeoutMillis = timeoutMillis
+                    connectTimeoutMillis = timeoutMillis
+                }
+            }
+        return response.status.value
+    }
+
     /** Creates a standalone, temporary gateway without modifying the global instance. */
+    actual fun tempService(
+        baseUrl: String,
+        token: String,
+    ): HermesGatewayApi = createTempService(baseUrl, token)
+
     fun createTempService(
         baseUrl: String,
         token: String,

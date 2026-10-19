@@ -5,8 +5,8 @@ package com.m57.hermescontrol.data.config
 import androidx.datastore.core.DataStore
 import androidx.datastore.core.Serializer
 import com.m57.hermescontrol.data.remote.ServerEndpoint
+import com.m57.hermescontrol.util.ioDispatcher
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,7 +26,7 @@ class ServerStore(
 
     init {
         val initial =
-            runBlocking(Dispatchers.IO) {
+            runBlocking(ioDispatcher) {
                 try {
                     dataStore.data.first().selfHealed()
                 } catch (e: Exception) {
@@ -43,7 +43,7 @@ class ServerStore(
         val current = getLatestState()
         val updated = transform(current).selfHealed()
         _stateFlow.value = updated
-        scope.launch(Dispatchers.IO) {
+        scope.launch(ioDispatcher) {
             try {
                 dataStore.updateData { updated }
             } catch (e: Exception) {

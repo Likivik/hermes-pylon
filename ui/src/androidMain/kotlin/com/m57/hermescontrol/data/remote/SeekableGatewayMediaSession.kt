@@ -1,8 +1,8 @@
 package com.m57.hermescontrol.data.remote
 
 import com.m57.hermescontrol.data.local.AuthSessionState
+import com.m57.hermescontrol.util.ioDispatcher
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
@@ -115,7 +115,7 @@ class SeekableGatewayMediaSession(
                         IllegalArgumentException("media byte range overflow"),
                     )
                 }
-        return withContext(Dispatchers.IO) {
+        return withContext(ioDispatcher) {
             try {
                 val response = rangeRequester.streamRange(path, "bytes=$position-$end")
                 try {

@@ -6,9 +6,11 @@ import android.util.Log
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.remote.CleartextPolicy
 import com.m57.hermescontrol.data.remote.CookieManager
+import com.m57.hermescontrol.data.remote.HermesHttpConfig
 import com.m57.hermescontrol.data.remote.OkHttpProvider
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.data.remote.buildFakePersistentCookieJar
+import com.m57.hermescontrol.data.remote.createHermesHttpClient
 import com.m57.hermescontrol.data.session.ActiveSessionHolder
 import io.mockk.every
 import io.mockk.mockk
@@ -35,7 +37,9 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.QueueDispatcher
 import org.junit.After
+import org.junit.AfterClass
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -43,6 +47,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Before
+import org.junit.BeforeClass
 import org.junit.Test
 import java.util.Collections
 import java.util.concurrent.CountDownLatch
@@ -54,6 +59,34 @@ import java.util.concurrent.atomic.AtomicInteger
 class HermesWsClientTest {
     private lateinit var mockWebServer: MockWebServer
 
+    companion object {
+        /**
+         * One MockWebServer for the whole class.
+         *
+         * Starting and shutting one down per test cost far more than the tests:
+         * `MockWebServer.shutdown()` blocks in `awaitTermination(5, SECONDS)`
+         * while a WebSocket connection is still open, which measurably cost
+         * 5.001s per test (69 tests -> ~5 middle minutes) on top of a 500ms
+         * `Thread.sleep` that was there to paper over the same thing. Closing
+         * the server-side socket makes shutdown take 1ms, and reusing one server
+         * means that cost is paid once per class instead of once per test.
+         */
+        @JvmStatic
+        @BeforeClass
+        fun startSharedServer() {
+            sharedServer = MockWebServer()
+            sharedServer.start()
+        }
+
+        @JvmStatic
+        @AfterClass
+        fun stopSharedServer() {
+            runCatching { sharedServer.shutdown() }
+        }
+
+        private lateinit var sharedServer: MockWebServer
+    }
+
     @Before
     fun setUp() {
         mockkStatic(Log::class)
@@ -63,8 +96,10 @@ class HermesWsClientTest {
         every { Log.e(any<String>(), any<String>()) } returns 0
         every { Log.isLoggable(any<String>(), any<Int>()) } returns false
 
-        mockWebServer = MockWebServer()
-        mockWebServer.start()
+        mockWebServer = sharedServer
+        // Fresh queue per test: a leftover response from a previous test would
+        // otherwise be handed to this one's connection.
+        mockWebServer.dispatcher = QueueDispatcher()
 
         mockkObject(AuthManager)
         every { AuthManager.wsUrl() } returns mockWebServer.url("/").toString().replace("http://", "ws://")
@@ -80,17 +115,29 @@ class HermesWsClientTest {
                     com.m57.hermescontrol.data.config.ServerStoreState()
             }
 
+        // Issue #470: clients are built through OkHttpProvider, which resolves
+        // the shared CookieManager.cookieJar. This MUST run before the transport
+        // line below: `OkHttpProvider.websocket` is a `by lazy` that dereferences
+        // `cookieJar` while building, so touching it first throws
+        // "CookieManager.initialize(context) must be called before use". That is
+        // why this class used to pass in a full suite (an earlier class had
+        // initialized the jar) and fail 69/69 when run alone.
+        CookieManager.setJarForTest(buildFakePersistentCookieJar())
+
         // The client reads its auth config through the :shared seam, so the
         // mocked AuthManager has to be installed rather than picked up by name.
         HermesWsClient.installAuth(AuthManager)
         // Same transport the client used to default to, installed explicitly now
         // that the seam has no platform default.
         HermesWsClient.installTransport(OkHttpWsTransport(OkHttpProvider.websocket))
-
-        // Issue #470: clients are built through OkHttpProvider, which now
-        // resolves the shared CookieManager.cookieJar. Inject a fake jar so
-        // the WS stack can build its OkHttp clients without app context.
-        CookieManager.setJarForTest(buildFakePersistentCookieJar())
+        // The ticket-mint client is process-global and installed by the app at
+        // startup. Without this, `refreshWsTicketIfNeeded()` sees a null client
+        // and returns TRANSIENT_FAILURE, so every gated-mode test fails - which
+        // is what happened when this class ran alone (a full suite only passed
+        // because AuthenticatedDisposableFixtureTest installs it first).
+        HermesWsClient.installHttpClient(
+            createHermesHttpClient(OkHttpProvider.probe, HermesHttpConfig.Probe),
+        )
 
         // Reset state. The singleton's outbound queue survives a plain
         // disconnect by design, so the reset clears it explicitly or a frame
@@ -618,11 +665,21 @@ class HermesWsClientTest {
         return frames
     }
 
+    /**
+     * Polls for a frame containing [needle].
+     *
+     * [timeoutMs] defaults to 5s because callers waiting for a frame that *is*
+     * expected want generous headroom on a loaded CI box. Pass a short value for
+     * negative assertions ("this frame must never arrive"): the refusal paths in
+     * this class are synchronous, so a 5s poll there proved nothing and cost
+     * 5-10s per test - it was most of this class's runtime.
+     */
     private fun awaitFrame(
         frames: java.util.Queue<String>,
         needle: String,
+        timeoutMs: Long = 5_000,
     ): String? {
-        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+        val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs)
         while (System.nanoTime() < deadline) {
             frames.firstOrNull { it.contains(needle) }?.let { return it }
             Thread.sleep(10)
@@ -681,7 +738,7 @@ class HermesWsClientTest {
 
         assertTrue(deferred.isCompleted)
         assertNotNull(deferred.getCompletionExceptionOrNull())
-        assertNull(awaitFrame(frames, WsMethods.APPROVAL_RESPOND))
+        assertNull(awaitFrame(frames, WsMethods.APPROVAL_RESPOND, timeoutMs = 250))
         assertTrue("a refused privileged frame is never queued", outboundQueue().isEmpty())
     }
 
@@ -699,7 +756,7 @@ class HermesWsClientTest {
             )
 
         assertNotNull(deferred.getCompletionExceptionOrNull())
-        assertNull(awaitFrame(frames, WsMethods.SECRET_RESPOND))
+        assertNull(awaitFrame(frames, WsMethods.SECRET_RESPOND, timeoutMs = 250))
         assertTrue(outboundQueue().isEmpty())
     }
 
@@ -749,7 +806,7 @@ class HermesWsClientTest {
             )
 
         assertNotNull(deferred.getCompletionExceptionOrNull())
-        assertNull(awaitFrame(frames, WsMethods.SUDO_RESPOND))
+        assertNull(awaitFrame(frames, WsMethods.SUDO_RESPOND, timeoutMs = 250))
         assertTrue(outboundQueue().isEmpty())
         HermesWsClient.setAppForeground(true)
     }
@@ -1339,14 +1396,10 @@ class HermesWsClientTest {
     fun tearDown() {
         HermesWsClient.disconnect()
         ActiveSessionHolder.clear()
-        // Wait a bit to allow internal OkHttp coroutines to clean up before shutting down MockWebServer
-        // Increased from 100ms for OkHttp 5.x — needs more time for the WS close handshake
-        Thread.sleep(500)
-        try {
-            mockWebServer.shutdown()
-        } catch (e: Throwable) {
-            e.printStackTrace()
-        }
+        // No mockWebServer.shutdown() here: the server is shared for the class
+        // (see the companion object) because shutdown() blocks ~5s while a
+        // WebSocket is still open. The client side is closed by disconnect()
+        // and the response queue is reset in @Before via a fresh dispatcher.
         unmockkAll()
     }
 

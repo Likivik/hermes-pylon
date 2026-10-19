@@ -2,12 +2,12 @@ package com.m57.hermescontrol.ui.analytics
 
 import android.content.Context
 import com.m57.hermescontrol.data.local.AnalyticsCacheStore
-import com.m57.hermescontrol.data.local.AuthManager
+import com.m57.hermescontrol.data.local.authStore
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.util.ioDispatcher
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
@@ -26,10 +26,10 @@ import kotlinx.coroutines.launch
  * invisible — the tab just falls back to its normal on-demand load).
  */
 object AnalyticsPreloader {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + ioDispatcher)
 
     fun preload(context: Context) {
-        if (AuthManager.getToken().isNullOrBlank()) return
+        if (authStore.getToken().isNullOrBlank()) return
         val store = AnalyticsCacheStore(context)
         val daysOptions = listOf(7, 30, 90)
         scope.launch {

@@ -7,8 +7,8 @@ import com.m57.hermescontrol.data.remote.GatewayFileResult
 import com.m57.hermescontrol.data.remote.MAX_IN_MEMORY_MEDIA_BYTES
 import com.m57.hermescontrol.data.remote.OkHttpProvider
 import com.m57.hermescontrol.data.remote.readBytesLimited
+import com.m57.hermescontrol.util.ioDispatcher
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import okhttp3.Call
@@ -34,7 +34,7 @@ private const val MAX_DATA_URL_METADATA_CHARS = 1024
  *   client without URL credentials,
  * - `http(s)://...` — an ordinary remote image URL.
  *
- * All I/O runs on [Dispatchers.IO].
+ * All I/O runs on [ioDispatcher].
  */
 object ImageBytesResolver {
     /** Outcome of [resolve]. */
@@ -58,7 +58,7 @@ object ImageBytesResolver {
         fallbackMime: String,
         gatewayPath: String? = null,
     ): Result =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             runCatching {
                 when {
                     gatewayPath != null -> fetchGatewayPath(context, gatewayPath, fallbackMime)

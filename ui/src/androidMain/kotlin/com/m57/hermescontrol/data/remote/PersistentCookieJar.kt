@@ -1,7 +1,7 @@
 package com.m57.hermescontrol.data.remote
 
+import com.m57.hermescontrol.util.ioDispatcher
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
@@ -39,7 +39,7 @@ data class CookieCredentialBoundary(
  */
 class PersistentCookieJar(
     private val store: CookieStore,
-    private val storeScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+    private val storeScope: CoroutineScope = CoroutineScope(SupervisorJob() + ioDispatcher),
     initialServerId: String = DEFAULT_SERVER_ID,
 ) : CookieJar {
     // serverId -> (cookie domain -> cookies)

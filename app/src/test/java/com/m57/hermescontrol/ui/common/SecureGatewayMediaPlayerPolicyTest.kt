@@ -1,6 +1,9 @@
 package com.m57.hermescontrol.ui.common
 
 import androidx.lifecycle.Lifecycle
+import com.m57.hermescontrol.ui.media.initializeAndOwnSecureMedia
+import com.m57.hermescontrol.ui.media.initializeSecureMedia
+import com.m57.hermescontrol.ui.media.monitorSecureMediaBoundary
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher

@@ -7,7 +7,7 @@ import androidx.datastore.dataStore
 import com.m57.hermescontrol.data.model.AnalyticsResponse
 import com.m57.hermescontrol.data.model.ModelsAnalyticsResponse
 import com.m57.hermescontrol.data.remote.OkHttpProvider
-import kotlinx.coroutines.Dispatchers
+import com.m57.hermescontrol.util.ioDispatcher
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -85,7 +85,7 @@ class AnalyticsCacheStore(
         days: Int,
         profile: String?,
     ): Pair<AnalyticsResponse, ModelsAnalyticsResponse?>? =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             try {
                 val win =
                     context.analyticsCacheDataStore.data
@@ -108,7 +108,7 @@ class AnalyticsCacheStore(
         profile: String?,
         usage: AnalyticsResponse,
         models: ModelsAnalyticsResponse?,
-    ) = withContext(Dispatchers.IO) {
+    ) = withContext(ioDispatcher) {
         try {
             context.analyticsCacheDataStore.updateData { state ->
                 val win =

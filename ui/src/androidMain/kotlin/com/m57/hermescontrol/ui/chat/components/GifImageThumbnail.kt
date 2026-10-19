@@ -9,11 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
@@ -38,6 +34,8 @@ import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.gif_action_pause
 import com.m57.hermescontrol.generated.resources.gif_action_play
 import com.m57.hermescontrol.theme.Spacing
+import com.m57.hermescontrol.ui.icons.HermesIcon
+import com.m57.hermescontrol.ui.icons.HermesSymbol
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -143,8 +141,8 @@ fun GifImageThumbnail(
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    HermesSymbol(
+                        icon = if (isPlaying) HermesIcon.Pause else HermesIcon.PlayArrow,
                         contentDescription = if (isPlaying) pauseDescription else playDescription,
                         modifier = Modifier.size(14.dp),
                         tint = MaterialTheme.colorScheme.onSurface,
@@ -170,8 +168,8 @@ fun GifImageThumbnail(
                             ).clickable { togglePlayPause() }
                             .padding(12.dp),
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.PlayArrow,
+                    HermesSymbol(
+                        icon = HermesIcon.PlayArrow,
                         contentDescription = playDescription,
                         modifier = Modifier.size(32.dp),
                         tint = MaterialTheme.colorScheme.onSurface,

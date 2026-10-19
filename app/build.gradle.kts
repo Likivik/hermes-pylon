@@ -20,8 +20,18 @@ android {
 
     testOptions {
         unitTests {
+            // Robolectric needs merged resources (RailOrderPersistenceTest and
+            // SessionRailRoboTest are the only two classes that use it).
             isIncludeAndroidResources = true
-            all { it.jvmArgs("-Xmx2g") }
+            all {
+                // One fork. Two forks measured 7m18s vs 7m12s for the full
+                // suite: the 1248 tests are not CPU-bound, so parallelism buys
+                // nothing while doubling the peak heap. If a run ever does get
+                // CPU-bound, raise this — HermesWsClientTest is order-independent
+                // since it installs its own ticket-mint client in @Before.
+                it.maxParallelForks = 1
+                it.jvmArgs("-Xmx2g")
+            }
         }
         managedDevices {
             localDevices {
