@@ -1,11 +1,16 @@
-# Hermes Mobile signing policy
+# Pylon signing policy
 
-Hermes Mobile releases use a dedicated signing identity. Do not reuse this key
-for Tacet, Iris Mobile, or another Android application.
+Pylon releases use a dedicated signing identity. Do not reuse this key for
+another Android application.
+
+> The identity strings below (`hermes-mobile`) predate the app-identity rename to
+> `io.github.likivik.pylon` and are kept deliberately: they name the real alias,
+> keystore and CI secret. Renaming them would break signing, not tidy it. The
+> `hermes`/`iris` *product flavor split* is gone — see AGENTS.md.
 
 ## Application identity
 
-- Application ID: `sh.slb.hermesmobile`
+- Application ID: `io.github.likivik.pylon`
 - Key alias: `hermes-mobile`
 - Certificate subject: `CN=Hermes Mobile Release, OU=Android, O=SLB`
 - Certificate expiry: 2126-06-25
@@ -36,8 +41,13 @@ encrypted backup system. Test restoring both before treating the release key
 as durable.
 
 Losing this key prevents normal Android updates to an installed
-`sh.slb.hermesmobile` application. Exposing it lets someone produce APKs that
+`io.github.likivik.pylon` application. Exposing it lets someone produce APKs that
 Android recognizes as signed by the same publisher.
+
+> **Note (2026-10-15):** the signing identity documented below (key alias,
+> certificate subject, fingerprint) is still the upstream's — only the
+> application id above was renamed. A fresh key for this fork is pending and
+> will replace this section when generated.
 
 ## GitHub Actions
 

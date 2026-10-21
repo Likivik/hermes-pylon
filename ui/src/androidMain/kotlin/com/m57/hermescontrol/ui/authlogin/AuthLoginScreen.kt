@@ -1,0 +1,337 @@
+// Modified from Hy4ri/hermes-mobile for this fork; see NOTICE.
+
+package com.m57.hermescontrol.ui.authlogin
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.semantics.contentType
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.auth_login_action_connect
+import com.m57.hermescontrol.generated.resources.auth_login_action_probing
+import com.m57.hermescontrol.generated.resources.auth_login_base_url_label
+import com.m57.hermescontrol.generated.resources.auth_login_desc
+import com.m57.hermescontrol.generated.resources.auth_login_existing_profiles_title
+import com.m57.hermescontrol.generated.resources.auth_login_password_label
+import com.m57.hermescontrol.generated.resources.auth_login_probing_dashboard
+import com.m57.hermescontrol.generated.resources.auth_login_title
+import com.m57.hermescontrol.generated.resources.auth_login_token_label
+import com.m57.hermescontrol.generated.resources.auth_login_use_profile
+import com.m57.hermescontrol.generated.resources.auth_login_username_label
+import com.m57.hermescontrol.theme.Spacing
+import com.m57.hermescontrol.ui.common.ComposeResourcesStringResolver
+import com.m57.hermescontrol.ui.icons.HermesIcon
+import com.m57.hermescontrol.ui.icons.HermesSymbol
+import org.jetbrains.compose.resources.stringResource
+
+@Composable
+fun AuthLoginScreen(
+    onConnected: () -> Unit,
+    onBack: () -> Unit,
+    showExistingProfiles: Boolean = true,
+    modifier: Modifier = Modifier,
+    viewModel: AuthLoginViewModel =
+        viewModel(
+            factory =
+                run {
+                    // The ViewModel no longer needs an `Application` —
+                    // the seam takes a `StringResolver`. The shared
+                    // Compose-Resources backed instance is fine for
+                    // production: there is no Application state to
+                    // mock out at the seam boundary.
+                    AuthLoginViewModelFactory(ComposeResourcesStringResolver.Default.shared)
+                },
+        ),
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(state.connectionSuccess) {
+        if (state.connectionSuccess) {
+            onConnected()
+        }
+    }
+
+    // Clear ephemeral connection state when screen leaves composition
+    // (ViewModel is Activity-scoped so it survives navigation — without
+    // this, stale connectionSuccess would auto-bounce the user on re-entry)
+    DisposableEffect(Unit) {
+        onDispose { viewModel.clearConnectionState() }
+    }
+
+    var passwordVisible by remember { mutableStateOf(false) }
+
+    Box(
+        modifier =
+            modifier
+                .fillMaxSize()
+                .imePadding(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = Spacing.lg, vertical = Spacing.xl),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            // Hero icon
+            Box(
+                modifier = Modifier.size(64.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                HermesSymbol(
+                    icon = HermesIcon.Bolt,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(48.dp),
+                )
+            }
+
+            Text(
+                text = stringResource(Res.string.auth_login_title),
+                style =
+                    MaterialTheme.typography.headlineSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                    ),
+            )
+
+            Text(
+                text = stringResource(Res.string.auth_login_desc),
+                style =
+                    MaterialTheme.typography.bodyMedium.copy(
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (showExistingProfiles && state.loggedInProfiles.isNotEmpty()) {
+                Text(
+                    text = stringResource(Res.string.auth_login_existing_profiles_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(top = Spacing.sm),
+                )
+                state.loggedInProfiles.forEach { profile ->
+                    androidx.compose.material3.OutlinedButton(
+                        onClick = { viewModel.useExistingProfile(profile.id) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        HermesSymbol(
+                            icon = HermesIcon.AccountCircle,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(modifier = Modifier.size(8.dp))
+                        Text(stringResource(Res.string.auth_login_use_profile, profile.name))
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            OutlinedTextField(
+                value = state.baseUrl,
+                onValueChange = viewModel::onBaseUrlChange,
+                label = {
+                    Text(stringResource(Res.string.auth_login_base_url_label))
+                },
+                placeholder = {
+                    Text("https://hermes.example.com:9119")
+                },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                enabled = state.authMode == null,
+            )
+
+            state.transportWarning?.let { warning ->
+                Text(
+                    text = warning,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+
+            // Probe / probing indicator
+            if (state.probing) {
+                CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                Text(
+                    text = stringResource(Res.string.auth_login_probing_dashboard),
+                    style =
+                        MaterialTheme.typography.bodySmall.copy(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
+                )
+            }
+
+            // ── Dynamic fields based on auth mode ──
+
+            // Token field — shown for TOKEN_ONLY and ALL
+            AnimatedVisibility(
+                visible =
+                    state.authMode == DashboardAuthMode.TOKEN_ONLY ||
+                        state.authMode == DashboardAuthMode.ALL,
+                enter = fadeIn(),
+                exit = fadeOut(),
+            ) {
+                OutlinedTextField(
+                    value = state.token,
+                    onValueChange = viewModel::onTokenChange,
+                    label = { Text(stringResource(Res.string.auth_login_token_label)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    visualTransformation =
+                        if (passwordVisible) {
+                            VisualTransformation.None
+                        } else {
+                            PasswordVisualTransformation()
+                        },
+                    trailingIcon = {
+                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                            HermesSymbol(
+                                icon =
+                                    if (passwordVisible) {
+                                        HermesIcon.Visibility
+                                    } else {
+                                        HermesIcon.VisibilityOff
+                                    },
+                                contentDescription = null,
+                            )
+                        }
+                    },
+                )
+            }
+
+            // Username field — shown for BASIC_AUTH and ALL
+            AnimatedVisibility(
+                visible =
+                    state.authMode == DashboardAuthMode.BASIC_AUTH ||
+                        state.authMode == DashboardAuthMode.ALL,
+                enter = fadeIn(),
+                exit = fadeOut(),
+            ) {
+                OutlinedTextField(
+                    value = state.username,
+                    onValueChange = viewModel::onUsernameChange,
+                    label = { Text(stringResource(Res.string.auth_login_username_label)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, autoCorrectEnabled = false),
+                    modifier =
+                        Modifier.fillMaxWidth()
+                            .semantics { contentType = ContentType.Username },
+                )
+            }
+
+            // Password field — shown for BASIC_AUTH and ALL
+            AnimatedVisibility(
+                visible =
+                    state.authMode == DashboardAuthMode.BASIC_AUTH ||
+                        state.authMode == DashboardAuthMode.ALL,
+                enter = fadeIn(),
+                exit = fadeOut(),
+            ) {
+                OutlinedTextField(
+                    value = state.password,
+                    onValueChange = viewModel::onPasswordChange,
+                    label = { Text(stringResource(Res.string.auth_login_password_label)) },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    modifier =
+                        Modifier.fillMaxWidth()
+                            .semantics { contentType = ContentType.Password },
+                )
+            }
+
+            // Error message
+            AnimatedVisibility(
+                visible = state.errorMessage != null,
+                enter = fadeIn(),
+                exit = fadeOut(),
+            ) {
+                state.errorMessage?.let { msg ->
+                    Text(
+                        text = msg,
+                        style =
+                            MaterialTheme.typography.bodySmall.copy(
+                                color = MaterialTheme.colorScheme.error,
+                            ),
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Connect / Probe button
+            Button(
+                onClick = {
+                    if (state.authMode == null) {
+                        viewModel.probe()
+                    } else {
+                        viewModel.connect()
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                enabled = !state.isLoading && !state.probing,
+            ) {
+                if (state.isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                    )
+                } else {
+                    Text(
+                        text =
+                            if (state.authMode == null) {
+                                stringResource(Res.string.auth_login_action_probing)
+                            } else {
+                                stringResource(Res.string.auth_login_action_connect)
+                            },
+                    )
+                }
+            }
+        }
+    }
+}

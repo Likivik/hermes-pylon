@@ -2,6 +2,7 @@ package com.m57.hermescontrol.ui.chat.fakes
 
 import com.m57.hermescontrol.ui.chat.ChatPersistenceRepository
 import com.m57.hermescontrol.ui.chat.OperationRegistrationHook
+import com.m57.hermescontrol.ui.chat.RoomChatMessageStore
 
 /**
  * In-memory [ChatPersistenceRepository] for tests.
@@ -13,13 +14,13 @@ import com.m57.hermescontrol.ui.chat.OperationRegistrationHook
  * ```
  * val fakeRepo = FakeChatPersistenceRepository()
  * fakeRepo.dao.addMessageDirect(someEntity)
- * val vm = ChatViewModel(app, startCleanup, fakeRepo)
+ * val vm = ChatViewModel(app, resolver, startCleanup, fakeRepo)
  * ```
  */
 internal open class FakeChatPersistenceRepository(
     val dao: FakeChatMessageDao = FakeChatMessageDao(),
     operationRegistrationHook: OperationRegistrationHook = OperationRegistrationHook {},
-) : ChatPersistenceRepository(dao, operationRegistrationHook) {
+) : ChatPersistenceRepository(RoomChatMessageStore(dao), operationRegistrationHook) {
     /** Clear all stored messages. */
     fun clear() = dao.clear()
 }

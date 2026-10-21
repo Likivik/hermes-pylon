@@ -30,7 +30,7 @@ class SlashUsageStoreTest {
         val file = Files.createTempFile("slash-usage-malformed", ".json").toFile()
         file.writeText("not-json")
         val dataStore = DataStoreFactory.create(serializer = SlashUsageSerializer) { file }
-        val store = SlashUsageStore(mockk<Context>(relaxed = true), dataStore)
+        val store = AndroidSlashUsageStore(mockk<Context>(relaxed = true), dataStore)
 
         assertThrows(CorruptionException::class.java) {
             runTest { store.counts("profile-a").first() }
@@ -42,7 +42,7 @@ class SlashUsageStoreTest {
         runTest {
             val file = Files.createTempFile("slash-usage-concurrent", ".json").toFile().also { it.delete() }
             val dataStore = DataStoreFactory.create(serializer = SlashUsageSerializer) { file }
-            val store = SlashUsageStore(mockk<Context>(relaxed = true), dataStore)
+            val store = AndroidSlashUsageStore(mockk<Context>(relaxed = true), dataStore)
 
             (1..100).map { async { store.recordUse("profile-a", "/help") } }.awaitAll()
 
@@ -53,7 +53,7 @@ class SlashUsageStoreTest {
     fun writeFailureIsNotSwallowed() {
         val directory = Files.createTempDirectory("slash-usage-write-failure").toFile()
         val dataStore = DataStoreFactory.create(serializer = SlashUsageSerializer) { directory }
-        val store = SlashUsageStore(mockk<Context>(relaxed = true), dataStore)
+        val store = AndroidSlashUsageStore(mockk<Context>(relaxed = true), dataStore)
 
         assertThrows(IOException::class.java) {
             runTest { store.recordUse("profile-a", "/help") }

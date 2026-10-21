@@ -1,0 +1,899 @@
+@file:OptIn(
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+    androidx.compose.foundation.layout.ExperimentalLayoutApi::class,
+)
+
+package com.m57.hermescontrol.ui.keys
+
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.m57.hermescontrol.data.model.EnvVarConfig
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.action_cancel
+import com.m57.hermescontrol.generated.resources.action_clear
+import com.m57.hermescontrol.generated.resources.action_save
+import com.m57.hermescontrol.generated.resources.content_desc_add_key
+import com.m57.hermescontrol.generated.resources.content_desc_delete_key
+import com.m57.hermescontrol.generated.resources.content_desc_edit
+import com.m57.hermescontrol.generated.resources.content_desc_hide_token
+import com.m57.hermescontrol.generated.resources.content_desc_refresh
+import com.m57.hermescontrol.generated.resources.content_desc_show_token
+import com.m57.hermescontrol.generated.resources.empty_action_clear_search
+import com.m57.hermescontrol.generated.resources.keys_action_copy
+import com.m57.hermescontrol.generated.resources.keys_action_delete
+import com.m57.hermescontrol.generated.resources.keys_action_toggle_visibility
+import com.m57.hermescontrol.generated.resources.keys_add_action
+import com.m57.hermescontrol.generated.resources.keys_add_key_label
+import com.m57.hermescontrol.generated.resources.keys_add_key_placeholder
+import com.m57.hermescontrol.generated.resources.keys_add_value_label
+import com.m57.hermescontrol.generated.resources.keys_add_value_placeholder
+import com.m57.hermescontrol.generated.resources.keys_copied_toast
+import com.m57.hermescontrol.generated.resources.keys_copy_warning_confirm
+import com.m57.hermescontrol.generated.resources.keys_copy_warning_message
+import com.m57.hermescontrol.generated.resources.keys_copy_warning_title
+import com.m57.hermescontrol.generated.resources.keys_dialog_add_title
+import com.m57.hermescontrol.generated.resources.keys_dialog_delete_message
+import com.m57.hermescontrol.generated.resources.keys_dialog_delete_title
+import com.m57.hermescontrol.generated.resources.keys_empty_desc
+import com.m57.hermescontrol.generated.resources.keys_empty_title
+import com.m57.hermescontrol.generated.resources.keys_filter_all
+import com.m57.hermescontrol.generated.resources.keys_label_not_configured
+import com.m57.hermescontrol.generated.resources.keys_no_matching_desc
+import com.m57.hermescontrol.generated.resources.keys_no_matching_title
+import com.m57.hermescontrol.generated.resources.keys_restart_action
+import com.m57.hermescontrol.generated.resources.keys_restart_desc
+import com.m57.hermescontrol.generated.resources.keys_restart_title
+import com.m57.hermescontrol.generated.resources.keys_search_placeholder
+import com.m57.hermescontrol.generated.resources.keys_status_configured
+import com.m57.hermescontrol.generated.resources.keys_status_not_set
+import com.m57.hermescontrol.generated.resources.screen_keys
+import com.m57.hermescontrol.theme.LocalHermesStatusColors
+import com.m57.hermescontrol.theme.Spacing
+import com.m57.hermescontrol.ui.common.EmptyState
+import com.m57.hermescontrol.ui.common.ErrorState
+import com.m57.hermescontrol.ui.common.HermesScaffold
+import com.m57.hermescontrol.ui.common.NavIcon
+import com.m57.hermescontrol.ui.common.SearchBar
+import com.m57.hermescontrol.ui.common.SectionHeader
+import com.m57.hermescontrol.ui.common.SkeletonListState
+import com.m57.hermescontrol.ui.common.StatusBadge
+import com.m57.hermescontrol.ui.common.StatusBadgeType
+import com.m57.hermescontrol.ui.common.ToastEffect
+import com.m57.hermescontrol.ui.icons.HermesIcon
+import com.m57.hermescontrol.ui.icons.HermesSymbol
+import org.jetbrains.compose.resources.stringResource
+
+private const val FILTER_ALL = "ALL"
+
+private val keysContentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+private val keysItemSpacing = Arrangement.spacedBy(12.dp)
+
+@Composable
+fun KeysScreen(
+    modifier: Modifier = Modifier,
+    onOpenDrawer: (() -> Unit)? = null,
+    viewModel: KeysViewModel = viewModel { KeysViewModel() },
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var query by remember { mutableStateOf("") }
+    var selectedCategory by remember { mutableStateOf(FILTER_ALL) }
+
+    val filterAllLabel = stringResource(Res.string.keys_filter_all)
+
+    val filteredCategories =
+        remember(query, state.categories) {
+            if (query.isBlank()) {
+                state.categories
+            } else {
+                state.categories.mapNotNull { section ->
+                    val filtered =
+                        section.vars.filter { (key, config) ->
+                            key.contains(query, ignoreCase = true) ||
+                                config.description?.contains(query, ignoreCase = true) == true
+                        }
+                    if (filtered.isNotEmpty()) {
+                        section.copy(vars = filtered)
+                    } else {
+                        null
+                    }
+                }
+            }
+        }
+
+    val visibleCategories =
+        remember(filteredCategories, selectedCategory) {
+            if (selectedCategory == FILTER_ALL) {
+                filteredCategories
+            } else {
+                filteredCategories.filter { it.name == selectedCategory }
+            }
+        }
+
+    val hasAnyVars = state.categories.any { it.vars.isNotEmpty() }
+
+    LaunchedEffect(Unit) {
+        viewModel.loadKeys()
+    }
+
+    ToastEffect(toastMessage = state.toastMessage, onClearToast = viewModel::clearToast)
+
+    // ── Delete Confirmation Dialog ──────────────────────────────────────────
+    state.deleteTargetKey?.let { key ->
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissDeleteDialog() },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    HermesSymbol(
+                        icon = HermesIcon.Delete,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(Res.string.keys_dialog_delete_title))
+                }
+            },
+            text = {
+                Text(stringResource(Res.string.keys_dialog_delete_message, key))
+            },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.confirmDeleteKey() },
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error,
+                        ),
+                ) {
+                    Text(stringResource(Res.string.keys_action_delete))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissDeleteDialog() }) {
+                    Text(stringResource(Res.string.action_cancel))
+                }
+            },
+        )
+    }
+
+    // ── Add Key Dialog ──────────────────────────────────────────────────────
+    if (state.showAddDialog) {
+        AddKeyDialog(
+            newKeyName = state.newKeyName,
+            newKeyValue = state.newKeyValue,
+            isAdding = state.isAddingKey,
+            onNameChange = viewModel::setNewKeyName,
+            onValueChange = viewModel::setNewKeyValue,
+            onAdd = viewModel::addKey,
+            onDismiss = viewModel::dismissAddDialog,
+        )
+    }
+
+    HermesScaffold(
+        title = { Text(stringResource(Res.string.screen_keys)) },
+        navigationIcon = onOpenDrawer?.let { NavIcon.Menu(it) },
+        isRefreshing = state.isLoading,
+        onRefresh = { viewModel.loadKeys() },
+        actions = {
+            IconButton(onClick = { viewModel.openAddDialog() }) {
+                HermesSymbol(
+                    icon = HermesIcon.Add,
+                    contentDescription = stringResource(Res.string.content_desc_add_key),
+                )
+            }
+        },
+    ) { paddingValues ->
+        Box(modifier = Modifier.fillMaxSize()) {
+            when {
+                state.isLoading && !hasAnyVars -> {
+                    SkeletonListState(modifier = Modifier.padding(paddingValues))
+                }
+
+                state.errorMessage != null && !hasAnyVars -> {
+                    ErrorState(
+                        message = state.errorMessage ?: "",
+                        onRetry = { viewModel.loadKeys() },
+                        modifier = Modifier.padding(paddingValues),
+                    )
+                }
+
+                !hasAnyVars && query.isBlank() -> {
+                    EmptyState(
+                        title = stringResource(Res.string.keys_empty_title),
+                        subtitle = stringResource(Res.string.keys_empty_desc),
+                        onAction = { viewModel.loadKeys() },
+                        actionLabel = stringResource(Res.string.content_desc_refresh),
+                        modifier = Modifier.padding(paddingValues),
+                    )
+                }
+
+                else -> {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = keysContentPadding,
+                        verticalArrangement = keysItemSpacing,
+                    ) {
+                        // ── 1. Restart banner (pinned at top when dirty) ─────────
+                        if (state.keysChanged) {
+                            item(key = "restart-banner") {
+                                RestartBanner(
+                                    isRestarting = state.isRestartingGateway,
+                                    onRestart = viewModel::restartGateway,
+                                )
+                            }
+                        }
+
+                        // ── 2. Search Bar ────────────────────────────────────────
+                        item(key = "search") {
+                            SearchBar(
+                                query = query,
+                                onQueryChange = { query = it },
+                                placeholder = stringResource(Res.string.keys_search_placeholder),
+                            )
+                        }
+
+                        // ── 3. Category Filter Chips ─────────────────────────────
+                        item(key = "filter-bar") {
+                            CategoryFilterBar(
+                                categories = state.categories,
+                                selectedCategory = selectedCategory,
+                                onCategorySelected = { selectedCategory = it },
+                                filterAllLabel = filterAllLabel,
+                            )
+                        }
+
+                        // ── 4. Keys List ─────────────────────────────────────────
+                        if (visibleCategories.isEmpty()) {
+                            item(key = "no-results") {
+                                Box(
+                                    modifier = Modifier.fillParentMaxHeight(0.6f),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    EmptyState(
+                                        title = stringResource(Res.string.keys_no_matching_title),
+                                        subtitle = stringResource(Res.string.keys_no_matching_desc),
+                                        actionLabel = stringResource(Res.string.empty_action_clear_search),
+                                        onAction = {
+                                            query = ""
+                                            selectedCategory = FILTER_ALL
+                                        },
+                                    )
+                                }
+                            }
+                        }
+
+                        visibleCategories.forEach { section ->
+                            if (selectedCategory == FILTER_ALL && filteredCategories.size > 1) {
+                                item(key = "category-section-${section.name}") {
+                                    SectionHeader(title = "${section.name} (${section.vars.size})")
+                                }
+                            }
+
+                            items(
+                                items = section.vars.toList(),
+                                key = { (key, _) -> "key-$key" },
+                            ) { (key, config) ->
+                                EnvVarCard(
+                                    key = key,
+                                    config = config,
+                                    revealedValue = state.revealedValues[key],
+                                    isDeleting = key in state.deletingKeys,
+                                    onReveal = { viewModel.revealKey(key) },
+                                    onHide = { viewModel.hideKey(key) },
+                                    onSave = { value -> viewModel.updateKey(key, value) },
+                                    onRequestDelete = { viewModel.requestDeleteKey(key) },
+                                    onShowToast = { msg -> viewModel.showToast(msg) },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ── Category Filter Bar ──────────────────────────────────────────────────────
+
+@Composable
+private fun CategoryFilterBar(
+    categories: List<CategorySection>,
+    selectedCategory: String,
+    onCategorySelected: (String) -> Unit,
+    filterAllLabel: String,
+    modifier: Modifier = Modifier,
+) {
+    val totalCount = remember(categories) { categories.sumOf { it.vars.size } }
+
+    LazyRow(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(horizontal = 2.dp),
+    ) {
+        item(key = "filter-all") {
+            FilterChip(
+                selected = selectedCategory == FILTER_ALL,
+                onClick = { onCategorySelected(FILTER_ALL) },
+                label = { Text("$filterAllLabel ($totalCount)") },
+                leadingIcon = {
+                    HermesSymbol(
+                        icon = HermesIcon.Apps,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                },
+            )
+        }
+
+        items(
+            items = categories,
+            key = { section -> "filter-${section.name}" },
+        ) { section ->
+            val icon: HermesIcon =
+                when (section.name) {
+                    "LLM Providers" -> HermesIcon.SmartToy
+                    "Tool API Keys" -> HermesIcon.Build
+                    "Messaging Platforms" -> HermesIcon.Forum
+                    "Agent Settings" -> HermesIcon.Tune
+                    else -> HermesIcon.Folder
+                }
+
+            FilterChip(
+                selected = selectedCategory == section.name,
+                onClick = { onCategorySelected(section.name) },
+                label = { Text("${section.name} (${section.vars.size})") },
+                leadingIcon = {
+                    HermesSymbol(
+                        icon = icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                },
+            )
+        }
+    }
+}
+
+// ── Add key dialog ───────────────────────────────────────────────────────────
+
+@Composable
+private fun AddKeyDialog(
+    newKeyName: String,
+    newKeyValue: String,
+    isAdding: Boolean,
+    onNameChange: (String) -> Unit,
+    onValueChange: (String) -> Unit,
+    onAdd: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var valueVisible by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = { if (!isAdding) onDismiss() },
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                HermesSymbol(
+                    icon = HermesIcon.Add,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(stringResource(Res.string.keys_dialog_add_title))
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = newKeyName,
+                    onValueChange = onNameChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text(stringResource(Res.string.keys_add_key_label)) },
+                    placeholder = { Text(stringResource(Res.string.keys_add_key_placeholder)) },
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
+                    trailingIcon = {
+                        if (newKeyName.isNotEmpty() && !isAdding) {
+                            IconButton(onClick = { onNameChange("") }) {
+                                HermesSymbol(
+                                    icon = HermesIcon.Clear,
+                                    contentDescription = stringResource(Res.string.action_clear),
+                                )
+                            }
+                        }
+                    },
+                    enabled = !isAdding,
+                )
+
+                OutlinedTextField(
+                    value = newKeyValue,
+                    onValueChange = onValueChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text(stringResource(Res.string.keys_add_value_label)) },
+                    placeholder = { Text(stringResource(Res.string.keys_add_value_placeholder)) },
+                    visualTransformation =
+                        if (valueVisible) {
+                            VisualTransformation.None
+                        } else {
+                            PasswordVisualTransformation()
+                        },
+                    trailingIcon = {
+                        IconButton(onClick = { valueVisible = !valueVisible }) {
+                            HermesSymbol(
+                                icon =
+                                    if (valueVisible) {
+                                        HermesIcon.VisibilityOff
+                                    } else {
+                                        HermesIcon.Visibility
+                                    },
+                                contentDescription =
+                                    stringResource(
+                                        if (valueVisible) {
+                                            Res.string.content_desc_hide_token
+                                        } else {
+                                            Res.string.content_desc_show_token
+                                        },
+                                    ),
+                            )
+                        }
+                    },
+                    enabled = !isAdding,
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onAdd,
+                enabled = !isAdding && newKeyName.isNotBlank() && newKeyValue.isNotBlank(),
+            ) {
+                if (isAdding) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                }
+                Text(stringResource(Res.string.keys_add_action))
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isAdding,
+            ) {
+                Text(stringResource(Res.string.action_cancel))
+            }
+        },
+    )
+}
+
+@Composable
+fun SensitiveCopyWarningDialog(
+    secretName: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(stringResource(Res.string.keys_copy_warning_title))
+        },
+        text = {
+            Text(
+                stringResource(
+                    Res.string.keys_copy_warning_message,
+                    secretName,
+                ),
+            )
+        },
+        confirmButton = {
+            Button(onClick = onConfirm) {
+                Text(stringResource(Res.string.keys_copy_warning_confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(Res.string.action_cancel))
+            }
+        },
+    )
+}
+
+// ── Env var card ──────────────────────────────────────────────────────────────
+
+@Composable
+private fun EnvVarCard(
+    key: String,
+    config: EnvVarConfig,
+    revealedValue: String?,
+    isDeleting: Boolean,
+    onReveal: () -> Unit,
+    onHide: () -> Unit,
+    onSave: (String) -> Unit,
+    onRequestDelete: () -> Unit,
+    onShowToast: (String) -> Unit,
+) {
+    var isEditing by remember { mutableStateOf(false) }
+    var valueVisible by remember { mutableStateOf(false) }
+    var pendingCopyValue by remember(key) { mutableStateOf<String?>(null) }
+    val isRevealed = revealedValue != null
+    var editedValue by remember(config, revealedValue) { mutableStateOf(revealedValue ?: "") }
+
+    LaunchedEffect(revealedValue) {
+        if (pendingCopyValue != null && pendingCopyValue != revealedValue) {
+            pendingCopyValue = null
+        }
+    }
+
+    val copySensitive = rememberSensitiveCopy()
+
+    val displayValue =
+        if (isRevealed) {
+            revealedValue.orEmpty()
+        } else if (config.isSet) {
+            config.redactedValue ?: "••••••••••••"
+        } else {
+            stringResource(Res.string.keys_label_not_configured)
+        }
+
+    val copiedMessage = stringResource(Res.string.keys_copied_toast)
+
+    pendingCopyValue?.let { value ->
+        SensitiveCopyWarningDialog(
+            secretName = key,
+            onConfirm = {
+                copySensitive(key, value)
+                pendingCopyValue = null
+                onShowToast(copiedMessage)
+            },
+            onDismiss = { pendingCopyValue = null },
+        )
+    }
+
+    // Insert zero-width spaces (\u200B) after underscores so line breaks happen cleanly between words
+    val formattedKeyName = remember(key) { key.replace("_", "_\u200B") }
+
+    Card(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .animateContentSize(),
+        shape = MaterialTheme.shapes.large,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            ),
+    ) {
+        Column(modifier = Modifier.padding(Spacing.md)) {
+            // Header: Key name (breaks cleanly at underscores _) + Delete Button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = formattedKeyName,
+                        style =
+                            if (key.length > 24) {
+                                MaterialTheme.typography.titleSmall
+                            } else {
+                                MaterialTheme.typography.titleMedium
+                            },
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.SemiBold,
+                        lineHeight = 20.sp,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    StatusBadge(
+                        text =
+                            if (config.isSet) {
+                                stringResource(Res.string.keys_status_configured)
+                            } else {
+                                stringResource(Res.string.keys_status_not_set)
+                            },
+                        status =
+                            if (config.isSet) {
+                                StatusBadgeType.SUCCESS
+                            } else {
+                                StatusBadgeType.WARNING
+                            },
+                    )
+
+                    // Description
+                    val description = config.description
+                    if (!description.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                        )
+                    }
+                }
+
+                if (!isEditing) {
+                    IconButton(
+                        onClick = onRequestDelete,
+                        enabled = !isDeleting,
+                    ) {
+                        if (isDeleting) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        } else {
+                            HermesSymbol(
+                                icon = HermesIcon.Delete,
+                                contentDescription = stringResource(Res.string.content_desc_delete_key),
+                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Value Display Box (Single-line, horizontally scrollable) or Edit Form
+            if (isEditing) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = editedValue,
+                        onValueChange = { editedValue = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text(stringResource(Res.string.keys_add_value_label)) },
+                        visualTransformation =
+                            if (valueVisible) {
+                                VisualTransformation.None
+                            } else {
+                                PasswordVisualTransformation()
+                            },
+                        trailingIcon = {
+                            IconButton(onClick = { valueVisible = !valueVisible }) {
+                                HermesSymbol(
+                                    icon =
+                                        if (valueVisible) {
+                                            HermesIcon.VisibilityOff
+                                        } else {
+                                            HermesIcon.Visibility
+                                        },
+                                    contentDescription =
+                                        stringResource(
+                                            if (valueVisible) {
+                                                Res.string.content_desc_hide_token
+                                            } else {
+                                                Res.string.content_desc_show_token
+                                            },
+                                        ),
+                                )
+                            }
+                        },
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        OutlinedButton(onClick = { isEditing = false }) {
+                            Text(stringResource(Res.string.action_cancel))
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(onClick = {
+                            onSave(editedValue)
+                            isEditing = false
+                        }) {
+                            Text(stringResource(Res.string.action_save))
+                        }
+                    }
+                }
+            } else {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = Spacing.sm),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Row(
+                            modifier =
+                                Modifier
+                                    .weight(1f)
+                                    .horizontalScroll(rememberScrollState()),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = displayValue,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color =
+                                    if (config.isSet) {
+                                        MaterialTheme.colorScheme.onSurface
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                    },
+                                fontFamily = FontFamily.Monospace,
+                                maxLines = 1,
+                                softWrap = false,
+                            )
+                        }
+                        Row {
+                            if (config.isSet) {
+                                IconButton(onClick = if (isRevealed) onHide else onReveal) {
+                                    HermesSymbol(
+                                        icon =
+                                            if (isRevealed) {
+                                                HermesIcon.VisibilityOff
+                                            } else {
+                                                HermesIcon.Visibility
+                                            },
+                                        contentDescription = stringResource(Res.string.keys_action_toggle_visibility),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                if (isRevealed && !revealedValue.isNullOrEmpty()) {
+                                    IconButton(onClick = {
+                                        pendingCopyValue = revealedValue
+                                    }) {
+                                        HermesSymbol(
+                                            icon = HermesIcon.ContentCopy,
+                                            contentDescription = stringResource(Res.string.keys_action_copy),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                            }
+                            IconButton(onClick = {
+                                editedValue = if (isRevealed) revealedValue.orEmpty() else ""
+                                isEditing = true
+                            }) {
+                                HermesSymbol(
+                                    icon = HermesIcon.Edit,
+                                    contentDescription = stringResource(Res.string.content_desc_edit),
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ── Restart banner ────────────────────────────────────────────────────────────
+
+@Composable
+private fun RestartBanner(
+    isRestarting: Boolean,
+    onRestart: () -> Unit,
+) {
+    val statusColors = LocalHermesStatusColors.current
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        border = BorderStroke(1.dp, statusColors.warning.copy(alpha = 0.4f)),
+        colors =
+            CardDefaults.cardColors(
+                containerColor = statusColors.warningContainer,
+            ),
+    ) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(Res.string.keys_restart_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = statusColors.warning,
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = stringResource(Res.string.keys_restart_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = statusColors.warning.copy(alpha = 0.9f),
+                )
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+            Button(
+                onClick = onRestart,
+                enabled = !isRestarting,
+                colors =
+                    ButtonDefaults.buttonColors(
+                        containerColor = statusColors.warning,
+                        contentColor = MaterialTheme.colorScheme.surface,
+                    ),
+            ) {
+                if (isRestarting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.surface,
+                    )
+                } else {
+                    HermesSymbol(
+                        icon = HermesIcon.RestartAlt,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(stringResource(Res.string.keys_restart_action))
+                }
+            }
+        }
+    }
+}

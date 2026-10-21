@@ -1,0 +1,837 @@
+// Modified from Hy4ri/hermes-mobile for this fork; see NOTICE.
+
+package com.m57.hermescontrol.ui.chat
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.m57.hermescontrol.HistoryScreen
+import com.m57.hermescontrol.NavigationController
+import com.m57.hermescontrol.data.local.rememberPreferencesStore
+import com.m57.hermescontrol.data.model.capabilitiesFor
+import com.m57.hermescontrol.data.ws.ConnectionStatus
+import com.m57.hermescontrol.data.ws.HermesWsClient
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.chat_action_close_search
+import com.m57.hermescontrol.generated.resources.chat_action_search
+import com.m57.hermescontrol.generated.resources.chat_camera_error
+import com.m57.hermescontrol.generated.resources.chat_mic_listening
+import com.m57.hermescontrol.generated.resources.chat_model_confirm_action
+import com.m57.hermescontrol.generated.resources.chat_model_confirm_title
+import com.m57.hermescontrol.generated.resources.chat_model_picker_title
+import com.m57.hermescontrol.generated.resources.chat_model_picker_title_current
+import com.m57.hermescontrol.generated.resources.chat_terminal_backend_content_description
+import com.m57.hermescontrol.generated.resources.common_cancel
+import com.m57.hermescontrol.generated.resources.common_save
+import com.m57.hermescontrol.generated.resources.content_desc_new_chat
+import com.m57.hermescontrol.generated.resources.stt_not_available
+import com.m57.hermescontrol.generated.resources.stt_permission_denied
+import com.m57.hermescontrol.theme.LocalHermesStatusColors
+import com.m57.hermescontrol.theme.Spacing
+import com.m57.hermescontrol.ui.chat.components.ChatConnectionBanner
+import com.m57.hermescontrol.ui.chat.components.ChatInputBar
+import com.m57.hermescontrol.ui.chat.components.ChatLifecycleEffects
+import com.m57.hermescontrol.ui.chat.components.ChatLoadingOverlay
+import com.m57.hermescontrol.ui.chat.components.ChatMessageList
+import com.m57.hermescontrol.ui.chat.components.ChatScrollToBottomFab
+import com.m57.hermescontrol.ui.chat.components.ChatTimelineNoPrefetchStrategy
+import com.m57.hermescontrol.ui.chat.components.ContextUsageChip
+import com.m57.hermescontrol.ui.chat.components.ContextUsageDialog
+import com.m57.hermescontrol.ui.chat.components.ReactionHeartsOverlay
+import com.m57.hermescontrol.ui.chat.components.ReloginDialog
+import com.m57.hermescontrol.ui.chat.components.SearchBarRow
+import com.m57.hermescontrol.ui.chat.components.StickySubagentBar
+import com.m57.hermescontrol.ui.chat.components.SubagentInspectionSheet
+import com.m57.hermescontrol.ui.chat.components.chatListItemCount
+import com.m57.hermescontrol.ui.chat.components.rememberChatScrollController
+import com.m57.hermescontrol.ui.chat.components.tailContentKey
+import com.m57.hermescontrol.ui.chat.input.rememberChatInputLaunchers
+import com.m57.hermescontrol.ui.chat.rail.RailEvent
+import com.m57.hermescontrol.ui.chat.rail.RailUiModel
+import com.m57.hermescontrol.ui.chat.rail.SessionRail
+import com.m57.hermescontrol.ui.common.AutoScrollingTitleText
+import com.m57.hermescontrol.ui.common.CredentialWarningBanner
+import com.m57.hermescontrol.ui.common.HermesScaffold
+import com.m57.hermescontrol.ui.common.NavIcon
+import com.m57.hermescontrol.ui.common.SecureGatewayMediaPlayer
+import com.m57.hermescontrol.ui.icons.HermesIcon
+import com.m57.hermescontrol.ui.icons.HermesSymbol
+import com.m57.hermescontrol.ui.icons.MaterialSymbol
+import com.m57.hermescontrol.ui.model.components.ModelPickerDialog
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
+
+private const val SESSION_SYNC_INTERVAL_MS = 5_000L
+
+/**
+ * Chat screen — the primary conversation surface of Hermes Control.
+ *
+ * This file is a thin compositor that delegates all UI rendering to focused
+ * composable components under `ui/chat/components/`. See issue #621 for the
+ * rationale behind the split and the full file→content mapping.
+ *
+ * The original 2,267-line god file was split into 11 single-purpose files;
+ * this entry point handles only state hoisting, scaffold wiring, and the
+ * remembered launchers that need to be activity-scoped.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun ChatScreen(
+    viewModel: ChatViewModel,
+    modifier: Modifier = Modifier,
+    onOpenDrawer: (() -> Unit)? = null,
+    sessionId: String? = null,
+) {
+    DisposableEffect(viewModel) {
+        onDispose(viewModel::closeMediaPlayer)
+    }
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val streamingState by viewModel.streamingState.collectAsStateWithLifecycle()
+    val currentModelCapabilities =
+        remember(state.currentSessionModel, state.modelPickerProviders) {
+            state.modelPickerProviders.capabilitiesFor(
+                state.currentSessionModel,
+            )
+        }
+    val credentialWarning by HermesWsClient.credentialWarning.collectAsStateWithLifecycle()
+    val visibleCredentialWarning =
+        actionableCredentialWarning(
+            warning = credentialWarning,
+            currentSessionModel = state.currentSessionModel,
+            providers = state.modelPickerProviders,
+            inventoryResolved = state.modelInventoryResolved,
+        )
+    val listState =
+        rememberLazyListState(
+            prefetchStrategy = ChatTimelineNoPrefetchStrategy,
+        )
+    val scrollScope = rememberCoroutineScope()
+    val scrollController = rememberChatScrollController(listState, scrollScope)
+    val listItemCount =
+        chatListItemCount(
+            messageCount = state.messages.size,
+            hasStreamingMessage = streamingState.streamingMessage != null,
+            isThinking = streamingState.isThinking,
+            hasClarifyRequest = state.clarifyRequest != null,
+            isLoadingOlder = state.isLoadingOlder,
+        )
+    var isOlderPagingArmed by remember(state.currentSessionId) { mutableStateOf(false) }
+
+    // Periodic session sync while connected.
+    LaunchedEffect(state.currentSessionId, state.connectionStatus) {
+        while (state.currentSessionId != null && state.connectionStatus == ConnectionStatus.CONNECTED) {
+            delay(SESSION_SYNC_INTERVAL_MS)
+            viewModel.syncCurrentSession()
+        }
+    }
+
+    // Arm + trigger older-message paging when the user scrolls near the top.
+    // Before prepending, capture the anchor (first visible message id + offset)
+    // so the same content stays under the reader's eye after the insert
+    // (issue #682). Restored in a LaunchedEffect once the page actually lands.
+    val pagingAnchor = remember { mutableStateOf<Pair<String, Int>?>(null) }
+    LaunchedEffect(listState, state.currentSessionId, state.hasOlderMessages, state.isLoadingOlder) {
+        if (!state.hasOlderMessages || state.isLoadingOlder) return@LaunchedEffect
+        snapshotFlow { listState.firstVisibleItemIndex }
+            .distinctUntilChanged()
+            .collectLatest { firstVisibleIndex ->
+                if (firstVisibleIndex > 2) {
+                    isOlderPagingArmed = true
+                } else if (isOlderPagingArmed) {
+                    val anchorId = state.messages.getOrNull(firstVisibleIndex)?.id
+                    val offset = scrollController.captureAnchorOffset()
+                    pagingAnchor.value = if (anchorId != null) anchorId to offset else null
+                    viewModel.loadOlderMessages()
+                }
+            }
+    }
+
+    // After older history is prepended, restore the anchor message (by id, so
+    // streaming-token inserts during paging don't skew the index) plus offset.
+    LaunchedEffect(state.messages) {
+        val anchor = pagingAnchor.value ?: return@LaunchedEffect
+        val (anchorId, offset) = anchor
+        val index = state.messages.indexOfFirst { it.id == anchorId }
+        if (index >= 0) {
+            scrollController.scrollToItem(index, offset)
+            pagingAnchor.value = null
+        }
+    }
+
+    // Continuous bottom-follow tracking from LazyListState (issue #682).
+    LaunchedEffect(Unit) {
+        scrollController.observeUserScrollPosition()
+    }
+
+    // Drive follow + unseen tracking from a stable tail-content key covering
+    // messages, streaming, thinking, subagent cards, and clarify prompts
+    // (issue #682). Replaces the old item-count heuristic that ignored the
+    // streaming tail.
+    LaunchedEffect(
+        state.messages,
+        streamingState.streamingMessage,
+        streamingState.isThinking,
+        state.subagentIndicators,
+        state.todos,
+        state.clarifyRequest,
+    ) {
+        scrollController.onTailChanged(
+            tailKey =
+                tailContentKey(
+                    messages = state.messages,
+                    streamingMessage = streamingState.streamingMessage,
+                    isThinking = streamingState.isThinking,
+                    subagentIndicators = state.subagentIndicators,
+                    todos = state.todos,
+                    clarifyRequest = state.clarifyRequest,
+                ),
+            messageCount = state.messages.size,
+            listItemCount = listItemCount,
+        )
+    }
+    val showScrollToBottom by remember {
+        derivedStateOf {
+            scrollController.showFab(state.messages.isNotEmpty())
+        }
+    }
+    var inputFieldValue by rememberSaveable(stateSaver = TextFieldValue.Saver) {
+        mutableStateOf(TextFieldValue(""))
+    }
+    LaunchedEffect(state.pendingPrefillText) {
+        state.pendingPrefillText?.let { prefill ->
+            inputFieldValue = ChatInputPolicy.commandFieldValue(prefill)
+            viewModel.consumePendingPrefill()
+        }
+    }
+    var lastAnimatedMessageId by rememberSaveable { mutableStateOf<String?>(null) }
+    var showReloginDialog by rememberSaveable { mutableStateOf(false) }
+    var showSubagentInspectionSheet by rememberSaveable { mutableStateOf(false) }
+    var viewingImage by rememberSaveable { mutableStateOf<ImageViewerModel?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val isDark = isSystemInDarkTheme()
+
+    LaunchedEffect(state.openHistoryRequested) {
+        if (state.openHistoryRequested) {
+            NavigationController.navigateTo(HistoryScreen)
+            viewModel.consumeOpenHistoryRequest()
+        }
+    }
+
+    val micListeningPrompt = stringResource(Res.string.chat_mic_listening)
+    val sttNotAvailableMsg = stringResource(Res.string.stt_not_available)
+    val sttPermissionDeniedMsg = stringResource(Res.string.stt_permission_denied)
+
+    val cameraErrorMsg = stringResource(Res.string.chat_camera_error)
+
+    // Speech, file picking and the camera live behind one platform seam, so this
+    // screen only decides what to do with the results.
+    val chatInput =
+        rememberChatInputLaunchers(
+            listeningPrompt = micListeningPrompt,
+            unavailableMessage = sttNotAvailableMsg,
+            permissionDeniedMessage = sttPermissionDeniedMsg,
+            cameraErrorMessage = cameraErrorMsg,
+            onSpeechText = { spoken ->
+                val merged =
+                    if (inputFieldValue.text.isBlank()) {
+                        spoken
+                    } else {
+                        "${inputFieldValue.text} $spoken"
+                    }
+                inputFieldValue = ChatInputPolicy.commandFieldValue(merged)
+            },
+            onFilesPicked = { picked -> viewModel.addAttachments(picked.take(MAX_PENDING_ATTACHMENTS)) },
+            onPhotoTaken = { photo ->
+                viewModel.addAttachment(photo.uri, photo.name, photo.mimeType, photo.size)
+            },
+            onError = { message -> scrollScope.launch { snackbarHostState.showSnackbar(message) } },
+        )
+    val isListening = chatInput.isListening
+
+    // Lifecycle effects, permissions, session switching, auto-scroll, errors
+    ChatLifecycleEffects(
+        sessionId = sessionId,
+        connectionStatus = state.connectionStatus,
+        currentSessionId = state.currentSessionId,
+        messages = state.messages,
+        listItemCount = listItemCount,
+        errorMessage = state.errorMessage,
+        backgroundCompleteMessage = state.backgroundCompleteMessage,
+        openError = state.openError,
+        isSearchActive = state.isSearchActive,
+        currentSearchMatchIndex = state.currentSearchMatchIndex,
+        searchMatchIndices = state.searchMatchIndices,
+        clarifyRequest = state.clarifyRequest,
+        sudoPrompt = state.sudoPrompt,
+        secretPrompt = state.secretPrompt,
+        vaultPrompt = state.vaultPrompt,
+        listState = listState,
+        scrollController = scrollController,
+        snackbarHostState = snackbarHostState,
+        viewModel = viewModel,
+    )
+
+    val backgroundGradient =
+        Brush.verticalGradient(
+            colors =
+                listOf(
+                    MaterialTheme.colorScheme.background,
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.05f),
+                ),
+        )
+
+    HermesScaffold(
+        modifier = modifier,
+        pinTopBar = true,
+        // Session titles/deletions are owned by the gateway and the rail updates
+        // optimistically, so give the user (and the E2E suite) a way to re-list
+        // and see server truth.
+        onRefresh = { viewModel.refreshSessions() },
+        isRefreshing = state.railRefreshing,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                AutoScrollingTitleText(
+                    text = state.chatTitle,
+                    // Tagged: the top bar title is the only semantics-readable
+                    // signal of which session is active (the rail's active tint
+                    // is not exposed), so the switch E2E can assert on it.
+                    modifier = Modifier.weight(1f).testTag("chat_title"),
+                    style =
+                        MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                        ),
+                )
+                // Connection status dot — red when offline, hidden when connected
+                if (!state.isConnected) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(10.dp)
+                                .clip(CircleShape)
+                                .background(LocalHermesStatusColors.current.error),
+                    )
+                }
+                val terminalBackend = state.terminalBackend
+                if (!terminalBackend.isNullOrBlank() && !terminalBackend.equals("local", ignoreCase = true)) {
+                    val terminalBackendDescription =
+                        stringResource(
+                            Res.string.chat_terminal_backend_content_description,
+                            terminalBackend,
+                        )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ) {
+                        Text(
+                            text = terminalBackend,
+                            modifier =
+                                Modifier
+                                    .padding(horizontal = Spacing.xs, vertical = 1.dp)
+                                    .semantics {
+                                        contentDescription = terminalBackendDescription
+                                    },
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
+        },
+        navigationIcon = onOpenDrawer?.let { NavIcon.Menu(it) },
+        snackbarHost = {
+            SnackbarHost(snackbarHostState) { data ->
+                Snackbar(
+                    snackbarData = data,
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                )
+            }
+        },
+        actions = {
+            // Search toggle
+            IconButton(onClick = { viewModel.toggleSearch() }) {
+                MaterialSymbol(
+                    name = if (state.isSearchActive) "close" else "search",
+                    contentDescription =
+                        if (state.isSearchActive) {
+                            stringResource(
+                                Res.string.chat_action_close_search,
+                            )
+                        } else {
+                            stringResource(Res.string.chat_action_search)
+                        },
+                )
+            }
+
+            IconButton(onClick = { viewModel.createNewSession() }) {
+                HermesSymbol(
+                    icon = HermesIcon.Add,
+                    contentDescription = stringResource(Res.string.content_desc_new_chat),
+                )
+            }
+        },
+    ) { _ ->
+        // Likivik patch: Telegram-style session rail on the leading edge.
+        val pinnedIds by viewModel.pinnedSessionIds.collectAsState()
+        val railMeta by viewModel.railMeta.collectAsState()
+        val homeOrder by viewModel.homeOrder.collectAsStateWithLifecycle()
+        var archiveOpen by rememberSaveable { mutableStateOf(false) }
+        var editingSessionId by remember { mutableStateOf<String?>(null) }
+        var reordering by rememberSaveable { mutableStateOf(false) }
+        Row(modifier = Modifier.fillMaxSize()) {
+            SessionRail(
+                state =
+                    RailUiModel(
+                        sessions = state.sessions,
+                        currentSessionId = state.currentSessionId,
+                        pinnedSessionIds = pinnedIds,
+                        railMeta = railMeta,
+                        order = homeOrder,
+                        archiveOpen = archiveOpen,
+                        reordering = reordering,
+                    ),
+                onEvent = { event ->
+                    when (event) {
+                        is RailEvent.Switch -> viewModel.switchSession(event.sessionId)
+                        is RailEvent.TogglePin -> viewModel.togglePinSession(event.sessionId)
+                        is RailEvent.Delete ->
+                            // Guard: never delete the session we're looking at.
+                            if (event.sessionId != state.currentSessionId) {
+                                viewModel.deleteRailSession(event.sessionId)
+                            }
+                        is RailEvent.Edit -> editingSessionId = event.sessionId
+                        is RailEvent.Reorder -> viewModel.setRailOrder(event.order)
+                        is RailEvent.ToggleReorder -> reordering = !reordering
+                        is RailEvent.ArchiveToggle -> archiveOpen = event.open
+                    }
+                },
+            )
+            Column(
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .fillMaxSize()
+                        .background(backgroundGradient)
+                        .imePadding(),
+            ) {
+                // Brand accent: thin Hermes-purple gradient hairline under the TopBar.
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(2.dp)
+                        .background(
+                            androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                listOf(
+                                    com.m57.hermescontrol.theme.HermesPurple,
+                                    com.m57.hermescontrol.theme.HermesPurpleLight,
+                                    com.m57.hermescontrol.theme.HermesPurple,
+                                ),
+                            ),
+                        ),
+                )
+                ChatConnectionBanner(
+                    connectionStatus = state.connectionStatus,
+                    onReconnect = viewModel::reconnect,
+                    onReloginClick = { showReloginDialog = true },
+                )
+
+                visibleCredentialWarning?.let { warning ->
+                    CredentialWarningBanner(
+                        warning = warning,
+                        onFix = { NavigationController.navigateTo(com.m57.hermescontrol.ProvidersScreen) },
+                        onDismiss = { HermesWsClient.clearCredentialWarning() },
+                    )
+                }
+
+                AnimatedVisibility(
+                    visible = state.isSearchActive,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut(),
+                ) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        tonalElevation = 2.dp,
+                        border =
+                            BorderStroke(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
+                            ),
+                    ) {
+                        Box(modifier = Modifier.padding(horizontal = 12.dp, vertical = Spacing.sm)) {
+                            SearchBarRow(
+                                searchQuery = state.searchQuery,
+                                onQueryChange = { viewModel.setSearchQuery(it) },
+                                searchMatchCount = state.searchMatchIndices.size,
+                                currentMatchIndex = state.currentSearchMatchIndex,
+                                onNavigateUp = { viewModel.navigateSearchMatch(-1) },
+                                onNavigateDown = { viewModel.navigateSearchMatch(1) },
+                                onClose = { viewModel.clearSearch() },
+                            )
+                        }
+                    }
+                }
+
+                StickySubagentBar(
+                    indicators = state.subagentIndicators,
+                    todos = state.todos,
+                    onClick = {
+                        showSubagentInspectionSheet = true
+                        scrollController.resumeFollowing()
+                    },
+                )
+
+                Box(
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                ) {
+                    // Likivik patch: status pill as an overlay on the message list,
+                    // NOT in the column flow — so it floats over the messages and
+                    // never reflows/bumps the list when it appears or dismisses.
+                    androidx.compose.runtime.remember(state.statusPill) {
+                        state.statusPill
+                    }?.let { pill ->
+                        Box(
+                            modifier =
+                                Modifier
+                                    .align(Alignment.TopCenter)
+                                    .fillMaxWidth()
+                                    .padding(horizontal = Spacing.md, vertical = Spacing.xs),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Surface(
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
+                                tonalElevation = 1.dp,
+                            ) {
+                                Text(
+                                    text = pill,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = Spacing.xs),
+                                )
+                            }
+                        }
+                    }
+                    ChatMessageList(
+                        messages = state.messages,
+                        streamingMessage = streamingState.streamingMessage,
+                        isThinking = streamingState.isThinking,
+                        thinkingText = streamingState.thinkingText,
+                        isSearchActive = state.isSearchActive,
+                        searchQuery = state.searchQuery,
+                        currentSearchMatchIndex = state.currentSearchMatchIndex,
+                        searchMatchIndices = state.searchMatchIndices,
+                        typingEffectEnabled = state.typingEffectEnabled,
+                        typingEffectDelayMs = state.typingEffectDelayMs,
+                        isLoading = state.isLoading,
+                        isLoadingOlder = state.isLoadingOlder,
+                        isDark = isDark,
+                        listState = listState,
+                        lastAnimatedMessageId = lastAnimatedMessageId,
+                        onLastAnimatedMessageIdChange = { lastAnimatedMessageId = it },
+                        onRespondApproval = viewModel::respondToApproval,
+                        onCancelApproval = viewModel::cancelApproval,
+                        onOpenAttachment = viewModel::openAttachment,
+                        openingAttachmentPath = state.openingAttachmentPath,
+                        clarifyRequest = state.clarifyRequest,
+                        onRespondClarify = viewModel::respondToClarifyBatch,
+                        onDismissClarify = viewModel::dismissClarify,
+                        onImageClick = { viewingImage = it },
+                    )
+
+                    // Loading overlay
+                    ChatLoadingOverlay(isLoading = state.isLoading)
+
+                    // Scroll-to-bottom FAB (issue #682): shows while follow is
+                    // paused and renders the unseen-message badge.
+                    ChatScrollToBottomFab(
+                        show = showScrollToBottom,
+                        pendingCount = scrollController.pendingCount,
+                        onScrollToBottom = scrollController::resumeFollowing,
+                    )
+
+                    // Reaction heartsanimation (purely cosmetic — fades out
+                    // automatically after the ViewModel clears the state)
+                    key(state.reactionTriggerId) {
+                        ReactionHeartsOverlay(
+                            reactionKind = state.reactionKind,
+                        )
+                    }
+                }
+
+                val contextWindow = state.contextWindowTokens()
+                ContextUsageChip(
+                    usedTokens = state.contextUsage?.usedTokens,
+                    fullTokens = contextWindow,
+                    onClick = viewModel::openContextDetail,
+                )
+
+                ChatInputBar(
+                    inputFieldValue = inputFieldValue,
+                    onInputChange = { inputFieldValue = it },
+                    onSend = {
+                        if (viewModel.sendMessage(inputFieldValue.text)) {
+                            inputFieldValue = TextFieldValue("")
+                            // Jump to bottom after send (serialized through the controller).
+                            scrollController.jumpToBottom(animated = true)
+                        }
+                    },
+                    onMicTap = { chatInput.startSpeechInput() },
+                    isListening = isListening,
+                    isAgentTyping = state.isAgentTyping,
+                    isConnected = state.isConnected,
+                    isSessionReady = state.isSessionReady,
+                    commandCatalog = state.commandCatalog,
+                    slashUsageCounts = state.slashUsageCounts,
+                    pendingAttachments = state.pendingAttachments,
+                    onCameraTap = { chatInput.takePhoto() },
+                    onImageTap = { chatInput.pickFiles() },
+                    onFileTap = { chatInput.pickFiles() },
+                    onRemoveAttachment = viewModel::removeAttachment,
+                    onPreviewAttachment = { attachment ->
+                        viewingImage =
+                            ImageViewerModel(
+                                model = attachment.uri,
+                                name = attachment.name,
+                                mimeType = attachment.mimeType,
+                            )
+                    },
+                    // Composer toolbar wiring (PR 1)
+                    currentSessionModel = state.currentSessionModel,
+                    reasoningLevel = state.reasoningLevel,
+                    canDisableReasoning =
+                        currentModelCapabilities?.can_disable_reasoning,
+                    supportsReasoning = currentModelCapabilities?.reasoning,
+                    onModelTap = { viewModel.openModelPicker() },
+                    onReasoningTap = { level -> viewModel.setReasoningLevel(level) },
+                )
+            }
+        } // Likivik patch: close the rail Row
+
+        if (showReloginDialog) {
+            ReloginDialog(
+                onDismiss = { showReloginDialog = false },
+                onRelogin = { username, password, onResult ->
+                    viewModel.relogin(username, password, onResult)
+                },
+            )
+        }
+
+        // In-session model picker — opens from the composer model chip or /model.
+        if (state.showModelPicker) {
+            ModelPickerDialog(
+                providers = state.modelPickerProviders,
+                title =
+                    state.currentSessionModel?.let {
+                        stringResource(Res.string.chat_model_picker_title_current, it)
+                    } ?: stringResource(Res.string.chat_model_picker_title),
+                isLoading = state.modelPickerLoading && state.modelPickerProviders.isEmpty(),
+                pinnedModels = state.modelPickerPinned,
+                onPinToggle = { provider, model -> viewModel.togglePinModel(provider, model) },
+                onSelect = { provider, model ->
+                    viewModel.sendSlashModel(provider, model)
+                },
+                onDismiss = { viewModel.closeModelPicker() },
+            )
+        }
+
+        val contextWindow = state.contextWindowTokens()
+        if (state.showContextDetail && contextWindow != null && contextWindow > 0L) {
+            ContextUsageDialog(
+                usage = state.contextUsage,
+                fullTokens = contextWindow,
+                model = state.currentSessionModel,
+                onDismiss = viewModel::closeContextDetail,
+            )
+        }
+
+        state.modelSwitchConfirmation?.let { confirmation ->
+            AlertDialog(
+                onDismissRequest = viewModel::cancelModelSwitchConfirmation,
+                title = { Text(stringResource(Res.string.chat_model_confirm_title)) },
+                text = { Text(confirmation.message) },
+                confirmButton = {
+                    TextButton(onClick = viewModel::confirmModelSwitch) {
+                        Text(stringResource(Res.string.chat_model_confirm_action))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = viewModel::cancelModelSwitchConfirmation) {
+                        Text(stringResource(Res.string.common_cancel))
+                    }
+                },
+            )
+        }
+
+        if (showSubagentInspectionSheet) {
+            SubagentInspectionSheet(
+                indicators = state.subagentIndicators,
+                todos = state.todos,
+                onDismiss = { showSubagentInspectionSheet = false },
+            )
+        }
+
+        viewingImage?.let { image ->
+            ImageViewerDialog(
+                image = image,
+                onDismiss = { viewingImage = null },
+            )
+        }
+
+        state.mediaPlayerRequest?.let { request ->
+            SecureGatewayMediaPlayer(
+                request = request,
+                onClose = viewModel::closeMediaPlayer,
+            )
+        }
+
+        // Likivik patch: icon + name editor for a rail session (long-press → Edit).
+        editingSessionId?.let { sessionId ->
+            RailEditDialog(
+                currentName = state.sessions.find { it.id == sessionId }?.title ?: "",
+                currentIcon = railMeta[sessionId]?.icon,
+                onDismiss = { editingSessionId = null },
+                onSave = { icon, name ->
+                    editingSessionId = null
+                    viewModel.renameSession(sessionId, name, icon)
+                },
+            )
+        }
+    }
+}
+
+private fun ChatUiState.contextWindowTokens(): Long? =
+    contextUsage?.maxTokens
+        ?: matchingModelContextLength(
+            activeModel = currentSessionModel ?: contextUsage?.model,
+            fallbackModel = modelContextLengthModel,
+            fallbackLength = modelContextLength,
+        )
+
+// Likivik patch: rail session icon + name editor (long-press a rail chip → Edit).
+@Composable
+private fun RailEditDialog(
+    currentName: String,
+    currentIcon: String?,
+    onDismiss: () -> Unit,
+    onSave: (icon: String?, name: String) -> Unit,
+) {
+    val prefs = rememberPreferencesStore()
+    var name by remember { mutableStateOf(currentName) }
+    var icon by remember { mutableStateOf(currentIcon ?: "") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Session icon & name") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Short name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().testTag("rename_field"),
+                )
+                Spacer(Modifier.height(12.dp))
+                Text("Icon", style = MaterialTheme.typography.labelMedium)
+                Spacer(Modifier.height(6.dp))
+                // Likivik patch: full Telegram-style emoji picker (search, tabs,
+                // recents) backed by Org.Kodein.Emoji.
+                EmojiPickerSection(selected = icon, onSelect = { icon = it })
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        text = if (icon.isEmpty()) "No icon — auto letter" else "Icon: $icon",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (currentIcon != null || icon.isNotEmpty()) {
+                        TextButton(onClick = { icon = "" }) {
+                            Text("No icon")
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (icon.isNotEmpty()) storeRecentIcon(prefs, icon)
+                    onSave(icon, name)
+                },
+            ) { Text(stringResource(Res.string.common_save)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(Res.string.common_cancel)) }
+        },
+    )
+}

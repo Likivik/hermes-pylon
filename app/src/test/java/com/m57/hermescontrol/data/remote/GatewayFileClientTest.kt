@@ -7,6 +7,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -264,11 +265,31 @@ class GatewayFileClientTest {
             val key = cache.key(scope, "/cancel")
             cache.writeBytes(key, "old".toByteArray())
             val target = cache.fresh(key)!!
-            val job = launch(Dispatchers.Default) { cache.writeBytes(key, "new".toByteArray()) }
+            // Park the coroutine at a real suspension point before the write, so
+            // cancellation is deterministic. Racing `cancel()` against `writeBytes`
+            // proved nothing: the write has no suspension point to be interrupted
+            // at, so the job either finished first (isCancelled == false) or never
+            // started, and the test passed or failed on scheduler timing.
+            val job =
+                launch(Dispatchers.Default) {
+                    delay(1_000)
+                    cache.writeBytes(key, "new".toByteArray())
+                }
             job.cancel()
             job.join()
 
             assertTrue(job.isCancelled)
+            assertEquals("old", target.readText())
+            assertFalse(dir.listFiles().orEmpty().any { it.name.startsWith(".") })
+
+            // A write that fails part-way must also leave no temp behind and keep
+            // the previously published bytes: same cleanup contract, reached
+            // deterministically through the size limit instead of through timing.
+            val limited = GatewayMediaCache(dir, maxBytes = 8)
+            val thrown =
+                runCatching { limited.writeBytes(key, "0123456789".toByteArray()) }
+                    .exceptionOrNull()
+            assertTrue("expected CacheTooLargeException, got $thrown", thrown is CacheTooLargeException)
             assertEquals("old", target.readText())
             assertFalse(dir.listFiles().orEmpty().any { it.name.startsWith(".") })
         }

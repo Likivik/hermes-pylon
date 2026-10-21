@@ -48,7 +48,10 @@ import com.m57.hermescontrol.data.remote.CleartextPolicy
 import com.m57.hermescontrol.data.remote.GatewayResponse
 import com.m57.hermescontrol.data.remote.HermesGatewayApi
 import com.m57.hermescontrol.data.remote.ServerEndpoint
+import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.connect_error_401
 import com.m57.hermescontrol.ui.channels.ChannelsViewModel
+import com.m57.hermescontrol.ui.common.FakeStringResolver
 import com.m57.hermescontrol.ui.connect.ConnectViewModel
 import com.m57.hermescontrol.ui.cron.CronJobsViewModel
 import com.m57.hermescontrol.ui.kanban.KanbanViewModel
@@ -76,6 +79,7 @@ class E2eIntegrationTest {
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var mockApiService: HermesGatewayApi
     private val mockApp = mockk<Application>(relaxed = true)
+    private lateinit var connectResolver: FakeStringResolver
 
     @Before
     fun setUp() {
@@ -119,8 +123,15 @@ class E2eIntegrationTest {
         every { AuthManager.getPinnedSessionIds(AuthManager.DEFAULT_PROFILE_ID) } returns emptyList()
         every { AuthManager.savePinnedSessionIds(any()) } returns Unit
 
-        // Application stubs
-        every { mockApp.getString(R.string.connect_error_401) } returns "Invalid token (401 Unauthorized)"
+        // The StringResolver seam replaces the old `mockApp.getString(R.string.x)`
+        // stubs for `ConnectViewModel`. We register the messages that
+        // the connect flow needs here, mirroring the values the
+        // previous test mocks returned so existing assertions still
+        // pass.
+        connectResolver =
+            FakeStringResolver().apply {
+                stub(Res.string.connect_error_401, "Invalid token (401 Unauthorized)")
+            }
     }
 
     @After
@@ -969,7 +980,7 @@ class E2eIntegrationTest {
             val mockResponse = createErrorResponse<StatusResponse>(401)
             coEvery { mockApiService.getStatus() } returns mockResponse
 
-            val viewModel = ConnectViewModel(app = mockApp, ioDispatcher = testDispatcher)
+            val viewModel = ConnectViewModel(resolver = connectResolver, ioDispatcher = testDispatcher)
             viewModel.onTokenChange("expired-token")
             viewModel.connect()
             advanceUntilIdle()
@@ -989,7 +1000,7 @@ class E2eIntegrationTest {
             val statusResponse = StatusResponse()
             coEvery { mockApiService.getStatus() } returns GatewayResponse.success(statusResponse)
 
-            val connectViewModel = ConnectViewModel(app = mockApp, ioDispatcher = testDispatcher)
+            val connectViewModel = ConnectViewModel(resolver = connectResolver, ioDispatcher = testDispatcher)
             connectViewModel.onTokenChange("valid-token")
             connectViewModel.connect()
             advanceUntilIdle()

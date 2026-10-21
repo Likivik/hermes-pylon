@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Pylon</title>
+    <style>
+        /* Compose injects no CSS of its own and ComposeViewport sizes its canvas to
+           the container (document.body here), so html/body must have a size or the
+           canvas has zero area. */
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #101418;
+        }
+    </style>
+</head>
+<body>
+    <!--
+      TEMPORARY diagnostic surface - remove once the web target is known good.
+      Renders immediately (before the 34 MB wasm loads) so a screenshot taken at any
+      point is informative: it shows any JS error / unhandled rejection, whether the
+      module script executed, and the canvas's real pixel size once ComposeViewport
+      appends it. A 0x0 canvas means the container had no area; a missing "module
+      executed" line means the script tag itself is wrong.
+    -->
+    <pre id="bootlog" style="color:#8fd6a0;font:12px/1.5 monospace;padding:8px;margin:0;white-space:pre-wrap;position:relative;z-index:10;">booting…
+</pre>
+    <script>
+      (function () {
+        var log = document.getElementById('bootlog');
+        function show(msg) { log.textContent += '\n' + msg; }
+        window.addEventListener('error', function (e) {
+          show('ERROR: ' + (e.message || e.type) + (e.filename ? ' @ ' + e.filename + ':' + e.lineno : ''));
+        });
+        window.addEventListener('unhandledrejection', function (e) {
+          show('REJECTION: ' + (e.reason && e.reason.message ? e.reason.message : e.reason));
+        });
+        window.__bootlog = show;
+        var ticks = 0;
+        var t = setInterval(function () {
+          var c = document.querySelector('canvas');
+          if (c) {
+            show('canvas ' + c.width + 'x' + c.height + ' css=' + c.style.width + 'x' + c.style.height);
+            clearInterval(t);
+          } else if (++ticks > 240) {
+            show('no canvas after 120s - wasm never reached ComposeViewport');
+            clearInterval(t);
+          }
+        }, 500);
+      })();
+    </script>
+    <!-- The dev server serves the webpack bundle, not the raw Kotlin loader.
+         webpack.config entry chunk is "main" -> output filename "ui.js" (UMD,
+         library "ui"), produced from kotlin/HermesControl-ui.mjs. Loading that
+         .mjs directly skips webpack, so bare npm specifiers like
+         "@js-joda/core" never resolve and the page dies at boot. Plain script,
+         no type="module": the output libraryTarget is umd. -->
+    <script src="ui.js" onerror="window.__bootlog && window.__bootlog('MODULE SCRIPT FAILED TO LOAD: ui.js')"></script>
+    <script>window.__bootlog && window.__bootlog('module script tag executed (module graph may still be loading)');</script>
+</body>
+</html>

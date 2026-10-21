@@ -12,6 +12,8 @@ import com.m57.hermescontrol.data.ws.WsEvent
 import com.m57.hermescontrol.data.ws.WsMethods
 import com.m57.hermescontrol.ui.chat.fakes.FakeChatPersistenceRepository
 import com.m57.hermescontrol.ui.chat.fakes.FakeSlashUsageStore
+import com.m57.hermescontrol.ui.chat.fakes.testChatEnvironment
+import com.m57.hermescontrol.ui.common.FakeStringResolver
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
@@ -52,6 +54,7 @@ class SlashCommandDispatchRpcTest {
     private val mockEventsFlow = MutableSharedFlow<WsEvent>(extraBufferCapacity = 64)
     private val mockConnectionStatus = MutableStateFlow(ConnectionStatus.DISCONNECTED)
     private lateinit var app: Application
+    private lateinit var resolver: FakeStringResolver
     private lateinit var fakeRepo: FakeChatPersistenceRepository
     private lateinit var fakeSlashUsageStore: FakeSlashUsageStore
     private var reqCount = 0
@@ -79,6 +82,7 @@ class SlashCommandDispatchRpcTest {
         mockkObject(HermesDatabase)
 
         app = mockk(relaxed = true)
+        resolver = FakeStringResolver()
         fakeRepo = FakeChatPersistenceRepository()
         fakeSlashUsageStore = FakeSlashUsageStore()
 
@@ -121,7 +125,8 @@ class SlashCommandDispatchRpcTest {
     private suspend fun TestScope.createViewModelWithSession(): Pair<ChatViewModel, String> {
         val vm =
             ChatViewModel(
-                app,
+                testChatEnvironment(fakeSlashUsageStore),
+                resolver,
                 false,
                 fakeRepo,
                 fakeSlashUsageStore,

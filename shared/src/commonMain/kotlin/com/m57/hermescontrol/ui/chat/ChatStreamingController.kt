@@ -31,14 +31,14 @@ class ChatStreamingController(
     private val isCurrentSession: (String?) -> Boolean,
     private val isTestEnvironment: () -> Boolean,
 ) {
-    private val streamingBuffer = java.lang.StringBuilder()
+    private val streamingBuffer = StringBuilder()
     private var lastFlushMs = 0L
     private var trailingMessageFlushJob: Job? = null
 
-    private val thinkingBuffer = java.lang.StringBuilder()
+    private val thinkingBuffer = StringBuilder()
     private var lastThinkingFlushMs = 0L
 
-    private val reasoningBuffer = java.lang.StringBuilder()
+    private val reasoningBuffer = StringBuilder()
     private var lastReasoningFlushMs = 0L
 
     /**

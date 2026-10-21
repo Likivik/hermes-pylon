@@ -156,7 +156,7 @@ fun acknowledgeSubmittedChanges(
     pendingChanges: MutableMap<String, JsonElement>,
     submitted: Map<String, JsonElement>,
 ) {
-    submitted.forEach { (key, value) -> pendingChanges.remove(key, value) }
+    submitted.forEach { (key, value) -> if (pendingChanges[key] == value) pendingChanges.remove(key) }
 }
 
 /** A raw document is editable only after its GET completed successfully. */

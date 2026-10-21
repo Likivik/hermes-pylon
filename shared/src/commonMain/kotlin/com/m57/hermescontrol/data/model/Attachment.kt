@@ -1,6 +1,7 @@
 package com.m57.hermescontrol.data.model
 
 import kotlinx.serialization.Serializable
+import kotlin.math.roundToInt
 
 /**
  * Represents a file attached to a chat message.
@@ -43,7 +44,12 @@ data class Attachment(
                 size <= 0 -> "—"
                 size < 1024 -> "$size B"
                 size < 1024 * 1024 -> "${size / 1024} KB"
-                else -> "%.1f MB".format(size.toDouble() / (1024 * 1024))
+                else -> {
+                    // One decimal, locale-independent: String.format is JVM-only.
+                    val megabytes = size.toDouble() / (1024 * 1024)
+                    val rounded = (megabytes * 10).roundToInt() / 10.0
+                    "$rounded MB"
+                }
             }
 
     val fileExtension: String

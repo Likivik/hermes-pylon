@@ -144,7 +144,7 @@ suspend inline fun <reified T> safeApiCall(
         } catch (e: Exception) {
             return NetworkResult.Failure(
                 NetworkError.Unknown(
-                    "An unexpected error occurred: ${e.localizedMessage ?: e.message}",
+                    "An unexpected error occurred: ${e.message}",
                     e,
                 ),
             )

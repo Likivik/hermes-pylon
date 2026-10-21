@@ -1,12 +1,12 @@
 # This workflow is the SINGLE owner of unit tests — android.yml no longer runs any.
 #
-# SCOPE — the IRIS flavor only (`sh.slb.irismobile`). Iris is the flavor this fork
-# ships: apk.yml defaults to it, the E2E suite drives it, and every APK delivered to
-# the device has been an iris build. `hermes` is the upstream identity
-# (`sh.slb.hermesmobile`) and is deliberately NOT tested — Likivik, 2026-10-05:
-# "for now we only ever want to test our own flavor and nothing else."
-# So there is exactly one variant under test here: irisDebug. No variant matrix, no
-# scheduled all-variants sweep — add one back deliberately if that ever changes.
+# SCOPE — there is now a single flavorless build with applicationId
+# `io.github.likivik.pylon`. The previous `hermes`/`iris` flavor split was removed
+# on 2026-10-15: the `iris` flavor's only purpose was a one-file string override
+# to "Iris Mobile" (the name of an unrelated upstream product), and shipping two
+# builds of the same app was not earning its keep. So there is exactly one
+# variant under test here: `debug`. No variant matrix, no scheduled all-variants
+# sweep — add one back deliberately if that ever changes.
 #
 # TRIGGERS — why push is limited to main:
 #   * pull_request  — the only event that fires for a PR from a FORK (a fork push
@@ -45,7 +45,7 @@ permissions:
 
 jobs:
   unit-tests:
-    name: Unit tests (iris debug)
+    name: Unit tests (debug)
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -59,10 +59,34 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # The multiplatform boundary: no platform API imports in :shared/commonMain,
+      # and every `expect` declaration has an `actual` in each declared target
+      # source set. Sub-second and needs no JDK, so it runs first to fail fast.
+      - name: Check the multiplatform boundary
+        run: |
+          python3 scripts/check_kmp_boundary.py
+          python3 scripts/test_check_kmp_boundary.py
+
       # The shared data/logic layer: ChatViewModel reducers, rail grouping + order
       # persistence, rename fast-path. JUnit + Robolectric, ~7 min.
-      - name: Run unit tests (iris debug)
-        run: ./gradlew testIrisDebugUnitTest --no-daemon -Dorg.gradle.workers.max=2
+      - name: Run unit tests (debug)
+        run: ./gradlew testDebugUnitTest --no-daemon -Dorg.gradle.workers.max=2
+
+      # The wasmJs target is the only non-JVM runtime :shared/commonMain is
+      # exercised on, and it runs the same commonTest sources through karma in a
+      # browser. Compiling them is not enough: a JVM-only assumption in
+      # commonMain (e.g. relying on an unchecked array read to raise) only
+      # surfaces once the tests actually execute. ubuntu-latest ships Chrome, so
+      # karma's default ChromeHeadless works here — the dev boxes, which do not
+      # have Chrome, pass -PwasmTestBrowser=firefox via scripts/local-tests.sh
+      # `wasm`.
+      - name: Install yarn for the wasm toolchain
+        run: |
+          npm install --global yarn
+          yarn --version
+
+      - name: Run :shared wasmJs tests
+        run: ./gradlew :shared:wasmJsBrowserTest --no-daemon -Dorg.gradle.workers.max=2
 
       - name: Upload unit test reports
         if: failure()
@@ -70,4 +94,12 @@ jobs:
         with:
           name: unit-test-reports
           path: app/build/reports/tests/
+          retention-days: 14
+
+      - name: Upload wasm test reports
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: wasm-test-reports
+          path: shared/build/reports/tests/
           retention-days: 14

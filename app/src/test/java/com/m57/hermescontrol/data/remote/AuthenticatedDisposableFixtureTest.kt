@@ -10,6 +10,7 @@ import com.m57.hermescontrol.data.remote.NetworkError.AuthExpired
 import com.m57.hermescontrol.data.remote.NetworkResult.Failure
 import com.m57.hermescontrol.data.ws.ConnectionStatus
 import com.m57.hermescontrol.data.ws.HermesWsClient
+import com.m57.hermescontrol.data.ws.OkHttpWsTransport
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
@@ -154,6 +155,11 @@ class AuthenticatedDisposableFixtureTest {
         every { AuthManager.getToken() } returns "stale-bearer"
         every { AuthManager.isAutoReconnect() } returns false
         every { AuthManager.getSessionCookie() } returns null
+        HermesWsClient.installAuth(AuthManager)
+        HermesWsClient.installTransport(OkHttpWsTransport(OkHttpProvider.websocket))
+        HermesWsClient.installHttpClient(
+            createHermesHttpClient(OkHttpProvider.probe, HermesHttpConfig.Probe),
+        )
         HermesWsClient.disconnect(clearPendingMessages = true)
         HermesWsClient.setAppForeground(true)
         AuthSessionState.markAuthenticated()
