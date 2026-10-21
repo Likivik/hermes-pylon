@@ -46,7 +46,9 @@ import io.mockk.mockkConstructor
 import io.mockk.mockkObject
 import io.mockk.mockkStatic
 import io.mockk.slot
-import io.mockk.unmockkAll
+import io.mockk.unmockkConstructor
+import io.mockk.unmockkObject
+import io.mockk.unmockkStatic
 import io.mockk.verify
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -68,12 +70,14 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.After
+import org.junit.AfterClass
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.BeforeClass
 import org.junit.Test
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -84,6 +88,33 @@ private const val PRIVILEGED_FAILURE_TEXT = "Hermes did not acknowledge that. Th
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatViewModelTest {
+    companion object {
+        /**
+         * Log is mocked once per class, not per test.
+         *
+         * `mockkStatic(Log::class)` costs 383ms (measured) because MockK
+         * instruments the JVM-wide static site; with 164 tests in this class that
+         * was a minute of pure setup. The stubs are identical in every test, so
+         * they live here. Teardown is deliberately targeted (see tearDown) rather
+         * than `unmockkAll()`, which would tear this down after the first test.
+         */
+        @JvmStatic
+        @BeforeClass
+        fun mockAndroidLog() {
+            mockkStatic(Log::class)
+            every { Log.d(any(), any()) } returns 0
+            every { Log.i(any(), any()) } returns 0
+            every { Log.w(any(), any<String>()) } returns 0
+            every { Log.e(any(), any()) } returns 0
+        }
+
+        @JvmStatic
+        @AfterClass
+        fun unmockAndroidLog() {
+            unmockkStatic(Log::class)
+        }
+    }
+
     private val testDispatcher = StandardTestDispatcher()
     private val mockEventsFlow = MutableSharedFlow<WsEvent>(extraBufferCapacity = 64)
     private val mockConnectionStatus = MutableStateFlow(ConnectionStatus.DISCONNECTED)
@@ -107,12 +138,6 @@ class ChatViewModelTest {
         // 383ms per test (measured), but the alternative - letting android.jar
         // stubs return defaults via isReturnDefaultValues - changes Uri/TextUtils
         // semantics globally and destabilised 31 ViewModel tests. Costly, correct.
-        mockkStatic(Log::class)
-        every { Log.d(any(), any()) } returns 0
-        every { Log.i(any(), any()) } returns 0
-        every { Log.w(any(), any<String>()) } returns 0
-        every { Log.e(any(), any()) } returns 0
-
         mockkStatic(Dispatchers::class)
         every { Dispatchers.IO } returns testDispatcher
         every { Dispatchers.Main } returns testMainDispatcher
@@ -216,7 +241,21 @@ class ChatViewModelTest {
     fun tearDown() {
         Dispatchers.resetMain()
         installAttachmentReader(null)
-        unmockkAll()
+        // Targeted, not unmockkAll(): the class-level Log mock must survive
+        // between tests. Every mock site in this file is listed - the two
+        // singletons the class mocks itself, plus the ones individual tests add
+        // (Uri, FileProvider, GatewayFileClient, and the Base64OutputStream /
+        // Intent constructors).
+        unmockkObject(AuthManager)
+        unmockkObject(HermesWsClient)
+        unmockkObject(ApiClient)
+        unmockkObject(HermesDatabase)
+        unmockkObject(GatewayFileClient)
+        unmockkStatic(Dispatchers::class)
+        unmockkStatic(Uri::class)
+        unmockkStatic(FileProvider::class)
+        runCatching { unmockkConstructor(android.util.Base64OutputStream::class) }
+        runCatching { unmockkConstructor(Intent::class) }
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
