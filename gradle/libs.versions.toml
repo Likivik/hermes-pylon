@@ -16,7 +16,7 @@ junit5 = "6.1.3"
 junitPlatform = "6.1.3"
 kotlin = "2.4.21"
 screenshot = "0.0.1-alpha15"
-roborazzi-plugin = "1.72.0"
+roborazzi-plugin = "1.76.0"
 # standalone per KSP 2.0+ guidance — NOT kotlinVersion-kspVersion; easy
 # to miss during Kotlin upgrades since it no longer tracks the Kotlin version.
 ksp = "2.3.12"
@@ -29,12 +29,12 @@ mockk = "1.14.11"
 turbine = "1.2.1"
 coil = "2.7.0"
 room = "2.7.1"
-sqlcipher = "4.18.0"
+sqlcipher = "4.19.1"
 datastore = "1.1.2"
-latex = "1.5.5"
+latex = "1.5.6"
 reorderable = "3.1.0"
-roborazzi = "1.72.0"
-robolectric = "4.14.1"
+roborazzi = "1.76.0"
+robolectric = "4.17"
 # ktlint: the plugin version and the engine version are separate pins on
 # purpose. The plugin default engine changes between plugin releases, which
 # is how CI and local runs drift apart on a required check.
@@ -52,7 +52,7 @@ composeMultiplatform = "1.12.2"
 # table in CMP 1.12.2 pins `material3*:1.12.0-alpha03` and the navigation-suite
 # chrome shares that version. Pinning it separately avoids pulling a phantom
 # `material3:1.12.2` that does not exist.
-composeMaterial3 = "1.12.0-alpha03"
+composeMaterial3 = "1.13.0-alpha02"
 # The CMP adaptive fork is published under `org.jetbrains.compose.material3.adaptive`,
 # not under `androidx.compose.material3.adaptive`. 1.3.0 is the latest stable
 # (2026-10-06) and matches the version table in CMP 1.12.2.
@@ -63,7 +63,7 @@ composeAdaptive = "1.3.0"
 # in separately per-host (linux-x64 here). Without this, `runComposeUiTest`
 # throws `LibraryLoadException: Cannot find libskiko-linux-x64.so.sha256`
 # before the composable even runs.
-skiko = "0.150.2"
+skiko = "0.153.0"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidxCore" }
