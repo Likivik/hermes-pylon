@@ -43,6 +43,17 @@ EXPECT_RE = re.compile(
 # Target source sets whose directories are siblings of commonMain.
 TARGET_SOURCE_SETS = ("androidMain", "jvmMain", "jsMain", "wasmJsMain", "iosMain", "desktopMain")
 
+# Intermediate source sets: one directory whose code is compiled into several
+# targets. An `actual` living there satisfies the expect for every target that
+# depends on it, so the per-target scan below has to look there too.
+INTERMEDIATE_SOURCE_SETS = ("jvmAndroidMain",)
+
+# Which intermediate source sets each target source set also compiles.
+INTERMEDIATE_MEMBERSHIP = {
+    "androidMain": ("jvmAndroidMain",),
+    "jvmMain": ("jvmAndroidMain",),
+}
+
 
 def strip_comments(text: str) -> str:
     """Drop block and line comments.
@@ -73,7 +84,14 @@ def scan(base_dir: Path) -> tuple[list[str], list[str]]:
         directory = base_dir / source_set
         if not directory.is_dir():
             continue
-        blob = "\n".join(strip_comments(p.read_text(encoding="utf-8")) for p in directory.rglob("*.kt"))
+        directories = [directory]
+        # An intermediate source set (e.g. jvmAndroidMain) is compiled into
+        # several targets; its `actual`s count for each of them.
+        for intermediate in INTERMEDIATE_MEMBERSHIP.get(source_set, ()):
+            candidate = base_dir / intermediate
+            if candidate.is_dir():
+                directories.append(candidate)
+        blob = "\n".join(strip_comments(p.read_text(encoding="utf-8")) for d in directories for p in d.rglob("*.kt"))
         for name in expect_names:
             if not re.search(rf"\bactual\b[^\n]*\b{re.escape(name)}\b", blob):
                 missing.append(f"{source_set}: no `actual` for expect `{name}`")

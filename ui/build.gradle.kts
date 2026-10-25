@@ -177,6 +177,20 @@ kotlin {
     }
 
     sourceSets {
+        // Intermediate source set for code that is byte-identical on the JVM
+        // console target and the Android target. Both `jvmMain` and
+        // `androidMain` depend on it, so one copy of the file serves both.
+        // `wasmJsMain` deliberately does NOT: the web target needs its own
+        // actual (no `java.*` on the web, `Dispatchers.IO` does not exist).
+        //
+        // The default Kotlin hierarchy template has no android+jvm group and
+        // refuses to coexist with explicit `dependsOn` edges, so the template
+        // is disabled in gradle.properties and the edges are declared here.
+        val jvmAndroidMain = create("jvmAndroidMain")
+        jvmAndroidMain.dependsOn(getByName("commonMain"))
+        getByName("androidMain").dependsOn(jvmAndroidMain)
+        getByName("jvmMain").dependsOn(jvmAndroidMain)
+
         commonMain {
             dependencies {
                 // Compose Multiplatform runtime — Phase 2 of the CMP plan. The

@@ -1,9 +1,10 @@
 package com.m57.hermescontrol.concurrent
 
 /**
- * JVM actuals for [concurrentMutableMap], [removeIfValue] and the three factories. Each
- * implementation wraps the JDK type the code used before, so shared code keeps the exact
- * concurrency semantics it had when it imported `java.util.concurrent` directly.
+ * JVM/Android actuals for [concurrentMutableMap], [removeIfValue] and the three
+ * factories. Each implementation wraps the JDK type the code used before, so shared code
+ * keeps the exact concurrency semantics it had when it imported `java.util.concurrent`
+ * directly.
  */
 actual fun <K, V> concurrentMutableMap(): MutableMap<K, V> = java.util.concurrent.ConcurrentHashMap()
 
@@ -16,13 +17,13 @@ actual fun <K, V> MutableMap<K, V>.removeIfValue(
     value: V,
 ): Boolean = remove(key, value)
 
-actual fun atomicInteger(initial: Int): AtomicInteger = JvmAtomicInteger(initial)
+actual fun atomicInteger(initial: Int): AtomicInteger = JdkAtomicInteger(initial)
 
-actual fun atomicBoolean(initial: Boolean): AtomicBoolean = JvmAtomicBoolean(initial)
+actual fun atomicBoolean(initial: Boolean): AtomicBoolean = JdkAtomicBoolean(initial)
 
-actual fun <E> concurrentLinkedQueue(): ConcurrentLinkedQueue<E> = JvmConcurrentLinkedQueue()
+actual fun <E> concurrentLinkedQueue(): ConcurrentLinkedQueue<E> = JdkConcurrentLinkedQueue()
 
-private class JvmAtomicInteger(
+private class JdkAtomicInteger(
     initial: Int,
 ) : AtomicInteger {
     private val delegate = java.util.concurrent.atomic.AtomicInteger(initial)
@@ -36,7 +37,7 @@ private class JvmAtomicInteger(
     override fun incrementAndGet(): Int = delegate.incrementAndGet()
 }
 
-private class JvmAtomicBoolean(
+private class JdkAtomicBoolean(
     initial: Boolean,
 ) : AtomicBoolean {
     private val delegate = java.util.concurrent.atomic.AtomicBoolean(initial)
@@ -53,7 +54,7 @@ private class JvmAtomicBoolean(
     ): Boolean = delegate.compareAndSet(expect, update)
 }
 
-private class JvmConcurrentLinkedQueue<E> : ConcurrentLinkedQueue<E> {
+private class JdkConcurrentLinkedQueue<E> : ConcurrentLinkedQueue<E> {
     private val delegate = java.util.concurrent.ConcurrentLinkedQueue<E>()
 
     override val size: Int get() = delegate.size
