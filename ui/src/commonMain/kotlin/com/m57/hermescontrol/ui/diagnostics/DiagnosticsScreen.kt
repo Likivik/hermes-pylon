@@ -22,6 +22,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.m57.hermescontrol.ui.keys.rememberSensitiveCopy
+import com.m57.hermescontrol.util.LogSeverity
 
 /**
  * The permanent answer to "why is the gateway unreachable?".
@@ -35,6 +37,7 @@ fun DiagnosticsScreen(modifier: Modifier = Modifier) {
     val viewModel = remember { DiagnosticsViewModel() }
     val state by viewModel.state.collectAsState()
     val events by viewModel.events.collectAsState()
+    val copy = rememberSensitiveCopy()
 
     LaunchedEffect(Unit) { viewModel.runChecks() }
 
@@ -50,6 +53,9 @@ fun DiagnosticsScreen(modifier: Modifier = Modifier) {
                     Text(if (state.running) "Checking…" else "Run checks")
                 }
                 OutlinedButton(onClick = { viewModel.refreshFacts() }) { Text("Refresh") }
+                OutlinedButton(onClick = { copy("Pylon diagnostics", buildDiagnosticsBundle(state, events)) }) {
+                    Text("Copy")
+                }
             }
         }
 
@@ -77,27 +83,26 @@ fun DiagnosticsScreen(modifier: Modifier = Modifier) {
                 CheckRow(check)
             }
 
-            item { SectionHeader("Recent requests (${events.size})") }
+            item { SectionHeader("Recent log (${events.size})") }
             if (events.isEmpty()) {
                 item {
                     Text(
-                        "Nothing recorded yet. Requests appear here as the app makes them — this is the " +
+                        "Nothing recorded yet. Every request appears here as the app makes it — this is the " +
                             "evidence that separates a wrong URL from a proxy that never answers.",
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
             }
-            items(events) { event ->
+            items(events) { record ->
                 Text(
-                    text =
-                        "${event.method} ${event.url} → ${event.outcome} (${event.durationMillis} ms)",
+                    text = record.render(),
                     style = MaterialTheme.typography.bodySmall,
                     fontFamily = FontFamily.Monospace,
                     color =
-                        if (event.isTransportFailure) {
-                            MaterialTheme.colorScheme.error
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
+                        when (record.severity) {
+                            LogSeverity.ERROR -> MaterialTheme.colorScheme.error
+                            LogSeverity.WARN -> MaterialTheme.colorScheme.onSurface
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
                         },
                 )
             }

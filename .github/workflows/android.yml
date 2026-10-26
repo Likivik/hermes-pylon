@@ -208,6 +208,15 @@ jobs:
         run: |
           ./gradlew compileReleaseKotlin
 
+      # The wasm klib compile is not the wasm executable compile: the Kotlin/Wasm
+      # backend can fail only in the executable step. A "declaration redefinition
+      # happened on functions" ICE was hit exactly there, after
+      # `:ui:compileKotlinWasmJs` had passed. The browser bundle is what ships, so
+      # the executable task is the one that has to be green.
+      - name: Compile wasm browser executable
+        run: |
+          ./gradlew :ui:compileDevelopmentExecutableKotlinWasmJs
+
   # ─────────────────────────────────────────────────────────────────────
   # Job 6: Instrumented tests — Android emulator, OPT-IN on PRs.
   # Required for Compose UI tests (TEST-09, TEST-14) and Navigation3 tests
