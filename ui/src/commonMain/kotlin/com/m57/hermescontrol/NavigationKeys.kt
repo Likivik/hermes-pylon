@@ -70,3 +70,6 @@ import kotlinx.serialization.Serializable
 @Serializable data object SettingsBehavior : NavKey
 
 @Serializable data object SettingsAbout : NavKey
+
+/** Diagnostics: connection facts, probe verdicts and the live log, on device. */
+@Serializable data object SettingsDiagnostics : NavKey

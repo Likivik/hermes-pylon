@@ -27,6 +27,7 @@ import com.m57.hermescontrol.SettingsAppearance
 import com.m57.hermescontrol.SettingsBehavior
 import com.m57.hermescontrol.SettingsChat
 import com.m57.hermescontrol.SettingsConnection
+import com.m57.hermescontrol.SettingsDiagnostics
 import com.m57.hermescontrol.SettingsLanguage
 import com.m57.hermescontrol.data.theme.ThemePreference
 import com.m57.hermescontrol.generated.resources.Res
@@ -36,6 +37,7 @@ import com.m57.hermescontrol.generated.resources.settings_sec_appearance
 import com.m57.hermescontrol.generated.resources.settings_sec_behavior
 import com.m57.hermescontrol.generated.resources.settings_sec_chat
 import com.m57.hermescontrol.generated.resources.settings_sec_connection
+import com.m57.hermescontrol.generated.resources.settings_sec_diagnostics
 import com.m57.hermescontrol.generated.resources.settings_sec_language
 import com.m57.hermescontrol.generated.resources.settings_summary_off
 import com.m57.hermescontrol.generated.resources.settings_summary_on
@@ -129,6 +131,11 @@ fun SettingsScreen(
                             icon = HermesIcon.Info,
                             label = stringResource(Res.string.settings_sec_about),
                             onClick = { NavigationController.navigateTo(SettingsAbout) },
+                        ),
+                        SettingsRow(
+                            icon = HermesIcon.Terminal,
+                            label = stringResource(Res.string.settings_sec_diagnostics),
+                            onClick = { NavigationController.navigateTo(SettingsDiagnostics) },
                         ),
                     ),
             )
