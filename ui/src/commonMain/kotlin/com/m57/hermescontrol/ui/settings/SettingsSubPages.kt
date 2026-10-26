@@ -29,10 +29,12 @@ import com.m57.hermescontrol.generated.resources.settings_sec_appearance
 import com.m57.hermescontrol.generated.resources.settings_sec_behavior
 import com.m57.hermescontrol.generated.resources.settings_sec_chat
 import com.m57.hermescontrol.generated.resources.settings_sec_connection
+import com.m57.hermescontrol.generated.resources.settings_sec_diagnostics
 import com.m57.hermescontrol.generated.resources.settings_sec_language
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.HermesScaffold
 import com.m57.hermescontrol.ui.common.NavIcon
+import com.m57.hermescontrol.ui.diagnostics.DiagnosticsScreen
 import com.m57.hermescontrol.ui.settings.components.AboutSection
 import com.m57.hermescontrol.ui.settings.components.AppearanceSection
 import com.m57.hermescontrol.ui.settings.components.BehaviorSection
@@ -249,5 +251,21 @@ fun SettingsAboutPage(
         ) {
             AboutSection()
         }
+    }
+}
+
+/**
+ * Diagnostics on Android: the same commonMain screen the web build shows, so a
+ * user reporting "it can't reach the gateway" has the probe verdicts and the
+ * live log on the device that has the problem — no `adb logcat` in the loop.
+ */
+@Composable
+fun SettingsDiagnosticsPage(onBack: () -> Unit) {
+    HermesScaffold(
+        title = { Text(stringResource(Res.string.settings_sec_diagnostics)) },
+        navigationIcon = NavIcon.Back(onBack),
+        drawerGesturesEnabled = false,
+    ) {
+        DiagnosticsScreen()
     }
 }
