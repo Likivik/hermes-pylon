@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -29,6 +31,7 @@ import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.app_name
 import com.m57.hermescontrol.generated.resources.landing_title
 import com.m57.hermescontrol.theme.HermesControlTheme
+import com.m57.hermescontrol.ui.diagnostics.DiagnosticsScreen
 import com.m57.hermescontrol.ui.icons.MaterialSymbol
 import com.m57.hermescontrol.ui.icons.MaterialSymbolPickerSection
 import com.m57.hermescontrol.ui.landing.LandingScreen
@@ -150,6 +153,7 @@ private fun PylonWebEntry() {
     }
 
     var status by remember { mutableStateOf<GatewayStatusUi>(GatewayStatusUi.Loading) }
+    var showDiagnostics by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         // The Ktor `Js` engine's `fetch()` is non-blocking — it returns a
@@ -185,6 +189,28 @@ private fun PylonWebEntry() {
                     .fillMaxWidth()
                     .padding(16.dp),
         )
+
+        // Diagnostics is a permanent surface, not a debug leftover: the failure
+        // that motivated it was only diagnosable by asking "what request did the
+        // app actually make, and what came back?" from the device itself.
+        OutlinedButton(
+            onClick = { showDiagnostics = !showDiagnostics },
+            modifier =
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp),
+        ) {
+            Text(if (showDiagnostics) "Close diagnostics" else "Diagnostics")
+        }
+
+        if (showDiagnostics) {
+            Surface(
+                color = MaterialTheme.colorScheme.background,
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                DiagnosticsScreen()
+            }
+        }
     }
 }
 

@@ -1,13 +1,16 @@
 package com.m57.hermescontrol.data.remote
 
+import com.m57.hermescontrol.data.diag.NetworkLog
 import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.plugins.HttpRequestRetry
+import io.ktor.client.plugins.HttpSend
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logging
+import io.ktor.client.plugins.plugin
 import io.ktor.http.HttpHeaders
 import io.ktor.serialization.kotlinx.json.json
 
@@ -59,13 +62,39 @@ data class HermesHttpConfig(
  * console target and future platforms consume.
  */
 fun createHermesHttpClient(config: HermesHttpConfig = HermesHttpConfig.Default): HttpClient =
-    HttpClient { installHermesPlugins(config) }
+    HttpClient { installHermesPlugins(config) }.withNetworkLog()
 
 /** Variant for tests ([io.ktor.client.engine.mock.MockEngine]) and for engines supplied by DI. */
 fun createHermesHttpClient(
     engine: HttpClientEngine,
     config: HermesHttpConfig = HermesHttpConfig.Default,
-): HttpClient = HttpClient(engine) { installHermesPlugins(config) }
+): HttpClient = HttpClient(engine) { installHermesPlugins(config) }.withNetworkLog()
+
+/**
+ * Records every request this client makes into [NetworkLog], including the ones
+ * that never produce a response.
+ *
+ * Interception rather than per-call instrumentation on purpose: a diagnostic
+ * that only sees the calls someone remembered to wrap is exactly as blind as
+ * the log it replaces. The URL is stored without its query string, because
+ * gateway URLs can carry tickets and tokens.
+ */
+private fun HttpClient.withNetworkLog(): HttpClient =
+    apply {
+        plugin(HttpSend).intercept { request ->
+            val mark = NetworkLog.start()
+            val url = request.url.toString().substringBefore('?')
+            val method = request.method.value
+            try {
+                val call = execute(request)
+                NetworkLog.record(method, url, "HTTP ${call.response.status.value}", mark)
+                call
+            } catch (t: Throwable) {
+                NetworkLog.record(method, url, t::class.simpleName ?: "failure", mark)
+                throw t
+            }
+        }
+    }
 
 /**
  * Installs the shared plugin set.
