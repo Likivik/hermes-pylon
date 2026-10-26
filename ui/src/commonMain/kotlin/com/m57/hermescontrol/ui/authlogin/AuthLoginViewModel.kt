@@ -5,14 +5,16 @@ package com.m57.hermescontrol.ui.authlogin
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.CreationExtras
 import com.m57.hermescontrol.data.config.ConnectionProfile
 import com.m57.hermescontrol.data.local.AuthSessionState
 import com.m57.hermescontrol.data.local.authStore
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.AuthPayloads
+import com.m57.hermescontrol.data.remote.HermesHttpConfig
 import com.m57.hermescontrol.data.remote.ServerEndpoint
+import com.m57.hermescontrol.data.remote.createHermesHttpClient
 import com.m57.hermescontrol.data.remote.parseForBuild
-import com.m57.hermescontrol.data.remote.resolve
 import com.m57.hermescontrol.data.remote.safeApiCall
 import com.m57.hermescontrol.data.ws.HermesWsClient
 import com.m57.hermescontrol.generated.resources.Res
@@ -27,18 +29,18 @@ import com.m57.hermescontrol.generated.resources.connect_error_http_code
 import com.m57.hermescontrol.ui.common.StringResolver
 import com.m57.hermescontrol.util.HermesLog
 import com.m57.hermescontrol.util.ioDispatcher
+import io.ktor.client.HttpClient
+import io.ktor.client.request.get
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.HttpHeaders
+import io.ktor.http.isSuccess
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import java.util.concurrent.TimeUnit
+import kotlin.reflect.KClass
 
 /**
  * What auth the dashboard requires.
@@ -67,6 +69,16 @@ data class AuthLoginUiState(
     val errorMessage: String? = null,
     val loggedInProfiles: List<ConnectionProfile> = emptyList(),
 )
+
+/**
+ * Probe / ticket-minting client, shared by every instance.
+ *
+ * Same short timeouts as the retired `OkHttpProvider.probe` (5 s connect, read
+ * and write), and one instance for the process: an [HttpClient] is expensive to
+ * build and safe to share. It is intentionally never closed — the app lifetime
+ * is the client lifetime.
+ */
+private val dashboardProbeClient: HttpClient by lazy { createHermesHttpClient(HermesHttpConfig.Probe) }
 
 class AuthLoginViewModel(
     private val resolver: StringResolver,
@@ -112,8 +124,7 @@ class AuthLoginViewModel(
         private const val TAG = "AuthLoginVM"
     }
 
-    private val probeClient: OkHttpClient =
-        com.m57.hermescontrol.data.remote.OkHttpProvider.probe
+    private val probeClient: HttpClient = dashboardProbeClient
 
     fun onBaseUrlChange(value: String) {
         val warning =
@@ -212,21 +223,15 @@ class AuthLoginViewModel(
      * When [ProbeResult.extractedToken] is non-null, the session token
      * was found embedded in the dashboard SPA HTML and can be auto-populated.
      */
-    private fun probeDashboardInternal(endpoint: ServerEndpoint): ProbeResult? {
+    private suspend fun probeDashboardInternal(endpoint: ServerEndpoint): ProbeResult? {
+        val base = endpoint.baseUrl.toString()
+
         // Step 1: Check if dashboard is reachable via /api/status (always public)
         val statusOk =
             try {
-                val req =
-                    Request
-                        .Builder()
-                        .url(endpoint.resolve("api/status"))
-                        .get()
-                        .build()
-                probeClient.newCall(req).execute().use { response ->
-                    response.isSuccessful
-                }
+                probeClient.get(endpoint.baseUrl.resolve("api/status").toString()).status.isSuccess()
             } catch (e: Exception) {
-                HermesLog.w(TAG, "Status probe failed (${e.javaClass.simpleName})")
+                HermesLog.w(TAG, "Status probe failed (${e::class.simpleName})")
                 return null // Dashboard unreachable
             }
 
@@ -235,19 +240,12 @@ class AuthLoginViewModel(
         // Step 2: Probe / to see if it redirects to /login (basic auth) or returns SPA
         val needsBasicAuth =
             try {
-                val req =
-                    Request
-                        .Builder()
-                        .url(endpoint.baseUrl.toString().toHttpUrlOrNull()!!)
-                        .get()
-                        .build()
-                probeClient.newCall(req).execute().use { response ->
-                    val location = response.header("location", "")
-                    response.code == 302 &&
-                        location?.contains("/login", ignoreCase = true) == true
-                }
+                val response = probeClient.get(base)
+                val location = response.headers[HttpHeaders.Location]
+                response.status.value == 302 &&
+                    location?.contains("/login", ignoreCase = true) == true
             } catch (e: Exception) {
-                HermesLog.w(TAG, "SPA probe failed (${e.javaClass.simpleName})")
+                HermesLog.w(TAG, "SPA probe failed (${e::class.simpleName})")
                 false
             }
 
@@ -255,16 +253,7 @@ class AuthLoginViewModel(
         var extractedToken: String? = null
         if (!needsBasicAuth) {
             try {
-                val req =
-                    Request
-                        .Builder()
-                        .url(endpoint.baseUrl.toString().toHttpUrlOrNull()!!)
-                        .get()
-                        .build()
-                val body =
-                    probeClient.newCall(req).execute().use { response ->
-                        response.body.string()
-                    }
+                val body = probeClient.get(base).bodyAsText()
                 // Extract __HERMES_SESSION_TOKEN__ from the SPA HTML
                 val tokenMatch = Regex("""__HERMES_SESSION_TOKEN__\s*=\s*"([^"]+)"""").find(body)
                 extractedToken = tokenMatch?.groupValues?.getOrNull(1)
@@ -272,7 +261,7 @@ class AuthLoginViewModel(
                     HermesLog.w(TAG, "SPA has no __HERMES_SESSION_TOKEN__ — mode might require both auth")
                 }
             } catch (e: Exception) {
-                HermesLog.w(TAG, "SPA token extraction failed (${e.javaClass.simpleName})")
+                HermesLog.w(TAG, "SPA token extraction failed (${e::class.simpleName})")
             }
         }
 
@@ -443,47 +432,30 @@ class AuthLoginViewModel(
             return null
         }
 
-        val jsonMediaType = "application/json; charset=utf-8".toMediaType()
         val jsonBody = AuthPayloads.passwordLogin(username, password)
 
         try {
-            // Step 1: Authenticate via the password login endpoint to get a session cookie
-            val loginClient =
-                com.m57.hermescontrol.data.remote.OkHttpProvider.probe
-                    .newBuilder()
-                    .connectTimeout(10, TimeUnit.SECONDS)
-                    .readTimeout(10, TimeUnit.SECONDS)
-                    .build()
-
-            val loginReq =
-                Request
-                    .Builder()
-                    .url(endpoint.resolve("auth/password-login"))
-                    .header("Content-Type", "application/json")
-                    .post(jsonBody.toRequestBody(jsonMediaType))
-                    .build()
-            com.m57.hermescontrol.data.remote.CookieManager.beginAuthentication()
-            loginClient.newCall(loginReq).execute().use { loginResp ->
-                if (!loginResp.isSuccessful) {
-                    val msg =
-                        when (loginResp.code) {
-                            401 -> resolver.get(Res.string.connect_error_401)
-                            403 -> resolver.get(Res.string.connect_error_403)
-                            else ->
-                                resolver.get(
-                                    Res.string.connect_error_http_code,
-                                    loginResp.code,
-                                )
-                        }
-                    _uiState.update {
-                        it.copy(isLoading = false, errorMessage = msg)
+            // Step 1: Authenticate via the password login endpoint. The platform
+            // captures the session cookie this response carries (on Android the
+            // persistent jar picks it up — issue #470).
+            val statusCode = performPasswordLogin(endpoint, jsonBody)
+            if (statusCode !in 200..299) {
+                val msg =
+                    when (statusCode) {
+                        401 -> resolver.get(Res.string.connect_error_401)
+                        403 -> resolver.get(Res.string.connect_error_403)
+                        else ->
+                            resolver.get(
+                                Res.string.connect_error_http_code,
+                                statusCode,
+                            )
                     }
-                    return null
+                _uiState.update {
+                    it.copy(isLoading = false, errorMessage = msg)
                 }
+                return null
             }
 
-            // The session cookie is captured automatically by the shared
-            // CookieJar (issue #470) attached to OkHttpProvider.probe.
             return ConnectResult()
         } catch (e: Exception) {
             val msg = resolver.get(Res.string.connect_error_connection_failed, e.message ?: "")
@@ -502,5 +474,8 @@ class AuthLoginViewModelFactory(
     private val resolver: StringResolver,
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel> create(modelClass: Class<T>): T = AuthLoginViewModel(resolver) as T
+    override fun <T : ViewModel> create(
+        modelClass: KClass<T>,
+        extras: CreationExtras,
+    ): T = AuthLoginViewModel(resolver) as T
 }
