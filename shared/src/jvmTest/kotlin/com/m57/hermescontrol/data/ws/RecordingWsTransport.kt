@@ -6,9 +6,9 @@ import kotlinx.coroutines.CompletableDeferred
  * In-memory [WsTransport] for tests: records what the client asked for and hands
  * back a socket it can inspect. No platform, no I/O.
  *
- * The real implementations are `OkHttpWsTransport` in `:app` and — for a future
- * web target — a Ktor one. This fake is what lets the client be exercised
- * anywhere, which is the point of the seam.
+ * The real implementation is `KtorWsTransport` in `:shared`'s `commonMain`, one
+ * copy for Android, the JVM console and wasmJs. This fake is what lets the
+ * client be exercised anywhere without a socket, which is the point of the seam.
  */
 class RecordingWsTransport : WsTransport {
     /** Completes with the first URL the client connects to, on any dispatcher. */

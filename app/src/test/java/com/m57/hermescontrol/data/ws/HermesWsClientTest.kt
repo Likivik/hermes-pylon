@@ -129,7 +129,11 @@ class HermesWsClientTest {
         HermesWsClient.installAuth(AuthManager)
         // Same transport the client used to default to, installed explicitly now
         // that the seam has no platform default.
-        HermesWsClient.installTransport(OkHttpWsTransport(OkHttpProvider.websocket))
+        // The same OkHttp-backed Ktor client the app installs: the socket handshake
+        // is authorised by the session cookie its jar carries.
+        HermesWsClient.installTransport(
+            KtorWsTransport(createHermesHttpClient(OkHttpProvider.websocket, HermesHttpConfig.streaming())),
+        )
         // The ticket-mint client is process-global and installed by the app at
         // startup. Without this, `refreshWsTicketIfNeeded()` sees a null client
         // and returns TRANSIENT_FAILURE, so every gated-mode test fails - which

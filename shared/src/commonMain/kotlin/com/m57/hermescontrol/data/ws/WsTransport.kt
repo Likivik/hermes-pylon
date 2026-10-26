@@ -5,8 +5,8 @@ package com.m57.hermescontrol.data.ws
  *
  * This file deliberately imports nothing from okhttp, java, javax, android, or
  * any other platform-specific module. `:shared` is the protocol layer; the
- * concrete `OkHttpWsTransport` implementation lives in `:app` and depends on
- * the platform engine.
+ * concrete `KtorWsTransport` lives next to this file in `commonMain` and reaches
+ * the platform engine only through Ktor's per-target engine resolution.
  *
  * The seam is intentionally minimal — three operations per socket (send, close,
  * cancel) and five listener callbacks. Anything more sophisticated belongs on
@@ -41,8 +41,9 @@ interface WsSocket {
      * one rather than exposing a byte count callers must interpret.
      *
      * Default is false so transports that cannot report a backlog behave as if
-     * the buffer were always empty (immediate cancel + reconnect). The OkHttp
-     * implementation overrides this with its real queue depth.
+     * the buffer were always empty (immediate cancel + reconnect).
+     * [KtorWsTransport] overrides it with the number of frames it accepted but
+     * has not yet handed to the engine.
      */
     fun hasPendingWrites(): Boolean = false
 }
