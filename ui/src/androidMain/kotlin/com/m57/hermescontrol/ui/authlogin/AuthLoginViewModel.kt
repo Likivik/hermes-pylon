@@ -379,7 +379,7 @@ class AuthLoginViewModel(
         }
 
         val tempApi =
-            ApiClient.createTempService(
+            ApiClient.tempService(
                 endpoint.baseUrl.toString(),
                 token,
             )

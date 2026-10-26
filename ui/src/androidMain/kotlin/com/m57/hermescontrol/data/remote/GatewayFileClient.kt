@@ -68,7 +68,7 @@ object GatewayFileClient {
                 )
             MediaRequestContext(
                 scope,
-                ApiClient.createMediaService(
+                AndroidMediaClient.createMediaService(
                     endpoint,
                     gated,
                     credential.takeUnless { gated },
@@ -77,7 +77,7 @@ object GatewayFileClient {
                 OkHttpGatewayRangeRequester(
                     endpoint = endpoint,
                     client =
-                        ApiClient.createMediaClient(
+                        AndroidMediaClient.createMediaClient(
                             gated = gated,
                             token = credential.takeUnless { gated },
                             cookieHeader = cookieHeader.takeIf { gated },
