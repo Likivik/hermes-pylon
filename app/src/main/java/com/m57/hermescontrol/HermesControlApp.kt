@@ -15,7 +15,7 @@ import com.m57.hermescontrol.data.remote.OkHttpProvider
 import com.m57.hermescontrol.data.remote.createHermesHttpClient
 import com.m57.hermescontrol.data.remote.installAttachmentReader
 import com.m57.hermescontrol.data.ws.HermesWsClient
-import com.m57.hermescontrol.data.ws.OkHttpWsTransport
+import com.m57.hermescontrol.data.ws.KtorWsTransport
 import com.m57.hermescontrol.ui.analytics.AnalyticsPreloader
 import com.m57.hermescontrol.util.AndroidLogSink
 import com.m57.hermescontrol.util.HermesLog
@@ -51,7 +51,13 @@ class HermesControlApp :
         AndroidNetworkMonitor.init(this)
         HermesWsClient.installNetworkMonitor(AndroidNetworkMonitor)
         HermesWsClient.installAuth(AuthManager)
-        HermesWsClient.installTransport(OkHttpWsTransport(OkHttpProvider.websocket))
+        // The socket stream runs on the shared Ktor transport (commonMain). It must
+        // drive the SAME OkHttp client as the REST surface: the gated handshake is
+        // authorised by the session cookie that client's jar carries, and a
+        // credential-less client is rejected with 401 before any ticket is read.
+        HermesWsClient.installTransport(
+            KtorWsTransport(createHermesHttpClient(OkHttpProvider.websocket, HermesHttpConfig.streaming())),
+        )
         HermesWsClient.installHttpClient(
             createHermesHttpClient(OkHttpProvider.probe, HermesHttpConfig.Probe),
         )

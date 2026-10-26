@@ -113,6 +113,9 @@ kotlin {
                 // The Ktor transport floor (HermesHttpClient) — the single wire
                 // transport now that Retrofit is gone from :app.
                 implementation(libs.ktor.client.core)
+                // WebSockets plugin + KtorWsTransport (commonMain): the socket
+                // stream for every target, on top of the per-target engine.
+                implementation(libs.ktor.client.websockets)
                 implementation(libs.ktor.client.content.negotiation)
                 implementation(libs.ktor.serialization.kotlinx.json)
                 implementation(libs.ktor.client.logging)
