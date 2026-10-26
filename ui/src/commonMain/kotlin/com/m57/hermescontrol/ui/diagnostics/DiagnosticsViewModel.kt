@@ -1,11 +1,11 @@
 package com.m57.hermescontrol.ui.diagnostics
 
-import com.m57.hermescontrol.data.diag.NetworkEvent
-import com.m57.hermescontrol.data.diag.NetworkLog
 import com.m57.hermescontrol.data.local.authStore
 import com.m57.hermescontrol.data.remote.GatewayPlatform
 import com.m57.hermescontrol.data.remote.HermesHttpConfig
 import com.m57.hermescontrol.data.remote.createHermesHttpClient
+import com.m57.hermescontrol.util.HermesLog
+import com.m57.hermescontrol.util.LogRecord
 import io.ktor.client.request.get
 import io.ktor.http.HttpHeaders
 import kotlinx.coroutines.CoroutineScope
@@ -60,8 +60,8 @@ class DiagnosticsViewModel {
     private val _state = MutableStateFlow(DiagnosticsState())
     val state: StateFlow<DiagnosticsState> = _state.asStateFlow()
 
-    /** Every request the shared client made, newest last. */
-    val events: StateFlow<List<NetworkEvent>> = NetworkLog.events
+    /** Every record in the always-on ring, newest last — network and otherwise. */
+    val events: StateFlow<List<LogRecord>> = HermesLog.records
 
     init {
         refreshFacts()

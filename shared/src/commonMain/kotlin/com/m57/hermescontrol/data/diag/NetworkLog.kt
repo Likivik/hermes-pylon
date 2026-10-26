@@ -1,79 +1,60 @@
 package com.m57.hermescontrol.data.diag
 
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import com.m57.hermescontrol.util.HermesLog
+import com.m57.hermescontrol.util.LogRedaction
+import com.m57.hermescontrol.util.LogSeverity
 import kotlin.time.TimeSource
 
 /**
- * One completed request: what was asked, how it ended, and how long it took.
+ * Network events as log records.
  *
- * [outcome] is deliberately a string rather than a sealed type: it has to carry
- * both `HTTP 401` and `RequestTimeoutException` without the recorder knowing
- * every error type the app can throw.
- */
-data class NetworkEvent(
-    val seq: Long,
-    val method: String,
-    val url: String,
-    val outcome: String,
-    val durationMillis: Long,
-) {
-    /** True when the request never produced a response. */
-    val isTransportFailure: Boolean
-        get() = !outcome.startsWith("HTTP ")
-}
-
-/**
- * Bounded, process-wide record of recent gateway traffic.
- *
- * Why this exists: the failure that started it was a 30 s `Request timeout has
- * expired` against a `/api/status` that answered in 20 ms from the shell. The
- * only way to tell that apart from a wrong URL, a proxy that never closes, or a
- * missing session cookie is to see the requests the app itself made. Log lines
- * are unavailable to a phone user; this is the same information, on screen.
- *
- * The buffer is small on purpose (diagnostics, not telemetry) and the newest
- * event is last so the list reads top-down in time order.
+ * This used to be a second bounded buffer with its own `StateFlow`; it is now a
+ * thin recorder in front of [HermesLog]'s ring, so the diagnostics screen, the
+ * share bundle and any future sink read one list instead of two that can drift.
+ * The typed `NetworkEvent` view is gone deliberately: a record with
+ * `component=net` already carries method, URL, outcome and duration, and a second
+ * representation is how "the log says 401 but the screen says timeout" happens.
  */
 object NetworkLog {
-    const val CAPACITY: Int = 40
-
-    private val _events = MutableStateFlow<List<NetworkEvent>>(emptyList())
-    val events: StateFlow<List<NetworkEvent>> = _events.asStateFlow()
+    const val COMPONENT: String = "net"
 
     /**
      * Marks the start of a request. The returned marker is turned into a
-     * duration by [record]; using a monotonic [TimeSource] rather than a clock
-     * keeps every target working, including wasm where `kotlin.time.Clock` is
-     * still experimental.
+     * duration by [record]; a monotonic [TimeSource] rather than a clock keeps
+     * every target working, including wasm where `kotlin.time.Clock` is still
+     * experimental.
      */
     fun start(): TimeSource.Monotonic.ValueTimeMark = TimeSource.Monotonic.markNow()
 
+    /**
+     * Records one completed request.
+     *
+     * Transport failures are `WARN` (the operation failed; a retry may still
+     * succeed), HTTP outcomes are `INFO`. The URL is redacted here rather than by
+     * the caller, so a new call site cannot leak a ticket; a timeout keeps the
+     * exception class name in `error`, which is what makes "no response at all"
+     * distinguishable from "answered 401".
+     */
     fun record(
         method: String,
         url: String,
         outcome: String,
         mark: TimeSource.Monotonic.ValueTimeMark,
+        requestId: String? = null,
+        error: Throwable? = null,
     ) {
-        val event =
-            NetworkEvent(
-                seq = 0,
-                method = method,
-                url = url,
-                outcome = outcome,
-                durationMillis = mark.elapsedNow().inWholeMilliseconds,
-            )
-        _events.update { current ->
-            val next = current + event
-            val trimmed = if (next.size > CAPACITY) next.takeLast(CAPACITY) else next
-            // Re-number so seq is dense and monotonic even after trimming.
-            trimmed.mapIndexed { index, e -> e.copy(seq = index + 1L) }
-        }
-    }
-
-    fun clear() {
-        _events.value = emptyList()
+        val transportFailure = !outcome.startsWith("HTTP ")
+        HermesLog.record(
+            severity = if (transportFailure) LogSeverity.WARN else LogSeverity.INFO,
+            component = COMPONENT,
+            message = "$method ${LogRedaction.url(url)}",
+            attributes =
+                mapOf(
+                    "outcome" to outcome,
+                    "duration_ms" to mark.elapsedNow().inWholeMilliseconds.toString(),
+                ),
+            error = error,
+            requestId = requestId,
+        )
     }
 }

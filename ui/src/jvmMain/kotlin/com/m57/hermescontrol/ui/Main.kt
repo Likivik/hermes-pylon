@@ -32,7 +32,9 @@ import org.jetbrains.compose.resources.stringResource
  * the body so the JVM toolchain actually exercises the resources lookup
  * (a value of `""` would still satisfy the type check).
  */
-fun main() =
+fun main() {
+    // Desktop console sink; the ring is always on inside HermesLog.
+    com.m57.hermescontrol.util.HermesLog.install(com.m57.hermescontrol.util.ConsoleLogSink())
     application {
         Window(
             onCloseRequest = ::exitApplication,
@@ -41,6 +43,7 @@ fun main() =
             PylonDesktopEntry()
         }
     }
+}
 
 @Composable
 private fun PylonDesktopEntry() {

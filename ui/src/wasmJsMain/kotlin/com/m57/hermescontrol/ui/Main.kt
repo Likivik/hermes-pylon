@@ -95,6 +95,9 @@ fun main() {
     // of its own, so `html, body` must have an explicit size in index.html or the
     // canvas has zero area and the page renders blank.
     onWasmReady {
+        // Console sink for DevTools; the ring is always on inside HermesLog, so
+        // diagnostics work even if this install never runs.
+        com.m57.hermescontrol.util.HermesLog.install(com.m57.hermescontrol.util.ConsoleLogSink())
         ComposeViewport(viewportContainer = document.body!!) {
             HermesControlTheme(themePreference = ThemePreference.DARK) {
                 PylonWebEntry()

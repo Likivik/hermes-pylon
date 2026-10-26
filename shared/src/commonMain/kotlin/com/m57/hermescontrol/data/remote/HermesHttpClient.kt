@@ -1,6 +1,7 @@
 package com.m57.hermescontrol.data.remote
 
 import com.m57.hermescontrol.data.diag.NetworkLog
+import com.m57.hermescontrol.util.nowMillis
 import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
 import io.ktor.client.engine.HttpClientEngine
@@ -13,6 +14,7 @@ import io.ktor.client.plugins.logging.Logging
 import io.ktor.client.plugins.plugin
 import io.ktor.http.HttpHeaders
 import io.ktor.serialization.kotlinx.json.json
+import kotlin.random.Random
 
 /**
  * Transport policy for a gateway [HttpClient], mirrored from the values baked
@@ -82,19 +84,31 @@ fun createHermesHttpClient(
 private fun HttpClient.withNetworkLog(): HttpClient =
     apply {
         plugin(HttpSend).intercept { request ->
+            val requestId = newRequestId()
+            request.headers[REQUEST_ID_HEADER] = requestId
             val mark = NetworkLog.start()
-            val url = request.url.toString().substringBefore('?')
+            val url = request.url.toString()
             val method = request.method.value
             try {
                 val call = execute(request)
-                NetworkLog.record(method, url, "HTTP ${call.response.status.value}", mark)
+                NetworkLog.record(method, url, "HTTP ${call.response.status.value}", mark, requestId)
                 call
             } catch (t: Throwable) {
-                NetworkLog.record(method, url, t::class.simpleName ?: "failure", mark)
+                NetworkLog.record(method, url, t::class.simpleName ?: "failure", mark, requestId, t)
                 throw t
             }
         }
     }
+
+/**
+ * Correlates a client request with the host's access log: the client mints it,
+ * the host records and echoes it. One short string per request buys the ability
+ * to join the two sides with a single grep.
+ */
+const val REQUEST_ID_HEADER: String = "X-Pylon-Request-Id"
+
+/** `px-<random hex>-<millis>`: unique enough to grep, short enough to read out loud. */
+private fun newRequestId(): String = "px-" + Random.nextLong().toULong().toString(16) + "-" + nowMillis()
 
 /**
  * Installs the shared plugin set.
