@@ -90,7 +90,7 @@ class E2eIntegrationTest {
 
         mockApiService = mockk()
         every { ApiClient.hermesApi } returns mockApiService
-        every { ApiClient.createTempService(any(), any()) } returns mockApiService
+        every { ApiClient.tempService(any(), any()) } returns mockApiService
         every { ApiClient.rebuild() } returns Unit
 
         // Default AuthManager stubs

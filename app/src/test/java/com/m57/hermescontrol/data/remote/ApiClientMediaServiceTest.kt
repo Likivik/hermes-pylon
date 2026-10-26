@@ -34,7 +34,7 @@ class ApiClientMediaServiceTest {
             val rangeRequester =
                 OkHttpGatewayRangeRequester(
                     endpoint,
-                    ApiClient.createMediaClient(gated = false, token = "snapshot-token"),
+                    AndroidMediaClient.createMediaClient(gated = false, token = "snapshot-token"),
                 )
 
             rangeRequester.streamRange("/tmp/a", "bytes=10-19").use { it.body?.close() }
@@ -56,7 +56,7 @@ class ApiClientMediaServiceTest {
                 OkHttpGatewayRangeRequester(
                     endpoint = endpoint,
                     client =
-                        ApiClient.createMediaClient(
+                        AndroidMediaClient.createMediaClient(
                             gated = true,
                             token = null,
                             cookieHeader = "hermes_session=captured; secondary=fixed",

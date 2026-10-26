@@ -243,6 +243,11 @@ kotlin {
                 // publishes a real klib (verified on Maven Central), so this is no
                 // longer Android-only.
                 api(libs.reorderable)
+                // The gateway REST client. :shared keeps ktor-client-core as
+                // `implementation`, so it is not exported on :shared's API surface;
+                // every target's `ApiClient` needs it now that the implementation
+                // lives in commonMain.
+                implementation(libs.ktor.client.core)
             }
         }
         commonTest {
@@ -273,28 +278,17 @@ kotlin {
         jvmMain {
             dependencies {
                 implementation(compose.desktop.currentOs)
-                // Same reason as the wasmJs block below: :shared keeps ktor-client-core
-                // as `implementation`, so it is not on :ui's jvm classpath. The desktop
-                // ApiClient actual builds a gateway client and therefore needs it.
-                implementation(libs.ktor.client.core)
+                // ktor-client-core arrives from commonMain: the gateway client is
+                // shared code now, not a per-target actual.
             }
         }
-        // The wasmJs entry calls `createHermesHttpClient()` from `:shared`'s
-        // `HermesHttpClient.kt`. `:shared` declares `ktor-client-core` as
-        // `implementation` in its commonMain, so it is NOT exported on
-        // `:shared`'s API surface and therefore not visible to `:ui`'s
-        // wasmJs compile classpath (`./gradlew :ui:dependencies
-        // --configuration wasmJsCompileClasspath` shows only Compose +
-        // `:shared` itself). Add it here so the wasmJs source set can
-        // resolve `io.ktor.client.HttpClient`. The engine itself
-        // (`ktor-client-js`) is intentionally NOT added here — picking a
-        // wasmJs Ktor engine is a parent decision. See the
-        // .hermes/plans/2026-10-19_*.md notes.
-        wasmJsMain {
-            dependencies {
-                implementation(libs.ktor.client.core)
-            }
-        }
+        // wasmJs needs no extra dependencies: both `createHermesHttpClient()`
+        // from `:shared`'s `HermesHttpClient.kt` and the shared `ApiClient`'s
+        // `io.ktor.client.HttpClient` resolve from the ktor-client-core
+        // dependency added to commonMain above. The engine itself
+        // (`ktor-client-js`) is intentionally NOT added — picking a wasmJs Ktor
+        // engine is a parent decision. See the .hermes/plans/2026-10-19_*.md
+        // notes.
         androidMain {
             kotlin.srcDir(buildConfigOutDir)
             dependencies {
