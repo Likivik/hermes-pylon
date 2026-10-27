@@ -16,7 +16,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class FilesScreenTest {
@@ -29,7 +28,9 @@ class FilesScreenTest {
             ManagedFileEntry(name = "gateway-image.png", path = "/tmp/gateway-image.png", mimeType = "image/png")
         val viewModel = mockk<FilesViewModel>(relaxed = true)
         every { viewModel.uiState } returns MutableStateFlow(FilesUiState(entries = listOf(entry))).asStateFlow()
-        val downloaded = DownloadedFile(entry.name, "image/png", File("/tmp/cached-image.png"))
+        // `cachePath` is the on-disk path string, not a java.io.File: `DownloadedFile`
+        // went platform-neutral when media moved to commonMain.
+        val downloaded = DownloadedFile(entry.name, "image/png", "/tmp/cached-image.png")
         every { viewModel.downloadFile(entry, any(), any()) } answers {
             thirdArg<(NetworkResult<DownloadedFile>) -> Unit>().invoke(NetworkResult.Success(downloaded))
         }
