@@ -217,6 +217,14 @@ jobs:
         run: |
           ./gradlew :ui:compileDevelopmentExecutableKotlinWasmJs
 
+      # androidTest sources are only compiled by the emulator job, which runs
+      # post-merge. That is how a `DownloadedFile(cachePath: String?)` signature
+      # change reached main with its instrumented test still passing a File.
+      # Compiling them here is seconds, versus a red main.
+      - name: Compile androidTest sources
+        run: |
+          ./gradlew :app:compileDebugAndroidTestKotlin
+
   # ─────────────────────────────────────────────────────────────────────
   # Job 6: Instrumented tests — Android emulator, OPT-IN on PRs.
   # Required for Compose UI tests (TEST-09, TEST-14) and Navigation3 tests
