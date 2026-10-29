@@ -10,6 +10,7 @@ import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 import okhttp3.ResponseBody
 import java.io.IOException
 
@@ -210,6 +211,16 @@ class SeekableGatewayMediaSession(
         private val CONTENT_RANGE = Regex("bytes (\\d+)-(\\d+)/(\\d+|\\*)", RegexOption.IGNORE_CASE)
     }
 }
+
+/**
+ * Bounded read of an OkHttp body.
+ *
+ * Lives next to the range transport that needs it (and imports OkHttp anyway)
+ * so `GatewayFileClient` — which now talks only through the Ktor floor and the
+ * cookie stack — carries no OkHttp type in its public surface.
+ */
+fun ResponseBody.readBytesLimited(maxBytes: Long = MAX_IN_MEMORY_MEDIA_BYTES): ByteArray? =
+    byteStream().use { it.readBytesLimited(maxBytes) }
 
 sealed interface GatewayMediaRangeResult {
     data class Success(

@@ -41,6 +41,19 @@ object CookieManager {
 
     fun isInitialized(): Boolean = jar != null
 
+    /**
+     * The `Cookie` header the persistent jar would send to [url], or `""`.
+     *
+     * Lives here rather than at the call sites so URL→cookie logic stays inside
+     * the cookie stack. `GatewayFileClient` used to build an `okhttp3.HttpUrl`
+     * just to ask this question, which was the only reason it imported OkHttp.
+     */
+    fun cookieHeaderFor(url: String): String {
+        val current = jar ?: return ""
+        val httpUrl = url.toHttpUrlOrNull() ?: return ""
+        return current.loadForRequest(httpUrl).joinToString("; ") { "${it.name}=${it.value}" }
+    }
+
     /** Current scope when initialized; null during startup or test teardown. */
     fun currentServerOrNull(): String? = jar?.currentServer()
 
