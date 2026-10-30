@@ -132,7 +132,7 @@ class AuthenticatedDisposableFixtureTest {
         CookieManager.setJarForTest(buildFakePersistentCookieJar())
         // OkHttpProvider clients are process-wide lazy singletons; a prior test may have
         // initialized them with another jar. Exercise the jar actually bound to transport.
-        jar = OkHttpProvider.base.cookieJar as PersistentCookieJar
+        jar = (OkHttpProvider.base.cookieJar as OkHttpCookieJarAdapter).jar
         jar.clearAll()
         CookieManager.setJarForTest(jar)
         mockkStatic(Log::class)

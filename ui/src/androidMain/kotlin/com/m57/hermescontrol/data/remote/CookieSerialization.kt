@@ -1,14 +1,17 @@
 package com.m57.hermescontrol.data.remote
 
-import okhttp3.Cookie
-import okhttp3.HttpUrl
+import io.ktor.http.HttpHeaders
+import io.ktor.http.Url
+import io.ktor.http.parseServerSetCookieHeader
 
 /**
- * Wire format for a persisted [Cookie].
+ * The in-memory and on-disk cookie model.
  *
- * OkHttp's [Cookie] is not itself serializable, so we project its immutable
- * fields into this flat holder. `sameSite` is nullable in newer OkHttp
- * versions — default to null on decode so older payloads still load.
+ * It was a projection of `okhttp3.Cookie`; it is now the model itself, so the
+ * cookie stack no longer imports OkHttp. [matches][com.m57.hermescontrol.data.remote.matches]
+ * lives in CookieMatching.kt — the rules OkHttp used to apply for us.
+ *
+ * `sameSite` stays nullable so payloads persisted by older builds still load.
  */
 @kotlinx.serialization.Serializable
 data class CookieHolder(
@@ -23,36 +26,6 @@ data class CookieHolder(
     val sameSite: String? = null,
 )
 
-/** Project a [Cookie] into its serializable form. */
-fun Cookie.serialize(): CookieHolder =
-    CookieHolder(
-        name = name,
-        value = value,
-        expiresAt = expiresAt,
-        domain = domain,
-        path = path,
-        secure = secure,
-        httpOnly = httpOnly,
-        hostOnly = hostOnly,
-        sameSite = sameSite,
-    )
-
-/** Rebuild a [Cookie] from a [CookieHolder]. */
-fun CookieHolder.toCookie(): Cookie? =
-    runCatching {
-        Cookie
-            .Builder()
-            .name(name)
-            .value(value)
-            .expiresAt(expiresAt)
-            .apply { if (hostOnly) hostOnlyDomain(domain) else domain(domain) }
-            .path(path)
-            .also { if (secure) it.secure() }
-            .also { if (httpOnly) it.httpOnly() }
-            .also { if (sameSite != null) it.sameSite(sameSite) }
-            .build()
-    }.getOrNull()
-
 /**
  * Wrap a raw `hermes_session_at` value (the pre-#470 single-string session
  * cookie) as a migration-only session cookie. OkHttp forbids constructing a
@@ -61,22 +34,21 @@ fun CookieHolder.toCookie(): Cookie? =
  * default server scope. This matches the previous bare `Cookie` header
  * behavior for the one-release migration window.
  */
-fun wrapSessionCookie(rawValue: String): Cookie? {
+fun wrapSessionCookie(rawValue: String): CookieHolder? {
     val value = rawValue.trim()
     if (value.isEmpty()) return null
-    return runCatching {
-        Cookie
-            .Builder()
-            .name(SESSION_COOKIE_NAME)
-            .value(value)
-            // Far-future expiry (10 years) — session lifetime is owned by the
-            // dashboard, not by client-side cookie expiry.
-            .expiresAt(System.currentTimeMillis() + 10L * 365 * 24 * 60 * 60 * 1000)
-            .hostOnlyDomain(LEGACY_WILDCARD_DOMAIN)
-            .path("/")
-            .httpOnly()
-            .build()
-    }.getOrNull()
+    // Far-future expiry (10 years) — session lifetime is owned by the
+    // dashboard, not by client-side cookie expiry.
+    return CookieHolder(
+        name = SESSION_COOKIE_NAME,
+        value = value,
+        expiresAt = System.currentTimeMillis() + 10L * 365 * 24 * 60 * 60 * 1000,
+        domain = LEGACY_WILDCARD_DOMAIN,
+        path = "/",
+        secure = false,
+        httpOnly = true,
+        hostOnly = true,
+    )
 }
 
 const val LEGACY_WILDCARD_DOMAIN = "legacy-cookie.invalid"
@@ -101,10 +73,49 @@ val SESSION_COOKIE_NAMES: List<String> =
 fun isSessionCookieName(name: String): Boolean = name in SESSION_COOKIE_NAMES
 
 /** True when [cookie] is the dashboard session cookie. */
-fun isSessionCookie(cookie: Cookie): Boolean = isSessionCookieName(cookie.name)
+fun isSessionCookie(cookie: CookieHolder): Boolean = isSessionCookieName(cookie.name)
 
-/** Parse a raw `Set-Cookie` header value (sans the `hermes_session_at=` key). */
-fun Cookie.Companion.parseRaw(
-    url: HttpUrl,
+/**
+ * Parse one `Set-Cookie` header value into the stored model.
+ *
+ * Ktor's parser produces the wire facts; this maps them onto [CookieHolder]
+ * with the two conventions the jar depends on: a cookie without an explicit
+ * expiry gets [COOKIE_MAX_DATE_MILLIS] (OkHttp's session sentinel, which the jar
+ * stores rather than prunes), and a cookie without a `Domain` attribute is
+ * host-only for the request's host.
+ */
+fun parseSetCookie(
+    url: Url,
     header: String,
-): Cookie? = Cookie.parse(url, header)
+): CookieHolder? {
+    val parsed = runCatching { parseServerSetCookieHeader(header) }.getOrNull() ?: return null
+    if (parsed.name.isEmpty()) return null
+    val now = System.currentTimeMillis()
+    val maxAge = parsed.maxAge
+    val expiresAt =
+        when {
+            maxAge != null -> now + maxAge.toLong() * 1000L
+            parsed.expires != null -> parsed.expires!!.timestamp
+            else -> COOKIE_MAX_DATE_MILLIS
+        }
+    return CookieHolder(
+        name = parsed.name,
+        value = parsed.value,
+        expiresAt = expiresAt,
+        domain = parsed.domain?.removePrefix(".") ?: url.host,
+        path = parsed.path?.ifEmpty { "/" } ?: "/",
+        secure = parsed.secure,
+        httpOnly = parsed.httpOnly,
+        hostOnly = parsed.domain == null,
+        sameSite = parsed.extensions["SameSite"],
+    )
+}
+
+/** Parse every `Set-Cookie` header in [headers]. */
+fun parseSetCookies(
+    url: Url,
+    headers: Set<Pair<String, String>>,
+): List<CookieHolder> =
+    headers
+        .filter { (name, _) -> name.equals(HttpHeaders.SetCookie, ignoreCase = true) }
+        .mapNotNull { (_, value) -> parseSetCookie(url, value) }

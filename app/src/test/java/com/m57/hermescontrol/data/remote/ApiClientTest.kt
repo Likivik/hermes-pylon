@@ -4,6 +4,7 @@ package com.m57.hermescontrol.data.remote
 
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.local.AuthSessionState
+import io.ktor.http.Url
 import io.mockk.every
 import io.mockk.mockkObject
 import io.mockk.unmockkAll
@@ -263,7 +264,7 @@ class ApiClientTest {
                 ),
             )
             assertEquals("cookie-secret", cookieJar.getSessionCookieValue())
-            assertEquals(1, cookieJar.loadForRequest(mockWebServer.url("/")).size)
+            assertEquals(1, cookieJar.loadForRequest(Url(mockWebServer.url("/").toString())).size)
             ApiClient.rebuild()
             mockWebServer.enqueue(MockResponse().setResponseCode(200).setBody("media"))
 
