@@ -8,7 +8,6 @@ import com.m57.hermescontrol.util.ioDispatcher
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import okhttp3.Cookie
 
 /**
  * Persistence contract for server-scoped cookies.
@@ -25,11 +24,11 @@ interface CookieStore {
     /** Persist [cookies] for [serverId]. Replaces the previous set atomically. */
     suspend fun save(
         serverId: String,
-        cookies: List<Cookie>,
+        cookies: List<CookieHolder>,
     )
 
     /** Load the persisted cookie set for [serverId] (may be empty). */
-    suspend fun load(serverId: String): List<Cookie>
+    suspend fun load(serverId: String): List<CookieHolder>
 
     /** Drop all persisted cookies for [serverId] (e.g. on logout). */
     suspend fun clear(serverId: String)
@@ -65,13 +64,12 @@ class EncryptedCookieStore constructor(
 
     override suspend fun save(
         serverId: String,
-        cookies: List<Cookie>,
+        cookies: List<CookieHolder>,
     ) = withContext(ioDispatcher) {
-        val serialized = cookies.map { it.serialize() }
-        storage.putString(SecureStorage.cookieKey(keyFor(serverId)), json.encodeToString(serialized))
+        storage.putString(SecureStorage.cookieKey(keyFor(serverId)), json.encodeToString(cookies))
     }
 
-    override suspend fun load(serverId: String): List<Cookie> =
+    override suspend fun load(serverId: String): List<CookieHolder> =
         withContext(ioDispatcher) {
             val scopedKey = SecureStorage.cookieKey(keyFor(serverId))
             var raw = storage.getString(scopedKey)
@@ -86,7 +84,7 @@ class EncryptedCookieStore constructor(
                             ?.takeIf { it.isNotBlank() }
                             ?.let(::wrapSessionCookie)
                     if (migrated != null) {
-                        raw = json.encodeToString(listOf(migrated.serialize()))
+                        raw = json.encodeToString(listOf(migrated))
                         storage.putString(scopedKey, raw)
                     }
                 }
@@ -94,9 +92,7 @@ class EncryptedCookieStore constructor(
             }
             raw ?: return@withContext emptyList()
             try {
-                json
-                    .decodeFromString<List<CookieHolder>>(raw)
-                    .mapNotNull { it.toCookie() }
+                json.decodeFromString<List<CookieHolder>>(raw)
             } catch (error: Exception) {
                 throw SecureBlobException(error)
             }

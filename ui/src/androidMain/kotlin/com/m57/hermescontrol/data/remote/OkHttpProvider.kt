@@ -1,5 +1,6 @@
 package com.m57.hermescontrol.data.remote
 
+import io.ktor.http.Url
 import kotlinx.serialization.json.Json
 import okhttp3.ConnectionPool
 import okhttp3.CookieJar
@@ -22,6 +23,14 @@ object OkHttpProvider {
      */
     private fun resolveCookieJar(): PersistentCookieJar = CookieManager.cookieJar
 
+    /**
+     * OkHttp's `CookieJar` view of [resolveCookieJar].
+     *
+     * The jar itself is OkHttp-free; the conversion lives in
+     * [OkHttpCookieJarAdapter] and disappears with this engine.
+     */
+    private fun cookieJarAdapter(): CookieJar = OkHttpCookieJarAdapter { resolveCookieJar() }
+
     private fun commonBuilder(): OkHttpClient.Builder =
         OkHttpClient
             .Builder()
@@ -33,7 +42,7 @@ object OkHttpProvider {
 
     private fun authenticatedBuilder(): OkHttpClient.Builder =
         commonBuilder()
-            .cookieJar(resolveCookieJar())
+            .cookieJar(cookieJarAdapter())
             .addInterceptor { chain ->
                 val boundary = resolveCookieJar().captureCredentialBoundary()
                 val request =
@@ -47,10 +56,18 @@ object OkHttpProvider {
                 val response = chain.proceed(chain.request())
                 val boundary = chain.request().tag(CookieCredentialBoundary::class.java)
                 if (boundary != null) {
+                    val requestUrl = chain.request().url
                     resolveCookieJar().saveFromResponse(
                         boundary = boundary,
-                        url = chain.request().url,
-                        cookies = okhttp3.Cookie.parseAll(chain.request().url, response.headers),
+                        url = Url(requestUrl.toString()),
+                        cookies =
+                            parseSetCookies(
+                                Url(requestUrl.toString()),
+                                response.headers
+                                    .toMultimap()
+                                    .flatMap { (name, values) -> values.map { name to it } }
+                                    .toSet(),
+                            ),
                     )
                 }
                 // BridgeInterceptor would otherwise persist Set-Cookie after
@@ -81,7 +98,7 @@ object OkHttpProvider {
     val websocket: OkHttpClient by lazy {
         base
             .newBuilder()
-            .cookieJar(resolveCookieJar())
+            .cookieJar(cookieJarAdapter())
             .readTimeout(0, TimeUnit.MILLISECONDS)
             .pingInterval(30, TimeUnit.SECONDS)
             .build()
@@ -91,7 +108,7 @@ object OkHttpProvider {
     val probe: OkHttpClient by lazy {
         base
             .newBuilder()
-            .cookieJar(resolveCookieJar())
+            .cookieJar(cookieJarAdapter())
             .connectTimeout(5, TimeUnit.SECONDS)
             .readTimeout(5, TimeUnit.SECONDS)
             .followRedirects(false)

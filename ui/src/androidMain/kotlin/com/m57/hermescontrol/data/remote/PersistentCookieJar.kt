@@ -1,15 +1,13 @@
 package com.m57.hermescontrol.data.remote
 
 import com.m57.hermescontrol.util.ioDispatcher
+import io.ktor.http.Url
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import okhttp3.Cookie
-import okhttp3.CookieJar
-import okhttp3.HttpUrl
 import java.util.concurrent.ConcurrentHashMap
 
 data class CookieCredentialBoundary(
@@ -19,14 +17,13 @@ data class CookieCredentialBoundary(
 )
 
 /**
- * OkHttp [CookieJar] backed by an in-memory [ConcurrentHashMap] cache plus
- * encrypted [CookieStore] persistence.
+ * Persistent, server-scoped cookie jar.
  *
  * Design notes (issue #470):
- * - **Memory cache** keyed by cookie domain; request reads apply OkHttp's
- *   complete host-only/domain/path/secure matching rules.
+ * - **Memory cache** keyed by cookie domain; request reads apply the RFC 6265
+ *   host-only/domain/path/secure matching in [matches] (CookieMatching.kt).
  * - **Async persistence** — writes are dispatched to [storeScope] and never
- *   block the calling OkHttp thread.
+ *   block the calling request thread.
  * - **Atomic server scoping** via [useStore] — callers (login, profile switch)
  *   flip the active server id; subsequent load/save target that scope. Guarded
  *   by [scopeMutex] so a swap can't race a mid-flight load.
@@ -41,9 +38,9 @@ class PersistentCookieJar(
     private val store: CookieStore,
     private val storeScope: CoroutineScope = CoroutineScope(SupervisorJob() + ioDispatcher),
     initialServerId: String = DEFAULT_SERVER_ID,
-) : CookieJar {
+) {
     // serverId -> (cookie domain -> cookies)
-    private val cache = ConcurrentHashMap<String, MutableMap<String, MutableList<Cookie>>>()
+    private val cache = ConcurrentHashMap<String, MutableMap<String, MutableList<CookieHolder>>>()
     private val loadedScopes = ConcurrentHashMap.newKeySet<String>()
     private val clearedScopes = ConcurrentHashMap.newKeySet<String>()
 
@@ -105,11 +102,11 @@ class PersistentCookieJar(
     }
 
     /**
-     * Return the live [Cookie] with [name] from the active server scope, or
+     * Return the live [CookieHolder] with [name] from the active server scope, or
      * null if absent. Scans every host bucket; the session cookie is typically
      * host-scoped to the dashboard host.
      */
-    fun getCookie(name: String): Cookie? {
+    fun getCookie(name: String): CookieHolder? {
         val serverId = credentialBoundary.serverId
         if (!loadedScopes.contains(serverId)) {
             kotlinx.coroutines.runBlocking { ensureLoaded(serverId) }
@@ -133,15 +130,15 @@ class PersistentCookieJar(
             getCookie(name)?.value
         }
 
-    override fun saveFromResponse(
-        url: HttpUrl,
-        cookies: List<Cookie>,
+    fun saveFromResponse(
+        url: Url,
+        cookies: List<CookieHolder>,
     ) = saveFromResponse(credentialBoundary, url, cookies)
 
     fun saveFromResponse(
         boundary: CookieCredentialBoundary,
-        url: HttpUrl,
-        cookies: List<Cookie>,
+        url: Url,
+        cookies: List<CookieHolder>,
     ) {
         if (cookies.isEmpty()) return
         synchronized(credentialLock) {
@@ -172,7 +169,7 @@ class PersistentCookieJar(
         }
     }
 
-    override fun loadForRequest(url: HttpUrl): List<Cookie> {
+    fun loadForRequest(url: Url): List<CookieHolder> {
         val serverId = credentialBoundary.serverId
         // Best-effort synchronous load on first touch (tests/first call).
         if (!loadedScopes.contains(serverId)) {
@@ -204,7 +201,7 @@ class PersistentCookieJar(
         }
         val boundary = credentialBoundary
         val persisted = store.load(serverId)
-        val byHost = ConcurrentHashMap<String, MutableList<Cookie>>()
+        val byHost = ConcurrentHashMap<String, MutableList<CookieHolder>>()
         for (cookie in persisted) {
             val host = cookie.domain.removePrefix(".")
             byHost.getOrPut(host) { mutableListOf() }.add(cookie)

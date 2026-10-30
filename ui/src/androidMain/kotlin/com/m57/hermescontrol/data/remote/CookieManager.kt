@@ -6,12 +6,11 @@ import android.content.Context
 import com.m57.hermescontrol.data.security.SecretStore
 import com.m57.hermescontrol.data.security.SecureStorage
 import com.m57.hermescontrol.util.ioDispatcher
+import io.ktor.http.Url
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import okhttp3.Cookie
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 /**
  * Coordinator for the issue #470 cookie stack.
@@ -50,8 +49,8 @@ object CookieManager {
      */
     fun cookieHeaderFor(url: String): String {
         val current = jar ?: return ""
-        val httpUrl = url.toHttpUrlOrNull() ?: return ""
-        return current.loadForRequest(httpUrl).joinToString("; ") { "${it.name}=${it.value}" }
+        val target = runCatching { Url(url) }.getOrNull() ?: return ""
+        return current.loadForRequest(target).joinToString("; ") { "${it.name}=${it.value}" }
     }
 
     /** Current scope when initialized; null during startup or test teardown. */
@@ -101,23 +100,22 @@ object CookieManager {
             return
         }
         j.beginAuthentication()
-        val builder =
-            Cookie
-                .Builder()
-                .name(SESSION_COOKIE_NAME)
-                .value(rawValue)
-                .expiresAt(
-                    System.currentTimeMillis() +
-                        10L * 365 * 24 * 60 * 60 * 1000,
-                )
-                .hostOnlyDomain(endpoint.baseUrl.host)
-                .path(endpoint.baseUrl.encodedPath)
-                .httpOnly()
-        if (endpoint.baseUrl.isHttps) builder.secure()
         j.saveFromResponse(
-            endpoint.baseUrl.toString().toHttpUrlOrNull()
-                ?: error("Cannot convert endpoint baseUrl to HttpUrl"),
-            listOf(builder.build()),
+            Url(endpoint.baseUrl.toString()),
+            listOf(
+                CookieHolder(
+                    name = SESSION_COOKIE_NAME,
+                    value = rawValue,
+                    // Session lifetime is owned by the dashboard, not by
+                    // client-side expiry.
+                    expiresAt = System.currentTimeMillis() + 10L * 365 * 24 * 60 * 60 * 1000,
+                    domain = endpoint.baseUrl.host,
+                    path = endpoint.baseUrl.encodedPath,
+                    secure = endpoint.baseUrl.isHttps,
+                    httpOnly = true,
+                    hostOnly = true,
+                ),
+            ),
         )
     }
 
