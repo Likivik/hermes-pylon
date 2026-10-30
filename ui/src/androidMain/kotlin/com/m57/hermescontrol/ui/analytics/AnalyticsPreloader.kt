@@ -2,6 +2,7 @@ package com.m57.hermescontrol.ui.analytics
 
 import android.content.Context
 import com.m57.hermescontrol.data.local.AnalyticsCacheStore
+import com.m57.hermescontrol.data.local.AndroidAnalyticsCacheStore
 import com.m57.hermescontrol.data.local.authStore
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.NetworkResult
@@ -30,7 +31,7 @@ object AnalyticsPreloader {
 
     fun preload(context: Context) {
         if (authStore.getToken().isNullOrBlank()) return
-        val store = AnalyticsCacheStore(context)
+        val store = AndroidAnalyticsCacheStore(context)
         val daysOptions = listOf(7, 30, 90)
         scope.launch {
             for (days in daysOptions) {

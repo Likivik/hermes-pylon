@@ -1,6 +1,5 @@
 package com.m57.hermescontrol.ui.analytics
 
-import android.app.Application
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,6 +39,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.m57.hermescontrol.NavigationController
 import com.m57.hermescontrol.SkillsScreen
+import com.m57.hermescontrol.data.local.AndroidAnalyticsCacheStore
 import com.m57.hermescontrol.data.model.AnalyticsDailyEntry
 import com.m57.hermescontrol.data.model.ModelsAnalyticsModelEntry
 import com.m57.hermescontrol.generated.resources.Res
@@ -79,8 +79,9 @@ fun AnalyticsScreen(
     modifier: Modifier = Modifier,
     onOpenDrawer: (() -> Unit)? = null,
 ) {
-    val application = LocalContext.current.applicationContext as Application
-    val viewModel: AnalyticsViewModel = viewModel { AnalyticsViewModel(application) }
+    val appContext = LocalContext.current.applicationContext
+    val cacheStore = remember(appContext) { AndroidAnalyticsCacheStore(appContext) }
+    val viewModel: AnalyticsViewModel = viewModel { AnalyticsViewModel(cacheStore) }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
