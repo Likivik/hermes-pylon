@@ -27,7 +27,7 @@ okhttp = "5.5.0"
 securityCrypto = "1.0.0"
 mockk = "1.14.11"
 turbine = "1.2.1"
-coil = "2.7.0"
+coil = "3.3.0"
 room = "2.7.1"
 sqlcipher = "4.18.0"
 datastore = "1.1.2"
@@ -138,8 +138,9 @@ latex-parser = { module = "io.github.huarangmeng:latex-parser", version.ref = "l
 latex-renderer = { module = "io.github.huarangmeng:latex-renderer", version.ref = "latex" }
 
 # Image loading
-coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coil" }
-coil-gif = { module = "io.coil-kt:coil-gif", version.ref = "coil" }
+coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
+coil-gif = { module = "io.coil-kt.coil3:coil-gif", version.ref = "coil" }
+coil-network-ktor3 = { module = "io.coil-kt.coil3:coil-network-ktor3", version.ref = "coil" }
 reorderable = { module = "sh.calvin.reorderable:reorderable", version.ref = "reorderable" }
 roborazzi-core = { module = "io.github.takahirom.roborazzi:roborazzi", version.ref = "roborazzi" }
 roborazzi-rule = { module = "io.github.takahirom.roborazzi:roborazzi-compose", version.ref = "roborazzi" }

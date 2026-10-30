@@ -1,19 +1,19 @@
 package com.m57.hermescontrol
 
 import android.app.Application
-import android.os.Build
-import coil.ImageLoader
-import coil.ImageLoaderFactory
-import coil.decode.GifDecoder
-import coil.decode.ImageDecoderDecoder
+import coil3.ImageLoader
+import coil3.PlatformContext
+import coil3.SingletonImageLoader
+import coil3.gif.GifDecoder
+import coil3.network.ktor3.KtorNetworkFetcherFactory
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.remote.AndroidAttachmentReader
 import com.m57.hermescontrol.data.remote.AndroidNetworkMonitor
 import com.m57.hermescontrol.data.remote.DashboardSessionTokenRefresher
 import com.m57.hermescontrol.data.remote.GatewayClientKind
 import com.m57.hermescontrol.data.remote.HermesHttpConfig
-import com.m57.hermescontrol.data.remote.OkHttpProvider
 import com.m57.hermescontrol.data.remote.createGatewayTransportClient
+import com.m57.hermescontrol.data.remote.createMediaTransportClient
 import com.m57.hermescontrol.data.remote.installAttachmentReader
 import com.m57.hermescontrol.data.ws.HermesWsClient
 import com.m57.hermescontrol.data.ws.KtorWsTransport
@@ -25,7 +25,7 @@ import io.kseongbin.stacktrace.CrashLoggerConfig
 
 class HermesControlApp :
     Application(),
-    ImageLoaderFactory {
+    SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
         // Likivik patch: capture crashes + ANRs to an app-scoped dir so they can
@@ -74,16 +74,19 @@ class HermesControlApp :
         AnalyticsPreloader.preload(this)
     }
 
-    override fun newImageLoader(): ImageLoader =
+    override fun newImageLoader(context: PlatformContext): ImageLoader =
         ImageLoader
-            .Builder(this)
-            .okHttpClient(OkHttpProvider.publicMedia)
+            .Builder(context)
             .components {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    add(ImageDecoderDecoder.Factory())
-                } else {
-                    add(GifDecoder.Factory())
-                }
-            }.crossfade(true)
+                // Public image URLs only: this fetcher carries no credentials, so
+                // authenticated gateway media keeps going through GatewayFileClient.
+                add(KtorNetworkFetcherFactory(httpClient = { publicMediaClient }))
+                add(GifDecoder.Factory())
+            }
             .build()
+
+    /** Credential-less Ktor client for public images. */
+    private val publicMediaClient by lazy {
+        createMediaTransportClient(token = null, cookieHeader = null)
+    }
 }

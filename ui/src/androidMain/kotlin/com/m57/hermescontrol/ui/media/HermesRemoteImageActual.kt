@@ -4,7 +4,7 @@ package com.m57.hermescontrol.ui.media
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 
 /**
  * Android renders through Coil, which owns the disk/memory cache and the animated

@@ -5,7 +5,7 @@ package com.m57.hermescontrol.data.config
 import android.content.Context
 import androidx.datastore.core.DataMigration
 import com.m57.hermescontrol.data.model.PinnedModel
-import com.m57.hermescontrol.data.remote.OkHttpProvider
+import com.m57.hermescontrol.data.remote.HermesJson
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.data.security.LegacySecurePreferences
 import com.m57.hermescontrol.data.theme.ThemePreference
@@ -66,7 +66,7 @@ class ServerStoreMigration(
         val connectionProfiles =
             if (connectionProfilesRaw != null) {
                 try {
-                    OkHttpProvider.json.decodeFromString<List<ConnectionProfile>>(connectionProfilesRaw)
+                    HermesJson.instance.decodeFromString<List<ConnectionProfile>>(connectionProfilesRaw)
                 } catch (e: Exception) {
                     emptyList()
                 }
@@ -80,7 +80,7 @@ class ServerStoreMigration(
         val pinnedModels =
             if (pinnedModelsRaw != null) {
                 try {
-                    OkHttpProvider.json.decodeFromString<List<PinnedModel>>(pinnedModelsRaw)
+                    HermesJson.instance.decodeFromString<List<PinnedModel>>(pinnedModelsRaw)
                 } catch (e: Exception) {
                     emptyList()
                 }

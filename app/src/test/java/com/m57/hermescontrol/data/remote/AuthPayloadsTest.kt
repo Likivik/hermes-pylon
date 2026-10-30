@@ -13,7 +13,7 @@ class AuthPayloadsTest {
         val password = "p\\ass\tword\u0000"
 
         val encoded = AuthPayloads.passwordLogin(username, password)
-        val decoded = OkHttpProvider.json.parseToJsonElement(encoded).jsonObject
+        val decoded = HermesJson.instance.parseToJsonElement(encoded).jsonObject
 
         assertEquals("basic", decoded.getValue("provider").jsonPrimitive.content)
         assertEquals(username, decoded.getValue("username").jsonPrimitive.content)
