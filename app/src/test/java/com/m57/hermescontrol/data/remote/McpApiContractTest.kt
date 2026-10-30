@@ -1,7 +1,6 @@
 package com.m57.hermescontrol.data.remote
 
 import kotlinx.coroutines.runBlocking
-import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.Assert.assertEquals
@@ -31,7 +30,7 @@ class McpApiContractTest {
                         server.url("/").toString(),
                         CleartextPolicy.ALLOW_WITH_WARNING,
                     ).baseUrl
-                val client = createHermesHttpClient(OkHttpClient())
+                val client = createHermesHttpClient()
                 val api = HermesGatewayApi(client, baseUrl)
 
                 val response = api.testMcpServer("local tools")

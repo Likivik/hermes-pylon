@@ -10,9 +10,10 @@ import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.remote.AndroidAttachmentReader
 import com.m57.hermescontrol.data.remote.AndroidNetworkMonitor
 import com.m57.hermescontrol.data.remote.DashboardSessionTokenRefresher
+import com.m57.hermescontrol.data.remote.GatewayClientKind
 import com.m57.hermescontrol.data.remote.HermesHttpConfig
 import com.m57.hermescontrol.data.remote.OkHttpProvider
-import com.m57.hermescontrol.data.remote.createHermesHttpClient
+import com.m57.hermescontrol.data.remote.createGatewayTransportClient
 import com.m57.hermescontrol.data.remote.installAttachmentReader
 import com.m57.hermescontrol.data.ws.HermesWsClient
 import com.m57.hermescontrol.data.ws.KtorWsTransport
@@ -56,10 +57,15 @@ class HermesControlApp :
         // authorised by the session cookie that client's jar carries, and a
         // credential-less client is rejected with 401 before any ticket is read.
         HermesWsClient.installTransport(
-            KtorWsTransport(createHermesHttpClient(OkHttpProvider.websocket, HermesHttpConfig.streaming())),
+            KtorWsTransport(
+                createGatewayTransportClient(
+                    GatewayClientKind.Session,
+                    config = HermesHttpConfig.streaming(),
+                ),
+            ),
         )
         HermesWsClient.installHttpClient(
-            createHermesHttpClient(OkHttpProvider.probe, HermesHttpConfig.Probe),
+            createGatewayTransportClient(GatewayClientKind.Session, config = HermesHttpConfig.Probe),
         )
         HermesWsClient.installLoopbackTokenRefresher { DashboardSessionTokenRefresher.refresh() }
         // Issue #537 follow-up (A): preload analytics in the background after launch

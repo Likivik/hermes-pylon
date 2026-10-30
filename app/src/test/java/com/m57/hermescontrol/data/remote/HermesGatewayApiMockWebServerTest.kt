@@ -4,7 +4,6 @@ import com.m57.hermescontrol.data.model.OAuthSubmitRequest
 import com.m57.hermescontrol.data.model.SessionMessage
 import com.m57.hermescontrol.data.model.StatusResponse
 import kotlinx.coroutines.runBlocking
-import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
@@ -32,7 +31,7 @@ class HermesGatewayApiMockWebServerTest {
         mockServer.start()
 
         val baseUrl = ServerEndpoint.parse(mockServer.url("/").toString(), CleartextPolicy.ALLOW_WITH_WARNING).baseUrl
-        val client = createHermesHttpClient(OkHttpClient())
+        val client = createHermesHttpClient()
         api = HermesGatewayApi(client, baseUrl)
     }
 
