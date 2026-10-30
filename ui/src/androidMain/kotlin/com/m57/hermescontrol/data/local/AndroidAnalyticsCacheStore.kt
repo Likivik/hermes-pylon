@@ -71,9 +71,9 @@ private val Context.analyticsCacheDataStore: DataStore<AnalyticsCacheState> by d
     serializer = AnalyticsCacheSerializer,
 )
 
-class AnalyticsCacheStore(
+class AndroidAnalyticsCacheStore(
     private val context: Context,
-) {
+) : AnalyticsCacheStore {
     /** Stable cache key covering both window and profile. */
     private fun key(
         days: Int,
@@ -81,7 +81,7 @@ class AnalyticsCacheStore(
     ): String = "$days:${profile ?: "default"}"
 
     /** Load a previously cached window, or null if absent/corrupt. */
-    suspend fun load(
+    override suspend fun load(
         days: Int,
         profile: String?,
     ): Pair<AnalyticsResponse, ModelsAnalyticsResponse?>? =
@@ -103,23 +103,24 @@ class AnalyticsCacheStore(
         }
 
     /** Persist a successful window response. Best-effort; never throws. */
-    suspend fun save(
+    override suspend fun save(
         days: Int,
         profile: String?,
         usage: AnalyticsResponse,
         models: ModelsAnalyticsResponse?,
-    ) = withContext(ioDispatcher) {
-        try {
-            context.analyticsCacheDataStore.updateData { state ->
-                val win =
-                    CachedWindow(
-                        usageJson = HermesJson.instance.encodeToString(usage),
-                        modelsJson = models?.let { HermesJson.instance.encodeToString(it) } ?: "",
-                    )
-                state.copy(windows = state.windows + (key(days, profile) to win))
+    ): Unit =
+        withContext(ioDispatcher) {
+            try {
+                context.analyticsCacheDataStore.updateData { state ->
+                    val win =
+                        CachedWindow(
+                            usageJson = HermesJson.instance.encodeToString(usage),
+                            modelsJson = models?.let { HermesJson.instance.encodeToString(it) } ?: "",
+                        )
+                    state.copy(windows = state.windows + (key(days, profile) to win))
+                }
+            } catch (e: Exception) {
+                // Fail-safe: a cache miss is preferable to a crash on launch.
             }
-        } catch (e: Exception) {
-            // Fail-safe: a cache miss is preferable to a crash on launch.
         }
-    }
 }

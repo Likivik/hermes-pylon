@@ -1,7 +1,6 @@
 package com.m57.hermescontrol.ui.analytics
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.m57.hermescontrol.data.local.AnalyticsCacheStore
 import com.m57.hermescontrol.data.model.AnalyticsResponse
@@ -43,12 +42,10 @@ data class AnalyticsUiState(
 )
 
 class AnalyticsViewModel(
-    application: Application,
-) : AndroidViewModel(application) {
+    private val cacheStore: AnalyticsCacheStore,
+) : ViewModel() {
     private val _uiState = MutableStateFlow(AnalyticsUiState())
     val uiState: StateFlow<AnalyticsUiState> = _uiState.asStateFlow()
-
-    private val cacheStore = AnalyticsCacheStore(application)
 
     private val api get() = ApiClient.hermesApi
 
