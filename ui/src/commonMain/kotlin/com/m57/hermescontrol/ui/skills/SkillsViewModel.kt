@@ -1,7 +1,6 @@
 package com.m57.hermescontrol.ui.skills
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.m57.hermescontrol.data.model.HubSkill
 import com.m57.hermescontrol.data.model.SaveSkillContentRequest
@@ -82,12 +81,9 @@ data class SkillsUiState(
 )
 
 class SkillsViewModel(
-    application: Application,
-    private val ioDispatcher: CoroutineDispatcher,
-) : AndroidViewModel(application),
+    private val ioDispatcher: CoroutineDispatcher = com.m57.hermescontrol.concurrent.ioDispatcher,
+) : ViewModel(),
     ToastHost {
-    constructor(application: Application) : this(application, ioDispatcher)
-
     private val _uiState = MutableStateFlow(SkillsUiState())
     val uiState: StateFlow<SkillsUiState> = _uiState.asStateFlow()
 

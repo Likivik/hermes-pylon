@@ -29,7 +29,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
@@ -68,6 +67,7 @@ import com.m57.hermescontrol.ui.common.listContentPadding
 import com.m57.hermescontrol.ui.common.listItemSpacing
 import com.m57.hermescontrol.ui.icons.HermesIcon
 import com.m57.hermescontrol.ui.icons.HermesSymbol
+import com.m57.hermescontrol.ui.mcp.rememberExternalUrlLauncher
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -77,7 +77,7 @@ fun ProvidersScreen(
     viewModel: ProvidersViewModel = viewModel { ProvidersViewModel() },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
+    val launcher = rememberExternalUrlLauncher()
 
     LaunchedEffect(Unit) { viewModel.load() }
 
@@ -91,18 +91,7 @@ fun ProvidersScreen(
             onSubmitCode = viewModel::submitOAuthCode,
             onCancel = viewModel::cancelOAuthFlow,
             onDismissFlow = viewModel::dismissFlow,
-            onOpenBrowser = { url ->
-                try {
-                    context.startActivity(
-                        android.content.Intent(
-                            android.content.Intent.ACTION_VIEW,
-                            android.net.Uri.parse(url),
-                        ),
-                    )
-                } catch (_: Exception) {
-                    // No browser available — ignore; user can copy the URL.
-                }
-            },
+            onOpenBrowser = { url -> launcher.openExternalUrl(url) },
         )
     }
 

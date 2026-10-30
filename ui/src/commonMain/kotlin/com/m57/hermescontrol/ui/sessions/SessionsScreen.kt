@@ -146,6 +146,8 @@ import com.m57.hermescontrol.ui.common.listItemSpacing
 import com.m57.hermescontrol.ui.icons.HermesIcon
 import com.m57.hermescontrol.ui.icons.HermesSymbol
 import com.m57.hermescontrol.ui.icons.MaterialSymbol
+import com.m57.hermescontrol.util.formatMonthDayHourMinute
+import com.m57.hermescontrol.util.nowMillis
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -153,10 +155,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import org.jetbrains.compose.resources.stringResource
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
 import kotlin.math.abs
 
 private const val AUTO_LOAD_THRESHOLD = 6
@@ -249,24 +247,14 @@ private fun SessionSearchResult.toSessionInfo(): SessionInfo =
  */
 private fun formatPlayedAt(epochSeconds: Double?): String? {
     if (epochSeconds == null || epochSeconds <= 0.0) return null
-    val instant =
-        try {
-            Instant.ofEpochSecond(epochSeconds.toLong())
-        } catch (_: Exception) {
-            return null
-        }
-    val now = Instant.now()
-    val diffSec = abs(now.epochSecond - instant.epochSecond)
-    val absFormatter =
-        DateTimeFormatter
-            .ofLocalizedDateTime(FormatStyle.MEDIUM)
-            .withZone(ZoneId.systemDefault())
+    val playedMillis = (epochSeconds * 1000.0).toLong()
+    val diffSec = abs(nowMillis() - playedMillis) / 1000
     return when {
         diffSec < 60 -> "just now"
         diffSec < 3600 -> "${diffSec / 60}m ago"
         diffSec < 86400 -> "${diffSec / 3600}h ago"
         diffSec < 7 * 86400 -> "${diffSec / 86400}d ago"
-        else -> absFormatter.format(instant)
+        else -> formatMonthDayHourMinute(playedMillis)
     }
 }
 
