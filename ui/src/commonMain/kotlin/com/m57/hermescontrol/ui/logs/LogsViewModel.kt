@@ -7,7 +7,6 @@ import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.safeApiCall
 import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.ui.common.safeLaunchLoad
-import io.kseongbin.stacktrace.CrashLogger
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -124,10 +123,7 @@ class LogsViewModel(
             var uploaded = 0
             var failed = false
             withContext(ioDispatcher) {
-                val dir = CrashLogger.getLogDirectory()
-                val files =
-                    dir?.listFiles()?.filter { it.isFile }?.sortedBy { it.lastModified() }
-                        ?: emptyList()
+                val files = readAppLogFiles()
                 if (files.isEmpty()) {
                     failed = true
                 } else {
@@ -138,7 +134,7 @@ class LogsViewModel(
                                     path = "logs/${'$'}{file.name}",
                                     overwrite = true,
                                     fileName = file.name,
-                                    content = file.readBytes(),
+                                    content = file.bytes,
                                 )
                             }
                         if (result is com.m57.hermescontrol.data.remote.NetworkResult.Success) {

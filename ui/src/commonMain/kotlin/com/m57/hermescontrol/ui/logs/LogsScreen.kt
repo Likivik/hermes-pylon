@@ -1,9 +1,5 @@
 package com.m57.hermescontrol.ui.logs
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
-import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -33,7 +29,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -130,7 +125,7 @@ fun LogsScreen(
         remember(filteredLogs) {
             filteredLogs.joinToString("\n")
         }
-    val context = LocalContext.current
+    val shareLogs = rememberLogSharer()
     val scope = rememberCoroutineScope()
 
     HermesScaffold(
@@ -152,7 +147,7 @@ fun LogsScreen(
             // Share / Export
             IconButton(
                 onClick = {
-                    shareLogs(context, exportText)
+                    shareLogs(exportText)
                 },
                 enabled = filteredLogs.isNotEmpty(),
             ) {
@@ -388,21 +383,4 @@ private fun FilterChipRow(
             )
         }
     }
-}
-
-private fun shareLogs(
-    context: Context,
-    text: String,
-) {
-    // Also copy to clipboard
-    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-    clipboard?.setPrimaryClip(ClipData.newPlainText("Hermes Logs", text))
-
-    val sendIntent =
-        Intent().apply {
-            action = Intent.ACTION_SEND
-            putExtra(Intent.EXTRA_TEXT, text)
-            type = "text/plain"
-        }
-    context.startActivity(Intent.createChooser(sendIntent, "Share logs"))
 }
