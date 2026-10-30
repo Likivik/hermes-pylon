@@ -172,6 +172,7 @@ dependencies {
     // HermesControlApp owns the coil ImageLoader.
     implementation(libs.coil.compose)
     implementation(libs.coil.gif)
+    implementation(libs.coil.network.ktor3)
 
     // HermesControlApp wires the CrashWatcher into Android's crash handler.
     implementation(libs.crashwatcher)

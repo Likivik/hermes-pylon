@@ -1,7 +1,7 @@
 package com.m57.hermescontrol.data.local
 
 import com.m57.hermescontrol.data.model.Attachment
-import com.m57.hermescontrol.data.remote.OkHttpProvider
+import com.m57.hermescontrol.data.remote.HermesJson
 import com.m57.hermescontrol.ui.chat.ChatMessage
 import com.m57.hermescontrol.ui.chat.MessageRole
 import com.m57.hermescontrol.ui.chat.ToolStatus
@@ -53,11 +53,11 @@ fun ChatMessage.toEntity(sessionId: String): ChatMessageEntity =
         toolCallId = toolCallId,
         toolStatus = toolStatus?.name,
         isStreaming = isStreaming,
-        attachmentsJson = OkHttpProvider.json.encodeToString(attachments.orEmpty()),
+        attachmentsJson = HermesJson.instance.encodeToString(attachments.orEmpty()),
         displayKind = displayKind,
     )
 
 private fun decodeAttachments(value: String): List<Attachment> =
     runCatching {
-        OkHttpProvider.json.decodeFromString<List<Attachment>>(value)
+        HermesJson.instance.decodeFromString<List<Attachment>>(value)
     }.getOrDefault(emptyList())

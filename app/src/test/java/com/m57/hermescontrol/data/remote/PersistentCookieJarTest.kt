@@ -2,10 +2,7 @@ package com.m57.hermescontrol.data.remote
 
 import io.ktor.http.Url
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
-import okhttp3.mockwebserver.MockResponse
-import okhttp3.mockwebserver.MockWebServer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -390,71 +387,6 @@ class PersistentCookieJarTest {
                 jar.loadForRequest(origin).map { it.value },
             )
         }
-
-    @Test
-    fun staleHttpResponseCannotRestoreCookieAfterClear() {
-        val server = MockWebServer()
-        val responseStarted = CompletableDeferred<Unit>()
-        val releaseResponse = CompletableDeferred<Unit>()
-        val store = FakeEncryptedCookieStore()
-        val jar =
-            PersistentCookieJar(
-                store = store,
-                storeScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined),
-            )
-        CookieManager.setJarForTest(jar)
-        val client =
-            okhttp3.OkHttpClient
-                .Builder()
-                .cookieJar(OkHttpCookieJarAdapter { jar })
-                .addInterceptor { chain ->
-                    val boundary = jar.captureCredentialBoundary()
-                    val request =
-                        chain.request().newBuilder().tag(CookieCredentialBoundary::class.java, boundary).build()
-                    chain.proceed(request)
-                }.addNetworkInterceptor { chain ->
-                    responseStarted.complete(Unit)
-                    kotlinx.coroutines.runBlocking { releaseResponse.await() }
-                    val response = chain.proceed(chain.request())
-                    val boundary = chain.request().tag(CookieCredentialBoundary::class.java)
-                    if (boundary != null) {
-                        jar.saveFromResponse(
-                            boundary,
-                            Url(chain.request().url.toString()),
-                            parseSetCookies(
-                                Url(chain.request().url.toString()),
-                                response.headers
-                                    .toMultimap()
-                                    .flatMap { (name, values) -> values.map { name to it } }
-                                    .toSet(),
-                            ),
-                        )
-                    }
-                    response.newBuilder().removeHeader("Set-Cookie").build()
-                }.build()
-        server.enqueue(
-            MockResponse()
-                .setHeader("Set-Cookie", "hermes_session_at=stale; Path=/; HttpOnly")
-                .setBody("ok"),
-        )
-        server.start()
-        val call =
-            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-                client.newCall(okhttp3.Request.Builder().url(server.url("/")).build()).execute().use { response ->
-                    response.body.string()
-                }
-            }
-        kotlinx.coroutines.runBlocking {
-            responseStarted.await()
-            jar.clearActive()
-            jar.beginAuthentication()
-            releaseResponse.complete(Unit)
-            call.join()
-        }
-
-        assertNull(jar.getSessionCookieValue())
-        server.shutdown()
-    }
 
     @Test
     fun getSessionCookieValue_acceptsServerCookieNameVariants() =

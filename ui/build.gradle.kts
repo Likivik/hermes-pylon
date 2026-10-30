@@ -309,8 +309,6 @@ kotlin {
                 api(libs.androidx.compose.material.icons.extended)
 
                 // Networking
-                api(libs.okhttp)
-                api(libs.okhttp.logging)
                 api(libs.ktor.client.core)
                 api(libs.kotlinx.serialization.json)
                 api(libs.crashwatcher)
@@ -320,6 +318,7 @@ kotlin {
                 // Image loading
                 api(libs.coil.compose)
                 api(libs.coil.gif)
+                api(libs.coil.network.ktor3)
 
                 // Encrypted storage
                 api(libs.androidx.security.crypto)

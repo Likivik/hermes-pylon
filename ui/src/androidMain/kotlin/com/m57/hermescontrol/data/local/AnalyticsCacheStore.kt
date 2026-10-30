@@ -6,7 +6,7 @@ import androidx.datastore.core.Serializer
 import androidx.datastore.dataStore
 import com.m57.hermescontrol.data.model.AnalyticsResponse
 import com.m57.hermescontrol.data.model.ModelsAnalyticsResponse
-import com.m57.hermescontrol.data.remote.OkHttpProvider
+import com.m57.hermescontrol.data.remote.HermesJson
 import com.m57.hermescontrol.util.ioDispatcher
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -46,7 +46,7 @@ private object AnalyticsCacheSerializer : Serializer<AnalyticsCacheState> {
         try {
             // Use the app's wire Json (ignoreUnknownKeys=true) so a backend
             // adding a field can't break our on-disk cache decode.
-            OkHttpProvider.json.decodeFromString(
+            HermesJson.instance.decodeFromString(
                 AnalyticsCacheState.serializer(),
                 input.readBytes().decodeToString(),
             )
@@ -59,7 +59,7 @@ private object AnalyticsCacheSerializer : Serializer<AnalyticsCacheState> {
         output: OutputStream,
     ) {
         output.write(
-            OkHttpProvider.json
+            HermesJson.instance
                 .encodeToString(AnalyticsCacheState.serializer(), t)
                 .toByteArray(),
         )
@@ -91,11 +91,11 @@ class AnalyticsCacheStore(
                     context.analyticsCacheDataStore.data
                         .first()
                         .windows[key(days, profile)] ?: return@withContext null
-                val usage = OkHttpProvider.json.decodeFromString<AnalyticsResponse>(win.usageJson)
+                val usage = HermesJson.instance.decodeFromString<AnalyticsResponse>(win.usageJson)
                 val models =
                     win.modelsJson
                         .takeIf { it.isNotBlank() }
-                        ?.let { OkHttpProvider.json.decodeFromString<ModelsAnalyticsResponse>(it) }
+                        ?.let { HermesJson.instance.decodeFromString<ModelsAnalyticsResponse>(it) }
                 usage to models
             } catch (e: Exception) {
                 null
@@ -113,8 +113,8 @@ class AnalyticsCacheStore(
             context.analyticsCacheDataStore.updateData { state ->
                 val win =
                     CachedWindow(
-                        usageJson = OkHttpProvider.json.encodeToString(usage),
-                        modelsJson = models?.let { OkHttpProvider.json.encodeToString(it) } ?: "",
+                        usageJson = HermesJson.instance.encodeToString(usage),
+                        modelsJson = models?.let { HermesJson.instance.encodeToString(it) } ?: "",
                     )
                 state.copy(windows = state.windows + (key(days, profile) to win))
             }

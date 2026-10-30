@@ -9,7 +9,6 @@ import io.ktor.client.HttpClient
  * Android side of the [ApiClient] seam.
  *
  * No second HTTP stack is created: the gateway client is built *on top of* the
- * app's `OkHttpProvider.base` via Ktor's `preconfigured`, so OkHttp keeps owning
  * the connection pool, the persistent cookie jar, TLS pinning,
  * Ktor drives the same objects.
  */

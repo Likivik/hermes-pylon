@@ -8,10 +8,16 @@ import androidx.compose.ui.test.performClick
 import com.m57.hermescontrol.data.config.ConnectionProfile
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.remote.AuthPayloads
-import com.m57.hermescontrol.data.remote.OkHttpProvider
+import com.m57.hermescontrol.data.remote.GatewayClientKind
+import com.m57.hermescontrol.data.remote.HermesHttpConfig
+import com.m57.hermescontrol.data.remote.createGatewayTransportClient
 import com.m57.hermescontrol.data.ws.HermesWsClient
+import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.http.HttpHeaders
+import kotlinx.coroutines.runBlocking
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 
 /**
@@ -166,17 +172,25 @@ object E2eHarness {
         // beginAuthentication() above, mirroring AuthLoginViewModel — the
         // pinned scope means the cookies land in the same scope the selected
         // profile will own after saveConnectionProfilesAndSelect().
-        val loginRequest =
-            Request
-                .Builder()
-                .url(baseUrl.trimEnd('/') + "/auth/password-login")
-                .header("Content-Type", "application/json")
-                .post(loginBody)
-                .build()
-
-        val loginResponse =
+        // Ktor on the app's own transport: the cookie jar is still open from
+        // beginAuthentication() above, so the Set-Cookie on this response lands
+        // in the pinned DEFAULT_PROFILE_ID scope.
+        val loginStatus =
             try {
-                OkHttpProvider.probe.newCall(loginRequest).execute()
+                runBlocking {
+                    val client =
+                        createGatewayTransportClient(GatewayClientKind.Session, config = HermesHttpConfig.Probe)
+                    try {
+                        client
+                            .post(baseUrl.trimEnd('/') + "/auth/password-login") {
+                                header(HttpHeaders.ContentType, "application/json")
+                                setBody(loginBody)
+                            }.status
+                            .value
+                    } finally {
+                        client.close()
+                    }
+                }
             } catch (t: Throwable) {
                 throw IllegalStateException(
                     "seedRealGatewayProfile: password-login HTTP call failed against $baseUrl — " +
@@ -184,18 +198,12 @@ object E2eHarness {
                     t,
                 )
             }
-        loginResponse.use { resp ->
-            if (!resp.isSuccessful) {
-                throw IllegalStateException(
-                    "seedRealGatewayProfile: password-login returned HTTP ${resp.code} for " +
-                        "admin@$baseUrl. Wrong username/password? Wrong provider? " +
-                        "Expected {provider:\"basic\", username:\"admin\", password, next:\"\"}.",
-                )
-            }
-            // The session cookies (hermes_session_at / hermes_session_rt) are
-            // persisted by PersistentCookieJar.saveAll() — OkHttp calls it on
-            // every response, including ours. They live in the active serverId
-            // scope (the "default" profile, set in saveConnectionProfilesAndSelect).
+        if (loginStatus !in 200..299) {
+            throw IllegalStateException(
+                "seedRealGatewayProfile: password-login returned HTTP $loginStatus for " +
+                    "admin@$baseUrl. Wrong username/password? Wrong provider? " +
+                    "Expected {provider:\"basic\", username:\"admin\", password, next:\"\"}.",
+            )
         }
 
         val profile =
