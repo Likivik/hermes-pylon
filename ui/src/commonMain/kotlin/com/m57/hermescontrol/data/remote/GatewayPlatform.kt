@@ -43,7 +43,7 @@ internal expect object GatewayPlatform {
  *
  * Android overrides this with Ktor-over-OkHttp (`preconfigured` on the shared
  * `OkHttpProvider` client), keeping the persistent cookie jar, the
- * credential-boundary interceptors, `TokenRefreshAuthenticator` and debug-only
+ * credential-boundary interceptors and debug-only
  * HTTP logging. Desktop/wasm return a plain Ktor client.
  */
 internal expect fun createGatewayHttpClient(auth: GatewayClientAuth): HttpClient

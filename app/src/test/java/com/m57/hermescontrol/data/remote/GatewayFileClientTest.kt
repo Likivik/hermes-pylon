@@ -12,7 +12,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -328,8 +327,8 @@ class GatewayFileClientTest {
 
     @Test
     fun `bounded readers reject oversized data`() {
-        assertNull("abcd".toResponseBody().readBytesLimited(maxBytes = 3))
-        assertArrayEquals("abc".toByteArray(), "abc".toResponseBody().readBytesLimited(maxBytes = 3))
+        assertNull("abcd".byteInputStream().readBytesLimited(maxBytes = 3))
+        assertArrayEquals("abc".toByteArray(), "abc".byteInputStream().readBytesLimited(maxBytes = 3))
         assertNull(ByteArrayInputStream(byteArrayOf(1, 2, 3, 4)).readBytesLimited(maxBytes = 3))
         assertArrayEquals(
             byteArrayOf(1, 2, 3),

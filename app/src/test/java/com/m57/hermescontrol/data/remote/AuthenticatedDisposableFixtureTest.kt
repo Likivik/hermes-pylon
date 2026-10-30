@@ -19,6 +19,7 @@ import io.mockk.unmockkAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.WebSocket
@@ -198,7 +199,7 @@ class AuthenticatedDisposableFixtureTest {
             assertEquals(
                 200,
                 OkHttpProvider.probe.newCall(
-                    okhttp3.Request.Builder().url(endpoint.resolve("api/auth/login"))
+                    okhttp3.Request.Builder().url(endpoint.baseUrl.resolve("api/auth/login").toString().toHttpUrl())
                         .post("{}".toRequestBody()).build(),
                 ).execute().use { it.code },
             )
@@ -221,7 +222,7 @@ class AuthenticatedDisposableFixtureTest {
                 profile: String,
             ): Int {
                 val url =
-                    endpoint.resolve("api/config").newBuilder()
+                    endpoint.baseUrl.resolve("api/config").toString().toHttpUrl().newBuilder()
                         .addQueryParameter("profile", profile).build()
                 val builder = Request.Builder().url(url)
                 if (method == "PUT") builder.put("{\"config\":{}}".toRequestBody())

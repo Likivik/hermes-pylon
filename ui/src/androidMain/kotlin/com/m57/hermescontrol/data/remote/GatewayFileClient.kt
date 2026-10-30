@@ -70,11 +70,10 @@ object GatewayFileClient {
                     credential.takeUnless { gated },
                     cookieHeader.takeIf { gated },
                 ),
-                OkHttpGatewayRangeRequester(
+                KtorGatewayRangeRequester(
                     endpoint = endpoint,
                     client =
-                        AndroidMediaClient.createMediaClient(
-                            gated = gated,
+                        createMediaTransportClient(
                             token = credential.takeUnless { gated },
                             cookieHeader = cookieHeader.takeIf { gated },
                         ),
@@ -228,7 +227,7 @@ data class MediaRequestContext(
     /** JSON gateway for byte-array downloads. */
     val service: HermesGatewayApi,
     /** Streaming transport for ranged media reads. */
-    val rangeRequester: OkHttpGatewayRangeRequester,
+    val rangeRequester: KtorGatewayRangeRequester,
     val currentScope: () -> MediaCacheScope,
 ) {
     fun isCurrent(): Boolean = currentScope() == scope

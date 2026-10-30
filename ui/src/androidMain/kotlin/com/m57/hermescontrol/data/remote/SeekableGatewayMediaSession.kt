@@ -2,78 +2,73 @@ package com.m57.hermescontrol.data.remote
 
 import com.m57.hermescontrol.data.local.AuthSessionState
 import com.m57.hermescontrol.util.ioDispatcher
+import io.ktor.client.HttpClient
+import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.statement.bodyAsChannel
+import io.ktor.http.HttpHeaders
+import io.ktor.http.encodeURLParameter
+import io.ktor.utils.io.readRemaining
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
-import okhttp3.HttpUrl
-import okhttp3.HttpUrl.Companion.toHttpUrl
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.Response
-import okhttp3.ResponseBody
+import kotlinx.io.readByteArray
 import java.io.IOException
 
 /**
  * Streaming transport for byte-range reads of managed files.
  *
- * Replaces the Retrofit `Call<ResponseBody>` method on the old
- * `HermesApiService`. Range semantics and streaming bodies are not modeled by
- * the JSON floor, so the path stays on plain OkHttp: one prepared client per
- * credential boundary, `Range` header attached, response body consumed by the
- * caller's `ResponseBody` reader.
+ * Ktor owns this path now: one client per credential boundary, a `Range`
+ * header, and a bounded body read. The seam returns plain data
+ * ([GatewayRangeResponse]) rather than an engine response, so nothing below it
+ * knows or cares which engine produced it.
  */
 interface GatewayRangeRequester {
-    /** Build a synchronous-ish range call. Body remains readable until [okhttp3.Response.close]. */
-    fun streamRange(
+    suspend fun streamRange(
         path: String,
         range: String,
-    ): okhttp3.Response
+    ): GatewayRangeResponse
 }
 
+/** A bounded range response: status, the headers the parser needs, and the bytes. */
+data class GatewayRangeResponse(
+    val status: Int,
+    val contentRange: String?,
+    val contentType: String?,
+    val body: ByteArray,
+)
+
 /**
- * Production implementation: build a `Range` request against [endpoint] and
- * dispatch on [client]. The URL is composed with `path` as a *query parameter*
- * (URL-form-encoded) to match the previous Retrofit endpoint (`api/files/stream?path=…`).
- *
- * The returned [okhttp3.Response] owns its body; callers must `close()` it (or
- * rely on the `awaitRangeResult` extension below, which does so).
+ * Production implementation: `Range` request against [endpoint], dispatched on
+ * [client]. The path is a URL-form-encoded *query parameter* to match the
+ * previous Retrofit endpoint (`api/files/stream?path=…`).
  */
-class OkHttpGatewayRangeRequester(
+class KtorGatewayRangeRequester(
     private val endpoint: ServerEndpoint,
-    private val client: OkHttpClient,
+    private val client: HttpClient,
 ) : GatewayRangeRequester {
-    override fun streamRange(
+    override suspend fun streamRange(
         path: String,
         range: String,
-    ): okhttp3.Response {
-        val url: HttpUrl =
-            endpoint.baseUrl
-                .resolve("api/files/stream")
-                .toString()
-                .toHttpUrl()
-                .newBuilder()
-                .addQueryParameter("path", path)
-                .build()
-        val request =
-            Request
-                .Builder()
-                .url(url)
-                .header("Range", range)
-                .get()
-                .build()
-        return client.newCall(request).execute()
+    ): GatewayRangeResponse {
+        val base = endpoint.baseUrl.resolve("api/files/stream").toString()
+        val url = base + "?path=" + path.encodeURLParameter(spaceToPlus = true)
+        val response =
+            client.get(url) {
+                header(HttpHeaders.Range, range)
+            }
+        val bytes =
+            response.bodyAsChannel()
+                .readRemaining(MAX_IN_MEMORY_MEDIA_BYTES)
+                .readByteArray()
+        return GatewayRangeResponse(
+            status = response.status.value,
+            contentRange = response.headers[HttpHeaders.ContentRange],
+            contentType = response.headers[HttpHeaders.ContentType],
+            body = bytes,
+        )
     }
 }
 
-/**
- * A seekable gateway-media transport captured at one profile credential boundary.
- *
- * This is deliberately a transport seam rather than a URL factory: callers can
- * request bounded ranges, but credentials remain inside the endpoint-bound
- * client and never appear in a URI. Every request is fenced before dispatch
- * and again before its response can be consumed.
- */
 fun interface SeekableGatewayMediaReader {
     suspend fun read(
         position: Long,
@@ -119,54 +114,26 @@ class SeekableGatewayMediaSession(
         return withContext(ioDispatcher) {
             try {
                 val response = rangeRequester.streamRange(path, "bytes=$position-$end")
-                try {
-                    if (!isCurrent()) {
-                        response.close()
-                        GatewayMediaRangeResult.Stale
-                    } else {
-                        readBodyCancellable(response) { response.toRangeResult(position, byteCount) }
-                    }
-                } finally {
-                    // Cleanup failures must not replace a successfully parsed range or strand its waiter.
-                    response.close()
+                if (!isCurrent()) {
+                    GatewayMediaRangeResult.Stale
+                } else {
+                    response.toRangeResult(position, byteCount)
                 }
-            } catch (e: CancellationException) {
-                throw e
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Throwable) {
                 GatewayMediaRangeResult.Failure(e)
             }
         }
     }
 
-    /**
-     * Runs the blocking body read as a child coroutine so the read can be cancelled.
-     *
-     * A blocking socket read cannot be interrupted, so cancelling closes the response
-     * body instead; the blocked read then fails with an [IOException] and the waiter
-     * observes a cancelled read rather than a stranded thread. This replaces what
-     * `retrofit2.Call.cancel()` used to provide for the old callback transport.
-     */
-    private suspend fun readBodyCancellable(
-        response: okhttp3.Response,
-        read: () -> GatewayMediaRangeResult,
-    ): GatewayMediaRangeResult =
-        coroutineScope {
-            val worker = async { read() }
-            try {
-                worker.await()
-            } catch (cancelled: CancellationException) {
-                runCatching { response.body?.close() }
-                throw cancelled
-            }
-        }
-
     override fun isCurrent(): Boolean = currentScope() == scope
 
-    private fun okhttp3.Response.toRangeResult(
+    private fun GatewayRangeResponse.toRangeResult(
         requestedPosition: Long,
         requestedCount: Int,
     ): GatewayMediaRangeResult =
-        when (code) {
+        when (status) {
             401 -> {
                 AuthSessionState.requireSignIn()
                 GatewayMediaRangeResult.Unauthorized
@@ -176,51 +143,36 @@ class SeekableGatewayMediaSession(
             404 -> GatewayMediaRangeResult.NotFound
             413 -> GatewayMediaRangeResult.TooLarge
             206 -> toRangeSuccess(requestedPosition, requestedCount)
-            else -> GatewayMediaRangeResult.Failure(IOException("HTTP $code"))
+            else -> GatewayMediaRangeResult.Failure(IOException("HTTP $status"))
         }
 
-    private fun okhttp3.Response.toRangeSuccess(
+    private fun GatewayRangeResponse.toRangeSuccess(
         requestedPosition: Long,
         requestedCount: Int,
     ): GatewayMediaRangeResult {
-        val body: ResponseBody =
-            body ?: return GatewayMediaRangeResult.Failure(
-                IOException("Empty range response body"),
-            )
-        val bytes =
-            body.readBytesLimited(requestedCount.toLong())
-                ?: return GatewayMediaRangeResult.TooLarge
-        val contentRange = headers["Content-Range"]
+        if (body.size.toLong() > requestedCount.toLong()) {
+            return GatewayMediaRangeResult.TooLarge
+        }
         val match =
             contentRange?.let { CONTENT_RANGE.matchEntire(it.trim()) }
                 ?: return GatewayMediaRangeResult.Failure(IOException("Invalid Content-Range"))
         val start = match.groupValues[1].toLongOrNull()
         val end = match.groupValues[2].toLongOrNull()
-        if (start != requestedPosition || end == null || end < start || end - start + 1L != bytes.size.toLong()) {
+        if (start != requestedPosition || end == null || end < start || end - start + 1L != body.size.toLong()) {
             return GatewayMediaRangeResult.Failure(IOException("Mismatched Content-Range"))
         }
         val totalLength = match.groupValues[3].takeUnless { it == "*" }?.toLongOrNull()
         if (totalLength != null && totalLength <= end) {
             return GatewayMediaRangeResult.Failure(IOException("Mismatched Content-Range total"))
         }
-        val mimeType = headers["Content-Type"]?.substringBefore(';')?.trim()?.takeIf(String::isNotBlank)
-        return GatewayMediaRangeResult.Success(bytes, totalLength, mimeType)
+        val mimeType = contentType?.substringBefore(';')?.trim()?.takeIf(String::isNotBlank)
+        return GatewayMediaRangeResult.Success(body, totalLength, mimeType)
     }
 
     companion object {
         private val CONTENT_RANGE = Regex("bytes (\\d+)-(\\d+)/(\\d+|\\*)", RegexOption.IGNORE_CASE)
     }
 }
-
-/**
- * Bounded read of an OkHttp body.
- *
- * Lives next to the range transport that needs it (and imports OkHttp anyway)
- * so `GatewayFileClient` — which now talks only through the Ktor floor and the
- * cookie stack — carries no OkHttp type in its public surface.
- */
-fun ResponseBody.readBytesLimited(maxBytes: Long = MAX_IN_MEMORY_MEDIA_BYTES): ByteArray? =
-    byteStream().use { it.readBytesLimited(maxBytes) }
 
 sealed interface GatewayMediaRangeResult {
     data class Success(
