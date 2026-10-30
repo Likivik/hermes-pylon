@@ -141,7 +141,7 @@ kotlin {
                 // commonMain. OkHttp stays declared because
                 // HermesHttpClientOkHttp.kt names the engine type explicitly to
                 // hand it OkHttpProvider's OkHttpClient via `preconfigured`.
-                implementation(libs.ktor.client.okhttp)
+                implementation(libs.ktor.client.cio)
             }
         }
 

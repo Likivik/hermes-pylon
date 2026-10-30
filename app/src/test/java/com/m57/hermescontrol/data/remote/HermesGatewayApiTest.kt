@@ -4,7 +4,6 @@ import com.m57.hermescontrol.data.model.BulkDeleteRequest
 import com.m57.hermescontrol.data.model.MemoryResetRequest
 import com.m57.hermescontrol.data.model.ToggleSkillRequest
 import kotlinx.coroutines.test.runTest
-import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.jupiter.api.AfterEach
@@ -33,7 +32,7 @@ class HermesGatewayApiTest {
         // The HttpClient is transport-agnostic from Ktor's point of view; it
         // sits on top of OkHttp so MockWebServer records the exact wire
         // requests that the gateway floor sends.
-        val client = createHermesHttpClient(OkHttpClient())
+        val client = createHermesHttpClient()
         api = HermesGatewayApi(client, baseUrl)
     }
 

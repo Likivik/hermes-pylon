@@ -70,7 +70,7 @@ object AndroidMediaClient {
         cookieHeader: String? = null,
     ): HermesGatewayApi =
         HermesGatewayApi(
-            createHermesHttpClient(createMediaClient(gated, token, cookieHeader)),
+            createMediaTransportClient(token = token, cookieHeader = cookieHeader),
             endpoint.baseUrl,
         )
 }
