@@ -2,11 +2,6 @@
 
 package com.m57.hermescontrol.ui.files
 
-import android.content.Intent
-import android.text.format.DateFormat
-import android.text.format.Formatter
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -44,14 +39,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.m57.hermescontrol.data.model.ManagedFileEntry
-import com.m57.hermescontrol.data.remote.readBytesLimited
 import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.action_cancel
 import com.m57.hermescontrol.generated.resources.content_desc_refresh
@@ -71,7 +63,6 @@ import com.m57.hermescontrol.generated.resources.files_error_not_found
 import com.m57.hermescontrol.generated.resources.files_error_open
 import com.m57.hermescontrol.generated.resources.files_error_open_failed
 import com.m57.hermescontrol.generated.resources.files_error_read_selected
-import com.m57.hermescontrol.generated.resources.files_error_selected_unavailable_or_too_large
 import com.m57.hermescontrol.generated.resources.files_error_session_expired
 import com.m57.hermescontrol.generated.resources.files_error_too_large_to_open
 import com.m57.hermescontrol.generated.resources.files_metadata_date_time
@@ -93,14 +84,9 @@ import com.m57.hermescontrol.ui.common.ToastEffect
 import com.m57.hermescontrol.ui.common.routeManagedFileOpen
 import com.m57.hermescontrol.ui.icons.HermesIcon
 import com.m57.hermescontrol.ui.icons.HermesSymbol
-import com.m57.hermescontrol.util.ioDispatcher
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.stringResource
-import java.io.File
-import java.util.Date
 
 private val filesContentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
 private val filesItemSpacing = Arrangement.spacedBy(8.dp)
@@ -128,7 +114,6 @@ fun FilesScreen(
     launchDownloadedFile: ((DownloadedFile) -> Unit)? = null,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var mediaPlayerRequest by remember { mutableStateOf<SecureGatewayMediaRequest?>(null) }
 
@@ -136,41 +121,22 @@ fun FilesScreen(
         viewModel.refresh()
     }
 
-    val uploadLauncher =
-        rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.GetContent(),
-            onResult = { uri ->
-                if (uri == null) return@rememberLauncherForActivityResult
-                val fileName =
-                    uri.lastPathSegment?.substringAfterLast("/")?.takeIf { it.isNotBlank() }
-                        ?: "upload.bin"
-                val mimeType = context.contentResolver.getType(uri) ?: "application/octet-stream"
-                scope.launch {
-                    val bytes =
-                        runCatching {
-                            withContext(ioDispatcher) {
-                                context.contentResolver.openInputStream(uri)?.use { stream ->
-                                    stream.readBytesLimited()
-                                }
-                            }
-                        }.getOrElse {
-                            if (it is CancellationException) throw it
-                            viewModel.showToast(
-                                FilesUiText(
-                                    Res.string.files_error_read_selected,
-                                    listOf(it.message.orEmpty()),
-                                ),
-                            )
-                            return@launch
-                        }
-                    if (bytes == null) {
-                        viewModel.showToast(FilesUiText(Res.string.files_error_selected_unavailable_or_too_large))
-                        return@launch
-                    }
-                    viewModel.uploadFile(fileName, bytes, mimeType)
+    val filesPlatform = rememberFilesPlatform()
+    val uploadFile: () -> Unit = {
+        filesPlatform.pickFile(
+            mimeType = "*/*",
+            onPicked = { picked ->
+                scope.launch { viewModel.uploadFile(picked.name, picked.bytes, picked.mimeType) }
+            },
+            onError = { message ->
+                if (message != null) {
+                    viewModel.showToast(
+                        FilesUiText(Res.string.files_error_read_selected, listOf(message)),
+                    )
                 }
             },
         )
+    }
 
     DisposableEffect(Unit) {
         onDispose { viewModel.clearTransientState() }
@@ -250,7 +216,7 @@ fun FilesScreen(
                     )
                 }
             }
-            IconButton(onClick = { uploadLauncher.launch("*/*") }) {
+            IconButton(onClick = uploadFile) {
                 HermesSymbol(
                     icon = HermesIcon.Upload,
                     contentDescription = stringResource(Res.string.files_action_upload),
@@ -324,7 +290,13 @@ fun FilesScreen(
                                         when (val route = routeManagedFileOpen(entry)) {
                                             is SecureMediaOpenRoute.Player -> mediaPlayerRequest = route.request
                                             SecureMediaOpenRoute.DownloadAndOpen ->
-                                                openManagedFile(entry, viewModel, context, scope, launchDownloadedFile)
+                                                openManagedFile(
+                                                    entry,
+                                                    viewModel,
+                                                    filesPlatform,
+                                                    scope,
+                                                    launchDownloadedFile,
+                                                )
 
                                             SecureMediaOpenRoute.OpenLocal -> Unit
                                         }
@@ -531,21 +503,14 @@ private fun fileIcon(entry: ManagedFileEntry): HermesIcon =
 
 @Composable
 private fun fileSubtitle(entry: ManagedFileEntry): String {
-    val context = LocalContext.current
-    val size =
-        entry.size?.let { bytes -> Formatter.formatShortFileSize(context, bytes) } ?: "—"
+    val platform = rememberFilesPlatform()
+    val size = entry.size?.let { platform.formatSize(it) } ?: "—"
     val mtime =
         entry.mtime
             ?.takeIf { it.isFinite() && it >= 0.0 }
-            ?.let { seconds -> Date((seconds * 1000.0).toLong()) }
-            ?.let { date ->
-                val formattedDate = DateFormat.getMediumDateFormat(context).format(date)
-                val formattedTime = DateFormat.getTimeFormat(context).format(date)
-                stringResource(
-                    Res.string.files_metadata_date_time,
-                    formattedDate,
-                    formattedTime,
-                )
+            ?.let { seconds ->
+                val (date, time) = platform.formatDateTime((seconds * 1000.0).toLong())
+                stringResource(Res.string.files_metadata_date_time, date, time)
             }
     return if (mtime == null) {
         size
@@ -556,7 +521,7 @@ private fun fileSubtitle(entry: ManagedFileEntry): String {
 
 /**
  * Download a managed file **in-app** through the authenticated client and open
- * it on the device via a `FileProvider`-shared URI + `ACTION_VIEW`.
+ * it on the device through the platform's file opener.
  *
  * Fetching through [FilesViewModel.downloadFile] reuses the normal
  * Bearer/session-cookie client. The file is materialized locally before
@@ -565,11 +530,16 @@ private fun fileSubtitle(entry: ManagedFileEntry): String {
 private fun openManagedFile(
     entry: ManagedFileEntry,
     viewModel: FilesViewModel,
-    context: android.content.Context,
+    platform: FilesPlatform,
     scope: CoroutineScope,
     launchDownloadedFile: ((DownloadedFile) -> Unit)? = null,
 ) {
-    viewModel.downloadFile(entry, File(context.cacheDir, "gateway_media").absolutePath) { result ->
+    val staging = platform.stagingDirectory()
+    if (staging == null && launchDownloadedFile == null) {
+        viewModel.showToast(FilesUiText(Res.string.files_error_open, emptyList()))
+        return
+    }
+    viewModel.downloadFile(entry, staging.orEmpty()) { result ->
         when (result) {
             is com.m57.hermescontrol.data.remote.NetworkResult.Success -> {
                 val data = result.data
@@ -578,38 +548,19 @@ private fun openManagedFile(
                     return@downloadFile
                 }
                 scope.launch {
-                    val intent =
-                        runCatching {
-                            withContext(ioDispatcher) {
-                                val uri =
-                                    FileProvider.getUriForFile(
-                                        context,
-                                        "${context.packageName}.fileprovider",
-                                        File(data.cachePath ?: error("no cache path for ${data.name}")),
-                                    )
-                                Intent(Intent.ACTION_VIEW).apply {
-                                    setDataAndType(uri, data.mimeType)
-                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                }
-                            }
-                        }.getOrElse {
-                            if (it is CancellationException) throw it
+                    platform
+                        .openDownloaded(
+                            cachePath = data.cachePath ?: error("no cache path for ${data.name}"),
+                            name = data.name,
+                            mimeType = data.mimeType,
+                        ).onFailure {
                             viewModel.showToast(
                                 FilesUiText(
                                     Res.string.files_error_open,
                                     listOf(it.message.orEmpty()),
                                 ),
                             )
-                            return@launch
                         }
-                    runCatching { context.startActivity(intent) }.onFailure {
-                        viewModel.showToast(
-                            FilesUiText(
-                                Res.string.files_error_open,
-                                listOf(it.message.orEmpty()),
-                            ),
-                        )
-                    }
                 }
             }
 
