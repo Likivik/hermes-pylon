@@ -31,7 +31,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -39,7 +38,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.m57.hermescontrol.NavigationController
 import com.m57.hermescontrol.SkillsScreen
-import com.m57.hermescontrol.data.local.AndroidAnalyticsCacheStore
+import com.m57.hermescontrol.data.local.rememberAnalyticsCacheStore
 import com.m57.hermescontrol.data.model.AnalyticsDailyEntry
 import com.m57.hermescontrol.data.model.ModelsAnalyticsModelEntry
 import com.m57.hermescontrol.generated.resources.Res
@@ -68,9 +67,11 @@ import com.m57.hermescontrol.ui.common.ErrorState
 import com.m57.hermescontrol.ui.common.HermesScaffold
 import com.m57.hermescontrol.ui.common.NavIcon
 import com.m57.hermescontrol.ui.common.SkeletonListState
+import com.m57.hermescontrol.ui.common.formatIntegerGrouped
 import com.m57.hermescontrol.ui.common.listContentPadding
 import com.m57.hermescontrol.ui.common.listItemSpacing
 import org.jetbrains.compose.resources.stringResource
+import kotlin.math.roundToLong
 
 private val DAY_OPTIONS = listOf(7, 30, 90)
 
@@ -79,8 +80,7 @@ fun AnalyticsScreen(
     modifier: Modifier = Modifier,
     onOpenDrawer: (() -> Unit)? = null,
 ) {
-    val appContext = LocalContext.current.applicationContext
-    val cacheStore = remember(appContext) { AndroidAnalyticsCacheStore(appContext) }
+    val cacheStore = rememberAnalyticsCacheStore()
     val viewModel: AnalyticsViewModel = viewModel { AnalyticsViewModel(cacheStore) }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -624,18 +624,37 @@ private fun ToolRow(tool: com.m57.hermescontrol.data.model.AnalyticsToolUsage) {
     }
 }
 
+/**
+ * Fixed-point rendering with [places] decimals, trailing zeros kept.
+ *
+ * `String.format` is JVM-only, and the analytics screen has to render the same
+ * numbers on the web. Scaling by 10^places and rounding is exact enough for
+ * display and identical on every target.
+ */
+private fun decimals(
+    value: Double,
+    places: Int,
+): String {
+    val factor = if (places <= 0) 1L else generateSequence(1L) { it * 10 }.elementAt(places)
+    val scaled = (value * factor).roundToLong()
+    val whole = scaled / factor
+    if (places == 0) return whole.toString()
+    val frac = (scaled % factor).let { if (it < 0) -it else it }.toString().padStart(places, '0')
+    return "$whole.$frac"
+}
+
 private fun formatCost(value: Double): String =
     if (value >= 100.0) {
-        "$${"%,.0f".format(value)}"
+        "$" + formatIntegerGrouped(value.roundToLong())
     } else {
-        "$${"%.2f".format(value)}"
+        "$" + decimals(value, 2)
     }
 
 private fun formatTokens(value: Long): String =
     when {
-        value >= 1_000_000_000_000L -> "%.1fT".format(value / 1_000_000_000_000.0)
-        value >= 1_000_000_000L -> "%.1fB".format(value / 1_000_000_000.0)
-        value >= 1_000_000L -> "%.1fM".format(value / 1_000_000.0)
-        value >= 1_000L -> "%.1fK".format(value / 1_000.0)
+        value >= 1_000_000_000_000L -> decimals(value / 1_000_000_000_000.0, 1) + "T"
+        value >= 1_000_000_000L -> decimals(value / 1_000_000_000.0, 1) + "B"
+        value >= 1_000_000L -> decimals(value / 1_000_000.0, 1) + "M"
+        value >= 1_000L -> decimals(value / 1_000.0, 1) + "K"
         else -> value.toString()
     }
