@@ -1,17 +1,10 @@
 package com.m57.hermescontrol.data.local
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
-
 /**
- * The web target has no persistent settings backend yet.
- *
- * Preferences live for the lifetime of the process only.
+ * In-memory preferences, kept for tests and for callers that want a scratch
+ * store. The real actual on this target is persistent — see
+ * [rememberPreferencesStore].
  */
-@Composable
-actual fun rememberPreferencesStore(): PreferencesStore = remember { InMemoryPreferencesStore() }
-
-/** The web target keeps preferences in memory. */
 class InMemoryPreferencesStore : PreferencesStore {
     private val sets = mutableMapOf<String, Set<String>>()
     private val strings = mutableMapOf<String, String>()
