@@ -24,6 +24,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -1601,6 +1602,24 @@ object HermesWsClient {
         pendingPromptSessions.clear()
         pendingReplayResponses.clear()
         pendingReply = false
+    }
+
+    /**
+     * Cancels work the client started and left running.
+     *
+     * Separate from [resetForTest] on purpose: that one is also used as *setup*
+     * by tests that need a live reconnect job, so cancelling there would break
+     * them. This is for teardown only — a reconnect or request-timeout job that
+     * outlives its test surfaces as `UncaughtExceptionsBeforeTest` on whichever
+     * test runs next.
+     */
+    @VisibleForTesting
+    fun cancelBackgroundWorkForTest() {
+        reconnectJob?.cancel()
+        reconnectJob = null
+        pendingCalls.values.forEach { it.timeoutJob?.cancel() }
+        pendingCalls.clear()
+        wsScope.coroutineContext[Job]?.cancelChildren()
     }
 
     /** The live outbound queue: tests read it and seed frames into it. */
