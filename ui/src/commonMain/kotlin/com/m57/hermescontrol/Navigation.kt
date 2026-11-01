@@ -44,6 +44,7 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
+import androidx.savedstate.serialization.SavedStateConfiguration
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.local.AuthSessionState
 import com.m57.hermescontrol.data.ws.ConnectionStatus
@@ -171,7 +172,7 @@ fun MainNavigation() {
             ?: serverState.wsAuthParam
     val startScreen = authenticatedStartScreen(token, selectedAuthParam)
 
-    val backStack = key(startScreen) { rememberNavBackStack(startScreen) }
+    val backStack = key(startScreen) { rememberNavBackStack(SavedStateConfiguration.DEFAULT, startScreen) }
     NavigationController.backStack = backStack
 
     val currentScreen = backStack.lastOrNull() ?: startScreen
