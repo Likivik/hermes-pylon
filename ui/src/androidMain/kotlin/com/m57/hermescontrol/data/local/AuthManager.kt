@@ -5,9 +5,7 @@ package com.m57.hermescontrol.data.local
 import android.content.Context
 import com.m57.hermescontrol.data.config.ConnectionProfile
 import com.m57.hermescontrol.data.config.ServerStore
-import com.m57.hermescontrol.data.config.ServerStoreMigration
 import com.m57.hermescontrol.data.config.ServerStoreState
-import com.m57.hermescontrol.data.config.ServerUrlMigration
 import com.m57.hermescontrol.data.config.resolveBaseUrl
 import com.m57.hermescontrol.data.config.resolvedBaseUrl
 import com.m57.hermescontrol.data.config.resolvedHost
@@ -87,27 +85,24 @@ object AuthManager : WsAuthConfig {
     val selectedProfileIdFlow: StateFlow<String> = _selectedProfileIdFlow.asStateFlow()
 
     /** Initialise Keystore-backed secure storage and app settings. */
-    fun init(context: Context) {
+    fun init(context: Context) = init(AndroidAuthPlatform(context))
+
+    /**
+     * Initialise from a platform bundle. The `Context` overload above is what
+     * Android callers use; this one is what the manager itself is written
+     * against, so it no longer needs to know what a `Context` is.
+     */
+    fun init(platform: AuthPlatform) {
         if (_serverStore != null) return
         synchronized(this) {
             if (_serverStore != null) return
 
-            val dataStore =
-                androidx.datastore.core.DataStoreFactory.create(
-                    storage = com.m57.hermescontrol.data.config.serverStoreStorage(context),
-                    migrations =
-                        listOf(
-                            ServerStoreMigration(context),
-                            ServerUrlMigration(),
-                        ),
-                )
-
             val scope = CoroutineScope(ioDispatcher)
             appScope = scope
-            val store = ServerStore(dataStore, scope)
+            val store = platform.createServerStore(scope)
             _serverStore = store
 
-            val storage = secureStorageFactory(context)
+            val storage = platform.createSecretStore()
             secureStorage = storage
             migrateLegacyDefaultIfNeeded(storage)
             publishTokenLocked(getTokenInternal(storage))
@@ -116,7 +111,7 @@ object AuthManager : WsAuthConfig {
             val initialProfileId =
                 store.getLatestState().selectedProfileId?.takeIf { it.isNotBlank() } ?: DEFAULT_PROFILE_ID
             _selectedProfileIdFlow.value = initialProfileId
-            CookieManager.initialize(context, initialServerId = initialProfileId)
+            platform.initializeCookieStore(initialProfileId)
 
             scope.launch {
                 store.stateFlow.collect { state ->
