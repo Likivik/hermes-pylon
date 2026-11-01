@@ -68,11 +68,3 @@ class ScreenGraph(
     fun contentFor(key: NavKey): (@Composable (sessionId: String?, openDrawer: () -> Unit) -> Unit)? =
         byKey[key]?.content
 }
-
-/**
- * The graph for this target.
- *
- * Android overrides the chat entry so it can build `ChatViewModel` from the
- * `Application`; other targets declare the subset they can render.
- */
-expect fun screenGraph(): ScreenGraph
