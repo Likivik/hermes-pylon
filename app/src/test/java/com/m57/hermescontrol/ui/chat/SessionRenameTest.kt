@@ -4,6 +4,7 @@ package com.m57.hermescontrol.ui.chat
 
 import android.app.Application
 import android.util.Log
+import androidx.lifecycle.viewModelScope
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.local.HermesDatabase
 import com.m57.hermescontrol.data.remote.ApiClient
@@ -30,6 +31,7 @@ import io.mockk.verify
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -169,12 +171,18 @@ class SessionRenameTest {
 
     @After
     fun tearDown() {
+        createdViewModels.forEach { it.viewModelScope.cancel() }
+        createdViewModels.clear()
         Dispatchers.resetMain()
         ActiveSessionHolder.clear()
         unmockkAll()
+        // Clears reconnect/timeout jobs the production client left behind.
+        HermesWsClient.cancelBackgroundWorkForTest()
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
+
+    private val createdViewModels = mutableListOf<ChatViewModel>()
 
     private fun createViewModel(): ChatViewModel =
         ChatViewModel(
@@ -185,7 +193,7 @@ class SessionRenameTest {
             fakeSlashUsageStore,
             testDispatcher,
             io = testDispatcher,
-        )
+        ).also { createdViewModels += it }
 
     /**
      * Create the ViewModel, emit GatewayReady, then create one session

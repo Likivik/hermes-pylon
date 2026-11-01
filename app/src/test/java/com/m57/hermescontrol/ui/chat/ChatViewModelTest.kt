@@ -8,6 +8,7 @@ import android.content.Intent
 import android.net.Uri
 import android.util.Log
 import androidx.core.content.FileProvider
+import androidx.lifecycle.viewModelScope
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.local.ChatMessageEntity
 import com.m57.hermescontrol.data.local.HermesDatabase
@@ -52,6 +53,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -214,12 +216,24 @@ class ChatViewModelTest {
 
     @After
     fun tearDown() {
+        createdViewModels.forEach { it.viewModelScope.cancel() }
+        createdViewModels.clear()
         Dispatchers.resetMain()
         installAttachmentReader(null)
         unmockkAll()
+        // Clears reconnect/timeout jobs the production client left behind.
+        HermesWsClient.cancelBackgroundWorkForTest()
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
+
+    private val createdViewModels = mutableListOf<ChatViewModel>()
+
+    /** Registers a ViewModel so `tearDown` can cancel its scope. */
+    private fun track(vm: ChatViewModel): ChatViewModel {
+        createdViewModels += vm
+        return vm
+    }
 
     private fun cachedEntity(
         sessionId: String,
@@ -257,14 +271,16 @@ class ChatViewModelTest {
 
     /** Create a ViewModel with the fake repo injected directly. */
     private fun createViewModel(startCleanup: Boolean = false): ChatViewModel =
-        ChatViewModel(
-            testChatEnvironment(fakeSlashUsageStore),
-            resolver,
-            startCleanup,
-            fakeRepo,
-            fakeSlashUsageStore,
-            testDispatcher,
-            io = testDispatcher,
+        track(
+            ChatViewModel(
+                testChatEnvironment(fakeSlashUsageStore),
+                resolver,
+                startCleanup,
+                fakeRepo,
+                fakeSlashUsageStore,
+                testDispatcher,
+                io = testDispatcher,
+            ),
         )
 
     /**
@@ -779,16 +795,18 @@ class ChatViewModelTest {
             val selectedProfile = MutableStateFlow("profile-a")
             every { AuthManager.getSelectedProfileId() } answers { selectedProfile.value }
             val viewModel =
-                ChatViewModel(
-                    testChatEnvironment(fakeSlashUsageStore),
-                    resolver,
-                    false,
-                    fakeRepo,
-                    fakeSlashUsageStore,
-                    testDispatcher,
-                    io = testDispatcher,
-                    selectedProfileId = { selectedProfile.value },
-                    selectedProfileIds = selectedProfile,
+                track(
+                    ChatViewModel(
+                        testChatEnvironment(fakeSlashUsageStore),
+                        resolver,
+                        false,
+                        fakeRepo,
+                        fakeSlashUsageStore,
+                        testDispatcher,
+                        io = testDispatcher,
+                        selectedProfileId = { selectedProfile.value },
+                        selectedProfileIds = selectedProfile,
+                    ),
                 )
             fakeSlashUsageStore.recordUse("profile-a", "/help")
             fakeSlashUsageStore.recordUse("profile-b", "/resume")
@@ -3479,14 +3497,16 @@ class ChatViewModelTest {
                 }
             coEvery { mockApi.getSessionMessages(any(), any(), any(), true, any()) } returns serverMessages("server")
             val viewModel =
-                ChatViewModel(
-                    testChatEnvironment(fakeSlashUsageStore),
-                    resolver,
-                    false,
-                    delayedRepo,
-                    fakeSlashUsageStore,
-                    testDispatcher,
-                    io = testDispatcher,
+                track(
+                    ChatViewModel(
+                        testChatEnvironment(fakeSlashUsageStore),
+                        resolver,
+                        false,
+                        delayedRepo,
+                        fakeSlashUsageStore,
+                        testDispatcher,
+                        io = testDispatcher,
+                    ),
                 )
 
             viewModel.switchSession("session-a")
@@ -3520,16 +3540,18 @@ class ChatViewModelTest {
             coEvery { mockApi.getSessionMessages(any(), any(), any(), true, any()) } throws
                 java.io.IOException("offline")
             val viewModel =
-                ChatViewModel(
-                    testChatEnvironment(fakeSlashUsageStore),
-                    resolver,
-                    false,
-                    delayedRepo,
-                    fakeSlashUsageStore,
-                    testDispatcher,
-                    io = testDispatcher,
-                    selectedProfileId = { selectedProfile.value },
-                    selectedProfileIds = selectedProfile,
+                track(
+                    ChatViewModel(
+                        testChatEnvironment(fakeSlashUsageStore),
+                        resolver,
+                        false,
+                        delayedRepo,
+                        fakeSlashUsageStore,
+                        testDispatcher,
+                        io = testDispatcher,
+                        selectedProfileId = { selectedProfile.value },
+                        selectedProfileIds = selectedProfile,
+                    ),
                 )
 
             viewModel.switchSession("session-a")
@@ -5373,18 +5395,20 @@ class ChatViewModelTest {
             every { app.startActivity(capture(intentSlot)) } returns Unit
 
             val viewModel =
-                ChatViewModel(
-                    testChatEnvironment(
-                        slashUsageStore = fakeSlashUsageStore,
-                        attachmentOpener =
-                            AndroidAttachmentOpener(app, resolver, cacheDir.absolutePath),
+                track(
+                    ChatViewModel(
+                        testChatEnvironment(
+                            slashUsageStore = fakeSlashUsageStore,
+                            attachmentOpener =
+                                AndroidAttachmentOpener(app, resolver, cacheDir.absolutePath),
+                        ),
+                        resolver,
+                        false,
+                        fakeRepo,
+                        fakeSlashUsageStore,
+                        testDispatcher,
+                        io = testDispatcher,
                     ),
-                    resolver,
-                    false,
-                    fakeRepo,
-                    fakeSlashUsageStore,
-                    testDispatcher,
-                    io = testDispatcher,
                 )
             val attachment =
                 Attachment(
@@ -5424,18 +5448,20 @@ class ChatViewModelTest {
             resolver.stub(Res.string.attachment_error_not_found, "File not found on gateway: missing.pdf")
 
             val viewModel =
-                ChatViewModel(
-                    testChatEnvironment(
-                        slashUsageStore = fakeSlashUsageStore,
-                        attachmentOpener =
-                            AndroidAttachmentOpener(app, resolver, cacheDir.absolutePath),
+                track(
+                    ChatViewModel(
+                        testChatEnvironment(
+                            slashUsageStore = fakeSlashUsageStore,
+                            attachmentOpener =
+                                AndroidAttachmentOpener(app, resolver, cacheDir.absolutePath),
+                        ),
+                        resolver,
+                        false,
+                        fakeRepo,
+                        fakeSlashUsageStore,
+                        testDispatcher,
+                        io = testDispatcher,
                     ),
-                    resolver,
-                    false,
-                    fakeRepo,
-                    fakeSlashUsageStore,
-                    testDispatcher,
-                    io = testDispatcher,
                 )
             val attachment =
                 Attachment(
@@ -5469,15 +5495,17 @@ class ChatViewModelTest {
     private val createMaxAttempts = 3
 
     private fun createViewModelWithCreateRetry(): ChatViewModel =
-        ChatViewModel(
-            testChatEnvironment(fakeSlashUsageStore),
-            resolver,
-            false,
-            fakeRepo,
-            fakeSlashUsageStore,
-            testDispatcher,
-            createRetryDelayMs,
-            io = testDispatcher,
+        track(
+            ChatViewModel(
+                testChatEnvironment(fakeSlashUsageStore),
+                resolver,
+                false,
+                fakeRepo,
+                fakeSlashUsageStore,
+                testDispatcher,
+                createRetryDelayMs,
+                io = testDispatcher,
+            ),
         )
 
     @Test

@@ -3,6 +3,7 @@
 package com.m57.hermescontrol.ui.chat
 
 import android.app.Application
+import androidx.lifecycle.viewModelScope
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.local.HermesDatabase
 import com.m57.hermescontrol.data.remote.ApiClient
@@ -23,6 +24,7 @@ import io.mockk.unmockkAll
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -58,6 +60,14 @@ class SlashCommandDispatchRpcTest {
     private lateinit var fakeRepo: FakeChatPersistenceRepository
     private lateinit var fakeSlashUsageStore: FakeSlashUsageStore
     private var reqCount = 0
+
+    /**
+     * Every ViewModel built by this class, so `tearDown` can cancel its
+     * `viewModelScope`. Without this a coroutine from one test survives into the
+     * next and surfaces as `UncaughtExceptionsBeforeTest` on whichever test
+     * happens to run afterwards — the flake this class kept producing.
+     */
+    private val createdViewModels = mutableListOf<ChatViewModel>()
 
     @Before
     fun setUp() {
@@ -118,8 +128,12 @@ class SlashCommandDispatchRpcTest {
 
     @After
     fun tearDown() {
+        createdViewModels.forEach { it.viewModelScope.cancel() }
+        createdViewModels.clear()
         Dispatchers.resetMain()
         unmockkAll()
+        // Clears reconnect/timeout jobs the production client left behind.
+        HermesWsClient.cancelBackgroundWorkForTest()
     }
 
     private suspend fun TestScope.createViewModelWithSession(): Pair<ChatViewModel, String> {
@@ -132,6 +146,7 @@ class SlashCommandDispatchRpcTest {
                 fakeSlashUsageStore,
                 testDispatcher,
             )
+        createdViewModels += vm
         advanceUntilIdle()
         mockConnectionStatus.value = ConnectionStatus.CONNECTED
         mockEventsFlow.emit(WsEvent.GatewayReady(null))
