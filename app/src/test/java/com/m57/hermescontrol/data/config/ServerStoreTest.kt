@@ -2,6 +2,9 @@ package com.m57.hermescontrol.data.config
 
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
+import okio.buffer
+import okio.sink
+import okio.source
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -29,9 +32,9 @@ class ServerStoreTest {
     fun `explicit dynamic color choice survives serialization`() =
         runTest {
             val output = ByteArrayOutputStream()
-            ServerStoreSerializer.writeTo(ServerStoreState(useDynamicColors = true), output)
+            output.sink().buffer().use { ServerStoreSerializer.writeTo(ServerStoreState(useDynamicColors = true), it) }
 
-            val restored = ServerStoreSerializer.readFrom(ByteArrayInputStream(output.toByteArray()))
+            val restored = ServerStoreSerializer.readFrom(ByteArrayInputStream(output.toByteArray()).source().buffer())
 
             assertTrue(restored.useDynamicColors)
         }
@@ -40,12 +43,12 @@ class ServerStoreTest {
     fun `chat font scale survives serialization round trip and defaults for legacy state`() =
         runTest {
             val output = ByteArrayOutputStream()
-            ServerStoreSerializer.writeTo(ServerStoreState(chatFontScale = 1.3f), output)
+            output.sink().buffer().use { ServerStoreSerializer.writeTo(ServerStoreState(chatFontScale = 1.3f), it) }
 
-            val restored = ServerStoreSerializer.readFrom(ByteArrayInputStream(output.toByteArray()))
+            val restored = ServerStoreSerializer.readFrom(ByteArrayInputStream(output.toByteArray()).source().buffer())
             val legacy =
                 ServerStoreSerializer.readFrom(
-                    ByteArrayInputStream("{\"host\":\"127.0.0.1\"}".toByteArray()),
+                    ByteArrayInputStream("{\"host\":\"127.0.0.1\"}".toByteArray()).source().buffer(),
                 )
 
             assertEquals(1.3f, restored.chatFontScale)
@@ -110,13 +113,15 @@ class ServerStoreTest {
                 )
             val output = ByteArrayOutputStream()
 
-            ServerStoreSerializer.writeTo(
-                ServerStoreState(pinnedSessionIdsByProfile = expected),
-                output,
-            )
+            output.sink().buffer().use {
+                ServerStoreSerializer.writeTo(
+                    ServerStoreState(pinnedSessionIdsByProfile = expected),
+                    it,
+                )
+            }
             val restored =
                 ServerStoreSerializer.readFrom(
-                    ByteArrayInputStream(output.toByteArray()),
+                    ByteArrayInputStream(output.toByteArray()).source().buffer(),
                 )
 
             assertEquals(expected, restored.pinnedSessionIdsByProfile)
@@ -127,7 +132,7 @@ class ServerStoreTest {
         runTest {
             val restored =
                 ServerStoreSerializer.readFrom(
-                    ByteArrayInputStream("{\"host\":\"127.0.0.1\"}".toByteArray()),
+                    ByteArrayInputStream("{\"host\":\"127.0.0.1\"}".toByteArray()).source().buffer(),
                 )
 
             assertTrue(restored.pinnedSessionIdsByProfile.isEmpty())

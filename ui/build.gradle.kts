@@ -193,6 +193,10 @@ kotlin {
 
         commonMain {
             dependencies {
+                // DataStore 1.3.0 is the first version with wasmJs storage
+                // backends (WebLocalStorage / WebOpfsStorage).
+                api(libs.androidx.datastore.core)
+                api(libs.androidx.datastore.core.okio)
                 // Compose Multiplatform runtime — Phase 2 of the CMP plan. The
                 // minimal set that the proof composable needs: runtime + ui +
                 // foundation(/-layout) + material3. The :ui androidMain source
