@@ -88,7 +88,7 @@ We enforce Kotlin coding conventions and Jetpack Compose best practices.
 CI is the referee, but you do not have to push to find out:
 
 ```bash
-nix develop -c bash scripts/local-tests.sh unit           # 1028 unit tests
+nix develop -c bash scripts/local-tests.sh unit           # 1215 :app + 216 :shared tests
 nix develop -c bash scripts/local-tests.sh instrumented   # 89 on-device UI tests
 nix develop -c bash scripts/local-tests.sh e2e            # 8 E2E classes, real gateway
 ```
@@ -109,5 +109,5 @@ Before submitting your PR, please verify:
 - [ ] No unused imports, unused parameters, or dead code.
 - [ ] Every `Image` and `Icon` element has a descriptive `contentDescription` for accessibility.
 - [ ] New screens use `HermesScaffold` and implement Loading/Error/Empty states.
-- [ ] New components match the UI/UX style of similar existing screens (28+ screens for reference).
+- [ ] New components match the UI/UX style of similar existing screens in `:ui/src/commonMain`.
 - [ ] Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/) and are atomic (subject + ≤2 lines body).

@@ -5,10 +5,17 @@ This complements [README.md](README.md) (for humans) with agent-focused context.
 
 ## Project Overview
 
-**Hermes Mobile** is a Jetpack Compose Android app — a mobile control panel for
-[Hermes Agent](https://hermes-agent.nousresearch.com). It talks to the Hermes
-dashboard's REST API and WebSocket TUI Gateway (JSON-RPC 2.0) over HTTPS/WSS in
-release builds. Debug builds may use HTTP/WS on a trusted development network.
+**Hermes Mobile** is a Compose Multiplatform client for
+[Hermes Agent](https://hermes-agent.nousresearch.com) — a control panel that runs
+as an Android app, a desktop JVM application and a browser (wasmJs) app from one
+codebase. It talks to the Hermes dashboard's REST API and WebSocket TUI Gateway
+(JSON-RPC 2.0) over HTTPS/WSS in release builds. Debug builds may use HTTP/WS on
+a trusted development network.
+
+The transfer is a work in progress: every screen and view model already lives in
+`:ui/src/commonMain`, and the Android-only remainder is `Context`-bound wiring
+(Room, Keystore, media client, notifications). See
+[docs/kmp-boundary.md](docs/kmp-boundary.md) for the rules that keep it that way.
 
 - **Min SDK 26 / Target SDK 36 / Compile SDK 37**
 - **Namespace:** `com.m57.hermescontrol`
@@ -18,8 +25,11 @@ release builds. Debug builds may use HTTP/WS on a trusted development network.
   Mobile", the name of an unrelated upstream product.)
 - **Kotlin / KSP:** inspect `gradle/libs.versions.toml` for the live versions.
   KSP uses standalone versioning, not `kotlinVersion-kspVersion`.
-- **Jetpack Compose**, Room 2.7.x, Navigation3, Ktor 3.6.0 (OkHttp WebSocket),
-  kotlinx-serialization
+- **Compose Multiplatform** — Android on Jetpack Compose, JVM and wasmJs on CMP.
+  **Room 2.7.x** (Android only), **Navigation3**, **Ktor 3.6.0** with the CIO
+  engine on every target (**no OkHttp anywhere**), kotlinx-serialization,
+  DataStore 1.3 (multiplatform storage), Coil 3, kotlinx-atomicfu (the locks in
+  `AuthManager`)
 - **Auth:** encrypted bearer tokens for direct mode; endpoint-scoped encrypted
   cookies plus short-lived WebSocket tickets for gated mode
 - **Upstream reconciliation:** `UPSTREAM.json` is the machine-owned mutable
@@ -365,7 +375,9 @@ repository reference document.
   app kills. `getMessagesForSession()` returns `suspend fun ...: List<ChatMessageEntity>`
   (not `Flow` — the caller controls the coroutine scope).
 - Room 2.7.x requires `room { schemaDirectory("$projectDir/schemas") }` DSL.
-- `ChatViewModel` extends `AndroidViewModel` (needs Application for DB access).
+- `ChatViewModel` is a plain `ViewModel`: repository, resolver and dispatchers
+  arrive through the constructor, so it compiles for every target. Room itself
+  stays in `androidMain` and is reached through that repository.
 
 ### Chat Rendering and History
 
@@ -486,14 +498,17 @@ the UI and any test that reads only the UI both agree it worked.
 
 ## Things to Avoid
 
-- Don't run `./gradlew` tasks without an Android SDK — CI handles compilation, lint, and tests.
+- Don't assume a local build is cheap. **CI is the default verifier** (ktlint,
+  lint, assemble, release compile, unit tests, CodeQL all run per PR), and this
+  host is memory-constrained — see "Building on a memory-constrained host".
 - Don't remove `@OptIn(ExperimentalMaterial3Api::class)` from screens that use
   `SegmentedButton`, `PullToRefreshBox`, or other experimental M3 APIs.
 - Don't access `MaterialTheme.colorScheme.*` inside non-`@Composable` lambdas
   (`remember {}`, `buildAnnotatedString`, `LaunchedEffect`). Extract to a local
   `val` at the composable scope first.
 - Don't add new screens without checking if an existing one already covers the
-  functionality (19+ screens exist). Extend rather than duplicate.
+  functionality (all screens live in `:ui/src/commonMain`; dozens exist). Extend
+  rather than duplicate.
 - **⚠ Never scope a dependency to `debugImplementation` if its import is used in
   `main/` source code.** The CI `release-compile` job catches this, but save the
   cycle. `okhttp3.logging.HttpLoggingInterceptor` is the classic example — it's
@@ -501,19 +516,60 @@ the UI and any test that reads only the UI both agree it worked.
   `debugImplementation`. If you want it debug-only, wrap the usage in
   `if (BuildConfig.DEBUG)` or extract it behind an interface.
 
-## Project Layout
+## Multiplatform Layout and Seams
 
-```
-com.m57.hermescontrol/
-├── data/          local (AuthManager), remote (Ktor), ws (WebSocket), model
-├── notification/  ChatNotificationService (foreground service)
-├── theme/         Color, Theme, Motion, Spacing, Shapes, Type
-├── ui/            chat, settings, common (HermesScaffold, StateViews), + 17 screens
-├── util/          CronExpressionFormatter, etc.
-├── Navigation.kt          Drawer + NavDisplay + entry wiring
-├── NavigationController.kt  Central navigation guard (dedup)
-└── MainActivity.kt
-```
+Three Gradle modules, and the split is what makes three targets cheap:
+
+| Module | Contents | Rule |
+|---|---|---|
+| `:shared` | Gateway API (Ktor), wire models, WS client, domain logic | `commonMain` may not import `androidx` at all |
+| `:ui` | Every screen, view model, and the data layer (`data/local`, `data/remote`, `data/security`) | `commonMain` may use KMP androidx only — `compose`, `lifecycle`, `navigation3`, `datastore`, `annotation`, `collection`, `graphics`, `savedstate` |
+| `:app` | `HermesControlApp`, `MainActivity`, `notification/` | Android only |
+
+Inside `:ui`, target source sets are the platform edge:
+
+- `commonMain` — the app as written once: screens, `ChatViewModel`, `AuthManager`,
+  `ServerStore`, `CookiePlatform` consumers.
+- `androidMain` — everything that needs a `Context`: `AndroidAuthPlatform`,
+  `SecureStorage` (Keystore), Room, the media client, notifications.
+- `jvmMain` / `wasmJsMain` — desktop and browser actuals.
+
+**One interface per platform capability, never a `Context` in `commonMain`.** The
+existing seams are the pattern to copy:
+
+| Seam | What it hides |
+|---|---|
+| `AuthPlatform` | server store, secret store, cookie-store setup |
+| `SecretStore` | encrypted string storage (Keystore vs. file vs. nothing) |
+| `CookiePlatform` | session-cookie reads and per-profile store switching |
+| `FilesPlatform` | file picking, staging dir, opening downloads, size/date formatting |
+| `ExternalUrlLauncher` | opening a browser |
+| `AnalyticsCacheStore` | the analytics cache |
+| `rememberLogSharer` / `readAppLogFiles` | sharing and reading local logs |
+
+Enforced by `python3 scripts/check_kmp_boundary.py`, which checks **both**
+`:shared` and `:ui` and also fails if any `expect` lacks an `actual` in a
+declared target.
+
+## Building on a memory-constrained host
+
+This host also builds two other projects. A full Android build is ~5 GB across
+the Gradle daemon and a Kotlin compile daemon; three of those at once swap the
+machine to a standstill.
+
+- **Verify with CI, not locally.** Open the PR and watch the checks; the local
+  suite exists only for compile feedback while iterating.
+- **One build at a time.** The wrapper (`/var/lib/hermes/bin/pylon-build.sh`, not
+  in the repo) takes a global lock and exits `75` when another build holds it —
+  sleep and retry, never launch a second one.
+- **Respect the memory guard.** The same wrapper exits `76` when
+  `MemAvailable < 3 GB`; that means the box is already swapping. Free memory (or
+  wait) instead of forcing the build.
+- **Local caps** live in `$GRADLE_USER_HOME/gradle.properties`, not in the
+  repo's `gradle.properties`: 1.5 GB heap, 2 workers, no parallel. CI is
+  unaffected and must stay that way.
+- **Tests locally = one class.** `--tests '*SomeTest*'` for the class you broke;
+  the full suite is CI's job (~10 min there).
 
 ## Further Reading
 
