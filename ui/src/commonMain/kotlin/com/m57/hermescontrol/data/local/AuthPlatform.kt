@@ -1,6 +1,7 @@
 package com.m57.hermescontrol.data.local
 
 import com.m57.hermescontrol.data.config.ServerStore
+import com.m57.hermescontrol.data.remote.CookiePlatform
 import com.m57.hermescontrol.data.security.SecretStore
 import kotlinx.coroutines.CoroutineScope
 
@@ -21,4 +22,7 @@ interface AuthPlatform {
 
     /** Prepares the encrypted cookie store for [initialServerId]. */
     fun initializeCookieStore(initialServerId: String)
+
+    /** Runtime cookie-store operations, available after [initializeCookieStore]. */
+    val cookies: CookiePlatform
 }

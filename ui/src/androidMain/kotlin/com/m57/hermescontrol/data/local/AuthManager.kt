@@ -12,7 +12,7 @@ import com.m57.hermescontrol.data.config.resolvedHost
 import com.m57.hermescontrol.data.config.resolvedPort
 import com.m57.hermescontrol.data.model.PinnedModel
 import com.m57.hermescontrol.data.remote.CleartextPolicy
-import com.m57.hermescontrol.data.remote.CookieManager
+import com.m57.hermescontrol.data.remote.CookiePlatform
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.data.remote.parseForBuild
 import com.m57.hermescontrol.data.security.SecretStore
@@ -47,6 +47,7 @@ object AuthManager : WsAuthConfig {
 
     @Volatile
     private var secureStorage: SecretStore? = null
+    private var cookiePlatform: CookiePlatform? = null
 
     @Volatile
     var secureStorageFactory: (Context) -> SecretStore = ::SecureStorage
@@ -102,6 +103,7 @@ object AuthManager : WsAuthConfig {
             val store = platform.createServerStore(scope)
             _serverStore = store
 
+            cookiePlatform = platform.cookies
             val storage = platform.createSecretStore()
             secureStorage = storage
             migrateLegacyDefaultIfNeeded(storage)
@@ -183,10 +185,10 @@ object AuthManager : WsAuthConfig {
      * automatically on every REST call, follows redirects, and persists it
      * encrypted. This accessor is a thin read-through to that store.
      */
-    fun getSessionCookie(): String? = CookieManager.getSessionCookie()
+    fun getSessionCookie(): String? = cookiePlatform?.getSessionCookie()
 
     fun setSessionCookie(cookie: String?) {
-        CookieManager.setSessionCookie(cookie, endpoint())
+        cookiePlatform?.setSessionCookie(cookie, endpoint())
     }
 
     /**
@@ -194,7 +196,7 @@ object AuthManager : WsAuthConfig {
      * bound cookie growth (issue #470 step 7).
      */
     fun pruneServerCache() {
-        CookieManager.pruneServerCache()
+        cookiePlatform?.pruneServerCache()
     }
 
     // ── Database Master Password ─────────────────────────────────────────
@@ -478,9 +480,9 @@ object AuthManager : WsAuthConfig {
 
     private fun syncCookieStoreForProfile(profileId: String?) {
         val normalizedId = normalizedProfileId(profileId)
-        val currentId = CookieManager.currentServerOrNull() ?: return
+        val currentId = cookiePlatform?.currentServerOrNull() ?: return
         if (currentId != normalizedId) {
-            CookieManager.useStore(normalizedId)
+            cookiePlatform?.useStore(normalizedId)
         }
     }
 
