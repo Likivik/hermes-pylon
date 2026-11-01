@@ -6,7 +6,6 @@ import android.content.Context
 import com.m57.hermescontrol.data.config.ConnectionProfile
 import com.m57.hermescontrol.data.config.ServerStore
 import com.m57.hermescontrol.data.config.ServerStoreMigration
-import com.m57.hermescontrol.data.config.ServerStoreSerializer
 import com.m57.hermescontrol.data.config.ServerStoreState
 import com.m57.hermescontrol.data.config.ServerUrlMigration
 import com.m57.hermescontrol.data.config.resolveBaseUrl
@@ -95,15 +94,13 @@ object AuthManager : WsAuthConfig {
 
             val dataStore =
                 androidx.datastore.core.DataStoreFactory.create(
-                    serializer = ServerStoreSerializer,
+                    storage = com.m57.hermescontrol.data.config.serverStoreStorage(context),
                     migrations =
                         listOf(
                             ServerStoreMigration(context),
                             ServerUrlMigration(),
                         ),
-                ) {
-                    context.filesDir.resolve("server_store.json")
-                }
+                )
 
             val scope = CoroutineScope(ioDispatcher)
             appScope = scope

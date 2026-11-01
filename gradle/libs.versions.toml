@@ -30,7 +30,7 @@ turbine = "1.2.1"
 coil = "3.3.0"
 room = "2.7.1"
 sqlcipher = "4.18.0"
-datastore = "1.1.2"
+datastore = "1.3.0"
 latex = "1.5.5"
 reorderable = "3.1.0"
 roborazzi = "1.72.0"
@@ -124,6 +124,8 @@ screenshot-validation-api = { group = "com.android.tools.screenshot", name = "sc
 # Security
 androidx-security-crypto = { module = "androidx.security:security-crypto", version.ref = "securityCrypto" }
 androidx-datastore = { module = "androidx.datastore:datastore", version.ref = "datastore" }
+androidx-datastore-core = { module = "androidx.datastore:datastore-core", version.ref = "datastore" }
+androidx-datastore-core-okio = { module = "androidx.datastore:datastore-core-okio", version.ref = "datastore" }
 
 # Database (Room)
 androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
