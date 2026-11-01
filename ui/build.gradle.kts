@@ -197,6 +197,9 @@ kotlin {
                 // backends (WebLocalStorage / WebOpfsStorage).
                 api(libs.androidx.datastore.core)
                 api(libs.androidx.datastore.core.okio)
+                // Ported AuthManager: `synchronized` has no common-Kotlin
+                // equivalent, so its 16 locks run on atomicfu monitors.
+                api(libs.kotlinx.atomicfu)
                 // Compose Multiplatform runtime — Phase 2 of the CMP plan. The
                 // minimal set that the proof composable needs: runtime + ui +
                 // foundation(/-layout) + material3. The :ui androidMain source

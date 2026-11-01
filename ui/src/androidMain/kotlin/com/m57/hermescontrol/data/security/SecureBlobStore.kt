@@ -14,7 +14,6 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 /** A failure to authenticate or parse a secure blob. Callers must not fall back on this error. */
-class SecureBlobException(cause: Throwable? = null) : Exception("Secure storage authentication failed", cause)
 
 interface BlobCipher {
     fun encrypt(

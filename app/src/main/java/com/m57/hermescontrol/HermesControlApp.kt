@@ -7,6 +7,7 @@ import coil3.SingletonImageLoader
 import coil3.gif.GifDecoder
 import coil3.network.ktor3.KtorNetworkFetcherFactory
 import com.m57.hermescontrol.data.local.AuthManager
+import com.m57.hermescontrol.data.local.init
 import com.m57.hermescontrol.data.remote.AndroidAttachmentReader
 import com.m57.hermescontrol.data.remote.AndroidNetworkMonitor
 import com.m57.hermescontrol.data.remote.DashboardSessionTokenRefresher

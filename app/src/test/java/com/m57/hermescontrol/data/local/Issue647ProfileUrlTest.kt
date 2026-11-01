@@ -86,7 +86,7 @@ class Issue647ProfileUrlTest {
                     values.keys.removeAll { it.startsWith(prefix) }
                 }
             }
-        AuthManager.secureStorageFactory = { testSecretStore }
+        AuthManager.secretStoreFactory = { testSecretStore }
         com.m57.hermescontrol.data.remote.CookieManager.resetForTest()
         com.m57.hermescontrol.data.remote.CookieManager.secureStorageFactory = { testSecretStore }
         AuthManager.init(testContext)

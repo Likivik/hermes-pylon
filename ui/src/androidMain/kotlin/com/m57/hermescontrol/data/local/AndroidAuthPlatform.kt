@@ -10,6 +10,7 @@ import com.m57.hermescontrol.data.remote.CookieManager
 import com.m57.hermescontrol.data.remote.CookiePlatform
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.data.security.SecretStore
+import com.m57.hermescontrol.data.security.SecureStorage
 import kotlinx.coroutines.CoroutineScope
 
 /** The Android side of [AuthPlatform]: `filesDir`, Keystore and the encrypted cookie store. */
@@ -27,9 +28,10 @@ internal class AndroidAuthPlatform(
             scope,
         )
 
-    // Goes through the same factory AuthManager exposes, so existing test
-    // overrides (and any future one) keep working unchanged.
-    override fun createSecretStore(): SecretStore = AuthManager.secureStorageFactory(appContext)
+    // Goes through the manager's factory first, so existing test overrides (and
+    // any future one) keep working; falls back to the real Keystore-backed store.
+    override fun createSecretStore(): SecretStore =
+        AuthManager.secretStoreFactory?.invoke() ?: SecureStorage(appContext)
 
     override fun initializeCookieStore(initialServerId: String) {
         CookieManager.initialize(appContext, initialServerId = initialServerId)

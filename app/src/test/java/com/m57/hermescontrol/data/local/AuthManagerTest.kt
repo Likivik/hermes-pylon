@@ -110,7 +110,7 @@ class AuthManagerTest {
 
                 override fun deletePrefix(prefix: String) = Unit
             }
-        AuthManager.secureStorageFactory = { testSecretStore }
+        AuthManager.secretStoreFactory = { testSecretStore }
         CookieManager.resetForTest()
         CookieManager.secureStorageFactory = { testSecretStore }
 
@@ -160,7 +160,7 @@ class AuthManagerTest {
     fun databasePasswordIsStableUnderConcurrentCreation() {
         val values = java.util.concurrent.ConcurrentHashMap<String, String?>()
         AuthManager.resetAuthStateForTest()
-        AuthManager.secureStorageFactory = {
+        AuthManager.secretStoreFactory = {
             object : SecretStore {
                 override fun getString(logicalKey: String): String? = values[logicalKey]
 
@@ -177,7 +177,9 @@ class AuthManagerTest {
             }
         }
         CookieManager.resetForTest()
-        CookieManager.secureStorageFactory = AuthManager.secureStorageFactory
+        CookieManager.secureStorageFactory = {
+            AuthManager.secretStoreFactory?.invoke() ?: error("secret store factory not set")
+        }
         AuthManager.init(testContext)
         val executor = java.util.concurrent.Executors.newFixedThreadPool(8)
 
