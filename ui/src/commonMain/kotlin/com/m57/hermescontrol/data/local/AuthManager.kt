@@ -2,7 +2,6 @@
 
 package com.m57.hermescontrol.data.local
 
-import android.content.Context
 import com.m57.hermescontrol.data.config.ConnectionProfile
 import com.m57.hermescontrol.data.config.ServerStore
 import com.m57.hermescontrol.data.config.ServerStoreState
@@ -16,17 +15,24 @@ import com.m57.hermescontrol.data.remote.CookiePlatform
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.data.remote.parseForBuild
 import com.m57.hermescontrol.data.security.SecretStore
-import com.m57.hermescontrol.data.security.SecureStorage
+import com.m57.hermescontrol.data.security.SecureBlobException
+import com.m57.hermescontrol.data.security.authSecretKey
+import com.m57.hermescontrol.data.security.holdsMonitor
+import com.m57.hermescontrol.data.security.secureRandomBytes
 import com.m57.hermescontrol.data.theme.ThemePreference
 import com.m57.hermescontrol.data.theme.ThemePreset
 import com.m57.hermescontrol.data.ws.WsAuthConfig
 import com.m57.hermescontrol.util.ioDispatcher
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlin.concurrent.Volatile
+import kotlin.io.encoding.Base64
 
 /**
  * Singleton that manages encrypted storage of the Hermes dashboard token
@@ -43,14 +49,22 @@ object AuthManager : WsAuthConfig {
     private const val KEY_LEGACY_TOKEN = "auth_token"
     private const val KEY_LEGACY_DEFAULT_MIGRATED = "legacy_default_migrated"
     private const val DATABASE_PASSWORD_BYTES = 32
-    private val databasePasswordLock = Any()
+    private val monitor = SynchronizedObject()
+
+    private val databasePasswordLock = SynchronizedObject()
 
     @Volatile
     private var secureStorage: SecretStore? = null
     private var cookiePlatform: CookiePlatform? = null
 
+    /**
+     * Test/DI substitution point for the encrypted secret store.
+     *
+     * Nullable rather than defaulted because the production default needs an
+     * Android `Context`; each platform supplies its own when this is null.
+     */
     @Volatile
-    var secureStorageFactory: (Context) -> SecretStore = ::SecureStorage
+    var secretStoreFactory: (() -> SecretStore)? = null
 
     @Volatile
     private var _serverStore: ServerStore? = null
@@ -85,17 +99,15 @@ object AuthManager : WsAuthConfig {
     private val _selectedProfileIdFlow = MutableStateFlow(DEFAULT_PROFILE_ID)
     val selectedProfileIdFlow: StateFlow<String> = _selectedProfileIdFlow.asStateFlow()
 
-    /** Initialise Keystore-backed secure storage and app settings. */
-    fun init(context: Context) = init(AndroidAuthPlatform(context))
-
     /**
-     * Initialise from a platform bundle. The `Context` overload above is what
-     * Android callers use; this one is what the manager itself is written
-     * against, so it no longer needs to know what a `Context` is.
+     * Initialise from a platform bundle. `AuthPlatform` supplies the server
+     * store, the secret store and the cookie store, so the manager itself never
+     * needs to know what a `Context` is. Android callers reach this through the
+     * `init(context)` extension in `androidMain`.
      */
     fun init(platform: AuthPlatform) {
         if (_serverStore != null) return
-        synchronized(this) {
+        synchronized(monitor) {
             if (_serverStore != null) return
 
             val scope = CoroutineScope(ioDispatcher)
@@ -117,7 +129,7 @@ object AuthManager : WsAuthConfig {
 
             scope.launch {
                 store.stateFlow.collect { state ->
-                    synchronized(AuthManager) {
+                    synchronized(monitor) {
                         val latestProfileId = store.getLatestState().selectedProfileId
                         _selectedProfileIdFlow.value = normalizedProfileId(latestProfileId)
                         syncCookieStoreForProfile(latestProfileId)
@@ -136,7 +148,7 @@ object AuthManager : WsAuthConfig {
         secureStorage ?: throw IllegalStateException("AuthManager not initialized. Call init(context) first.")
 
     fun setWsAuthParam(param: String) {
-        synchronized(this) {
+        synchronized(monitor) {
             val selectedId = getSelectedProfileId()
             serverStore.update { state ->
                 state.copy(
@@ -204,17 +216,15 @@ object AuthManager : WsAuthConfig {
     fun getDatabasePassword(): ByteArray =
         synchronized(databasePasswordLock) {
             val storage = requireSecureStorage()
-            var dbPasswordBase64 = storage.getString(SecureStorage.authKey("db_password"))
+            var dbPasswordBase64 = storage.getString(authSecretKey("db_password"))
             if (dbPasswordBase64 == null) {
-                val random = java.security.SecureRandom()
-                val newPassword = ByteArray(32)
-                random.nextBytes(newPassword)
-                dbPasswordBase64 = android.util.Base64.encodeToString(newPassword, android.util.Base64.NO_WRAP)
-                storage.putString(SecureStorage.authKey("db_password"), dbPasswordBase64)
+                val newPassword = secureRandomBytes(DATABASE_PASSWORD_BYTES)
+                dbPasswordBase64 = Base64.Default.encode(newPassword)
+                storage.putString(authSecretKey("db_password"), dbPasswordBase64)
             }
             val decoded =
                 try {
-                    android.util.Base64.decode(dbPasswordBase64, android.util.Base64.NO_WRAP)
+                    Base64.Default.decode(dbPasswordBase64)
                 } catch (error: IllegalArgumentException) {
                     throw com.m57.hermescontrol.data.security.SecureBlobException(error)
                 }
@@ -229,7 +239,7 @@ object AuthManager : WsAuthConfig {
     fun getConnectionProfiles(): List<ConnectionProfile> = serverStore.getLatestState().connectionProfiles
 
     fun saveConnectionProfiles(profiles: List<ConnectionProfile>) {
-        synchronized(this) { serverStore.update { it.copy(connectionProfiles = profiles) } }
+        synchronized(monitor) { serverStore.update { it.copy(connectionProfiles = profiles) } }
     }
 
     fun saveConnectionProfilesAndToken(
@@ -237,9 +247,9 @@ object AuthManager : WsAuthConfig {
         profileId: String,
         token: String?,
     ) {
-        synchronized(this) {
+        synchronized(monitor) {
             serverStore.update { it.copy(connectionProfiles = profiles) }
-            requireSecureStorage().putString(SecureStorage.authKey("token_$profileId"), token)
+            requireSecureStorage().putString(authSecretKey("token_$profileId"), token)
             if (getSelectedProfileId() == profileId) {
                 cachedToken = token
                 tokenInitialized = true
@@ -253,9 +263,9 @@ object AuthManager : WsAuthConfig {
         profileId: String,
         token: String?,
     ) {
-        synchronized(this) {
+        synchronized(monitor) {
             serverStore.update { it.copy(connectionProfiles = profiles, selectedProfileId = profileId) }
-            requireSecureStorage().putString(SecureStorage.authKey("token_$profileId"), token)
+            requireSecureStorage().putString(authSecretKey("token_$profileId"), token)
             cachedToken = token
             tokenInitialized = true
             syncCookieStoreForProfile(profileId)
@@ -319,16 +329,16 @@ object AuthManager : WsAuthConfig {
      * [KEY_LEGACY_DEFAULT_MIGRATED].
      */
     private fun migrateLegacyDefaultIfNeeded(storage: SecretStore) {
-        if (storage.getString(SecureStorage.authKey(KEY_LEGACY_DEFAULT_MIGRATED)) == "true") return
-        val legacyToken = storage.getString(SecureStorage.authKey(KEY_LEGACY_TOKEN))
+        if (storage.getString(authSecretKey(KEY_LEGACY_DEFAULT_MIGRATED)) == "true") return
+        val legacyToken = storage.getString(authSecretKey(KEY_LEGACY_TOKEN))
         ensureDefaultProfile()
         if (!legacyToken.isNullOrBlank()) {
             storage.putString(
-                SecureStorage.authKey("token_$DEFAULT_PROFILE_ID"),
+                authSecretKey("token_$DEFAULT_PROFILE_ID"),
                 legacyToken,
             )
         }
-        storage.putString(SecureStorage.authKey(KEY_LEGACY_DEFAULT_MIGRATED), "true")
+        storage.putString(authSecretKey(KEY_LEGACY_DEFAULT_MIGRATED), "true")
     }
 
     // ── Pinned Models ────────────────────────────────────────────────────
@@ -370,14 +380,14 @@ object AuthManager : WsAuthConfig {
     }
 
     fun getProfileToken(profileId: String): String? =
-        requireSecureStorage().getString(SecureStorage.authKey("token_$profileId"))
+        requireSecureStorage().getString(authSecretKey("token_$profileId"))
 
     fun setProfileToken(
         profileId: String,
         token: String?,
     ) {
-        synchronized(this) {
-            requireSecureStorage().putString(SecureStorage.authKey("token_$profileId"), token)
+        synchronized(monitor) {
+            requireSecureStorage().putString(authSecretKey("token_$profileId"), token)
             if (getSelectedProfileId() == profileId) {
                 cachedToken = token
                 tokenInitialized = true
@@ -392,7 +402,7 @@ object AuthManager : WsAuthConfig {
     }
 
     fun setSelectedProfileId(id: String?) {
-        synchronized(this) {
+        synchronized(monitor) {
             serverStore.update { it.copy(selectedProfileId = id) }
             cachedToken = null
             tokenInitialized = false
@@ -410,7 +420,7 @@ object AuthManager : WsAuthConfig {
     )
 
     fun credentialBoundary(): CredentialBoundary =
-        synchronized(this) {
+        synchronized(monitor) {
             val state = serverStore.getLatestState()
             val selectedId = state.selectedProfileId?.takeIf(String::isNotBlank)
             val profileId = selectedId ?: DEFAULT_PROFILE_ID
@@ -430,12 +440,12 @@ object AuthManager : WsAuthConfig {
         boundary: CredentialBoundary,
         token: String?,
     ): Boolean {
-        return synchronized(this) {
+        return synchronized(monitor) {
             val state = serverStore.getLatestState()
             val currentProfile = currentProfileBoundary(state, boundary.profileId)
             if (!currentProfile.matches(boundary)) return@synchronized false
 
-            requireSecureStorage().putString(SecureStorage.authKey("token_${boundary.profileId}"), token)
+            requireSecureStorage().putString(authSecretKey("token_${boundary.profileId}"), token)
             val active =
                 normalizedProfileId(state.selectedProfileId) == boundary.profileId &&
                     currentProfile.matches(boundary)
@@ -488,7 +498,7 @@ object AuthManager : WsAuthConfig {
 
     /** Publish the active token while the surrounding credential mutation still owns this monitor. */
     private fun publishTokenLocked(token: String?) {
-        check(Thread.holdsLock(this))
+        check(holdsMonitor(monitor))
         beforeTokenFlowPublicationForTest?.invoke()
         _tokenFlow.value = token
     }
@@ -503,7 +513,7 @@ object AuthManager : WsAuthConfig {
 
     // For testing purposes
     fun resetTokenCacheForTest() {
-        synchronized(this) {
+        synchronized(monitor) {
             cachedToken = null
             tokenInitialized = false
         }
@@ -511,7 +521,7 @@ object AuthManager : WsAuthConfig {
 
     // For testing purposes
     fun resetAuthStateForTest() {
-        synchronized(this) {
+        synchronized(monitor) {
             cachedToken = null
             tokenInitialized = false
             beforeTokenFlowPublicationForTest = null
@@ -529,7 +539,7 @@ object AuthManager : WsAuthConfig {
 
     fun getToken(): String? {
         if (tokenInitialized) return cachedToken
-        synchronized(this) {
+        synchronized(monitor) {
             if (tokenInitialized) return cachedToken
             val selectedId = getSelectedProfileId()
             val token = if (selectedId != null) getProfileToken(selectedId) else null
@@ -542,20 +552,20 @@ object AuthManager : WsAuthConfig {
     private fun getTokenInternal(storage: SecretStore): String? {
         val selectedId = serverStore.getLatestState().selectedProfileId?.takeIf { it.isNotBlank() }
         return if (selectedId != null) {
-            storage.getString(SecureStorage.authKey("token_$selectedId"))
+            storage.getString(authSecretKey("token_$selectedId"))
         } else {
             null
         }
     }
 
     fun setToken(token: String?) {
-        synchronized(this) {
+        synchronized(monitor) {
             val selectedId =
                 getSelectedProfileId() ?: run {
                     ensureDefaultSelected()
                     DEFAULT_PROFILE_ID
                 }
-            requireSecureStorage().putString(SecureStorage.authKey("token_$selectedId"), token)
+            requireSecureStorage().putString(authSecretKey("token_$selectedId"), token)
             cachedToken = token
             tokenInitialized = true
             publishTokenLocked(token)
@@ -580,7 +590,7 @@ object AuthManager : WsAuthConfig {
                 baseUrl,
                 CleartextPolicy.ALLOW_WITH_WARNING,
             ).baseUrl.toString()
-        synchronized(this) {
+        synchronized(monitor) {
             val selectedId =
                 getSelectedProfileId() ?: run {
                     ensureDefaultSelected()
