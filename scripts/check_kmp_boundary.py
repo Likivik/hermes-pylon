@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Guard the multiplatform boundary of `:shared/commonMain`.
+"""Guard the multiplatform boundary of every `commonMain` in the build.
 
 `commonMain` is the code every target shares, so it must not touch platform
-APIs: an `androidx`/`java`/`okhttp3`/`retrofit2` import there compiles for
+APIs: an `android`/`java`/`okhttp3`/`retrofit2` import there compiles for
 Android and the JVM and breaks the moment a web or desktop target is added.
 
 This check exists because that boundary rots silently. Platform code belongs in
@@ -12,7 +12,17 @@ This check exists because that boundary rots silently. Platform code belongs in
 Also verifies that every `expect` declaration has an `actual` in each declared
 target source set, so a half-migrated target is caught rather than compiled.
 
-Usage:  python3 scripts/check_kmp_boundary.py [--shared-dir PATH]
+Two modules are checked, with different rules:
+
+* `:shared` — no `androidx` at all. It is pure domain code.
+* `:ui` — Compose Multiplatform, so `androidx.compose.*`, `androidx.lifecycle.*`,
+  `androidx.navigation3.*` and the other KMP artifacts are legitimate in
+  `commonMain`. `android.*`, `java.*`, `javax.*`, `okhttp3` and `retrofit2` are
+  still forbidden, and any `androidx` outside the allow-list counts as a
+  violation — that is what stops an Android-only artifact (Room, WorkManager,
+  Keystore) from drifting into shared UI code.
+
+Usage:  python3 scripts/check_kmp_boundary.py [--module-dir PATH ...]
 """
 
 from __future__ import annotations
@@ -20,10 +30,10 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-FORBIDDEN_ROOTS = {"android", "androidx", "java", "javax", "okhttp3", "retrofit2"}
 
 IMPORT_RE = re.compile(r"^\s*import\s+([\w.]+)", re.MULTILINE)
 # `expect fun` may carry type parameters and an extension receiver before the
@@ -55,6 +65,53 @@ INTERMEDIATE_MEMBERSHIP = {
 }
 
 
+@dataclass(frozen=True)
+class Policy:
+    """What `commonMain` may import in one module."""
+
+    forbidden_roots: frozenset[str]
+    # `None` means "every androidx import is forbidden" (the :shared rule).
+    allowed_androidx: tuple[str, ...] | None = None
+
+    def forbids(self, imported: str) -> bool:
+        root = imported.split(".")[0]
+        if root in self.forbidden_roots:
+            return True
+        if root == "androidx" and self.allowed_androidx is not None:
+            return not any(
+                imported == allowed or imported.startswith(f"{allowed}.") for allowed in self.allowed_androidx
+            )
+        return False
+
+
+SHARED_POLICY = Policy(frozenset({"android", "androidx", "java", "javax", "okhttp3", "retrofit2"}))
+
+# Compose Multiplatform artifacts that legitimately ship in commonMain.
+UI_ALLOWED_ANDROIDX = (
+    "androidx.annotation",
+    "androidx.collection",
+    "androidx.compose",
+    "androidx.datastore",
+    "androidx.graphics",
+    "androidx.lifecycle",
+    "androidx.navigation3",
+    "androidx.savedstate",
+)
+
+UI_POLICY = Policy(
+    frozenset({"android", "java", "javax", "okhttp3", "retrofit2"}),
+    UI_ALLOWED_ANDROIDX,
+)
+
+POLICIES = {"shared": SHARED_POLICY, "ui": UI_POLICY}
+DEFAULT_MODULES = ("shared", "ui")
+
+
+def policy_for(base_dir: Path) -> Policy:
+    """`<repo>/<module>/src` → that module's policy; unknown modules get the strict one."""
+    return POLICIES.get(base_dir.parent.name, SHARED_POLICY)
+
+
 def strip_comments(text: str) -> str:
     """Drop block and line comments.
 
@@ -65,14 +122,15 @@ def strip_comments(text: str) -> str:
     return re.sub(r"//[^\n]*", "", without_blocks)
 
 
-def scan(base_dir: Path) -> tuple[list[str], list[str]]:
+def scan(base_dir: Path, policy: Policy | None = None) -> tuple[list[str], list[str]]:
     """Return (violations, missing_actuals) for a `shared/src`-like directory."""
+    policy = policy or policy_for(base_dir)
     common = base_dir / "commonMain"
     violations: list[str] = []
     for path in sorted(common.rglob("*.kt")):
         for match in IMPORT_RE.finditer(strip_comments(path.read_text(encoding="utf-8"))):
             imported = match.group(1)
-            if imported.split(".")[0] in FORBIDDEN_ROOTS:
+            if policy.forbids(imported):
                 violations.append(f"{path.relative_to(base_dir.parent.parent)}: imports {imported}")
 
     expect_names: list[str] = []
@@ -101,30 +159,58 @@ def scan(base_dir: Path) -> tuple[list[str], list[str]]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
+        "--module-dir",
+        type=Path,
+        action="append",
+        dest="module_dirs",
+        help="a `<module>/src` directory to check; repeatable (default: shared and ui)",
+    )
+    parser.add_argument(
         "--shared-dir",
         type=Path,
-        default=ROOT / "shared" / "src",
-        help="the :shared/src directory to check (default: the repository's)",
+        help="deprecated alias for --module-dir",
     )
     args = parser.parse_args()
 
-    violations, missing = scan(args.shared_dir)
-    for violation in violations:
-        print(f"boundary violation: {violation}")
-    for gap in missing:
-        print(f"unimplemented expect: {gap}")
+    if args.module_dirs:
+        module_dirs = args.module_dirs
+    elif args.shared_dir:
+        module_dirs = [args.shared_dir]
+    else:
+        module_dirs = [ROOT / module / "src" for module in DEFAULT_MODULES]
 
-    if violations or missing:
+    module_dirs = [d for d in module_dirs if (d / "commonMain").is_dir()]
+    if not module_dirs:
+        print("no commonMain found to check", file=sys.stderr)
+        return 1
+
+    total_violations = 0
+    total_missing = 0
+    for base_dir in module_dirs:
+        violations, missing = scan(base_dir)
+        for violation in violations:
+            print(f"boundary violation: {violation}")
+        for gap in missing:
+            print(f"unimplemented expect: {gap}")
+        total_violations += len(violations)
+        total_missing += len(missing)
+        module = base_dir.parent.name
         print(
-            f"\nFAILED: {len(violations)} platform API(s) in commonMain, "
-            f"{len(missing)} expect(s) without an actual.\n"
+            f"{module}: {len(violations)} platform API(s) in commonMain, "
+            f"{len(missing)} expect(s) without an actual"
+        )
+
+    if total_violations or total_missing:
+        print(
+            f"\nFAILED: {total_violations} platform API(s) in commonMain, "
+            f"{total_missing} expect(s) without an actual.\n"
             "Move platform code into the target source set and expose it through "
             "an expect/actual declaration.",
             file=sys.stderr,
         )
         return 1
 
-    print(f"OK: {args.shared_dir}/commonMain is free of platform APIs; every expect has its actuals.")
+    print("OK: every commonMain is free of platform APIs; every expect has its actuals.")
     return 0
 
 

@@ -90,5 +90,41 @@ class ScanTest(unittest.TestCase):
             self.assertIn("removeIfValue", missing[0])
 
 
+class UiPolicyTest(unittest.TestCase):
+    """`:ui` is Compose Multiplatform: KMP androidx is fine, Android-only is not."""
+
+    def _scan_ui(self, imports: str) -> list[str]:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp) / "ui" / "src"
+            write(base, "commonMain/A.kt", imports)
+            violations, _ = scan(base)
+            return violations
+
+    def test_compose_multiplatform_imports_are_allowed(self) -> None:
+        violations = self._scan_ui(
+            "import androidx.compose.runtime.getValue\n"
+            "import androidx.compose.runtime.mutableStateOf\n"
+            "import androidx.lifecycle.ViewModel\n",
+        )
+        self.assertEqual([], violations)
+
+    def test_android_platform_import_is_rejected(self) -> None:
+        violations = self._scan_ui("import android.content.Context\n")
+        self.assertEqual(1, len(violations))
+        self.assertIn("android.content.Context", violations[0])
+
+    def test_non_kmp_androidx_artifact_is_rejected(self) -> None:
+        violations = self._scan_ui("import androidx.room.Room\n")
+        self.assertEqual(1, len(violations))
+        self.assertIn("androidx.room.Room", violations[0])
+
+    def test_shared_still_forbids_androidx(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp) / "shared" / "src"
+            write(base, "commonMain/A.kt", "import androidx.compose.runtime.getValue\n")
+            violations, _ = scan(base)
+            self.assertEqual(1, len(violations))
+
+
 if __name__ == "__main__":
     unittest.main()
