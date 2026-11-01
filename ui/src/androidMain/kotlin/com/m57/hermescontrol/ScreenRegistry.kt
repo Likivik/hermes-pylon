@@ -26,7 +26,7 @@ import com.m57.hermescontrol.generated.resources.screen_skills
 import com.m57.hermescontrol.generated.resources.screen_system
 import com.m57.hermescontrol.generated.resources.screen_toolsets
 import com.m57.hermescontrol.generated.resources.screen_webhooks
-import com.m57.hermescontrol.ui.chat.AndroidChatScreen
+import com.m57.hermescontrol.ui.chat.ChatScreenEntry
 import com.m57.hermescontrol.ui.icons.HermesIcon
 import com.m57.hermescontrol.ui.achievements.AchievementsScreen as AchievementsScreenContent
 import com.m57.hermescontrol.ui.analytics.AnalyticsScreen as AnalyticsScreenContent
@@ -67,7 +67,7 @@ actual fun screenGraph(): ScreenGraph =
                     Res.string.screen_chat,
                     HermesIcon.Chat,
                     DrawerSection.CONVERSE,
-                ) { sessionId, openDrawer -> AndroidChatScreen(onOpenDrawer = openDrawer, sessionId = sessionId) },
+                ) { sessionId, openDrawer -> ChatScreenEntry(onOpenDrawer = openDrawer, sessionId = sessionId) },
                 ScreenDefinition(
                     BotsScreen,
                     Res.string.screen_bots,
