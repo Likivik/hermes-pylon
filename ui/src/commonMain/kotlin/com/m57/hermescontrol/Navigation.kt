@@ -66,6 +66,9 @@ import com.m57.hermescontrol.ui.settings.SettingsDiagnosticsPage
 import com.m57.hermescontrol.ui.settings.SettingsLanguagePage
 import com.m57.hermescontrol.ui.settings.SettingsViewModel
 import kotlinx.coroutines.launch
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.polymorphic
+import kotlinx.serialization.modules.subclass
 import org.jetbrains.compose.resources.stringResource
 import com.m57.hermescontrol.ui.authlogin.AuthLoginScreen as AuthLoginScreenContent
 import com.m57.hermescontrol.ui.landing.LandingScreen as LandingScreenContent
@@ -150,6 +153,55 @@ private fun appEntryProvider(
     }
 }
 
+/**
+ * The nav back stack is serialised through `NavKey`, which is an open
+ * polymorphic type: every concrete key must be registered here or the first
+ * frame throws "You must pass a `SavedStateConfiguration.serializersModule`
+ * configured to handle `NavKey` open polymorphism". `DEFAULT` has no module.
+ */
+private val navStateConfiguration: SavedStateConfiguration =
+    SavedStateConfiguration {
+        serializersModule =
+            SerializersModule {
+                polymorphic(NavKey::class) {
+                    subclass(LandingScreen.serializer())
+                    subclass(AuthLoginScreen.serializer())
+                    subclass(ChatScreen.serializer())
+                    subclass(SettingsScreen.serializer())
+                    subclass(SkillsScreen.serializer())
+                    subclass(CronJobsScreen.serializer())
+                    subclass(GatewayScreen.serializer())
+                    subclass(HistoryScreen.serializer())
+                    subclass(ProfilesScreen.serializer())
+                    subclass(BotsScreen.serializer())
+                    subclass(ToolsetsScreen.serializer())
+                    subclass(AchievementsScreen.serializer())
+                    subclass(ConfigScreen.serializer())
+                    subclass(McpServersScreen.serializer())
+                    subclass(WebhooksScreen.serializer())
+                    subclass(ModelScreen.serializer())
+                    subclass(LogsScreen.serializer())
+                    subclass(PluginsScreen.serializer())
+                    subclass(ChannelsScreen.serializer())
+                    subclass(KeysScreen.serializer())
+                    subclass(SystemScreen.serializer())
+                    subclass(KanbanScreen.serializer())
+                    subclass(ProcessesScreen.serializer())
+                    subclass(ProvidersScreen.serializer())
+                    subclass(AnalyticsScreen.serializer())
+                    subclass(BillingScreen.serializer())
+                    subclass(FilesScreen.serializer())
+                    subclass(SettingsConnection.serializer())
+                    subclass(SettingsAppearance.serializer())
+                    subclass(SettingsLanguage.serializer())
+                    subclass(SettingsChat.serializer())
+                    subclass(SettingsBehavior.serializer())
+                    subclass(SettingsAbout.serializer())
+                    subclass(SettingsDiagnostics.serializer())
+                }
+            }
+    }
+
 @Composable
 fun MainNavigation() {
     val signInRequired by AuthSessionState.signInRequired.collectAsState()
@@ -172,7 +224,7 @@ fun MainNavigation() {
             ?: serverState.wsAuthParam
     val startScreen = authenticatedStartScreen(token, selectedAuthParam)
 
-    val backStack = key(startScreen) { rememberNavBackStack(SavedStateConfiguration.DEFAULT, startScreen) }
+    val backStack = key(startScreen) { rememberNavBackStack(navStateConfiguration, startScreen) }
     NavigationController.backStack = backStack
 
     val currentScreen = backStack.lastOrNull() ?: startScreen
