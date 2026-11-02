@@ -1,5 +1,6 @@
 package com.m57.hermescontrol.data.remote
 
+import com.m57.hermescontrol.util.nowMillis
 import io.ktor.http.HttpHeaders
 import io.ktor.http.Url
 import io.ktor.http.parseServerSetCookieHeader
@@ -42,7 +43,7 @@ fun wrapSessionCookie(rawValue: String): CookieHolder? {
     return CookieHolder(
         name = SESSION_COOKIE_NAME,
         value = value,
-        expiresAt = System.currentTimeMillis() + 10L * 365 * 24 * 60 * 60 * 1000,
+        expiresAt = nowMillis() + 10L * 365 * 24 * 60 * 60 * 1000,
         domain = LEGACY_WILDCARD_DOMAIN,
         path = "/",
         secure = false,
@@ -90,7 +91,7 @@ fun parseSetCookie(
 ): CookieHolder? {
     val parsed = runCatching { parseServerSetCookieHeader(header) }.getOrNull() ?: return null
     if (parsed.name.isEmpty()) return null
-    val now = System.currentTimeMillis()
+    val now = nowMillis()
     val maxAge = parsed.maxAge
     val expiresAt =
         when {
