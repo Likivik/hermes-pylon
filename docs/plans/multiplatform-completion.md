@@ -161,6 +161,19 @@ Stop-if: a file needs a new seam to move (that is a seam task, not a move task).
 
 ## 7. Phase 3 — media and files (chat usable on web)
 
+**MEASURED (before doing the work): most of Phase 3 already exists.** The seams this phase planned to build are in the tree, with `actual`s in all three targets:
+
+| expect | commonMain | android / jvm / wasm actuals |
+|---|---|---|
+| `rememberMediaActions()` | `ui/media/MediaActions.kt:52` | `MediaActionsAndroid.kt`, `MediaActions.jvm.kt`, `MediaActions.wasm.kt` |
+| `rememberMediaPlayback(...)` | `ui/media/MediaPlayback.kt:45` | `MediaPlaybackAndroid.kt`, `MediaPlaybackActual.kt` (jvm), `MediaPlaybackActual.kt` (wasm) |
+| `MediaSurface(...)` | `ui/media/MediaPlayback.kt:49` | as above |
+| `mediaStore` | `data/remote/MediaStore.kt:60` | `MediaStoreAndroid.kt`, `MediaStore.kt` (jvm), `MediaStore.kt` (wasm) |
+
+So T3.1 and T3.2 are **not** greenfield work. What remains is (a) proving the browser actuals behave — playback, blob URLs, `MAX_IN_MEMORY_MEDIA_BYTES` — which needs a browser and is blocked with T1.5, and (b) deciding which Android-only media files are genuine platform code (`AndroidAttachmentReader`, `SeekableGatewayMediaSession`, `MediaImageStore` are) versus duplication that should collapse into the shared path.
+
+Checked before writing this note: web HTTP does **not** depend on `GatewayTransport` (androidMain) — `GatewayPlatformWasmJs.createGatewayHttpClient` is its own Ktor client. That makes the cookie port Android cleanup, not a web blocker, and changes the priority order: media behaviour, not cookies, is what stands between the browser build and a usable app.
+
 **T3.1 `MediaPlayback` seam.** Files: `MediaPlaybackAndroid.kt` (205), new common interface, wasm + jvm actuals. JVM ships `canPlay = false` in this phase, stated in the PR; web uses an HTML media element.
 **T3.2 `ImageBytesResolver` + decode seam.** File: `ImageBytesResolver.kt` (184) → common fetch (Ktor handles HTTP since #66) + `expect` decode; web uses blob URLs. `MAX_IN_MEMORY_MEDIA_BYTES` unchanged.
 **T3.3 okio for file + range access.** Files: `GatewayFileClient.kt` (362), `SeekableGatewayMediaSession.kt` (195) → okio `FileSystem`; web gets an in-memory `FileSystem`. Range semantics (206/`Content-Range`) untouched; `GatewayFileClientTest` unchanged and green.
