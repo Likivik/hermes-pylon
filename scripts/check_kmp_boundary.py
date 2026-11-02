@@ -122,6 +122,42 @@ def strip_comments(text: str) -> str:
     return re.sub(r"//[^\n]*", "", without_blocks)
 
 
+# Non-import constructs that compile on the JVM and fail in common Kotlin.
+# The import scan cannot see these: they are symbols, not package references.
+# Each entry is (regex, reason, excusing import or None).
+FORBIDDEN_CONSTRUCTS: tuple[tuple[str, str, str | None], ...] = (
+    (r"(?<![A-Za-z0-9_])System\.", "no common `System`; use `nowMillis()` or platform code", None),
+    (r"(?<![A-Za-z0-9_])Thread\.", "no common `Thread`; use coroutines", None),
+    (r"(?<![A-Za-z0-9_])runBlocking\s*[({]", "no common `runBlocking`; make the caller suspend", None),
+    (r"Dispatchers\.IO", "no common `Dispatchers.IO`", None),
+    (r"String\.format", "no common `String.format`; format explicitly", None),
+    (r"(?<![A-Za-z0-9_])Locale\.", "no common `Locale`", None),
+    (r"(?<![A-Za-z0-9_])javaClass\b", "no common `javaClass`", None),
+    # Legal in commonMain only through atomicfu’s multiplatform lock.
+    (r"synchronized\s*[({]", "`synchronized` in common requires atomicfu", "kotlinx.atomicfu.locks"),
+)
+
+
+def scan_constructs(
+    base_dir: Path = Path("."),
+    module_dir: Path | None = None,
+) -> list[str]:
+    """JVM-only constructs in `commonMain` that the import policy cannot catch."""
+    root = (module_dir or base_dir) / "commonMain"
+    if not root.is_dir():
+        return []
+    found: list[str] = []
+    for path in sorted(root.rglob("*.kt")):
+        text = strip_comments(path.read_text(encoding="utf-8"))
+        for pattern, reason, excuse in FORBIDDEN_CONSTRUCTS:
+            if excuse is not None and f"import {excuse}" in text:
+                continue
+            for match in re.finditer(pattern, text):
+                line = text.count("\n", 0, match.start()) + 1
+                found.append(f"{path.relative_to((module_dir or base_dir).parent.parent)}:{line}: {reason}")
+    return found
+
+
 def scan(base_dir: Path, policy: Policy | None = None) -> tuple[list[str], list[str]]:
     """Return (violations, missing_actuals) for a `shared/src`-like directory."""
     policy = policy or policy_for(base_dir)
@@ -186,8 +222,13 @@ def main() -> int:
 
     total_violations = 0
     total_missing = 0
+    total_constructs = 0
     for base_dir in module_dirs:
         violations, missing = scan(base_dir)
+        constructs = scan_constructs(module_dir=base_dir)
+        for item in constructs:
+            print(f"forbidden construct: {item}")
+        total_constructs += len(constructs)
         for violation in violations:
             print(f"boundary violation: {violation}")
         for gap in missing:
@@ -197,15 +238,17 @@ def main() -> int:
         module = base_dir.parent.name
         print(
             f"{module}: {len(violations)} platform API(s) in commonMain, "
-            f"{len(missing)} expect(s) without an actual"
+            f"{len(missing)} expect(s) without an actual, "
+            f"{len(constructs)} JVM-only construct(s)"
         )
 
-    if total_violations or total_missing:
+    if total_violations or total_missing or total_constructs:
         print(
             f"\nFAILED: {total_violations} platform API(s) in commonMain, "
             f"{total_missing} expect(s) without an actual.\n"
             "Move platform code into the target source set and expose it through "
-            "an expect/actual declaration.",
+            "an expect/actual declaration; replace JVM-only constructs with "
+            "their common equivalents.",
             file=sys.stderr,
         )
         return 1
