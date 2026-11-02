@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from check_kmp_boundary import scan, strip_comments  # noqa: E402
+from check_kmp_boundary import scan, scan_constructs, strip_comments  # noqa: E402
 
 
 def write(base: Path, relative: str, text: str) -> None:
@@ -124,6 +124,40 @@ class UiPolicyTest(unittest.TestCase):
             write(base, "commonMain/A.kt", "import androidx.compose.runtime.getValue\n")
             violations, _ = scan(base)
             self.assertEqual(1, len(violations))
+
+
+class ConstructScanTest(unittest.TestCase):
+    """The import scan cannot see a symbol; these constructs need their own check."""
+
+    def scan_text(self, text: str) -> list[str]:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp) / "ui" / "src"
+            write(base, "commonMain/A.kt", text)
+            return scan_constructs(module_dir=base)
+
+    def test_system_clock_is_reported(self) -> None:
+        hits = self.scan_text("fun a(): Long = System.currentTimeMillis()\n")
+        self.assertEqual(len(hits), 1)
+        self.assertIn("System", hits[0])
+
+    def test_run_blocking_is_reported(self) -> None:
+        hits = self.scan_text("fun a() { runBlocking { } }\n")
+        self.assertEqual(len(hits), 1)
+        self.assertIn("runBlocking", hits[0])
+
+    def test_synchronized_needs_an_excuse(self) -> None:
+        self.assertEqual(len(self.scan_text("fun a() { synchronized(Any()) { } }\n")), 1)
+
+    def test_atomicfu_import_excuses_synchronized(self) -> None:
+        text = "import kotlinx.atomicfu.locks.synchronized\nfun a() { synchronized(Any()) { } }\n"
+        self.assertEqual(self.scan_text(text), [])
+
+    def test_comment_mentions_do_not_count(self) -> None:
+        text = "/** Was System.currentTimeMillis(). */\nfun a(): Long = 0L\n"
+        self.assertEqual(self.scan_text(text), [])
+
+    def test_clean_common_code_reports_nothing(self) -> None:
+        self.assertEqual(self.scan_text("fun a(): Long = nowMillis()\n"), [])
 
 
 if __name__ == "__main__":
