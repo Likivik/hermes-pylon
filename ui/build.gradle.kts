@@ -197,6 +197,14 @@ kotlin {
                 // backends (WebLocalStorage / WebOpfsStorage).
                 api(libs.androidx.datastore.core)
                 api(libs.androidx.datastore.core.okio)
+                // Navigation 3 on every target: the JetBrains KMP build. Google's
+                // `androidx.navigation3` artifacts are Android-only and carry the
+                // same packages, so both cannot be on the classpath at once.
+                // Google's runtime is published for every target; only its `-ui`
+                // artifact is Android-only, and JetBrains publishes that one.
+                api(libs.androidx.navigation3.runtime)
+                api(libs.jetbrains.navigation3.ui)
+                api(libs.jetbrains.lifecycle.viewmodel.navigation3)
                 // Ported AuthManager: `synchronized` has no common-Kotlin
                 // equivalent, so its 16 locks run on atomicfu monitors.
                 api(libs.kotlinx.atomicfu)
@@ -337,9 +345,6 @@ kotlin {
                 api(libs.sqlcipher)
 
                 // Navigation
-                api(libs.androidx.navigation3.ui)
-                api(libs.androidx.navigation3.runtime)
-                api(libs.androidx.lifecycle.viewmodel.navigation3)
 
                 // Phase 1: depends on the multiplatform data model + HTTP primitives
                 // that already live in :shared.

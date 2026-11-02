@@ -21,6 +21,9 @@ roborazzi-plugin = "1.72.0"
 # to miss during Kotlin upgrades since it no longer tracks the Kotlin version.
 ksp = "2.3.12"
 nav3Core = "1.0.1"
+# JetBrains' KMP build of Navigation 3 — same packages as Google's artifact,
+# but published for jvm/wasmJs as well. Version tracks what CMP 1.12.2 resolves.
+nav3Jetbrains = "1.1.0"
 lifecycleViewmodelNav3 = "2.10.0"
 leakcanary = "2.14"
 okhttp = "5.5.0"
@@ -109,6 +112,7 @@ mockk-android = { module = "io.mockk:mockk-android", version.ref = "mockk" }
 turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
 androidx-navigation3-runtime = { module = "androidx.navigation3:navigation3-runtime", version.ref = "nav3Core" }
 androidx-navigation3-ui = { module = "androidx.navigation3:navigation3-ui", version.ref = "nav3Core" }
+jetbrains-navigation3-ui = { module = "org.jetbrains.androidx.navigation3:navigation3-ui", version.ref = "nav3Jetbrains" }
 androidx-lifecycle-viewmodel-navigation3 = { module = "androidx.lifecycle:lifecycle-viewmodel-navigation3", version.ref = "lifecycleViewmodelNav3" }
 
 # Networking
