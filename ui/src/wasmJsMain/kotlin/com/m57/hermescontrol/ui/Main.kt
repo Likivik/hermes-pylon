@@ -98,9 +98,21 @@ fun main() {
         // Console sink for DevTools; the ring is always on inside HermesLog, so
         // diagnostics work even if this install never runs.
         com.m57.hermescontrol.util.HermesLog.install(com.m57.hermescontrol.util.ConsoleLogSink())
+        // The app needs the manager before the first composition reads its
+        // flows; the browser platform persists profiles in `localStorage` and
+        // keeps secrets and cookies in memory for the life of the tab.
+        com.m57.hermescontrol.data.local.AuthManager.init(
+            com.m57.hermescontrol.data.local.WebAuthPlatform(),
+        )
         ComposeViewport(viewportContainer = document.body!!) {
             HermesControlTheme(themePreference = ThemePreference.DARK) {
-                PylonWebEntry()
+                // `?icons` still renders the icon-picker proof surface; every
+                // other URL is the real app.
+                if (window.location.search.contains("icons")) {
+                    PylonWebEntry()
+                } else {
+                    com.m57.hermescontrol.MainNavigation()
+                }
             }
         }
     }
