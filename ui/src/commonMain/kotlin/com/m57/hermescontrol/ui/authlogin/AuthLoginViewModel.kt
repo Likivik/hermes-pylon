@@ -126,6 +126,9 @@ class AuthLoginViewModel(
 
         /** A blocked or hung probe must fail, not spin. */
         private const val PROBE_TIMEOUT_MILLIS = 15_000L
+
+        /** Login POSTs, including basic-auth validation, get longer than a probe. */
+        private const val CONNECT_TIMEOUT_MILLIS = 25_000L
     }
 
     private val probeClient: HttpClient = dashboardProbeClient
@@ -317,6 +320,23 @@ class AuthLoginViewModel(
             }
 
         _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+
+        // Same trap as the probe (see `probe`): a request stuck in a
+        // browser-level connect never delivers cancellation, so the deadline is
+        // a watchdog that only touches state. Without it a hung POST leaves the
+        // Connect button disabled forever, which on wasmJs is the visible
+        // difference between "bad password" and "this app is broken".
+        viewModelScope.launch {
+            delay(CONNECT_TIMEOUT_MILLIS)
+            val timedOut = resolver.get(Res.string.auth_login_error_unreachable)
+            _uiState.update { current ->
+                if (!current.isLoading) {
+                    current
+                } else {
+                    current.copy(isLoading = false, errorMessage = current.errorMessage ?: timedOut)
+                }
+            }
+        }
 
         viewModelScope.launch {
             val result =
