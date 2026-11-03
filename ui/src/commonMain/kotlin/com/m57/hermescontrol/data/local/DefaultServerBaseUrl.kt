@@ -9,3 +9,13 @@ package com.m57.hermescontrol.data.local
  * has to be the origin the page was loaded from.
  */
 expect val defaultServerBaseUrl: String
+
+/**
+ * Whether the gateway URL is *fixed* by where the page was loaded from.
+ *
+ * True in a browser: the page can only talk to its own origin, so a stored or
+ * typed URL pointing anywhere else is not a preference, it is a guaranteed
+ * "Failed to fetch". Android and desktop can reach any host, so they stay
+ * editable.
+ */
+expect val serverBaseUrlIsPageOrigin: Boolean
