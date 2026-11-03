@@ -46,7 +46,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.auth_login_action_connect
-import com.m57.hermescontrol.generated.resources.auth_login_action_probing
 import com.m57.hermescontrol.generated.resources.auth_login_base_url_label
 import com.m57.hermescontrol.generated.resources.auth_login_desc
 import com.m57.hermescontrol.generated.resources.auth_login_existing_profiles_title
@@ -322,14 +321,11 @@ fun AuthLoginScreen(
                         color = MaterialTheme.colorScheme.onPrimary,
                     )
                 } else {
-                    Text(
-                        text =
-                            if (state.authMode == null) {
-                                stringResource(Res.string.auth_login_action_probing)
-                            } else {
-                                stringResource(Res.string.auth_login_action_connect)
-                            },
-                    )
+                    // The label used to key off `authMode == null`, so a screen
+                    // that had never probed said "Probing dashboard…" while
+                    // doing nothing — it read as a hang. `probing` is the state
+                    // that legitimately means "a probe is in flight".
+                    Text(text = stringResource(Res.string.auth_login_action_connect))
                 }
             }
         }

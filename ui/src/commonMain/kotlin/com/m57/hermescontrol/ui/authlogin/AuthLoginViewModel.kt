@@ -40,6 +40,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.reflect.KClass
 
 /**
@@ -122,6 +123,9 @@ class AuthLoginViewModel(
 
     companion object {
         private const val TAG = "AuthLoginVM"
+
+        /** A blocked or hung probe must fail, not spin. */
+        private const val PROBE_TIMEOUT_MILLIS = 15_000L
     }
 
     private val probeClient: HttpClient = dashboardProbeClient
@@ -188,9 +192,11 @@ class AuthLoginViewModel(
         }
 
         viewModelScope.launch {
+            // Bounded: a blocked or hung request must surface as "unreachable"
+            // rather than leaving the button on "Probing dashboard..." forever.
             val result =
                 withContext(ioDispatcher) {
-                    probeDashboardInternal(endpoint)
+                    withTimeoutOrNull(PROBE_TIMEOUT_MILLIS) { probeDashboardInternal(endpoint) }
                 }
             val unreachableMsg =
                 if (result == null) {
