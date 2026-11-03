@@ -5,15 +5,14 @@ import com.m57.hermescontrol.data.remote.HermesJson
 import com.m57.hermescontrol.ui.chat.ChatMessage
 import com.m57.hermescontrol.ui.chat.MessageRole
 import com.m57.hermescontrol.ui.chat.ToolStatus
-import kotlinx.serialization.encodeToString
 
 /**
- * Converts between the Room [ChatMessageEntity] and the UI [ChatMessage].
+ * Converts a stored row to the UI [ChatMessage].
  *
- * Keep this as a pure mapping — no I/O, no side effects.
+ * Keep this as a pure mapping — no I/O, no side effects. The reverse direction
+ * is Android-only ([ChatMessageEntity]) because it builds a Room entity.
  */
-
-fun ChatMessageEntity.toUiModel(): ChatMessage =
+fun ChatMessageRow.toUiModel(): ChatMessage =
     ChatMessage(
         id = id,
         role =
@@ -38,22 +37,6 @@ fun ChatMessageEntity.toUiModel(): ChatMessage =
                 "FAILED" -> ToolStatus.FAILED
                 else -> null
             },
-        displayKind = displayKind,
-    )
-
-fun ChatMessage.toEntity(sessionId: String): ChatMessageEntity =
-    ChatMessageEntity(
-        id = id,
-        sessionId = sessionId,
-        role = role.name,
-        content = content,
-        reasoningText = reasoningText,
-        timestamp = timestamp,
-        toolName = toolName,
-        toolCallId = toolCallId,
-        toolStatus = toolStatus?.name,
-        isStreaming = isStreaming,
-        attachmentsJson = HermesJson.instance.encodeToString(attachments.orEmpty()),
         displayKind = displayKind,
     )
 

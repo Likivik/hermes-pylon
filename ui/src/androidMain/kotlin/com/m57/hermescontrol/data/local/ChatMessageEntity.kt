@@ -21,27 +21,27 @@ import androidx.room.PrimaryKey
 )
 data class ChatMessageEntity(
     @PrimaryKey
-    val id: String,
+    override val id: String,
     @ColumnInfo(name = "session_id")
     val sessionId: String,
     @ColumnInfo(name = "role")
-    val role: String,
+    override val role: String,
     @ColumnInfo(name = "content")
-    val content: String,
+    override val content: String,
     @ColumnInfo(name = "reasoning_text", defaultValue = "")
-    val reasoningText: String = "",
+    override val reasoningText: String = "",
     @ColumnInfo(name = "timestamp")
-    val timestamp: Long,
+    override val timestamp: Long,
     @ColumnInfo(name = "tool_name")
-    val toolName: String? = null,
+    override val toolName: String? = null,
     @ColumnInfo(name = "tool_call_id")
-    val toolCallId: String? = null,
+    override val toolCallId: String? = null,
     @ColumnInfo(name = "tool_status")
-    val toolStatus: String? = null,
+    override val toolStatus: String? = null,
     @ColumnInfo(name = "is_streaming")
-    val isStreaming: Boolean = false,
+    override val isStreaming: Boolean = false,
     @ColumnInfo(name = "attachments_json", defaultValue = "[]")
-    val attachmentsJson: String = "[]",
+    override val attachmentsJson: String = "[]",
     @ColumnInfo(name = "display_kind")
-    val displayKind: String? = null,
-)
+    override val displayKind: String? = null,
+) : ChatMessageRow
