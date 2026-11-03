@@ -88,7 +88,7 @@ class Issue647ProfileUrlTest {
             }
         AuthManager.secretStoreFactory = { testSecretStore }
         com.m57.hermescontrol.data.remote.CookieManager.resetForTest()
-        com.m57.hermescontrol.data.remote.CookieManager.secureStorageFactory = { testSecretStore }
+        com.m57.hermescontrol.data.remote.AndroidCookieStore.secureStorageFactory = { testSecretStore }
         AuthManager.init(testContext)
         AuthManager.serverStore.getLatestState()
     }

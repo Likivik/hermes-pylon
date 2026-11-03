@@ -7,6 +7,7 @@ import io.mockk.unmockkAll
 import io.mockk.verify
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.jupiter.api.AfterEach
@@ -44,7 +45,7 @@ class DashboardSessionTokenRefresherTest {
                 .setBody("""<script>window.__HERMES_SESSION_TOKEN__ = "new-token";</script>"""),
         )
 
-        val token = DashboardSessionTokenRefresher.fetch(server.url("/").toString(), ktClient())
+        val token = runBlocking { DashboardSessionTokenRefresher.fetch(server.url("/").toString(), ktClient()) }
 
         assertEquals("new-token", token)
         assertEquals("/", server.takeRequest().path)
@@ -63,11 +64,13 @@ class DashboardSessionTokenRefresherTest {
             }
 
         assertThrows(CancellationException::class.java) {
-            DashboardSessionTokenRefresher.fetch(
-                server.url("/").toString(),
-                ktClient(),
-                cancelledDispatcher,
-            )
+            runBlocking {
+                DashboardSessionTokenRefresher.fetch(
+                    server.url("/").toString(),
+                    ktClient(),
+                    cancelledDispatcher,
+                )
+            }
         }
     }
 
@@ -75,7 +78,7 @@ class DashboardSessionTokenRefresherTest {
     fun fetchReturnsNullWhenDashboardDoesNotInjectToken() {
         server.enqueue(MockResponse().setResponseCode(200).setBody("<html></html>"))
 
-        val token = DashboardSessionTokenRefresher.fetch(server.url("/").toString(), ktClient())
+        val token = runBlocking { DashboardSessionTokenRefresher.fetch(server.url("/").toString(), ktClient()) }
 
         assertNull(token)
     }
@@ -84,7 +87,7 @@ class DashboardSessionTokenRefresherTest {
     fun fetchReturnsNullForFailedResponse() {
         server.enqueue(MockResponse().setResponseCode(500))
 
-        val token = DashboardSessionTokenRefresher.fetch(server.url("/").toString(), ktClient())
+        val token = runBlocking { DashboardSessionTokenRefresher.fetch(server.url("/").toString(), ktClient()) }
 
         assertNull(token)
     }
@@ -97,7 +100,7 @@ class DashboardSessionTokenRefresherTest {
                 .setBody("""<script>window.__HERMES_SESSION_TOKEN__ = "";</script>"""),
         )
 
-        val token = DashboardSessionTokenRefresher.fetch(server.url("/").toString(), ktClient())
+        val token = runBlocking { DashboardSessionTokenRefresher.fetch(server.url("/").toString(), ktClient()) }
 
         assertNull(token)
     }
@@ -122,7 +125,7 @@ class DashboardSessionTokenRefresherTest {
                 .setBody("""<script>window.__HERMES_SESSION_TOKEN__ = "mocked-token";</script>"""),
         )
 
-        val token = DashboardSessionTokenRefresher.refresh()
+        val token = runBlocking { DashboardSessionTokenRefresher.refresh() }
 
         assertEquals("mocked-token", token)
         verify { AuthManager.commitRefreshedToken(boundary, "mocked-token") }
@@ -133,7 +136,7 @@ class DashboardSessionTokenRefresherTest {
         mockkObject(AuthManager)
         every { AuthManager.credentialBoundary() } throws RuntimeException("Network Error")
 
-        val token = DashboardSessionTokenRefresher.refresh()
+        val token = runBlocking { DashboardSessionTokenRefresher.refresh() }
 
         assertNull(token)
     }
@@ -152,7 +155,7 @@ class DashboardSessionTokenRefresherTest {
         // No token returned from fetch
         server.enqueue(MockResponse().setResponseCode(200).setBody("<html></html>"))
 
-        val token = DashboardSessionTokenRefresher.refresh()
+        val token = runBlocking { DashboardSessionTokenRefresher.refresh() }
 
         assertNull(token)
         verify(exactly = 0) { AuthManager.commitRefreshedToken(any(), any()) }

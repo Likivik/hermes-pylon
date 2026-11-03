@@ -8,27 +8,42 @@ import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.isSuccess
 import io.ktor.utils.io.readRemaining
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.io.readByteArray
 
+/**
+ * Recovers the dashboard session token from the SPA after the gateway drops it.
+ *
+ * Portable on purpose: the previous version used `@Synchronized` and
+ * `runBlocking`, neither of which exists on wasmJs, which kept the whole
+ * transport layer on Android. Serialisation is now a [Mutex] and the blocking
+ * call is a `suspend` function — callers are already suspending (Ktor
+ * `intercept`, view-model scopes).
+ */
 object DashboardSessionTokenRefresher {
     // Probe client: no jar, no retry, redirects off (see [fetch]).
     private val probeClient: HttpClient by lazy { createHermesHttpClient(HermesHttpConfig.Probe) }
 
     private val tokenPattern = Regex("""__HERMES_SESSION_TOKEN__\s*=\s*"([^"]+)"""")
 
-    // Synchronized so concurrent 401s / reconnect storms don't each fire a
+    // Serialised so concurrent 401s / reconnect storms don't each fire a
     // redundant GET at the dashboard SPA (thundering-herd guard).
-    @Synchronized
-    fun refresh(): String? =
-        try {
-            val boundary = AuthManager.credentialBoundary()
-            val token = fetch(boundary.endpoint.baseUrl.toString()) ?: return null
-            token.takeIf { AuthManager.commitRefreshedToken(boundary, it) }
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (_: Exception) {
-            null
+    private val refreshMutex = Mutex()
+
+    suspend fun refresh(): String? =
+        refreshMutex.withLock {
+            try {
+                val boundary = AuthManager.credentialBoundary()
+                val token = fetch(boundary.endpoint.baseUrl.toString()) ?: return@withLock null
+                token.takeIf { AuthManager.commitRefreshedToken(boundary, it) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
+            }
         }
 
     /**
@@ -38,15 +53,15 @@ object DashboardSessionTokenRefresher {
      * the web UI, not the gateway, and following it would fetch a login page and
      * report "no token" for the wrong reason.
      */
-    fun fetch(
+    suspend fun fetch(
         baseUrl: String,
         client: HttpClient = probeClient,
-        dispatcher: kotlinx.coroutines.CoroutineDispatcher = ioDispatcher,
+        dispatcher: CoroutineDispatcher = ioDispatcher,
     ): String? =
         try {
-            runBlocking(dispatcher) {
+            withContext(dispatcher) {
                 val response = client.get(baseUrl)
-                if (!response.status.isSuccess()) return@runBlocking null
+                if (!response.status.isSuccess()) return@withContext null
                 val bytes =
                     response.bodyAsChannel()
                         .readRemaining(MAX_BODY_BYTES)

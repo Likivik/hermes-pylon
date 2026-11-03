@@ -23,6 +23,13 @@ import com.m57.hermescontrol.util.AndroidLogSink
 import com.m57.hermescontrol.util.HermesLog
 import io.kseongbin.stacktrace.CrashLogger
 import io.kseongbin.stacktrace.CrashLoggerConfig
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+
+/** Application-lifetime scope for fire-and-forget work started at start-up. */
+private val refreshScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
 class HermesControlApp :
     Application(),
@@ -68,7 +75,11 @@ class HermesControlApp :
         HermesWsClient.installHttpClient(
             createGatewayTransportClient(GatewayClientKind.Session, config = HermesHttpConfig.Probe),
         )
-        HermesWsClient.installLoopbackTokenRefresher { DashboardSessionTokenRefresher.refresh() }
+        // The refresher is suspend now (wasmJs has no `runBlocking`), and the
+        // WS hook is fire-and-forget: hand it a scope instead of a blocking call.
+        HermesWsClient.installLoopbackTokenRefresher {
+            refreshScope.launch { DashboardSessionTokenRefresher.refresh() }
+        }
         // Issue #537 follow-up (A): preload analytics in the background after launch
         // so the tab renders instantly when opened (the usage endpoint is slow on a
         // cold backend). Fire-and-forget; never blocks UI startup.
