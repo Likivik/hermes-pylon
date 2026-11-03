@@ -34,13 +34,13 @@ import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
 import io.ktor.http.isSuccess
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.reflect.KClass
 
 /**
@@ -191,13 +191,25 @@ class AuthLoginViewModel(
             )
         }
 
+        // The deadline is a watchdog, not `withTimeoutOrNull` around the call.
+        // A fetch stuck in a browser-level connect (cross-origin to a filtered
+        // port) never delivers cancellation, so a timeout wrapped around it
+        // never resumes and the button spins forever. The watchdog only touches
+        // UI state, so it fires whatever the request is doing.
         viewModelScope.launch {
-            // Bounded: a blocked or hung request must surface as "unreachable"
-            // rather than leaving the button on "Probing dashboard..." forever.
-            val result =
-                withContext(ioDispatcher) {
-                    withTimeoutOrNull(PROBE_TIMEOUT_MILLIS) { probeDashboardInternal(endpoint) }
+            delay(PROBE_TIMEOUT_MILLIS)
+            val timedOut = resolver.get(Res.string.auth_login_error_unreachable)
+            _uiState.update { state ->
+                if (!state.probing) {
+                    state
+                } else {
+                    state.copy(probing = false, errorMessage = state.errorMessage ?: timedOut)
                 }
+            }
+        }
+
+        viewModelScope.launch {
+            val result = withContext(ioDispatcher) { probeDashboardInternal(endpoint) }
             val unreachableMsg =
                 if (result == null) {
                     resolver.get(Res.string.auth_login_error_unreachable)
