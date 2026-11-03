@@ -230,3 +230,49 @@ Local build command (parent only): `/var/lib/hermes/bin/pylon-build.sh <tasks> -
 4. **One graph + capability flags**, not per-target screen lists.
 5. **JB nav3 artifact at 1.1.0**, Google coords removed in the same commit.
 6. **T1.3 before T1.1 before T1.2** — chat's `Context` wrapper is the only thing that blocks a common graph, so it moves first.
+
+## 14. Phase 2/3 outcome (2026-11-03)
+
+The remaining move-shaped work is done. `ui/src/androidMain` went from 75 files /
+6,244 lines at the start of Phase 2 to **69 files / 4,539 lines**.
+
+Landed, in order:
+
+| PR | What moved | What stayed |
+|---|---|---|
+| #100 | `ChatMessageRow` + `toUiModel()` → `commonMain` | `ChatMessageEntity`, `toEntity()` |
+| #101 | `CookieStore`, `PersistentCookieJar`, `CookieManager` → `commonMain` | `EncryptedCookieStore`, `initializeAndroidCookieStack(context)` |
+| #102 | `DashboardSessionTokenRefresher` (now `suspend`), `GatewayTransport` → `commonMain` | — |
+
+Three deliberate behaviour changes, all forced by wasmJs having no `runBlocking`:
+
+1. Cookie reads no longer block on the lazy load. The cache is authoritative for
+   what the process knows; a scope whose persisted set has not finished loading
+   reads empty until `useStore` completes.
+2. `CookieManager.useStore` flips the scope and generation synchronously, then
+   loads on the store scope (`CookiePlatform.useStore` is non-suspend).
+3. `DashboardSessionTokenRefresher.refresh/fetch` are `suspend`; the WS hook
+   (`() -> Unit`) starts them on an application-lifetime scope.
+
+`ensureLoaded` merges the persisted set instead of replacing it, so a login that
+races start-up does not lose its cookie. CI caught this one: `ApiClientTest`
+asserts the session cookie is immediately readable after `setSessionCookie`, and
+the first port gated reads on "scope loaded".
+
+### What remains platform-bound, by contract
+
+41 of the 69 files mention `Context`. They are the platform edge, not stragglers:
+
+- **Room** — 3 files (`ChatMessageEntity`, `ChatMessageDao`, `HermesDatabase`).
+  Decision 3 stands: persistence is Android-only.
+- **Keystore / `SecretStore`** — cookie blobs and auth secrets.
+- **MediaStore / attachment reader** — `content://` only exists on Android.
+- **Android logging sink, network monitor, DI start-up, `TestEnvironmentAndroid`.**
+
+### If the goal ever changes
+
+Dropping Android-only persistence means a KMP SQLite driver (Room-KMP or
+SQLDelight) and a `ChatMessageDao` interface in `commonMain`. That is a separate
+piece of work with a schema migration attached; it is not blocked by anything in
+this plan, it is simply not what "port the app" required.
+
