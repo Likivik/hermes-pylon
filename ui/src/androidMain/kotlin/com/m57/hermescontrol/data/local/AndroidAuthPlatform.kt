@@ -9,6 +9,7 @@ import com.m57.hermescontrol.data.config.serverStoreStorage
 import com.m57.hermescontrol.data.remote.CookieManager
 import com.m57.hermescontrol.data.remote.CookiePlatform
 import com.m57.hermescontrol.data.remote.ServerEndpoint
+import com.m57.hermescontrol.data.remote.initializeAndroidCookieStack
 import com.m57.hermescontrol.data.security.SecretStore
 import com.m57.hermescontrol.data.security.SecureStorage
 import kotlinx.coroutines.CoroutineScope
@@ -34,7 +35,7 @@ internal class AndroidAuthPlatform(
         AuthManager.secretStoreFactory?.invoke() ?: SecureStorage(appContext)
 
     override fun initializeCookieStore(initialServerId: String) {
-        CookieManager.initialize(appContext, initialServerId = initialServerId)
+        CookieManager.initializeAndroidCookieStack(appContext, initialServerId = initialServerId)
     }
 
     override val cookies: CookiePlatform =

@@ -10,34 +10,6 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 /**
- * Persistence contract for server-scoped cookies.
- *
- * Implementations store cookies per logical server id (not the raw host) so
- * that switching [PersistentCookieJar] scopes never lets cookies from one
- * gateway leak into another (issue #470 — multi-server isolation).
- *
- * Splitting this into an interface lets unit tests inject an in-memory fake
- * ([com.m57.hermescontrol.data.remote.FakeEncryptedCookieStore]) instead of
- * spinning up Android Keystore-backed storage.
- */
-interface CookieStore {
-    /** Persist [cookies] for [serverId]. Replaces the previous set atomically. */
-    suspend fun save(
-        serverId: String,
-        cookies: List<CookieHolder>,
-    )
-
-    /** Load the persisted cookie set for [serverId] (may be empty). */
-    suspend fun load(serverId: String): List<CookieHolder>
-
-    /** Drop all persisted cookies for [serverId] (e.g. on logout). */
-    suspend fun clear(serverId: String)
-
-    /** Drop everything across all servers. */
-    suspend fun clearAll()
-}
-
-/**
  * Encrypted, per-server cookie persistence backed by independent atomic
  * Android Keystore AES-GCM blobs. Cookies are serialized with kotlinx.serialization
  * and written on [ioDispatcher].
