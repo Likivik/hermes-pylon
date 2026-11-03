@@ -975,6 +975,7 @@
     <string name="auth_login_error_username_required">Username is required</string>
     <string name="auth_login_error_password_required">Password is required</string>
     <string name="auth_login_error_unreachable">Dashboard unreachable — check IP and port</string>
+    <string name="auth_login_error_cross_origin">This browser build can only reach its own origin. Use %1$s.</string>
     <string name="auth_login_error_oauth_unsupported">OAuth login (Nous Portal) is not supported in this app version yet. Switch the dashboard to basic auth or token mode. (issue #639)</string>
     <string name="auth_login_oauth_coming_soon">This dashboard uses OAuth (Nous Portal) login, which is coming soon to Hermes Mobile.</string>
     <string name="auth_login_existing_profiles_title">Use existing logged-in profile:</string>

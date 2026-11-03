@@ -20,6 +20,7 @@ import com.m57.hermescontrol.data.remote.parseForBuild
 import com.m57.hermescontrol.data.remote.safeApiCall
 import com.m57.hermescontrol.data.ws.HermesWsClient
 import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.auth_login_error_cross_origin
 import com.m57.hermescontrol.generated.resources.auth_login_error_password_required
 import com.m57.hermescontrol.generated.resources.auth_login_error_token_required
 import com.m57.hermescontrol.generated.resources.auth_login_error_unreachable
@@ -136,15 +137,35 @@ class AuthLoginViewModel(
     private val probeClient: HttpClient = dashboardProbeClient
 
     /**
-     * A browser cannot reach any origin but its own, so the stored value is
-     * ignored there. Restoring it is what made the web login sit on a saved
-     * `:9119` URL that no phone can reach.
+     * A browser can only reach its own origin, so an edited URL in the web build
+     * is not a preference to honour silently — it is a request the browser will
+     * refuse. Say so at the field, not as "unreachable" after a failed fetch.
+     *
+     * Cross-origin would work if the dashboard sent `Access-Control-Allow-Origin`;
+     * that is tracked as a feature request, and this message is the gate.
+     */
+    private suspend fun crossOriginMessage(candidate: String): String? {
+        if (!serverBaseUrlIsPageOrigin || candidate.isBlank()) return null
+        val sameOrigin =
+            runCatching {
+                val parsed = ServerEndpoint.parseForBuild(candidate).baseUrl
+                val expected = ServerEndpoint.parseForBuild(defaultServerBaseUrl).baseUrl
+                parsed.protocol == expected.protocol &&
+                    parsed.host == expected.host &&
+                    parsed.port == expected.port
+            }.getOrDefault(false)
+        return if (sameOrigin) null else resolver.get(Res.string.auth_login_error_cross_origin, defaultServerBaseUrl)
+    }
+
+    /**
+     * A browser cannot reach any origin but its own, so a stored value is ignored
+     * there. Restoring it is what made the web login sit on a saved `:9119` URL
+     * that no phone can reach.
      */
     private fun initialBaseUrl(): String =
         if (serverBaseUrlIsPageOrigin) defaultServerBaseUrl else authStore.getBaseUrl()
 
     fun onBaseUrlChange(value: String) {
-        if (serverBaseUrlIsPageOrigin) return
         val warning =
             runCatching {
                 ServerEndpoint.parseForBuild(value).securityWarning
@@ -156,6 +177,14 @@ class AuthLoginViewModel(
                 errorMessage = null,
                 authMode = null,
             )
+        }
+        if (serverBaseUrlIsPageOrigin) {
+            viewModelScope.launch {
+                val message = crossOriginMessage(value.trim())
+                _uiState.update { state ->
+                    if (state.baseUrl == value.trim()) state.copy(errorMessage = message) else state
+                }
+            }
         }
     }
 
@@ -321,6 +350,21 @@ class AuthLoginViewModel(
      * Step 2: Connect using the detected auth mode.
      */
     fun connect() {
+        if (serverBaseUrlIsPageOrigin) {
+            viewModelScope.launch {
+                val message = crossOriginMessage(_uiState.value.baseUrl)
+                if (message == null) {
+                    connectSameOrigin()
+                } else {
+                    _uiState.update { it.copy(isLoading = false, probing = false, errorMessage = message) }
+                }
+            }
+            return
+        }
+        connectSameOrigin()
+    }
+
+    private fun connectSameOrigin() {
         val state = _uiState.value
         val endpoint =
             try {
