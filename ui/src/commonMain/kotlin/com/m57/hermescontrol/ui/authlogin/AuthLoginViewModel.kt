@@ -9,6 +9,8 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import com.m57.hermescontrol.data.config.ConnectionProfile
 import com.m57.hermescontrol.data.local.AuthSessionState
 import com.m57.hermescontrol.data.local.authStore
+import com.m57.hermescontrol.data.local.defaultServerBaseUrl
+import com.m57.hermescontrol.data.local.serverBaseUrlIsPageOrigin
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.AuthPayloads
 import com.m57.hermescontrol.data.remote.HermesHttpConfig
@@ -87,7 +89,7 @@ class AuthLoginViewModel(
     private val _uiState =
         MutableStateFlow(
             AuthLoginUiState(
-                baseUrl = authStore.getBaseUrl(),
+                baseUrl = initialBaseUrl(),
             ),
         )
     val uiState: StateFlow<AuthLoginUiState> = _uiState.asStateFlow()
@@ -133,7 +135,16 @@ class AuthLoginViewModel(
 
     private val probeClient: HttpClient = dashboardProbeClient
 
+    /**
+     * A browser cannot reach any origin but its own, so the stored value is
+     * ignored there. Restoring it is what made the web login sit on a saved
+     * `:9119` URL that no phone can reach.
+     */
+    private fun initialBaseUrl(): String =
+        if (serverBaseUrlIsPageOrigin) defaultServerBaseUrl else authStore.getBaseUrl()
+
     fun onBaseUrlChange(value: String) {
+        if (serverBaseUrlIsPageOrigin) return
         val warning =
             runCatching {
                 ServerEndpoint.parseForBuild(value).securityWarning
