@@ -1,23 +1,22 @@
-// Modified from Hy4ri/hermes-mobile for this fork; see NOTICE.
-
 package com.m57.hermescontrol.data.remote
 
-import android.content.Context
-import com.m57.hermescontrol.data.security.SecretStore
-import com.m57.hermescontrol.data.security.SecureStorage
 import com.m57.hermescontrol.util.ioDispatcher
+import com.m57.hermescontrol.util.nowMillis
+import com.m57.hermescontrol.util.synchronizedOn
 import io.ktor.http.Url
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import kotlin.concurrent.Volatile
 
 /**
  * Coordinator for the issue #470 cookie stack.
  *
  * Owns the single [PersistentCookieJar] instance and exposes:
- * - [cookieJar] — inject into every OkHttp client (REST + WS + probe).
- * - [initialize] — build the encrypted store + jar (idempotent).
+ * - [cookieJar] — the jar every HTTP client reads cookies from.
+ * - [initialize] — build the jar around a platform [CookieStore] (idempotent).
+ *   Android supplies its Keystore-backed store through the
+ *   `CookieManager.initializeAndroidCookieStack(context, …)` extension in `androidMain`.
  * - [useStore] — atomically switch the active server scope.
  * - [pruneServerCache] / [clearAll] — lifecycle/maintenance.
  * - [getSessionCookie] / [setSessionCookie] — backward-compatible accessors
@@ -29,14 +28,13 @@ import kotlinx.coroutines.runBlocking
  */
 object CookieManager {
     private val scope = CoroutineScope(SupervisorJob() + ioDispatcher)
-
-    @Volatile private var jar: PersistentCookieJar? = null
+    private val initLock = Any()
 
     @Volatile
-    var secureStorageFactory: (Context) -> SecretStore = ::SecureStorage
+    private var jar: PersistentCookieJar? = null
 
     val cookieJar: PersistentCookieJar
-        get() = jar ?: error("CookieManager.initialize(context) must be called before use")
+        get() = jar ?: error("CookieManager.initialize(...) must be called before use")
 
     fun isInitialized(): Boolean = jar != null
 
@@ -44,8 +42,7 @@ object CookieManager {
      * The `Cookie` header the persistent jar would send to [url], or `""`.
      *
      * Lives here rather than at the call sites so URL→cookie logic stays inside
-     * the cookie stack. `GatewayFileClient` used to build an `okhttp3.HttpUrl`
-     * just to ask this question, which was the only reason it imported OkHttp.
+     * the cookie stack.
      */
     fun cookieHeaderFor(url: String): String {
         val current = jar ?: return ""
@@ -56,26 +53,40 @@ object CookieManager {
     /** Current scope when initialized; null during startup or test teardown. */
     fun currentServerOrNull(): String? = jar?.currentServer()
 
+    /**
+     * Build the jar around [store]. Concurrent callers are serialised; the first
+     * one wins and later calls are no-ops, so start-up paths can call this
+     * without coordinating.
+     */
     fun initialize(
-        context: Context,
+        store: CookieStore,
         initialServerId: String = PersistentCookieJar.DEFAULT_SERVER_ID,
     ) {
         if (jar != null) return
-        synchronized(this) {
-            if (jar != null) return
-            val store = EncryptedCookieStore(context.applicationContext, secureStorageFactory)
-            val createdJar = PersistentCookieJar(store, scope, initialServerId)
-            jar = createdJar
-            // Eagerly load the initial scope off the caller thread so the
-            // first REST call is instant without blocking app startup.
-            scope.launch { createdJar.useStore(initialServerId) }
+        synchronizedOn(initLock) {
+            if (jar == null) {
+                val createdJar = PersistentCookieJar(store, scope, initialServerId)
+                jar = createdJar
+                // Eagerly load the initial scope off the caller thread so the
+                // first REST call finds cookies already in memory.
+                scope.launch { createdJar.useStore(initialServerId) }
+            }
         }
     }
 
-    /** Switch the active server scope and load its persisted cookies. */
+    /**
+     * Switch the active server scope and load its persisted cookies.
+     *
+     * The scope id and credential generation flip synchronously; the persisted
+     * load happens on [scope], because blocking a caller on it would need
+     * `runBlocking`, which does not exist on wasmJs. A request issued in the
+     * same tick as the swap may therefore see an empty jar for the new scope —
+     * callers that must not (the login flow) await [PersistentCookieJar.useStore]
+     * directly via the jar.
+     */
     fun useStore(serverId: String) {
-        val j = jar ?: return
-        runBlocking(scope.coroutineContext) { j.useStore(serverId) }
+        val current = jar ?: return
+        scope.launch { current.useStore(serverId) }
     }
 
     /** Read the current dashboard access-cookie value (or null). */
@@ -94,13 +105,13 @@ object CookieManager {
         rawValue: String?,
         endpoint: ServerEndpoint,
     ) {
-        val j = jar ?: return
+        val current = jar ?: return
         if (rawValue.isNullOrBlank()) {
-            j.clearActive()
+            current.clearActive()
             return
         }
-        j.beginAuthentication()
-        j.saveFromResponse(
+        current.beginAuthentication()
+        current.saveFromResponse(
             Url(endpoint.baseUrl.toString()),
             listOf(
                 CookieHolder(
@@ -108,7 +119,7 @@ object CookieManager {
                     value = rawValue,
                     // Session lifetime is owned by the dashboard, not by
                     // client-side expiry.
-                    expiresAt = System.currentTimeMillis() + 10L * 365 * 24 * 60 * 60 * 1000,
+                    expiresAt = nowMillis() + 10L * 365 * 24 * 60 * 60 * 1000,
                     domain = endpoint.baseUrl.host,
                     path = endpoint.baseUrl.encodedPath,
                     secure = endpoint.baseUrl.isHttps,
@@ -144,6 +155,5 @@ object CookieManager {
     @Suppress("unused")
     fun resetForTest() {
         jar = null
-        secureStorageFactory = ::SecureStorage
     }
 }
