@@ -29,7 +29,7 @@ class InMemoryAuthStore : AuthStore {
     private val pinnedSessions = mutableMapOf<String, List<String>>()
     private var pinnedModels: List<PinnedModel> = emptyList()
 
-    private var baseUrl: String = DEFAULT_BASE_URL
+    private var baseUrl: String = defaultServerBaseUrl
     private var sessionCookie: String? = null
     private var wsAuthParam: String = "ticket"
     private var autoReconnect: Boolean = true
@@ -191,7 +191,6 @@ class InMemoryAuthStore : AuthStore {
 
     private companion object {
         const val DEFAULT_PROFILE_ID = "default"
-        const val DEFAULT_BASE_URL = "http://127.0.0.1:8787/"
         val CHAT_FONT_SCALE_STOPS = listOf(0.85f, 1.0f, 1.15f, 1.3f, 1.5f)
     }
 }
