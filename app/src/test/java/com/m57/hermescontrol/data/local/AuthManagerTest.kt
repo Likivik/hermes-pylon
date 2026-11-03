@@ -5,6 +5,7 @@ package com.m57.hermescontrol.data.local
 import android.content.Context
 import android.content.SharedPreferences
 import com.m57.hermescontrol.data.config.ConnectionProfile
+import com.m57.hermescontrol.data.remote.AndroidCookieStore
 import com.m57.hermescontrol.data.remote.CookieManager
 import com.m57.hermescontrol.data.remote.GatewayFileClient
 import com.m57.hermescontrol.data.security.SecretStore
@@ -112,7 +113,7 @@ class AuthManagerTest {
             }
         AuthManager.secretStoreFactory = { testSecretStore }
         CookieManager.resetForTest()
-        CookieManager.secureStorageFactory = { testSecretStore }
+        AndroidCookieStore.secureStorageFactory = { testSecretStore }
 
         // Initialise AuthManager
         AuthManager.init(testContext)
@@ -177,7 +178,7 @@ class AuthManagerTest {
             }
         }
         CookieManager.resetForTest()
-        CookieManager.secureStorageFactory = {
+        AndroidCookieStore.secureStorageFactory = {
             AuthManager.secretStoreFactory?.invoke() ?: error("secret store factory not set")
         }
         AuthManager.init(testContext)

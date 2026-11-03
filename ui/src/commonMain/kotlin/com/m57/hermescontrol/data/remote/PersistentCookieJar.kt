@@ -119,7 +119,9 @@ class PersistentCookieJar(
      */
     fun getCookie(name: String): CookieHolder? {
         val serverId = credentialBoundary.serverId
-        if (!isLoaded(serverId)) return null
+        // No loaded-scope gate: the cache is authoritative for what this process
+        // knows. A scope whose persisted cookies have not finished loading simply
+        // looks empty until [useStore] completes.
         val buckets = bucketsFor(serverId) ?: return null
         for (bucket in buckets) {
             val match = synchronizedOn(bucket) { bucket.firstOrNull { it.name == name } }
@@ -227,7 +229,23 @@ class PersistentCookieJar(
             ) {
                 return@synchronizedOn
             }
-            cache[serverId] = byHost
+            // Merge rather than replace: a cookie saved before this load ran (an
+            // explicit login racing start-up) must survive the persisted set.
+            val live = cache.getOrPut(serverId) { mutableMapOf() }
+            for ((host, bucket) in byHost) {
+                val existing = live.getOrPut(host) { mutableListOf() }
+                synchronizedOn(existing) {
+                    for (cookie in bucket) {
+                        val idx =
+                            existing.indexOfFirst {
+                                it.name == cookie.name &&
+                                    it.domain == cookie.domain &&
+                                    it.path == cookie.path
+                            }
+                        if (idx >= 0) existing[idx] = cookie else existing.add(cookie)
+                    }
+                }
+            }
             loadedScopes.add(serverId)
         }
     }
