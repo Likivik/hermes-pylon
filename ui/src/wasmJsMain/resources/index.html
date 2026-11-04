@@ -7,7 +7,8 @@
     <style>
         /* Compose injects no CSS of its own and ComposeViewport sizes its canvas to
            the container (document.body here), so html/body must have a size or the
-           canvas has zero area. */
+           canvas has zero area. Body must stay a plain block: making it a flex/grid
+           container would size the canvas to its content instead of the viewport. */
         html, body {
             width: 100%;
             height: 100%;
@@ -16,39 +17,104 @@
             overflow: hidden;
             background: #101418;
         }
+
+        /* Overlay, not a layout child, for the reason above. */
+        #boot {
+            position: fixed;
+            inset: 0;
+            display: grid;
+            place-content: center;
+            justify-items: center;
+            gap: 10px;
+            padding: 24px;
+            text-align: center;
+            background: #101418;
+            color: #cfd8dc;
+            font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+            z-index: 10;
+        }
+
+        #boot .name {
+            font-size: 20px;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+        }
+
+        #boot .hint {
+            opacity: 0.6;
+            max-width: 32ch;
+        }
+
+        #boot.failed {
+            color: #ff8a80;
+        }
+
+        #boot.failed .hint {
+            opacity: 0.8;
+        }
     </style>
 </head>
 <body>
     <!--
-      TEMPORARY diagnostic surface - remove once the web target is known good.
-      Renders immediately (before the 34 MB wasm loads) so a screenshot taken at any
-      point is informative: it shows any JS error / unhandled rejection, whether the
-      module script executed, and the canvas's real pixel size once ComposeViewport
-      appends it. A 0x0 canvas means the container had no area; a missing "module
-      executed" line means the script tag itself is wrong.
+      Shown until Compose appends its canvas, which removes it. It exists for the
+      one case that otherwise looks like a dead page: the wasm bundle failing to
+      load or boot. Boot-stage logging was scaffolding and is gone; the failure
+      message is the part worth keeping.
     -->
-    <pre id="bootlog" style="color:#8fd6a0;font:12px/1.5 monospace;padding:8px;margin:0;white-space:pre-wrap;position:relative;z-index:10;">booting…
-</pre>
+    <div id="boot">
+        <div class="name">Pylon</div>
+        <div class="hint">Loading…</div>
+    </div>
     <script>
       (function () {
-        var log = document.getElementById('bootlog');
-        function show(msg) { log.textContent += '\n' + msg; }
+        var boot = document.getElementById('boot');
+        function fail(detail) {
+          if (!boot) return;
+          boot.className = 'failed';
+          // Built with textContent, not innerHTML: the detail is an error message
+          // from arbitrary scripts, and interpolating it into markup would make
+          // the boot overlay an injection point.
+          boot.textContent = '';
+          function line(className, text) {
+            var node = document.createElement('div');
+            node.className = className;
+            node.textContent = text;
+            boot.appendChild(node);
+          }
+          line('name', 'Pylon failed to start');
+          line('hint', String(detail || 'unknown error'));
+          line('hint', 'Reload the page. If it keeps happening, check the dashboard URL and its logs.');
+        }
+        window.__bootFail = fail;
         window.addEventListener('error', function (e) {
-          show('ERROR: ' + (e.message || e.type) + (e.filename ? ' @ ' + e.filename + ':' + e.lineno : ''));
+          fail((e.message || e.type) + (e.filename ? ' (' + e.filename + ':' + e.lineno + ')' : ''));
         });
         window.addEventListener('unhandledrejection', function (e) {
-          show('REJECTION: ' + (e.reason && e.reason.message ? e.reason.message : e.reason));
+          var reason = e.reason;
+          fail(reason && reason.message ? reason.message : reason);
         });
-        window.__bootlog = show;
+        // Compose replaces the body content when it mounts, and not every build
+        // renders into a <canvas>: the wasm/skiko path here appends div layers
+        // instead. "Mounted" therefore means "anything that is not our overlay or
+        // a script tag", which holds for both renderers.
+        function appMounted() {
+          if (document.querySelector('canvas')) return true;
+          var children = document.body.children;
+          for (var i = 0; i < children.length; i++) {
+            var el = children[i];
+            if (el.id === 'boot' || el.tagName === 'SCRIPT') continue;
+            return true;
+          }
+          return false;
+        }
         var ticks = 0;
-        var t = setInterval(function () {
-          var c = document.querySelector('canvas');
-          if (c) {
-            show('canvas ' + c.width + 'x' + c.height + ' css=' + c.style.width + 'x' + c.style.height);
-            clearInterval(t);
+        var timer = setInterval(function () {
+          if (appMounted()) {
+            clearInterval(timer);
+            if (boot) boot.remove();
           } else if (++ticks > 240) {
-            show('no canvas after 120s - wasm never reached ComposeViewport');
-            clearInterval(t);
+            clearInterval(timer);
+            fail('the app did not start within 120 s');
           }
         }, 500);
       })();
@@ -59,7 +125,6 @@
          .mjs directly skips webpack, so bare npm specifiers like
          "@js-joda/core" never resolve and the page dies at boot. Plain script,
          no type="module": the output libraryTarget is umd. -->
-    <script src="ui.js" onerror="window.__bootlog && window.__bootlog('MODULE SCRIPT FAILED TO LOAD: ui.js')"></script>
-    <script>window.__bootlog && window.__bootlog('module script tag executed (module graph may still be loading)');</script>
+    <script src="ui.js" onerror="window.__bootFail && window.__bootFail('ui.js failed to load')"></script>
 </body>
 </html>

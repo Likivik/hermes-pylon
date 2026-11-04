@@ -206,11 +206,13 @@ fun AuthLoginScreen(
 
             // ── Dynamic fields based on auth mode ──
 
-            // Token field — shown for TOKEN_ONLY and ALL
+            // Token field — TOKEN_ONLY only.
+            //
+            // `connect()` routes ALL to `connectBasicAuth`, so in ALL mode this
+            // field took input and never read it: a credential prompt that
+            // silently did nothing.
             AnimatedVisibility(
-                visible =
-                    state.authMode == DashboardAuthMode.TOKEN_ONLY ||
-                        state.authMode == DashboardAuthMode.ALL,
+                visible = state.authMode == DashboardAuthMode.TOKEN_ONLY,
                 enter = fadeIn(),
                 exit = fadeOut(),
             ) {
