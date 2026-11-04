@@ -68,6 +68,14 @@
             font-variant-numeric: tabular-nums;
         }
 
+        /* Fade out rather than cut: the app's first frame is on screen when the
+           signal arrives, and a hard disappearance reads as a flicker. */
+        #boot.leaving {
+            opacity: 0;
+            transition: opacity 180ms ease-out;
+            pointer-events: none;
+        }
+
         #boot.failed .name {
             color: #e65f5a;
         }
@@ -217,31 +225,35 @@
           if (!sawWasm && boot) setLine('Waiting for the app bundle…');
         }, 4000);
 
-        // ── Mount detection ────────────────────────────────────────────────
-        // Compose replaces the body content when it mounts, and not every build
-        // renders into a <canvas>: the wasm/skiko path here appends div layers
-        // instead. "Mounted" means "anything that is not our overlay or a script".
-        function appMounted() {
-          if (document.querySelector('canvas')) return true;
-          var children = document.body.children;
-          for (var i = 0; i < children.length; i++) {
-            var el = children[i];
-            if (el.id === 'boot' || el.tagName === 'SCRIPT') continue;
-            return true;
-          }
-          return false;
+        // ── Ready signal ───────────────────────────────────────────────────
+        // The app calls this from its first drawn frames (`notifyBrowserShellReady`
+        // in Main.kt). Watching the DOM instead fires when Compose creates its
+        // container — before anything is painted — which showed the landing layout
+        // with blank labels.
+        var dismissed = false;
+        function dismiss() {
+          if (dismissed || !boot) return;
+          dismissed = true;
+          boot.className = 'leaving';
+          setTimeout(function () {
+            if (boot) boot.remove();
+          }, 200);
         }
+        window.__pylonReady = dismiss;
 
+        // Safety net: a shell must never trap a working app behind its own
+        // overlay, so anything mounted-but-unannounced is dismissed anyway.
         var ticks = 0;
         var timer = setInterval(function () {
-          if (appMounted()) {
-            clearInterval(timer);
-            if (boot) boot.remove();
-          } else if (++ticks > 240) {
+          ticks++;
+          if (document.querySelector('canvas') || document.body.children.length > 2) {
+            if (ticks > 16) dismiss();
+          } else if (ticks > 240) {
             clearInterval(timer);
             fail('the app did not start within 120 s');
           }
         }, 500);
+
       })();
     </script>
     <!-- The dev server serves the webpack bundle, not the raw Kotlin loader.

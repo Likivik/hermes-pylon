@@ -16,9 +16,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFontFamilyResolver
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.ComposeViewport
 import com.m57.hermescontrol.data.model.StatusResponse
@@ -39,6 +42,7 @@ import kotlinx.browser.document
 import kotlinx.browser.window
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.skiko.wasm.onWasmReady
+import kotlin.js.js
 
 /**
  * Minimal wasmJs/browser entry point that proves the `:ui` web target
@@ -106,6 +110,24 @@ fun main() {
         )
         ComposeViewport(viewportContainer = document.body!!) {
             HermesControlTheme(themePreference = ThemePreference.DARK) {
+                // The browser shell draws a branded loading screen and removes it
+                // on this signal. Removing it when the container appears is too
+                // early: Compose has a container but has painted nothing, so the
+                // user sees the landing layout with blank labels for a moment.
+                // Two frames means composition is done *and* a frame was drawn.
+                val fontResolver = LocalFontFamilyResolver.current
+                LaunchedEffect(Unit) {
+                    withFrameNanos { }
+                    withFrameNanos { }
+                    // Shapes paint before glyphs do: the default font family is
+                    // resolved asynchronously, so the hero appeared with blank
+                    // labels for a moment after the shell's overlay left. Await
+                    // the font, then take one more frame, and only then say the
+                    // screen is ready.
+                    runCatching { fontResolver.preload(FontFamily.Default) }
+                    withFrameNanos { }
+                    notifyBrowserShellReady()
+                }
                 // `?icons` still renders the icon-picker proof surface; every
                 // other URL is the real app.
                 if (window.location.search.contains("icons")) {
@@ -116,6 +138,14 @@ fun main() {
             }
         }
     }
+}
+
+// Tells index.html that the first frame is on screen, so its loading overlay can
+// go away at the right moment instead of on container creation. No-op when the
+// shell is not the stock one (native builds never call this).
+@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)
+private fun notifyBrowserShellReady() {
+    js("typeof window.__pylonReady === 'function' && window.__pylonReady()")
 }
 
 private sealed interface GatewayStatusUi {
