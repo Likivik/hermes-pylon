@@ -7,8 +7,7 @@
     <style>
         /* Compose injects no CSS of its own and ComposeViewport sizes its canvas to
            the container (document.body here), so html/body must have a size or the
-           canvas has zero area. Body must stay a plain block: making it a flex/grid
-           container would size the canvas to its content instead of the viewport. */
+           canvas has zero area. */
         html, body {
             width: 100%;
             height: 100%;
@@ -17,63 +16,32 @@
             overflow: hidden;
             background: #101418;
         }
-
-        /* Overlay, not a layout child, for the reason above. */
-        #boot {
-            position: fixed;
-            inset: 0;
-            display: grid;
-            place-content: center;
-            justify-items: center;
-            gap: 10px;
-            padding: 24px;
-            text-align: center;
-            background: #101418;
-            color: #cfd8dc;
-            font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
-            z-index: 10;
-        }
-
-        #boot .name {
-            font-size: 20px;
-            font-weight: 600;
-            letter-spacing: 0.02em;
-        }
-
-        #boot .hint {
-            opacity: 0.6;
-            max-width: 32ch;
-        }
-
-        #boot.failed {
-            color: #ff8a80;
-        }
-
-        #boot.failed .hint {
-            opacity: 0.8;
-        }
     </style>
 </head>
 <body>
     <!--
-      Shown until Compose appends its canvas, which removes it. It exists for the
-      one case that otherwise looks like a dead page: the wasm bundle failing to
-      load or boot. Boot-stage logging was scaffolding and is gone; the failure
-      message is the part worth keeping.
+      Shown until Compose mounts, which replaces the body content. It exists for
+      two cases: the seconds while the ~10 MB wasm loads (with real byte counts,
+      not a spinner), and the one that otherwise looks like a dead page — the
+      bundle failing to load or boot.
     -->
     <div id="boot">
         <div class="name">Pylon</div>
-        <div class="hint">Loading…</div>
+        <div class="hint" id="boot-hint">Loading…</div>
     </div>
     <script>
       (function () {
         var boot = document.getElementById('boot');
+        var hint = document.getElementById('boot-hint');
+
+        function setLine(text) {
+          if (hint) hint.textContent = text;
+        }
+
         function fail(detail) {
           if (!boot) return;
           boot.className = 'failed';
-          // Built with textContent, not innerHTML: the detail is an error message
-          // from arbitrary scripts, and interpolating it into markup would make
-          // the boot overlay an injection point.
+          // textContent, not innerHTML: the detail is an arbitrary error message.
           boot.textContent = '';
           function line(className, text) {
             var node = document.createElement('div');
@@ -86,6 +54,7 @@
           line('hint', 'Reload the page. If it keeps happening, check the dashboard URL and its logs.');
         }
         window.__bootFail = fail;
+
         window.addEventListener('error', function (e) {
           fail((e.message || e.type) + (e.filename ? ' (' + e.filename + ':' + e.lineno + ')' : ''));
         });
@@ -93,10 +62,97 @@
           var reason = e.reason;
           fail(reason && reason.message ? reason.message : reason);
         });
+
+        // ── Real progress, no second download ───────────────────────────────
+        // The loader fetches the .wasm itself; wrapping fetch lets us count the
+        // bytes of that same response instead of guessing with a spinner.
+        var MB = 1024 * 1024;
+        function mb(bytes) {
+          return (bytes / MB).toFixed(1) + ' MB';
+        }
+
+        // The dev bundle loads more than one .wasm (the app plus a runtime
+        // payload). Counting per-response made the percentage jump backwards as
+        // each stream restarted its own total, so the counters aggregate across
+        // every wasm response instead.
+        var wasmSeen = 0;
+        var wasmTotal = 0;
+        var sawWasm = false;
+        var originalFetch = window.fetch;
+        if (originalFetch) {
+          window.fetch = function (input) {
+            var url = typeof input === 'string' ? input : (input && input.url) || '';
+            return originalFetch.apply(this, arguments).then(function (response) {
+              if (!/\.wasm(\?|$)/.test(url) || !response.ok || !response.body) return response;
+              sawWasm = true;
+              // The preview server gzips the wasm, so Content-Length is the
+              // compressed size and the stream yields decompressed bytes: a
+              // percentage computed from it would run past 100%. It sends the
+              // real size as X-Uncompressed-Length for exactly this.
+              var total =
+                parseInt(response.headers.get('x-uncompressed-length') || '0', 10) ||
+                (response.headers.get('content-encoding') ? 0 : parseInt(response.headers.get('content-length') || '0', 10));
+              var reader = response.body.getReader();
+              if (total > 0) wasmTotal += total;
+              var stream = new ReadableStream({
+                start: function (controller) {
+                  function pump() {
+                    reader.read().then(function (chunk) {
+                      if (chunk.done) {
+                        controller.close();
+                        return;
+                      }
+                      wasmSeen += chunk.value.byteLength;
+                      if (wasmTotal > 0) {
+                        var percent = Math.min(99, Math.floor((wasmSeen * 100) / wasmTotal));
+                        setLine('Loading engine… ' + percent + '%  ·  ' + mb(wasmSeen) + ' of ' + mb(wasmTotal));
+                      } else {
+                        setLine('Loading engine… ' + mb(wasmSeen));
+                      }
+                      controller.enqueue(chunk.value);
+                      pump();
+                    }).catch(function (error) {
+                      controller.error(error);
+                    });
+                  }
+                  pump();
+                }
+              });
+              return new Response(stream, {
+                status: response.status,
+                statusText: response.statusText,
+                headers: response.headers
+              });
+            });
+          };
+        }
+
+        // Instantiating the wasm has no byte progress; say what is happening
+        // instead of leaving a frozen 99%.
+        var originalInstantiateStreaming = WebAssembly.instantiateStreaming;
+        if (originalInstantiateStreaming) {
+          WebAssembly.instantiateStreaming = function (source, imports) {
+            setLine('Starting UI…');
+            return originalInstantiateStreaming.call(WebAssembly, source, imports);
+          };
+        }
+        var originalInstantiate = WebAssembly.instantiate;
+        WebAssembly.instantiate = function () {
+          setLine('Starting UI…');
+          return originalInstantiate.apply(WebAssembly, arguments);
+        };
+
+        // Nothing measurable yet after a few seconds means the loader is not
+        // going through fetch (or the file is already cached): say something
+        // true rather than leaving "Loading…" on screen for a minute.
+        setTimeout(function () {
+          if (!sawWasm && boot) setLine('Waiting for the app bundle…');
+        }, 4000);
+
+        // ── Mount detection ────────────────────────────────────────────────
         // Compose replaces the body content when it mounts, and not every build
         // renders into a <canvas>: the wasm/skiko path here appends div layers
-        // instead. "Mounted" therefore means "anything that is not our overlay or
-        // a script tag", which holds for both renderers.
+        // instead. "Mounted" means "anything that is not our overlay or a script".
         function appMounted() {
           if (document.querySelector('canvas')) return true;
           var children = document.body.children;
@@ -107,6 +163,7 @@
           }
           return false;
         }
+
         var ticks = 0;
         var timer = setInterval(function () {
           if (appMounted()) {
@@ -125,6 +182,7 @@
          .mjs directly skips webpack, so bare npm specifiers like
          "@js-joda/core" never resolve and the page dies at boot. Plain script,
          no type="module": the output libraryTarget is umd. -->
-    <script src="ui.js" onerror="window.__bootFail && window.__bootFail('ui.js failed to load')"></script>
+    <script src="ui.js" onerror="window.__bootlog && window.__bootlog('MODULE SCRIPT FAILED TO LOAD: ui.js')"></script>
+    <script>window.__bootlog && window.__bootlog('module script tag executed (module graph may still be loading)');</script>
 </body>
 </html>
