@@ -14,8 +14,70 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background: #101418;
+            background: #0c0b11;
         }
+
+        /* Overlay, not a layout child: making body a flex/grid container would
+           size Compose's canvas to its content instead of the viewport. */
+        #boot {
+            position: fixed;
+            inset: 0;
+            display: grid;
+            place-content: center;
+            justify-items: center;
+            padding: 24px;
+            text-align: center;
+            background: #0c0b11;
+            color: #ffffff;
+            font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+            z-index: 10;
+        }
+
+        /* Same identity as the app's landing screen: violet disc, bolt, wordmark,
+           subtitle, and the accent rule underneath. The accent line is where the
+           status text lives — it is the same slot the landing screen draws its
+           squiggle in. */
+        #boot .mark {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            background: #7c5cff;
+            display: grid;
+            place-items: center;
+            margin-bottom: 16px;
+        }
+
+        #boot .name {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            color: #ffffff;
+        }
+
+        #boot .sub {
+            margin-top: 2px;
+            font-size: 13px;
+            color: #9a94a8;
+        }
+
+        #boot .hint {
+            margin-top: 18px;
+            min-height: 20px;
+            font-size: 13px;
+            color: #e65f5a;
+            font-variant-numeric: tabular-nums;
+        }
+
+        #boot.failed .name {
+            color: #e65f5a;
+        }
+
+        #boot.failed .hint {
+            max-width: 34ch;
+            color: #cfc9d6;
+            margin-top: 10px;
+        }
+
     </style>
 </head>
 <body>
@@ -26,7 +88,13 @@
       bundle failing to load or boot.
     -->
     <div id="boot">
+        <div class="mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="34" height="34" role="presentation">
+                <path d="M13.5 2 4 14h6l-1 8 9.5-12h-6z" fill="#ffffff" />
+            </svg>
+        </div>
         <div class="name">Pylon for Hermes</div>
+        <div class="sub">Control panel for Hermes Agent</div>
         <div class="hint" id="boot-hint">Loading…</div>
     </div>
     <script>
