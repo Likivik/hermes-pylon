@@ -56,39 +56,59 @@
             z-index: 10;
         }
 
-        /* Same identity as the app's landing screen: violet disc, bolt, wordmark,
-           subtitle, and the accent rule underneath. The accent line is where the
-           status text lives — it is the same slot the landing screen draws its
-           squiggle in. */
-        #boot .mark {
-            width: 72px;
-            height: 72px;
-            border-radius: 50%;
-            background: #7c5cff;
-            display: grid;
-            place-items: center;
-            margin-bottom: 16px;
-        }
-
-        #boot .name {
-            font-size: 24px;
-            font-weight: 700;
-            letter-spacing: -0.01em;
-            color: #ffffff;
-        }
-
+        /* Status-line-only overlay: no logo, no wordmark. The app's own landing
+           is half a second away and identical branding there would just flash;
+           the boot screen keeps only the phase text. The .mark/.name/.sub
+           markup stays in the DOM so the failure path and any future branding
+           don't need HTML edits. */
+        #boot .mark,
+        #boot .name,
         #boot .sub {
-            margin-top: 2px;
-            font-size: 13px;
-            color: #9a94a8;
+            display: none;
         }
 
         #boot .hint {
-            margin-top: 18px;
+            margin-top: 0;
             min-height: 20px;
             font-size: 13px;
             color: #e65f5a;
             font-variant-numeric: tabular-nums;
+        }
+
+        /* NixOS-style boot lines: one line per resource, completed stages stay
+           with a green check, the active line breathes. Lines fade+slide in so
+           appearing one after another doesn't look jerky. */
+        #boot-lines {
+            margin-top: 0;
+            font: 12px/2 ui-monospace, SFMono-Regular, Menlo, monospace;
+            color: #9a94a8;
+            text-align: left;
+            /* Fixed width in px: the block is centred as a whole, so letting it
+               size to content would re-centre it every time a progress line
+               changed length and the column would wobble horizontally. px, not
+               ch — ch re-evaluates while fonts settle and wobbles anyway. */
+            width: 280px;
+            max-width: 100%;
+        }
+        .boot-line {
+            white-space: pre;
+            opacity: 0;
+            transform: translateY(3px);
+            transition: opacity 220ms ease-out, transform 220ms ease-out;
+        }
+        .boot-line.shown { opacity: 1; transform: none; }
+        .boot-line .st { display: inline-block; width: 2.5ch; }
+        .boot-line.pending { color: #4d4860; }
+        .boot-line.pending .st { color: #4d4860; }
+        .boot-line.active { color: #e65f5a; }
+        .boot-line.active .st { animation: hint-breathe 900ms ease-in-out infinite; }
+        .boot-line.done { color: #6b6578; transition: opacity 220ms ease-out, color 300ms ease-out; }
+        .boot-line.done .st { color: #58b368; }
+        .boot-line.broken { color: #e65f5a; }
+        .boot-line.broken .st { color: #e65f5a; }
+        @keyframes hint-breathe {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.35; }
         }
 
         /* Fade out rather than cut: the app's first frame is on screen when the
@@ -126,16 +146,115 @@
         </div>
         <div class="name">Pylon for Hermes</div>
         <div class="sub">Control panel for Hermes Agent</div>
-        <div class="hint" id="boot-hint">Loading…</div>
+        <div id="boot-lines"></div>
+        <div class="hint" id="boot-hint"></div>
     </div>
     <script>
       (function () {
         var boot = document.getElementById('boot');
         var hint = document.getElementById('boot-hint');
+        var linesEl = document.getElementById('boot-lines');
 
         function setLine(text) {
           if (hint) hint.textContent = text;
         }
+
+        // ── Boot stages, NixOS-style ────────────────────────────────────────
+        // One line per resource. A line is created when its resource starts
+        // loading, breathes while active, and stays on screen with a green
+        // check once done. Built with createElement/textContent only — the
+        // labels are constant, but the rule against innerHTML holds anyway.
+        var MB = 1024 * 1024;
+        function mb(bytes) {
+          return (bytes / MB).toFixed(1) + ' MB';
+        }
+        var stages = {};
+        // Fixed display order: lines slot into their rank instead of the order
+        // events happen to fire in (instantiateStreaming starts before the
+        // wasm lines appear, which scattered the list).
+        var STAGE_RANK = { shell: 1, fonts: 10, interface: 90 };
+        function stage(key, label, rank, startActive) {
+          if (stages[key]) {
+            if (startActive !== false) stages[key].activate(label);
+            return stages[key];
+          }
+          if (!linesEl) return null;
+          if (rank === undefined) rank = STAGE_RANK[key] !== undefined ? STAGE_RANK[key] : 50;
+          var el = document.createElement('div');
+          el.className = 'boot-line pending';
+          el._rank = rank;
+          var st = document.createElement('span');
+          st.className = 'st';
+          st.textContent = '·';
+          var tx = document.createElement('span');
+          tx.className = 'tx';
+          tx.textContent = label;
+          el.appendChild(st);
+          el.appendChild(tx);
+          var before = null;
+          for (var other of linesEl.children) {
+            var orank = other._rank === undefined ? 50 : other._rank;
+            if (orank > rank) { before = other; break; }
+          }
+          linesEl.insertBefore(el, before);
+          var s = {
+            el: el, st: st, tx: tx, label: label,
+            activate: function (l) {
+              el.classList.remove('pending');
+              el.classList.add('active');
+              st.textContent = '⟳';
+              if (l) tx.textContent = l;
+            },
+            // Percent from decoded bytes (the stream's true position), MB from
+            // the compressed total — same rule as the old aggregate line: the
+            // decoded number would report 19.3 MB for a 4.6 MB download.
+            // The label is padded to a fixed width and the percent to 3 digits,
+            // so in the monospace font the number columns start at the same x
+            // and the line never grows as the values change.
+            progress: function (seen, total, wire, wireTotal) {
+              if (el.classList.contains('pending')) s.activate();
+              st.textContent = '⟳';
+              var pct = total > 0 ? String(Math.floor((seen * 100) / total)) : '';
+              var rest = total > 0
+                ? String(pct).padStart(3) + '% · ' + mb(wireTotal > 0 ? (seen / total) * wire : seen) + ' of ' + mb(wire || seen)
+                : mb(seen);
+              tx.textContent = label.padEnd(10, ' ') + '· ' + rest;
+            },
+            done: function () {
+              el.classList.remove('pending', 'active');
+              el.classList.add('done');
+              st.textContent = '✓';
+            },
+            broken: function () {
+              el.classList.remove('pending', 'active');
+              el.classList.add('broken');
+              st.textContent = '✗';
+            },
+          };
+          var l0 = function (l) { return l || s.label; };
+          if (startActive !== false) s.activate();
+          // Fade+slide in: appended hidden, then flip to .shown on the next
+          // frame so the transition actually runs.
+          requestAnimationFrame(function () {
+            requestAnimationFrame(function () { el.classList.add('shown'); });
+          });
+          stages[key] = s;
+          return s;
+        }
+
+        // Every stage is reserved up front as a dim '·' placeholder row, so the
+        // block is laid out once and later lines never push the others around.
+        // The real events then light their row up in place.
+        stage('shell', 'shell', 1);
+        stage('fonts', 'fonts', 10);
+        stage('wasm1', 'engine 1', 21, false);
+        stage('wasm2', 'engine 2', 22, false);
+        stage('interface', 'starting interface', 90, false);
+
+        // The shell is loading from the very first moment (ui.js is executing
+        // right now), so create its stage before anything else can appear
+        // above it; DOMContentLoaded marks it done.
+        stage('shell', 'shell');
 
         function fail(detail) {
           if (!boot) return;
@@ -165,18 +284,10 @@
         // ── Real progress, no second download ───────────────────────────────
         // The loader fetches the .wasm itself; wrapping fetch lets us count the
         // bytes of that same response instead of guessing with a spinner.
-        var MB = 1024 * 1024;
-        function mb(bytes) {
-          return (bytes / MB).toFixed(1) + ' MB';
-        }
-
-        // The dev bundle loads more than one .wasm (the app plus a runtime
-        // payload). Counting per-response made the percentage jump backwards as
-        // each stream restarted its own total, so the counters aggregate across
-        // every wasm response instead.
-        var wasmSeen = 0;
-        var wasmTotal = 0;
-        var wireTotal = 0;
+        // Each .wasm response gets its own boot line — the dev bundle ships
+        // two (the app plus a runtime payload), and a shared counter made the
+        // percentage jump backwards when the second total arrived.
+        var wasmCount = 0;
         var sawWasm = false;
         var originalFetch = window.fetch;
         if (originalFetch) {
@@ -185,6 +296,8 @@
             return originalFetch.apply(this, arguments).then(function (response) {
               if (!/\.wasm(\?|$)/.test(url) || !response.ok || !response.body) return response;
               sawWasm = true;
+              wasmCount++;
+              var stageRef = stage('wasm' + wasmCount, 'engine ' + wasmCount, 20 + wasmCount);
               // The preview server gzips the wasm, so Content-Length is the
               // compressed size and the stream yields decompressed bytes: a
               // percentage computed from it would run past 100%. It sends the
@@ -193,35 +306,25 @@
                 parseInt(response.headers.get('x-uncompressed-length') || '0', 10) ||
                 (response.headers.get('content-encoding') ? 0 : parseInt(response.headers.get('content-length') || '0', 10));
               var reader = response.body.getReader();
-              // Two different numbers: the stream yields DECODED bytes (what
-              // progress can be measured against), while Content-Length is what
-              // actually crosses the network. Reporting the decoded total told the
-              // user "19.3 MB" for a 4.6 MB download.
+              var seen = 0;
+              // Content-Length is the compressed size (the wire); the stream
+              // yields decoded bytes — hence the seen/total × wire mapping.
               var wire = parseInt(response.headers.get('content-length') || '0', 10);
-              if (total > 0) wasmTotal += total;
-              if (wire > 0) wireTotal += wire;
               var stream = new ReadableStream({
                 start: function (controller) {
                   function pump() {
                     reader.read().then(function (chunk) {
                       if (chunk.done) {
+                        if (stageRef) { stageRef.progress(total, total, wire, wire); stageRef.done(); }
                         controller.close();
                         return;
                       }
-                      wasmSeen += chunk.value.byteLength;
-                      if (wasmTotal > 0) {
-                        var percent = Math.min(99, Math.floor((wasmSeen * 100) / wasmTotal));
-                        // Percent from decoded bytes (exact), megabytes from the
-                        // same fraction of the compressed total (an estimate, but
-                        // monotonic and it lands exactly on the real transfer size).
-                        var wireNow = wireTotal > 0 ? (wasmSeen / wasmTotal) * wireTotal : wasmSeen;
-                        setLine('Loading engine… ' + percent + '%  ·  ' + mb(wireNow) + ' of ' + mb(wireTotal || wasmTotal));
-                      } else {
-                        setLine('Loading engine… ' + mb(wasmSeen));
-                      }
+                      seen += chunk.value.byteLength;
+                      if (stageRef) stageRef.progress(seen, total, wire, wire);
                       controller.enqueue(chunk.value);
                       pump();
                     }).catch(function (error) {
+                      if (stageRef) stageRef.broken();
                       controller.error(error);
                     });
                   }
@@ -237,34 +340,56 @@
           };
         }
 
-        // Instantiating the wasm has no byte progress; say what is happening
-        // instead of leaving a frozen 99%.
+        // Instantiating the wasm has no byte progress; give it its own stage so
+        // the wait is a line, not silence.
         var originalInstantiateStreaming = WebAssembly.instantiateStreaming;
         if (originalInstantiateStreaming) {
           WebAssembly.instantiateStreaming = function (source, imports) {
-            setLine('Starting UI…');
+            stage('interface', 'starting interface');
             return originalInstantiateStreaming.call(WebAssembly, source, imports);
           };
         }
         var originalInstantiate = WebAssembly.instantiate;
         WebAssembly.instantiate = function () {
-          setLine('Starting UI…');
+          stage('interface', 'starting interface');
           return originalInstantiate.apply(WebAssembly, arguments);
         };
 
         // Nothing measurable yet after a few seconds means the loader is not
         // going through fetch (or the file is already cached): say something
-        // true rather than leaving "Loading…" on screen for a minute.
-        setTimeout(function () {
-          if (!sawWasm && boot) setLine('Waiting for the app bundle…');
-        }, 4000);
+        // true rather than leaving an empty line list on screen for a minute.
+        // Re-checked every second and self-clearing — a one-shot setTimeout
+        // left "Waiting for the app bundle…" stuck on screen forever when the
+        // first engine began at second 5 on a slow connection.
+        var bundleTimer = setInterval(function () {
+          if (!boot || !boot.parentNode) { clearInterval(bundleTimer); return; }
+          if (sawWasm) {
+            if (hint && hint.textContent === 'Waiting for the app bundle…') hint.textContent = '';
+            clearInterval(bundleTimer);
+          } else {
+            setLine('Waiting for the app bundle…');
+          }
+        }, 1000);
 
         // ── Ready signal ───────────────────────────────────────────────────
         // The app calls this from its first drawn frames (`notifyBrowserShellReady`
         // in Main.kt). Watching the DOM instead fires when Compose creates its
         // container — before anything is painted — which showed the landing layout
         // with blank labels.
+        //
+        // But the app's ready signal still cannot wait for font BYTES on web
+        // (`preload()` resolves without the bytes), so on a slow connection the
+        // overlay could leave before Onest / the icon subset arrived — landing
+        // shapes with no glyphs. The shell fetches both fonts itself (same URLs
+        // the <link rel=preload> hints, served from cache on repeat visits) and
+        // dismisses only when the app is ready AND the fonts are in.
         var dismissed = false;
+        var appReady = false;
+        var fontsPending = 2;
+        var fontStage = stage('fonts', 'fonts');
+        function maybeDismiss() {
+          if (appReady && fontsPending === 0) dismiss();
+        }
         function dismiss() {
           if (dismissed || !boot) return;
           dismissed = true;
@@ -273,14 +398,59 @@
             if (boot) boot.remove();
           }, 200);
         }
-        window.__pylonReady = dismiss;
+        window.__pylonReady = function () {
+          appReady = true;
+          var s = stages['interface'];
+          if (s) s.done();
+          if (fontsPending > 0 && boot) setLine('Finishing up…');
+          maybeDismiss();
+        };
+        ["/composeResources/com.m57.hermescontrol.generated.resources/font/onest_variable.ttf",
+         "/composeResources/com.m57.hermescontrol.generated.resources/font/material_symbols_subset.ttf"
+        ].forEach(function (url) {
+          fetch(url).then(function () {
+            fontsPending--;
+            if (fontsPending === 0 && fontStage) fontStage.done();
+            maybeDismiss();
+          }).catch(function () {
+            // A font that cannot be fetched must not trap the app behind the
+            // overlay: the app degrades to the automatic fallback instead.
+            fontsPending--;
+            if (fontStage) fontStage.broken();
+            maybeDismiss();
+          });
+        });
+
+        // ui.js has executed by DOMContentLoaded; the shell stage was created
+        // at boot script start, only flip it to done here.
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', function () {
+            var s = stages['shell'];
+            if (s) s.done();
+          });
+        } else {
+          var s0 = stages['shell'];
+          if (s0) s0.done();
+        }
 
         // Safety net: a shell must never trap a working app behind its own
         // overlay, so anything mounted-but-unannounced is dismissed anyway.
+        // "Mounted" means a real app child: canvas or any element that is not
+        // a script and not the boot overlay itself. Counting body.children
+        // raw was a bug — the boot div and the script tags already make
+        // children.length > 2, so the watchdog dismissed the overlay after
+        // 8 s mid-download on slow connections (blank screen at ~5%).
+        function appMounted() {
+          if (document.querySelector('canvas')) return true;
+          for (var el of document.body.children) {
+            if (el.tagName !== 'SCRIPT' && el.id !== 'boot') return true;
+          }
+          return false;
+        }
         var ticks = 0;
         var timer = setInterval(function () {
           ticks++;
-          if (document.querySelector('canvas') || document.body.children.length > 2) {
+          if (appMounted()) {
             if (ticks > 16) dismiss();
           } else if (ticks > 240) {
             clearInterval(timer);
