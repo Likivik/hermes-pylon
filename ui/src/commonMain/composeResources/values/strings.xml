@@ -962,7 +962,7 @@
     <string name="settings_logout">Logout</string>
 
     <!-- Auth Login Screen -->
-    <string name="auth_login_title">Auth Login</string>
+    <string name="auth_login_title">Login</string>
     <string name="auth_login_desc">Connect to your Hermes dashboard</string>
     <string name="auth_login_base_url_label">Server URL</string>
     <string name="auth_login_token_label">Session Token</string>
@@ -984,7 +984,7 @@
     <!-- Landing Screen -->
     <string name="landing_title">Pylon for Hermes</string>
     <string name="landing_subtitle">Control panel for Hermes Agent</string>
-    <string name="landing_action_auth_login">Auth Login</string>
+    <string name="landing_action_auth_login">Login</string>
 
     <!-- Loading State -->
 
