@@ -1,0 +1,129 @@
+# Web (wasmJs) bundle: production build + Binaryen size pass.
+#
+# WHY THIS EXISTS — the Kotlin production target (`:ui:wasmJsBrowserDistribution`)
+# wants to fetch Binaryen itself through `kotlinWasmBinaryenSetup`, which declares
+# a *project* repository (github.com/WebAssembly/binaryen/releases/download).
+# `settings.gradle.kts` sets `RepositoriesMode.FAIL_ON_PROJECT_REPOS`, so that
+# task makes the whole build unconfigurable:
+#
+#   > Build was configured to prefer settings repositories over project
+#   > repositories but repository 'Distributions at ...binaryen/releases/download'
+#   > was added by unknown code
+#
+# Relaxing the policy to allow one download would drop a supply-chain guarantee
+# for every dependency in the project. Instead the build runs with
+# `-x kotlinWasmBinaryenSetup` and Binaryen is invoked as a post-build step on the
+# artifact (scripts/optimize-wasm-size.sh). Optimising an artifact is a build
+# step, not a dependency, so the repository policy stays intact.
+#
+# MEASURED (2026-11-04, this project):
+#   development bundle   47.36 MB raw / 10.40 MB gzip   (what the preview serves)
+#   production + wasm-opt 11.57 MB raw /  3.02 MB gzip
+#   skiko payload          8.65 MB raw /  3.33 MB gzip   (already optimal)
+#
+# COST — dispatch and tags only. The Android/unit workflows already compile the
+# wasm executable on every PR; this job produces a *shippable* bundle and takes
+# minutes, so it does not belong in the PR gate.
+
+name: Web bundle
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["web-*"]
+
+concurrency:
+  group: web-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  BINARYEN_VERSION: "133"
+  BINARYEN_SHA256: "2dc9c7813f5375db93d96ead4b78222fcc3e2677bbb832297af4797782a37489"
+
+jobs:
+  web:
+    name: Wasm production bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6
+        with:
+          validate-wrappers: true
+
+      # The wasmJs distribution task runs webpack, which the Kotlin plugin drives
+      # through yarn.
+      - name: Install yarn
+        run: |
+          npm install --global yarn
+          yarn --version
+
+      # Binaryen releases are ~111 MB; cache it rather than re-downloading.
+      - name: Cache Binaryen
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ~/.cache/binaryen-${{ env.BINARYEN_VERSION }}
+          key: binaryen-${{ env.BINARYEN_VERSION }}-linux-x86_64
+
+      - name: Install Binaryen (pinned, checksum-verified)
+        run: |
+          set -euo pipefail
+          DIR="$HOME/.cache/binaryen-${BINARYEN_VERSION}"
+          if [ -x "$DIR/bin/wasm-opt" ]; then
+            echo "cached: $("$DIR/bin/wasm-opt" --version)"
+            echo "$DIR/bin" >> "$GITHUB_PATH"
+            exit 0
+          fi
+          mkdir -p "$DIR"
+          TARBALL="$RUNNER_TEMP/binaryen.tar.gz"
+          URL="https://github.com/WebAssembly/binaryen/releases/download/version_${BINARYEN_VERSION}/binaryen-version_${BINARYEN_VERSION}-x86_64-linux.tar.gz"
+          curl -sSL -o "$TARBALL" "$URL"
+          echo "${BINARYEN_SHA256}  ${TARBALL}" | sha256sum -c -
+          tar xzf "$TARBALL" -C "$DIR" --strip-components=1
+          "$DIR/bin/wasm-opt" --version
+          echo "$DIR/bin" >> "$GITHUB_PATH"
+
+      - name: Build production bundle
+        run: |
+          # -x: see the header. Without it the build fails at configuration time.
+          ./gradlew :ui:wasmJsBrowserDistribution -x kotlinWasmBinaryenSetup --no-daemon
+
+      - name: Optimize wasm (post-build)
+        run: |
+          # Budget: measured 6.05 MB gzip. 8 MB leaves room for growth but fails
+          # the job if the bundle silently triples because Binaryen stopped being
+          # applied.
+          bash scripts/optimize-wasm-size.sh ui/build/dist/wasmJs/productionExecutable --max-gzip-mb 8
+
+      - name: Size report
+        run: |
+          DIST=ui/build/dist/wasmJs/productionExecutable
+          echo "### Web bundle" >> "$GITHUB_STEP_SUMMARY"
+          echo "| file | raw | gzip |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| --- | ---: | ---: |" >> "$GITHUB_STEP_SUMMARY"
+          for f in "$DIST"/*.wasm "$DIST"/*.js; do
+            [ -f "$f" ] || continue
+            raw=$(stat -c%s "$f")
+            gz=$(gzip -9c "$f" | wc -c)
+            echo "| $(basename "$f") | $((raw / 1024)) KiB | $((gz / 1024)) KiB |" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+      - name: Upload bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: web-bundle
+          path: ui/build/dist/wasmJs/productionExecutable
+          if-no-files-found: error
+          retention-days: 14
