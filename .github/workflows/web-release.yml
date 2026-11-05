@@ -112,6 +112,27 @@ jobs:
           # applied.
           bash scripts/optimize-wasm-size.sh ui/build/dist/wasmJs/productionExecutable --max-gzip-mb 8
 
+      # Pre-compressed siblings, the same shape the preview server produces: a
+      # static host serves `file.br` with `Content-Encoding: br` when the client
+      # offers it, and the raw file otherwise. Measured: app wasm 3.02 MB gzip vs
+      # 2.10 MB brotli (~30%); ui.js 102 KB vs 83 KB.
+      - name: Precompress (brotli)
+        run: |
+          set -euo pipefail
+          if ! command -v brotli >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends brotli
+          fi
+          brotli --version
+          DIST=ui/build/dist/wasmJs/productionExecutable
+          for f in "$DIST"/*.wasm "$DIST"/*.js; do
+            [ -f "$f" ] || continue
+            brotli -q 11 -f -o "$f.br" "$f"
+            raw=$(stat -c%s "$f")
+            br=$(stat -c%s "$f.br")
+            printf '  %-28s %10d -> %10d brotli\n' "$(basename "$f")" "$raw" "$br"
+          done
+
       - name: Size report
         run: |
           DIST=ui/build/dist/wasmJs/productionExecutable
