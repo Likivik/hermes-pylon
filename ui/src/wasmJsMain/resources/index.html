@@ -4,6 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Pylon</title>
+    <!--
+      Compose resolves web resources through Fetch *after* the runtime boots, so
+      `strings.commonMain.cvr` otherwise lands seconds after the wasm and every
+      `stringResource` waits on it — that is the blank-label frame, not the fonts.
+      These paths are stable (no content hash), which is what makes preloading
+      them possible from the shell at all.
+
+      `crossorigin` is required on `as="fetch"`: without it the preload is stored
+      under a different credentials mode than the resource runtime requests, and
+      the browser fetches the file twice.
+    -->
+    <link rel="preload" as="fetch" crossorigin
+          href="/composeResources/com.m57.hermescontrol.generated.resources/values/strings.commonMain.cvr" />
+    <link rel="preload" as="fetch" crossorigin
+          href="/composeResources/com.m57.hermescontrol.generated.resources/files/material_symbols.codepoints" />
     <style>
         /* Compose injects no CSS of its own and ComposeViewport sizes its canvas to
            the container (document.body here), so html/body must have a size or the
