@@ -249,87 +249,97 @@ fun MainNavigation() {
             drawerState = drawerState,
             gesturesEnabled = gestureController.enabled,
             drawerContent = {
-                ModalDrawerSheet(
-                    modifier = Modifier.verticalScroll(rememberScrollState()),
-                ) {
-                    val connectionStatus by HermesWsClient.connectionStatus.collectAsState()
-                    val statusColor =
-                        when (connectionStatus) {
-                            ConnectionStatus.CONNECTED -> LocalHermesStatusColors.current.success
-
-                            ConnectionStatus.CONNECTING,
-                            ConnectionStatus.RECONNECTING,
-                            -> LocalHermesStatusColors.current.warning
-
-                            ConnectionStatus.DISCONNECTED,
-                            ConnectionStatus.NO_NETWORK,
-                            ConnectionStatus.AUTH_EXPIRED,
-                            -> LocalHermesStatusColors.current.error
-                        }
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 2.dp),
+                // The drawer must not compose while closed. Its strings contain
+                // native-script language names (中文, 日本語, 한국어) — laying them
+                // out at boot triggers the CJK/emoji fallback-font machinery on
+                // the single UI thread, which delayed the landing page's first
+                // painted text by ~1 s even though the landing needs none of
+                // those fonts. Compose the sheet only when the drawer is open
+                // or animating toward open; the fallback fonts then load on
+                // first real use, once per session, cached after.
+                if (drawerState.isOpen || drawerState.targetValue != DrawerValue.Closed) {
+                    ModalDrawerSheet(
+                        modifier = Modifier.verticalScroll(rememberScrollState()),
                     ) {
-                        Text(
-                            text = stringResource(Res.string.nav_drawer_title),
-                            style =
-                                MaterialTheme.typography.headlineSmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                ),
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Box(
-                            modifier =
-                                Modifier
-                                    .size(10.dp)
-                                    .background(color = statusColor, shape = CircleShape),
-                        )
-                    }
-                    Text(
-                        text = stringResource(Res.string.nav_drawer_subtitle),
-                        modifier = Modifier.padding(start = 16.dp, bottom = 8.dp, end = 16.dp),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        val connectionStatus by HermesWsClient.connectionStatus.collectAsState()
+                        val statusColor =
+                            when (connectionStatus) {
+                                ConnectionStatus.CONNECTED -> LocalHermesStatusColors.current.success
 
-                    for ((section, entries) in screenGraph().drawer()) {
-                        Text(
-                            text = stringResource(section.titleRes).uppercase(),
-                            modifier =
-                                Modifier.padding(
-                                    start = 16.dp,
-                                    top = 8.dp,
-                                    bottom = 4.dp,
-                                    end = 16.dp,
-                                ),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        entries.forEach { entry ->
-                            NavigationDrawerItem(
-                                icon = { HermesSymbol(icon = entry.icon, contentDescription = null) },
-                                label = { Text(stringResource(entry.labelRes)) },
-                                selected = currentScreen == entry.key,
-                                onClick = {
-                                    scope.launch { drawerState.close() }
-                                    NavigationController.navigateTo(entry.key)
-                                },
-                                colors =
-                                    NavigationDrawerItemDefaults.colors(
-                                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                        selectedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                ConnectionStatus.CONNECTING,
+                                ConnectionStatus.RECONNECTING,
+                                -> LocalHermesStatusColors.current.warning
+
+                                ConnectionStatus.DISCONNECTED,
+                                ConnectionStatus.NO_NETWORK,
+                                ConnectionStatus.AUTH_EXPIRED,
+                                -> LocalHermesStatusColors.current.error
+                            }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 2.dp),
+                        ) {
+                            Text(
+                                text = stringResource(Res.string.nav_drawer_title),
+                                style =
+                                    MaterialTheme.typography.headlineSmall.copy(
+                                        fontWeight = FontWeight.Bold,
                                     ),
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .size(10.dp)
+                                        .background(color = statusColor, shape = CircleShape),
                             )
                         }
-                    }
+                        Text(
+                            text = stringResource(Res.string.nav_drawer_subtitle),
+                            modifier = Modifier.padding(start = 16.dp, bottom = 8.dp, end = 16.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
-                    Spacer(modifier = Modifier.height(8.dp))
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    Spacer(modifier = Modifier.height(12.dp))
+                        for ((section, entries) in screenGraph().drawer()) {
+                            Text(
+                                text = stringResource(section.titleRes).uppercase(),
+                                modifier =
+                                    Modifier.padding(
+                                        start = 16.dp,
+                                        top = 8.dp,
+                                        bottom = 4.dp,
+                                        end = 16.dp,
+                                    ),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            entries.forEach { entry ->
+                                NavigationDrawerItem(
+                                    icon = { HermesSymbol(icon = entry.icon, contentDescription = null) },
+                                    label = { Text(stringResource(entry.labelRes)) },
+                                    selected = currentScreen == entry.key,
+                                    onClick = {
+                                        scope.launch { drawerState.close() }
+                                        NavigationController.navigateTo(entry.key)
+                                    },
+                                    colors =
+                                        NavigationDrawerItemDefaults.colors(
+                                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                            selectedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        ),
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
                 }
             },
         ) {

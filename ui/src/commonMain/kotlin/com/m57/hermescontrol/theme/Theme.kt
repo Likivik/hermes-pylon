@@ -159,7 +159,7 @@ fun HermesControlTheme(
     ) {
         MaterialTheme(
             colorScheme = colorScheme,
-            typography = Typography,
+            typography = pylonTypography(),
             shapes = HermesShapes,
             content = content,
         )
