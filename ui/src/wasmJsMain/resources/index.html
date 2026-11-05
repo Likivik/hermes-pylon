@@ -19,6 +19,14 @@
           href="/composeResources/com.m57.hermescontrol.generated.resources/values/strings.commonMain.cvr" />
     <link rel="preload" as="fetch" crossorigin
           href="/composeResources/com.m57.hermescontrol.generated.resources/files/material_symbols.codepoints" />
+    <!-- Fonts too: without these the bytes land ~500 ms after the overlay is
+         allowed to leave, and the landing can flash shapes with no glyphs.
+         preload() in Kotlin cannot await font bytes on web, so the shell does
+         it. Both paths are stable (no content hash). -->
+    <link rel="preload" as="fetch" crossorigin
+          href="/composeResources/com.m57.hermescontrol.generated.resources/font/onest_variable.ttf" />
+    <link rel="preload" as="fetch" crossorigin
+          href="/composeResources/com.m57.hermescontrol.generated.resources/font/material_symbols_subset.ttf" />
     <style>
         /* Compose injects no CSS of its own and ComposeViewport sizes its canvas to
            the container (document.body here), so html/body must have a size or the

@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.material_symbols_outlined
+import com.m57.hermescontrol.generated.resources.material_symbols_subset
 import org.jetbrains.compose.resources.Font
 
 /**
@@ -44,6 +45,14 @@ object MaterialSymbols {
     private var cache: Map<String, String>? = null
 
     /**
+     * Names covered by the subset font (`material_symbols_subset.ttf`, built
+     * from the [HermesIcon] enum). A glyph in this set renders from the ~200 KB
+     * subset; anything else falls through to the full 10.7 MB font, which the
+     * browser then fetches on demand — once per session, cached after.
+     */
+    private var subsetNames: Set<String>? = null
+
+    /**
      * Parse `files/material_symbols.codepoints` (`<name> <hex>` per line) into
      * an ordered name -> glyph map. The file is ~79 KB / 4,301 entries; it is
      * read through Compose resources so it is fetched on demand on web.
@@ -67,6 +76,20 @@ object MaterialSymbols {
 
     /** Look up a symbol's glyph, or null when the name is unknown. */
     suspend fun glyph(name: String): String? = entries()[name]
+
+    /** True when [name] is covered by the subset font. */
+    suspend fun inSubset(name: String): Boolean {
+        subsetNames?.let { return name in it }
+        val parsed =
+            Res
+                .readBytes("files/material_symbols_subset.codepoints")
+                .decodeToString()
+                .lineSequence()
+                .mapNotNull { line -> line.trim().split(' ').firstOrNull()?.takeIf { it.isNotEmpty() } }
+                .toSet()
+        subsetNames = parsed
+        return name in parsed
+    }
 
     /**
      * Code point -> String.
@@ -116,6 +139,25 @@ fun materialSymbolsFamily(filled: Boolean = true): FontFamily {
 }
 
 /**
+ * The subset family: same variable axes, 108 known glyphs, ~200 KB instead of
+ * 10.7 MB. See [MaterialSymbols.inSubset] for the selection rule — this family
+ * must be preferred whenever the glyph is covered, because on web the full font
+ * is a main-thread parse of 10.7 MB that stalls every frame in the same second.
+ */
+@Composable
+fun materialSymbolsSubsetFamily(filled: Boolean = true): FontFamily {
+    val font =
+        Font(
+            Res.font.material_symbols_subset,
+            variationSettings =
+                FontVariation.Settings(
+                    FontVariation.Setting("FILL", if (filled) 1f else 0f),
+                ),
+        )
+    return FontFamily(font)
+}
+
+/**
  * Render a single Material Symbol by name.
  *
  * Renders nothing when [name] is not in the catalog — callers should not be
@@ -131,7 +173,14 @@ fun MaterialSymbol(
     contentDescription: String? = null,
 ) {
     var glyph by remember(name) { mutableStateOf<String?>(null) }
-    LaunchedEffect(name) { glyph = MaterialSymbols.glyph(name) }
+    var useSubset by remember(name) { mutableStateOf(true) }
+    LaunchedEffect(name) {
+        glyph = MaterialSymbols.glyph(name)
+        // Default true so the common (subset-covered) path never flashes; a
+        // name outside the subset flips to the full family, whose first
+        // composition triggers its one-time fetch.
+        useSubset = MaterialSymbols.inSubset(name)
+    }
 
     val symbol = glyph ?: return
     val fontSize = with(LocalDensity.current) { size.toSp() }
@@ -145,7 +194,7 @@ fun MaterialSymbol(
         text = symbol,
         modifier = semanticsModifier,
         color = tint,
-        fontFamily = materialSymbolsFamily(filled),
+        fontFamily = if (useSubset) materialSymbolsSubsetFamily(filled) else materialSymbolsFamily(filled),
         fontSize = fontSize,
         lineHeight = fontSize,
         maxLines = 1,

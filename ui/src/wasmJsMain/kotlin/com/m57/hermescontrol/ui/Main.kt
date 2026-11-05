@@ -32,14 +32,18 @@ import com.m57.hermescontrol.data.remote.createHermesHttpClient
 import com.m57.hermescontrol.data.theme.ThemePreference
 import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.app_name
+import com.m57.hermescontrol.generated.resources.landing_action_auth_login
+import com.m57.hermescontrol.generated.resources.landing_subtitle
 import com.m57.hermescontrol.generated.resources.landing_title
 import com.m57.hermescontrol.theme.HermesControlTheme
 import com.m57.hermescontrol.ui.diagnostics.DiagnosticsScreen
 import com.m57.hermescontrol.ui.icons.MaterialSymbol
 import com.m57.hermescontrol.ui.icons.MaterialSymbolPickerSection
+import com.m57.hermescontrol.ui.icons.materialSymbolsSubsetFamily
 import com.m57.hermescontrol.ui.landing.LandingScreen
 import kotlinx.browser.document
 import kotlinx.browser.window
+import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.skiko.wasm.onWasmReady
 import kotlin.js.js
@@ -116,15 +120,30 @@ fun main() {
                 // user sees the landing layout with blank labels for a moment.
                 // Two frames means composition is done *and* a frame was drawn.
                 val fontResolver = LocalFontFamilyResolver.current
+                // Created in composition (Font(...) is @Composable) so the ~200 KB
+                // subset starts fetching immediately; the gate below then waits
+                // for it, guaranteeing rail/drawer glyphs never paint as tofu
+                // after the overlay leaves. The full 10.7 MB font is deliberately
+                // NOT awaited — it is fetched on demand for out-of-subset glyphs.
+                val iconSubsetFamily = materialSymbolsSubsetFamily(filled = true)
                 LaunchedEffect(Unit) {
                     withFrameNanos { }
                     withFrameNanos { }
-                    // Shapes paint before glyphs do: the default font family is
-                    // resolved asynchronously, so the hero appeared with blank
-                    // labels for a moment after the shell's overlay left. Await
-                    // the font, then take one more frame, and only then say the
-                    // screen is ready.
+                    // The overlay must not leave until there is something to read.
+                    // Two separate waits, in order of what the user notices:
+                    //   1. strings — a resource file fetched by the runtime; until
+                    //      it lands every `stringResource` is unresolved, so the
+                    //      hero renders as shapes with no labels at all;
+                    //   2. the default font — glyphs resolve asynchronously too.
+                    // Awaiting the font alone was not enough: the overlay left
+                    // ~0.8 s before any text existed.
+                    runCatching {
+                        getString(Res.string.landing_title)
+                        getString(Res.string.landing_subtitle)
+                        getString(Res.string.landing_action_auth_login)
+                    }
                     runCatching { fontResolver.preload(FontFamily.Default) }
+                    runCatching { fontResolver.preload(iconSubsetFamily) }
                     withFrameNanos { }
                     notifyBrowserShellReady()
                 }
