@@ -713,7 +713,7 @@
     <string name="channels_restart_banner">تم حفظ التغييرات. أعد تشغيل البوابة (Gateway) لتصبح سارية المفعول.</string>
     <string name="settings_saved_profiles">الملفات المحفوظة (%1$d)</string>
     <string name="settings_logout">تسجيل الخروج</string>
-    <string name="auth_login_title">تسجيل الدخول والمصادقة</string>
+    <string name="auth_login_title">تسجيل الدخول</string>
     <string name="auth_login_desc">الاتصال بلوحة تحكم Hermes</string>
     <string name="auth_login_base_url_label">رابط الخادم (URL)</string>
     <string name="auth_login_token_label">رمز الجلسة (Session Token)</string>
@@ -732,7 +732,7 @@
     <string name="auth_login_use_profile">الدخول باسم %1$s</string>
     <string name="landing_title">Pylon for Hermes</string>
     <string name="landing_subtitle">لوحة التحكم لـ Hermes Agent</string>
-    <string name="landing_action_auth_login">تسجيل الدخول والمصادقة</string>
+    <string name="landing_action_auth_login">تسجيل الدخول</string>
     <string name="providers_empty_title">لا يوجد موفرو OAuth</string>
     <string name="providers_empty_desc">سيظهر موفرو خدمة OAuth المهيؤون هنا. قم بربط حساب لاستخدامه من التطبيق.</string>
     <string name="providers_action_connect">اتصال</string>

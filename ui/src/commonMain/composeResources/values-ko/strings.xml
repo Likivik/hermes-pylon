@@ -942,7 +942,7 @@
     <string name="settings_logout">로그아웃</string>
 
     <!-- Auth Login Screen -->
-    <string name="auth_login_title">인증 로그인</string>
+    <string name="auth_login_title">로그인</string>
     <string name="auth_login_desc">Hermes 대시보드에 연결</string>
     <string name="auth_login_base_url_label">서버 URL</string>
     <string name="auth_login_token_label">세션 토큰</string>
@@ -963,7 +963,7 @@
     <!-- Landing Screen -->
     <string name="landing_title">Hermes Agent에 오신 것을 환영합니다</string>
     <string name="landing_subtitle">Hermes Agent 제어판</string>
-    <string name="landing_action_auth_login">인증 로그인</string>
+    <string name="landing_action_auth_login">로그인</string>
 
     <!-- Loading State -->
 

@@ -936,7 +936,7 @@
     <string name="settings_logout">ログアウト</string>
 
     <!-- Auth Login Screen -->
-    <string name="auth_login_title">認証ログイン</string>
+    <string name="auth_login_title">ログイン</string>
     <string name="auth_login_desc">Hermesダッシュボードに接続します</string>
     <string name="auth_login_base_url_label">サーバーURL</string>
     <string name="auth_login_token_label">セッショントークン</string>
@@ -957,7 +957,7 @@
     <!-- Landing Screen -->
     <string name="landing_title">Hermes Agentへようこそ</string>
     <string name="landing_subtitle">Hermes Agentのコントロールパネル</string>
-    <string name="landing_action_auth_login">認証ログイン</string>
+    <string name="landing_action_auth_login">ログイン</string>
 
     <!-- Loading State -->
 
