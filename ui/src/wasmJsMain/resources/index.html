@@ -168,6 +168,7 @@
         // every wasm response instead.
         var wasmSeen = 0;
         var wasmTotal = 0;
+        var wireTotal = 0;
         var sawWasm = false;
         var originalFetch = window.fetch;
         if (originalFetch) {
@@ -184,7 +185,13 @@
                 parseInt(response.headers.get('x-uncompressed-length') || '0', 10) ||
                 (response.headers.get('content-encoding') ? 0 : parseInt(response.headers.get('content-length') || '0', 10));
               var reader = response.body.getReader();
+              // Two different numbers: the stream yields DECODED bytes (what
+              // progress can be measured against), while Content-Length is what
+              // actually crosses the network. Reporting the decoded total told the
+              // user "19.3 MB" for a 4.6 MB download.
+              var wire = parseInt(response.headers.get('content-length') || '0', 10);
               if (total > 0) wasmTotal += total;
+              if (wire > 0) wireTotal += wire;
               var stream = new ReadableStream({
                 start: function (controller) {
                   function pump() {
@@ -196,7 +203,11 @@
                       wasmSeen += chunk.value.byteLength;
                       if (wasmTotal > 0) {
                         var percent = Math.min(99, Math.floor((wasmSeen * 100) / wasmTotal));
-                        setLine('Loading engine… ' + percent + '%  ·  ' + mb(wasmSeen) + ' of ' + mb(wasmTotal));
+                        // Percent from decoded bytes (exact), megabytes from the
+                        // same fraction of the compressed total (an estimate, but
+                        // monotonic and it lands exactly on the real transfer size).
+                        var wireNow = wireTotal > 0 ? (wasmSeen / wasmTotal) * wireTotal : wasmSeen;
+                        setLine('Loading engine… ' + percent + '%  ·  ' + mb(wireNow) + ' of ' + mb(wireTotal || wasmTotal));
                       } else {
                         setLine('Loading engine… ' + mb(wasmSeen));
                       }
