@@ -937,7 +937,7 @@
 
     <!-- Auth Login Screen -->
     <string name="auth_login_title">ログイン</string>
-    <string name="auth_login_desc">Hermesダッシュボードに接続します</string>
+    <string name="auth_login_desc">Hermes ゲートウェイに接続</string>
     <string name="auth_login_base_url_label">サーバーURL</string>
     <string name="auth_login_token_label">セッショントークン</string>
     <string name="auth_login_username_label">ユーザー名</string>

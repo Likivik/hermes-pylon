@@ -714,7 +714,7 @@
     <string name="settings_saved_profiles">الملفات المحفوظة (%1$d)</string>
     <string name="settings_logout">تسجيل الخروج</string>
     <string name="auth_login_title">تسجيل الدخول</string>
-    <string name="auth_login_desc">الاتصال بلوحة تحكم Hermes</string>
+    <string name="auth_login_desc">الاتصال ببوابة Hermes</string>
     <string name="auth_login_base_url_label">رابط الخادم (URL)</string>
     <string name="auth_login_token_label">رمز الجلسة (Session Token)</string>
     <string name="auth_login_username_label">اسم المستخدم</string>
