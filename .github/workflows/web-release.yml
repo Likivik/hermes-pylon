@@ -100,6 +100,11 @@ jobs:
           # -x: see the header. Without it the build fails at configuration time.
           ./gradlew :ui:wasmJsBrowserDistribution -x kotlinWasmBinaryenSetup --no-daemon
 
+      # Source maps are ~1.5 MB and would ship to every visitor who opens
+      # devtools. They are a debugging aid for a build we produce, not an artifact.
+      - name: Drop source maps
+        run: rm -f ui/build/dist/wasmJs/productionExecutable/*.map
+
       - name: Optimize wasm (post-build)
         run: |
           # Budget: measured 6.05 MB gzip. 8 MB leaves room for growth but fails
