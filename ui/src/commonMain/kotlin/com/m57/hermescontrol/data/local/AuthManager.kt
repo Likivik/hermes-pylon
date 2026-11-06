@@ -30,6 +30,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.concurrent.Volatile
 import kotlin.io.encoding.Base64
@@ -126,6 +127,22 @@ object AuthManager : WsAuthConfig {
                 store.getLatestState().selectedProfileId?.takeIf { it.isNotBlank() } ?: DEFAULT_PROFILE_ID
             _selectedProfileIdFlow.value = initialProfileId
             platform.initializeCookieStore(initialProfileId)
+
+            scope.launch {
+                // The read above can run before the store finishes loading, when the
+                // selected profile is still unknown and the token reads back as null.
+                // Wait for the first loaded state, then read the token once. Without
+                // this a signed-in user lands on the login screen after a reload.
+                // Side effects stay out of the collector below: credential publication
+                // is owned by the profile-transition path, which publishes under the
+                // monitor and has its own ordering guarantees.
+                runCatching { store.stateFlow.first() }
+                synchronized(monitor) {
+                    if (_tokenFlow.value == null) {
+                        runCatching { publishTokenLocked(getTokenInternal(storage)) }
+                    }
+                }
+            }
 
             scope.launch {
                 store.stateFlow.collect { state ->
