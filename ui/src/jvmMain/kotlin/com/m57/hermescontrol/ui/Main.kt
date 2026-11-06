@@ -35,6 +35,9 @@ import org.jetbrains.compose.resources.stringResource
 fun main() {
     // Desktop console sink; the ring is always on inside HermesLog.
     com.m57.hermescontrol.util.HermesLog.install(com.m57.hermescontrol.util.ConsoleLogSink())
+    // Bind the auth seams before any composable reads them: profiles on disk,
+    // tokens and cookies in 0600 files under the app config directory.
+    com.m57.hermescontrol.data.local.AuthManager.init(com.m57.hermescontrol.data.local.JvmAuthPlatform())
     application {
         Window(
             onCloseRequest = ::exitApplication,
