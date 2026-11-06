@@ -57,13 +57,12 @@ import com.m57.hermescontrol.ui.webhooks.WebhooksScreen as WebhooksScreenContent
 /**
  * Every screen the app ships, assembled once for all targets.
  *
- * Only [platformScreens] varies: a screen whose *content* needs a platform API
- * keeps its definition next to that content, instead of dragging a `Context`
- * into the shared list.
+ * Every definition is shared, so there is no platform seam to assemble around:
+ * a screen that later needs a platform API can add one back at the call site.
  */
 fun screenGraph(): ScreenGraph =
     ScreenGraph(
-        screens = commonScreens() + platformScreens(),
+        screens = commonScreens(),
         primary = primaryScreens,
     )
 
@@ -245,6 +244,3 @@ private val primaryScreens: Set<NavKey> =
         SystemScreen,
         SettingsScreen,
     )
-
-/** Screens only this target can render; empty for targets that can render all. */
-expect fun platformScreens(): List<ScreenDefinition>

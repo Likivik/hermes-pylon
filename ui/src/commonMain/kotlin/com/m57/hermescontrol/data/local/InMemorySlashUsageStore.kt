@@ -4,7 +4,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 
-/** The web target keeps slash usage for the session only. */
+/** Desktop and web keep slash usage for the session only. */
 class InMemorySlashUsageStore : SlashUsageStore {
     private val state = MutableStateFlow<Map<String, Map<String, Int>>>(emptyMap())
 
