@@ -1,4 +1,7 @@
 package com.m57.hermescontrol.data.local
 
-/** Desktop/web binding: an in-memory store, nothing persisted. */
-actual val authStore: AuthStore = InMemoryAuthStore()
+/**
+ * Browser binding: settings and profiles persist in `localStorage`, secrets in
+ * `sessionStorage`. See [WebAuthStore].
+ */
+actual val authStore: AuthStore = WebAuthStore()
