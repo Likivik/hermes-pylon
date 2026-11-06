@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Pylon">
+  <title>Pylon</title>
+  <!-- Favicon tile: the app badge, purple tile with the compact spire. -->
+  <rect width="32" height="32" rx="7" fill="#7C5CFF"/>
+  <g transform="translate(4 4) scale(1)">
+    <path d="M12 1.2 L15.6 7.8 L12 21.6 L8.4 7.8 Z" fill="#FFFFFF"/>
+    <path d="M3.2 8.4 L8.8 12.2 L9.4 17.8 Z" fill="#D9CCFF"/>
+    <path d="M20.8 8.4 L15.2 12.2 L14.6 17.8 Z" fill="#D9CCFF"/>
+  </g>
+</svg>
