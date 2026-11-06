@@ -1,20 +1,14 @@
 package com.m57.hermescontrol
 
-import com.m57.hermescontrol.generated.resources.Res
-import com.m57.hermescontrol.generated.resources.screen_processes
-import com.m57.hermescontrol.ui.icons.HermesIcon
-import com.m57.hermescontrol.ui.process.ProcessesScreen as ProcessesScreenContent
-
 /**
- * The one screen whose content is Android-only today: process inspection reads
- * the platform's process table. Every other screen lives in `ScreenGraphEntries.kt`.
+ * Screens only this target can render.
+ *
+ * Empty on every target today. The last entry was the Processes screen, which
+ * was assumed to need the platform process table; it does not — it renders the
+ * gateway process rows through `ProcessesViewModel`, which has always lived in
+ * `commonMain`. It now ships from `commonScreens()` like every other screen.
+ *
+ * The seam stays: a screen that genuinely needs a platform API (a file picker,
+ * a camera, a notification channel) belongs here, not in the shared list.
  */
-actual fun platformScreens(): List<ScreenDefinition> =
-    listOf(
-        ScreenDefinition(
-            ProcessesScreen,
-            Res.string.screen_processes,
-            HermesIcon.Memory,
-            DrawerSection.INSPECT,
-        ) { _, openDrawer -> ProcessesScreenContent(onOpenDrawer = openDrawer) },
-    )
+actual fun platformScreens(): List<ScreenDefinition> = emptyList()

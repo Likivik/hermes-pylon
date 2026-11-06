@@ -28,7 +28,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -36,6 +35,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.m57.hermescontrol.data.model.ProcessInfo
 import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.action_cancel
 import com.m57.hermescontrol.generated.resources.error_unknown
 import com.m57.hermescontrol.generated.resources.processes_empty_desc
 import com.m57.hermescontrol.generated.resources.processes_empty_title
@@ -151,7 +151,7 @@ fun ProcessesScreen(
             },
             dismissButton = {
                 TextButton(onClick = { killTarget = null }) {
-                    Text(stringResource(android.R.string.cancel))
+                    Text(stringResource(Res.string.action_cancel))
                 }
             },
         )
