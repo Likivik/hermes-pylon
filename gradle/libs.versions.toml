@@ -1,4 +1,6 @@
 [versions]
+# KMP logging engine behind the HermesLog facade.
+kermit = "2.0.8"
 androidGradlePlugin = "9.1.1"
 androidxBrowser = "1.8.0"
 androidxCore = "1.18.0"
@@ -69,6 +71,8 @@ composeAdaptive = "1.3.0"
 skiko = "0.150.2"
 
 [libraries]
+kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }
+kermit-test = { module = "co.touchlab:kermit-test", version.ref = "kermit" }
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidxCore" }
 androidx-browser = { module = "androidx.browser:browser", version.ref = "androidxBrowser" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidxActivity" }
