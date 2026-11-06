@@ -1,5 +1,6 @@
 package com.m57.hermescontrol.ui.landing
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -49,10 +49,9 @@ fun LandingScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            // Hero icon — local ImageVector (see HermesIcons): Material Icons
-            // is deprecated upstream and not republished for CMP 1.8+, so the
-            // bolt glyph is vendored in commonMain instead of pulled from an
-            // Android-only artifact.
+            // Hero mark — the "spire" ImageVector (see HermesIcons). Drawn with
+            // Image, not Icon: the hero tier bakes its facet colours into the
+            // paths, and Icon's tint would flatten them into one colour.
             Box(
                 modifier =
                     Modifier
@@ -61,11 +60,10 @@ fun LandingScreen(
                         .background(MaterialTheme.colorScheme.primary),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    imageVector = HermesIcons.Bolt,
+                Image(
+                    imageVector = HermesIcons.Spire,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(44.dp),
+                    modifier = Modifier.size(48.dp),
                 )
             }
 

@@ -164,8 +164,12 @@ fun pylonTypography(): Typography =
             TextStyle(
                 fontFamily = onestFamily(),
                 fontWeight = FontWeight.Normal,
-                fontSize = 12.sp,
-                lineHeight = 16.sp,
+                // 13, not M3's 12: this is the smallest style that carries
+                // real content (captions, secondary lines), and 12 sp read as
+                // 12 px on web is below what accessibility checkers call
+                // readable small text.
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
                 letterSpacing = 0.4.sp,
             ),
         // Label — buttons, chips, captions
@@ -189,7 +193,9 @@ fun pylonTypography(): Typography =
             TextStyle(
                 fontFamily = onestFamily(),
                 fontWeight = FontWeight.Medium,
-                fontSize = 11.sp,
+                // 12, not M3's 11: labels appear in dense lists on a phone and
+                // 11 sp / 11 px on web is the smallest readable step.
+                fontSize = 12.sp,
                 lineHeight = 16.sp,
                 letterSpacing = 0.5.sp,
             ),

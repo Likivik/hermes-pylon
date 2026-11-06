@@ -5,6 +5,8 @@ package com.m57.hermescontrol.ui.authlogin
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -35,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.contentType
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -59,6 +63,7 @@ import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.ComposeResourcesStringResolver
 import com.m57.hermescontrol.ui.icons.HermesIcon
 import com.m57.hermescontrol.ui.icons.HermesSymbol
+import com.m57.hermescontrol.ui.landing.HermesIcons
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -113,23 +118,30 @@ fun AuthLoginScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // Hero icon
+            // Same badge as the landing hero: the "spire" mark in a filled
+            // circle, so the two screens read as one flow. Image, not Icon —
+            // the hero tier carries its own facet colours.
             Box(
-                modifier = Modifier.size(64.dp),
+                modifier =
+                    Modifier
+                        .size(80.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary),
                 contentAlignment = Alignment.Center,
             ) {
-                HermesSymbol(
-                    icon = HermesIcon.Bolt,
+                Image(
+                    imageVector = HermesIcons.Spire,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(48.dp),
                 )
             }
 
+            Spacer(modifier = Modifier.height(20.dp))
+
             Text(
                 text = stringResource(Res.string.auth_login_title),
                 style =
-                    MaterialTheme.typography.headlineSmall.copy(
+                    MaterialTheme.typography.headlineLarge.copy(
                         fontWeight = FontWeight.Bold,
                     ),
             )
