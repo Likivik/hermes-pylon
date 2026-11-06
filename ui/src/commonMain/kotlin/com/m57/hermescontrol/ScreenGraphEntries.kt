@@ -19,6 +19,7 @@ import com.m57.hermescontrol.generated.resources.screen_logs
 import com.m57.hermescontrol.generated.resources.screen_mcp_servers
 import com.m57.hermescontrol.generated.resources.screen_models
 import com.m57.hermescontrol.generated.resources.screen_plugins
+import com.m57.hermescontrol.generated.resources.screen_processes
 import com.m57.hermescontrol.generated.resources.screen_profiles
 import com.m57.hermescontrol.generated.resources.screen_providers
 import com.m57.hermescontrol.generated.resources.screen_settings
@@ -43,6 +44,7 @@ import com.m57.hermescontrol.ui.logs.LogsScreen as LogsScreenContent
 import com.m57.hermescontrol.ui.mcp.McpServersScreen as McpServersScreenContent
 import com.m57.hermescontrol.ui.model.ModelScreen as ModelScreenContent
 import com.m57.hermescontrol.ui.plugins.PluginsScreen as PluginsScreenContent
+import com.m57.hermescontrol.ui.process.ProcessesScreen as ProcessesScreenContent
 import com.m57.hermescontrol.ui.profiles.ProfilesScreen as ProfilesScreenContent
 import com.m57.hermescontrol.ui.providers.ProvidersScreen as ProvidersScreenContent
 import com.m57.hermescontrol.ui.sessions.SessionsScreen as HistoryScreenContent
@@ -175,6 +177,16 @@ private fun commonScreens(): List<ScreenDefinition> =
             HermesIcon.Info,
             DrawerSection.INSPECT,
         ) { sessionId, openDrawer -> SystemScreenContent(onOpenDrawer = openDrawer) },
+        // Processes used to be Android-only, on the theory that process
+        // inspection reads the platform table. It does not: the screen renders
+        // /api/* process rows through ProcessesViewModel, which has always lived
+        // in commonMain. It is shared like every other screen.
+        ScreenDefinition(
+            ProcessesScreen,
+            Res.string.screen_processes,
+            HermesIcon.Memory,
+            DrawerSection.INSPECT,
+        ) { sessionId, openDrawer -> ProcessesScreenContent(onOpenDrawer = openDrawer) },
         ScreenDefinition(
             LogsScreen,
             Res.string.screen_logs,
