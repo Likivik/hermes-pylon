@@ -105,7 +105,7 @@ fun main() {
     onWasmReady {
         // Console sink for DevTools; the ring is always on inside HermesLog, so
         // diagnostics work even if this install never runs.
-        com.m57.hermescontrol.util.HermesLog.install(com.m57.hermescontrol.util.ConsoleLogSink())
+        com.m57.hermescontrol.util.HermesLog.setDebugLogging(com.m57.hermescontrol.BuildFlags.isDebug)
         // The app needs the manager before the first composition reads its
         // flows; the browser platform persists profiles in `localStorage` and
         // keeps secrets and cookies in memory for the life of the tab.

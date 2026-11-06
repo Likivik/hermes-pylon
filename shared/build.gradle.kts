@@ -106,6 +106,10 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.core)
                 // Multiplatform lock for HermesWsClient's critical sections.
                 implementation(libs.kotlinx.atomicfu)
+                // Logging engine. HermesLog is the facade; Kermit supplies the
+                // per-platform writers (logcat, console, JVM) so no target needs
+                // its own LogSink class.
+                implementation(libs.kermit)
                 // io.ktor.http.Url: multiplatform URL parsing — replaces the
                 // jvm-only okhttp3.HttpUrl so ServerEndpoint can move out of
                 // :app and into :shared's common source set.

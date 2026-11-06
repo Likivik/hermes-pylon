@@ -1,5 +1,9 @@
 package com.m57.hermescontrol.util
 
+import co.touchlab.kermit.Logger
+import co.touchlab.kermit.Severity
+import co.touchlab.kermit.mutableLoggerConfigInit
+import co.touchlab.kermit.platformLogWriter
 import kotlin.concurrent.Volatile
 
 /**
@@ -82,6 +86,33 @@ object HermesLog : LogSink {
     @Volatile
     private var installed: List<LogSink> = emptyList()
 
+    /**
+     * The logging engine. Kermit owns the per-platform writers (logcat on
+     * Android, `os_log` on iOS, `console` on wasm, stdout on the JVM), so this
+     * module no longer ships a hand-rolled sink per target.
+     *
+     * Severity policy lives here, not at the call sites: debug builds keep
+     * Debug and above, release keeps Info and above. A verbose line therefore
+     * costs nothing in release without a single `if (BuildConfig.DEBUG)` in the
+     * logging code.
+     */
+    @Volatile
+    private var engine: Logger =
+        Logger(
+            mutableLoggerConfigInit(platformLogWriter(), minSeverity = Severity.Info),
+        )
+
+    /** Called once at start-up with the build's own debug flag. */
+    fun setDebugLogging(enabled: Boolean) {
+        engine =
+            Logger(
+                mutableLoggerConfigInit(
+                    platformLogWriter(),
+                    minSeverity = if (enabled) Severity.Verbose else Severity.Info,
+                ),
+            )
+    }
+
     /** Records from the always-on ring, newest last. */
     val records get() = ring.records
 
@@ -128,6 +159,21 @@ object HermesLog : LogSink {
         ring.record(record)
         installed.forEach { sink ->
             runCatching { sink.record(record) }
+        }
+        // One line per record, at the engine's severity gate, through the
+        // platform writer. `record` already redacted and capped the attributes.
+        val line = record.render()
+        val tag = record.component
+        runCatching {
+            // Named arguments: Kermit's positional order differs between the
+            // `log()` overloads, and this is the one place that matters.
+            when (record.severity) {
+                LogSeverity.VERBOSE -> engine.v(message = { line }, tag = tag)
+                LogSeverity.DEBUG -> engine.d(message = { line }, tag = tag)
+                LogSeverity.INFO -> engine.i(message = { line }, tag = tag)
+                LogSeverity.WARN -> engine.w(message = { line }, tag = tag)
+                LogSeverity.ERROR -> engine.e(message = { line }, tag = tag)
+            }
         }
     }
 
