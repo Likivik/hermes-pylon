@@ -56,12 +56,13 @@ TARGET_SOURCE_SETS = ("androidMain", "jvmMain", "jsMain", "wasmJsMain", "iosMain
 # Intermediate source sets: one directory whose code is compiled into several
 # targets. An `actual` living there satisfies the expect for every target that
 # depends on it, so the per-target scan below has to look there too.
-INTERMEDIATE_SOURCE_SETS = ("jvmAndroidMain",)
+INTERMEDIATE_SOURCE_SETS = ("jvmAndroidMain", "desktopWebMain")
 
 # Which intermediate source sets each target source set also compiles.
 INTERMEDIATE_MEMBERSHIP = {
     "androidMain": ("jvmAndroidMain",),
-    "jvmMain": ("jvmAndroidMain",),
+    "jvmMain": ("jvmAndroidMain", "desktopWebMain"),
+    "wasmJsMain": ("desktopWebMain",),
 }
 
 

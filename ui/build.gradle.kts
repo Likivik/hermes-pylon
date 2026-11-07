@@ -191,6 +191,21 @@ kotlin {
         getByName("androidMain").dependsOn(jvmAndroidMain)
         getByName("jvmMain").dependsOn(jvmAndroidMain)
 
+        // Intermediate source set for code that is byte-identical on the two
+        // targets with no OS services to reach for: the JVM console build and
+        // the browser. Both are "memory + files allowed, no platform SDK", so
+        // one copy serves them, and a second copy is never the right answer.
+        //
+        // This makes `jvmMain` inherit from two intermediate sets at once — a
+        // diamond. The default hierarchy template builds trees, not diamonds,
+        // and the template's own group API is broken with
+        // `com.android.kotlin.multiplatform.library`, so the edges are declared
+        // by hand here. Proven to compile on both targets.
+        val desktopWebMain = create("desktopWebMain")
+        desktopWebMain.dependsOn(getByName("commonMain"))
+        getByName("jvmMain").dependsOn(desktopWebMain)
+        getByName("wasmJsMain").dependsOn(desktopWebMain)
+
         commonMain {
             dependencies {
                 // DataStore 1.3.0 is the first version with wasmJs storage
