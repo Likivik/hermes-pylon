@@ -247,99 +247,103 @@ fun MainNavigation() {
     CompositionLocalProvider(LocalDrawerGestureController provides gestureController) {
         ModalNavigationDrawer(
             drawerState = drawerState,
-            gesturesEnabled = gestureController.enabled,
+            // Dismissal and the screen policy have to coexist:
+            //  - closed  -> the screen's own preference decides, so a horizontal
+            //               drag over content never opens the drawer (issue #619)
+            //  - open    -> Material's scrim tap and swipe own dismissal;
+            //               `gesturesEnabled = false` removes the scrim click too,
+            //               which made the drawer openable but not closable
+            // `currentValue` keeps that true for the whole close animation, so the
+            // value cannot flip mid-flight.
+            gesturesEnabled =
+                drawerState.currentValue == DrawerValue.Open || gestureController.enabled,
             drawerContent = {
-                // The drawer must not compose while closed. Its strings contain
-                // native-script language names (中文, 日本語, 한국어) — laying them
-                // out at boot triggers the CJK/emoji fallback-font machinery on
-                // the single UI thread, which delayed the landing page's first
-                // painted text by ~1 s even though the landing needs none of
-                // those fonts. Compose the sheet only when the drawer is open
-                // or animating toward open; the fallback fonts then load on
-                // first real use, once per session, cached after.
-                if (drawerState.isOpen || drawerState.targetValue != DrawerValue.Closed) {
-                    ModalDrawerSheet(
-                        modifier = Modifier.verticalScroll(rememberScrollState()),
+                // Always composed, never conditionally. Material measures the sheet to
+                // compute the drawer anchors; unmounting it mid-dismissal re-measures
+                // them and the state snaps to the nearest anchor, so the drawer closed
+                // and reopened by itself. The old gate kept CJK fallback fonts off the
+                // boot path; that cost now applies only to CJK users, on first paint.
+                ModalDrawerSheet(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                ) {
+                    val connectionStatus by HermesWsClient.connectionStatus.collectAsState()
+                    val statusColor =
+                        when (connectionStatus) {
+                            ConnectionStatus.CONNECTED -> LocalHermesStatusColors.current.success
+
+                            ConnectionStatus.CONNECTING,
+                            ConnectionStatus.RECONNECTING,
+                            -> LocalHermesStatusColors.current.warning
+
+                            ConnectionStatus.DISCONNECTED,
+                            ConnectionStatus.NO_NETWORK,
+                            ConnectionStatus.AUTH_EXPIRED,
+                            -> LocalHermesStatusColors.current.error
+                        }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 2.dp),
                     ) {
-                        val connectionStatus by HermesWsClient.connectionStatus.collectAsState()
-                        val statusColor =
-                            when (connectionStatus) {
-                                ConnectionStatus.CONNECTED -> LocalHermesStatusColors.current.success
-
-                                ConnectionStatus.CONNECTING,
-                                ConnectionStatus.RECONNECTING,
-                                -> LocalHermesStatusColors.current.warning
-
-                                ConnectionStatus.DISCONNECTED,
-                                ConnectionStatus.NO_NETWORK,
-                                ConnectionStatus.AUTH_EXPIRED,
-                                -> LocalHermesStatusColors.current.error
-                            }
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 2.dp),
-                        ) {
-                            Text(
-                                text = stringResource(Res.string.nav_drawer_title),
-                                style =
-                                    MaterialTheme.typography.headlineSmall.copy(
-                                        fontWeight = FontWeight.Bold,
-                                    ),
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Box(
-                                modifier =
-                                    Modifier
-                                        .size(10.dp)
-                                        .background(color = statusColor, shape = CircleShape),
-                            )
-                        }
                         Text(
-                            text = stringResource(Res.string.nav_drawer_subtitle),
-                            modifier = Modifier.padding(start = 16.dp, bottom = 8.dp, end = 16.dp),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            text = stringResource(Res.string.nav_drawer_title),
+                            style =
+                                MaterialTheme.typography.headlineSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                ),
+                            color = MaterialTheme.colorScheme.primary,
                         )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-                        for ((section, entries) in screenGraph().drawer()) {
-                            Text(
-                                text = stringResource(section.titleRes).uppercase(),
-                                modifier =
-                                    Modifier.padding(
-                                        start = 16.dp,
-                                        top = 8.dp,
-                                        bottom = 4.dp,
-                                        end = 16.dp,
-                                    ),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                            entries.forEach { entry ->
-                                NavigationDrawerItem(
-                                    icon = { HermesSymbol(icon = entry.icon, contentDescription = null) },
-                                    label = { Text(stringResource(entry.labelRes)) },
-                                    selected = currentScreen == entry.key,
-                                    onClick = {
-                                        scope.launch { drawerState.close() }
-                                        NavigationController.navigateTo(entry.key)
-                                    },
-                                    colors =
-                                        NavigationDrawerItemDefaults.colors(
-                                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                            selectedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                            selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        ),
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Box(
+                            modifier =
+                                Modifier
+                                    .size(10.dp)
+                                    .background(color = statusColor, shape = CircleShape),
+                        )
                     }
+                    Text(
+                        text = stringResource(Res.string.nav_drawer_subtitle),
+                        modifier = Modifier.padding(start = 16.dp, bottom = 8.dp, end = 16.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                    for ((section, entries) in screenGraph().drawer()) {
+                        Text(
+                            text = stringResource(section.titleRes).uppercase(),
+                            modifier =
+                                Modifier.padding(
+                                    start = 16.dp,
+                                    top = 8.dp,
+                                    bottom = 4.dp,
+                                    end = 16.dp,
+                                ),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        entries.forEach { entry ->
+                            NavigationDrawerItem(
+                                icon = { HermesSymbol(icon = entry.icon, contentDescription = null) },
+                                label = { Text(stringResource(entry.labelRes)) },
+                                selected = currentScreen == entry.key,
+                                onClick = {
+                                    scope.launch { drawerState.close() }
+                                    NavigationController.navigateTo(entry.key)
+                                },
+                                colors =
+                                    NavigationDrawerItemDefaults.colors(
+                                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                        selectedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    ),
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Spacer(modifier = Modifier.height(12.dp))
                 }
             },
         ) {
