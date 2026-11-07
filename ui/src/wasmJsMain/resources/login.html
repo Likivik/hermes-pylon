@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Sign in · Pylon for Hermes</title>
+    <meta name="theme-color" content="#7C5CFF" />
+    <meta name="robots" content="noindex" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="apple-touch-icon-180.png" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <!--
+      The sign-in page is plain HTML on purpose.
+
+      Compose draws its fields into a canvas, and a canvas field is invisible to
+      every password manager: Bitwarden's extension enumerates input/textarea/
+      select nodes, 1Password's docs ask for <form> + <label for>, and Chrome's
+      own canvas documentation lists autofill as unavailable by default. Firefox
+      for Android builds its login manager on DOMInputPasswordAdded, which only
+      a real <input type="password"> fires.
+
+      So authentication happens here, on real DOM controls, and then hands off
+      to the Compose app. That also removes the duplicate paste UI: with a real
+      input there is one menu, the browser's.
+    -->
+    <style>
+        :root {
+            --surface: #0D0B12;
+            --card: #14111C;
+            --border: #241E33;
+            --primary: #7C5CFF;
+            --primary-press: #6B4BEF;
+            --lilac: #D9CCFF;
+            --ink: #EAE7F2;
+            --dim: #9A94A8;
+            --danger: #E65F5A;
+        }
+
+        @font-face {
+            font-family: "Onest";
+            src: url("/composeResources/com.m57.hermescontrol.generated.resources/font/onest_variable.ttf") format("truetype");
+            font-weight: 100 900;
+            font-display: swap;
+        }
+
+        html, body {
+            height: 100%;
+            margin: 0;
+            background: var(--surface);
+            color: var(--ink);
+            font-family: "Onest", system-ui, -apple-system, "Segoe UI", sans-serif;
+            -webkit-text-size-adjust: 100%;
+        }
+
+        body {
+            /* Compose's app shell owns the viewport; this page owns only itself,
+               so a centred flex column is correct here. */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100dvh;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+
+        main {
+            width: 100%;
+            max-width: 360px;
+        }
+
+        .mark {
+            display: block;
+            margin: 0 auto 18px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+            text-align: center;
+        }
+
+        .sub {
+            margin: 6px 0 28px;
+            font-size: 13px;
+            color: var(--dim);
+            text-align: center;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--dim);
+        }
+
+        /* 16px minimum: anything smaller makes iOS and some Android browsers
+           zoom the whole viewport when the field takes focus. */
+        input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 12px 14px;
+            font: inherit;
+            font-size: 16px;
+            color: var(--ink);
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            outline: none;
+            transition: border-color 120ms ease-out, box-shadow 120ms ease-out;
+        }
+
+        input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(124, 92, 255, 0.22);
+        }
+
+        input:disabled {
+            opacity: 0.6;
+        }
+
+        button {
+            margin-top: 6px;
+            padding: 13px 16px;
+            font: inherit;
+            font-size: 15px;
+            font-weight: 600;
+            color: #fff;
+            background: var(--primary);
+            border: 0;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background-color 120ms ease-out;
+        }
+
+        button:hover:not(:disabled) { background: var(--primary-press); }
+        button:disabled { opacity: 0.55; cursor: default; }
+
+        .error {
+            min-height: 20px;
+            margin: 0;
+            font-size: 13px;
+            color: var(--danger);
+            text-align: center;
+        }
+
+        .aside {
+            margin-top: 22px;
+            font-size: 12px;
+            color: var(--dim);
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+<main>
+    <svg class="mark" viewBox="0 0 24 24" width="40" height="40" role="presentation" aria-hidden="true">
+        <path d="M12 1.2 L15.6 7.8 L12 21.6 L8.4 7.8 Z" fill="#ffffff" />
+        <path d="M3.2 8.4 L8.8 12.2 L9.4 17.8 Z" fill="#d9ccff" />
+        <path d="M20.8 8.4 L15.2 12.2 L14.6 17.8 Z" fill="#d9ccff" />
+    </svg>
+
+    <h1>Pylon for Hermes</h1>
+    <p class="sub">Control panel for Hermes Agent</p>
+
+    <!--
+      One <form>, one autocomplete hint per field, unique id/name, and a real
+      submit button: that is the whole checklist Chromium and 1Password publish
+      for password-manager support. The form is submitted by script because the
+      endpoint takes JSON, then removed and followed by a navigation — the
+      fallback Chromium documents for fetch-based sign-in.
+    -->
+    <form id="login" method="post" action="auth/password-login" novalidate>
+        <div>
+            <label for="username">Username</label>
+            <input id="username" name="username" type="text"
+                   autocomplete="username" autocapitalize="none" autocorrect="off"
+                   spellcheck="false" required autofocus />
+        </div>
+        <div>
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password"
+                   autocomplete="current-password" required />
+        </div>
+        <button type="submit" id="submit">Sign in</button>
+        <p class="error" id="error" role="alert" aria-live="polite"></p>
+    </form>
+
+    <p class="aside" id="aside"></p>
+</main>
+
+<script>
+    (function () {
+        var form = document.getElementById('login');
+        var user = document.getElementById('username');
+        var pass = document.getElementById('password');
+        var submit = document.getElementById('submit');
+        var errorEl = document.getElementById('error');
+        var asideEl = document.getElementById('aside');
+
+        // Same probe the app uses: api/status is public, api/profiles is not, so
+        // a 401 here means "no session" and anything else means "already in".
+        var PROBE = 'api/profiles';
+        var NEXT = 'index.html';
+
+        function fail(text) {
+            errorEl.textContent = text;
+        }
+
+        function busy(on) {
+            submit.disabled = on;
+            user.disabled = on;
+            pass.disabled = on;
+        }
+
+        var messages = {
+            401: 'Wrong username or password.',
+            403: 'This account is not allowed to sign in.',
+            429: 'Too many attempts. Wait a moment and try again.',
+        };
+
+        // Already signed in (a reload, or a second tab): go straight in, so a
+        // password manager is not asked to fill a form the session already owns.
+        // Only a 2xx counts: a 404 means there is no such endpoint on this host,
+        // which is not the same thing as a live session.
+        fetch(PROBE, { credentials: 'include', cache: 'no-store' })
+            .then(function (res) {
+                if (res.ok) {
+                    location.replace(NEXT);
+                }
+            })
+            .catch(function () { /* offline: leave the form, the submit will say */ });
+
+        form.addEventListener('submit', function (event) {
+            event.preventDefault();
+            fail('');
+
+            var username = user.value.trim();
+            var password = pass.value;
+            if (!username || !password) {
+                fail('Enter your username and password.');
+                return;
+            }
+
+            busy(true);
+            // The endpoint takes JSON, so the body is built here rather than by
+            // the form's own encoding: provider/username/password/next mirrors
+            // AuthPayloads.passwordLogin.
+            fetch('auth/password-login', {
+                method: 'POST',
+                credentials: 'include',
+                cache: 'no-store',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    provider: 'basic',
+                    username: username,
+                    password: password,
+                    next: ''
+                })
+            }).then(function (res) {
+                if (res.ok) {
+                    // Remove the password from the DOM before navigating: both
+                    // Chromium and 1Password treat a removed password form plus a
+                    // navigation as a completed sign-in and offer to save it.
+                    form.remove();
+                    busy(false);
+                    location.replace(NEXT);
+                    return;
+                }
+                busy(false);
+                if (res.status === 404) {
+                    fail('This server has no password sign-in endpoint.');
+                    return;
+                }
+                fail(messages[res.status] || ('Sign-in failed (HTTP ' + res.status + ').'));
+            }).catch(function (err) {
+                busy(false);
+                fail('Could not reach the server' + (err && err.message ? ': ' + err.message : '.'));
+            });
+        });
+
+        // A hint that costs nothing and explains a surprising absence: if the
+        // page is opened over plain http on a LAN address, password managers
+        // still fill, but Chrome withholds its "save password" prompt for some
+        // insecure origins.
+        if (location.protocol === 'http:' && location.hostname !== '127.0.0.1' && location.hostname !== 'localhost') {
+            asideEl.textContent = 'Served over plain HTTP — password managers may not offer to save here.';
+        }
+
+        // Warm the app while the user types, instead of starting the download
+        // only after the form is submitted. ui.js names the content-hashed
+        // .wasm files, so the second step needs the first to know the URLs.
+        // Both are immutable once fetched, so the boot finds them in the cache.
+        function warmBundle() {
+            var connection = navigator.connection;
+            if (connection && (connection.saveData || /(^|-)2g$/.test(connection.effectiveType || ''))) {
+                return; // someone is paying per megabyte; let the form win
+            }
+            fetch('ui.js', { cache: 'force-cache' })
+                .then(function (res) { return res.ok ? res.text() : ''; })
+                .then(function (text) {
+                    var names = text.match(/[0-9a-f]{16,}\.wasm/g) || [];
+                    var seen = {};
+                    names.forEach(function (name) {
+                        if (seen[name]) return;
+                        seen[name] = 1;
+                        fetch(name, { cache: 'force-cache', credentials: 'same-origin' })
+                            .catch(function () { /* offline, or blocked: boot will retry */ });
+                    });
+                })
+                .catch(function () { /* offline: boot will retry */ });
+        }
+
+        if (document.readyState === 'complete') {
+            warmBundle();
+        } else {
+            addEventListener('load', warmBundle, { once: true });
+        }
+    })();
+</script>
+</body>
+</html>
