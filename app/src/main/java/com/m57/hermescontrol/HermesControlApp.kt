@@ -1,6 +1,7 @@
 package com.m57.hermescontrol
 
 import android.app.Application
+import android.content.pm.ApplicationInfo
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
@@ -19,7 +20,6 @@ import com.m57.hermescontrol.data.remote.installAttachmentReader
 import com.m57.hermescontrol.data.ws.HermesWsClient
 import com.m57.hermescontrol.data.ws.KtorWsTransport
 import com.m57.hermescontrol.ui.analytics.AnalyticsPreloader
-import com.m57.hermescontrol.util.AndroidLogSink
 import com.m57.hermescontrol.util.HermesLog
 import io.kseongbin.stacktrace.CrashLogger
 import io.kseongbin.stacktrace.CrashLoggerConfig
@@ -48,9 +48,11 @@ class HermesControlApp :
             ),
         )
         AuthManager.init(this)
-        // Shared code logs through the :shared HermesLog facade; install the
-        // android.util.Log-backed sink (and its BuildConfig.DEBUG flag) here.
-        HermesLog.install(AndroidLogSink)
+        // Shared code logs through the :shared HermesLog facade; that facade hands
+        // the record to Kermit, whose Android writer is logcat. The severity gate
+        // comes from the manifest's debuggable flag rather than BuildConfig, which
+        // this module does not generate.
+        HermesLog.setDebugLogging((applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0)
         // Only Android can read a content:// attachment; install the reader here so
         // shared chat code can request the bytes without holding a Context.
         installAttachmentReader(AndroidAttachmentReader(this))
