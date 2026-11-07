@@ -18,6 +18,7 @@ import com.m57.hermescontrol.data.remote.safeApiCall
 import com.m57.hermescontrol.data.theme.ThemePreference
 import com.m57.hermescontrol.data.theme.ThemePreset
 import com.m57.hermescontrol.data.ws.HermesWsClient
+import com.m57.hermescontrol.ui.authlogin.performLogout
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -408,7 +409,7 @@ class SettingsViewModel(
         authStore.setTypingEffectDelayMs(delayMs)
     }
 
-    /** Clear all auth credentials — logs out and returns to landing screen. */
+    /** Clear all auth credentials — logs out and returns to the sign-in page. */
     fun logout() {
         // Tear down the authenticated socket before discarding credentials;
         // a live socket must never outlive the identity it was opened with.
@@ -416,6 +417,13 @@ class SettingsViewModel(
         authStore.setToken(null)
         authStore.setSessionCookie(null)
         authStore.setWsAuthParam("token")
+        // Clearing the store is not a web logout: the session is an HttpOnly
+        // cookie, so only the server can end it, and only the browser can show
+        // the HTML sign-in page. Both belong to the platform half.
+        val baseUrl = _uiState.value.baseUrl
+        viewModelScope.launch {
+            runCatching { performLogout(ServerEndpoint.parseForBuild(baseUrl)) }
+        }
         // Don't rebuild ApiClient here — let the navigation complete first
     }
 
