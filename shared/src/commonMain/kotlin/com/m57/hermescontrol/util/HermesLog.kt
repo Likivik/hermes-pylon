@@ -1,5 +1,7 @@
 package com.m57.hermescontrol.util
 
+import co.touchlab.kermit.Logger
+import co.touchlab.kermit.Severity
 import kotlin.concurrent.Volatile
 
 /**
@@ -101,6 +103,38 @@ object HermesLog : LogSink {
     }
 
     /**
+     * The engine. Defaults to Kermit's singleton logger, which already writes to
+     * the platform sink (logcat, `console`, stdout). `internal` so a test can
+     * swap in a logger whose config carries a `TestLogWriter` — that is the whole
+     * reason this is a facade rather than direct Kermit calls.
+     */
+    internal var engine: co.touchlab.kermit.BaseLogger = Logger
+
+    /**
+     * Severity gate, set once per entry point: Verbose in debug, Info in release.
+     *
+     * Applied to the engine's own config. If the config cannot be mutated the
+     * failure is recorded in the ring rather than dropped — a gate that silently
+     * does nothing is how "logging is broken" stays invisible.
+     */
+    fun setDebugLogging(enabled: Boolean) {
+        val target = if (enabled) Severity.Verbose else Severity.Info
+        try {
+            engine.mutableConfig.minSeverity = target
+        } catch (notMutable: Throwable) {
+            ring.record(
+                LogRecord(
+                    seq = 0,
+                    atMillis = nowMillis(),
+                    severity = LogSeverity.ERROR,
+                    component = "logging",
+                    message = "severity gate not applied: ${notMutable::class.simpleName}",
+                ),
+            )
+        }
+    }
+
+    /**
      * Builds and dispatches one record.
      *
      * Redaction and the attribute cap happen here, once, so no sink can forget
@@ -129,6 +163,31 @@ object HermesLog : LogSink {
         installed.forEach { sink ->
             runCatching { sink.record(record) }
         }
+        val line = record.render()
+        val tag = record.component
+        try {
+            // Named args: Kermit's positional order varies between overloads and
+            // the message parameter is a lazy lambda.
+            // Positional arguments, in Kermit's actual order: (message, throwable,
+            // tag). The named form is ambiguous between the eager and lazy
+            // overloads, and the line is already rendered, so lazy buys nothing.
+            // BaseLogger.log(severity, tag, throwable, message). Verified by test:
+            // passing the message second puts the tag in the message slot.
+            engine.log(severity.toKermit(), tag, null, line)
+        } catch (engineFailure: Throwable) {
+            // An engine failure must not be silent — that is the one logging bug
+            // nobody finds later. The ring cannot recurse through the engine, so
+            // the diagnostics screen shows it.
+            ring.record(
+                LogRecord(
+                    seq = 0,
+                    atMillis = nowMillis(),
+                    severity = LogSeverity.ERROR,
+                    component = "logging",
+                    message = "engine failure: ${engineFailure::class.simpleName}",
+                ),
+            )
+        }
     }
 
     override fun d(
@@ -150,4 +209,13 @@ object HermesLog : LogSink {
         tag: String,
         message: String,
     ) = record(LogSeverity.ERROR, tag, message)
+
+    private fun LogSeverity.toKermit(): Severity =
+        when (this) {
+            LogSeverity.VERBOSE -> Severity.Verbose
+            LogSeverity.DEBUG -> Severity.Debug
+            LogSeverity.INFO -> Severity.Info
+            LogSeverity.WARN -> Severity.Warn
+            LogSeverity.ERROR -> Severity.Error
+        }
 }
