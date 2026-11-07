@@ -59,6 +59,20 @@ class ScanTest(unittest.TestCase):
             self.assertEqual(1, len(missing))
             self.assertIn("androidMain", missing[0])
 
+    def test_desktop_web_actual_satisfies_both_targets(self) -> None:
+        """An actual in the jvm+wasm intermediate set counts for both targets.
+
+        Same rule as `jvmAndroidMain`: the intermediate directory is compiled
+        into every target that depends on it, so one file there satisfies the
+        expect for both.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp) / "src"
+            write(base, "commonMain/Toast.kt", "expect fun toast(): Unit\n")
+            write(base, "desktopWebMain/Toast.desktopWeb.kt", "actual fun toast(): Unit = Unit\n")
+            _, missing = scan(base)
+            self.assertEqual([], missing)
+
     def test_untargeted_source_set_is_ignored(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp) / "src"
