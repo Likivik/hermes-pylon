@@ -474,7 +474,34 @@
          .mjs directly skips webpack, so bare npm specifiers like
          "@js-joda/core" never resolve and the page dies at boot. Plain script,
          no type="module": the output libraryTarget is umd. -->
-    <script src="ui.js" onerror="window.__bootlog && window.__bootlog('MODULE SCRIPT FAILED TO LOAD: ui.js')"></script>
+    <!-- Session gate, then the bundle.
+         Compose's login screen cannot host a password manager, so authentication
+         lives on login.html and this page only ever boots with a session. The
+         probe is api/profiles because api/status is public (200 with no cookie)
+         and would never report "not signed in". A failed probe is not a lockout:
+         if the server cannot be reached the app boots and says so itself. -->
+    <script>
+      (function () {
+        function loadApp() {
+          var s = document.createElement('script');
+          s.src = 'ui.js';
+          s.onerror = function () {
+            window.__bootlog && window.__bootlog('MODULE SCRIPT FAILED TO LOAD: ui.js');
+          };
+          document.body.appendChild(s);
+        }
+
+        fetch('api/profiles', { credentials: 'include', cache: 'no-store' })
+          .then(function (res) {
+            if (res.status === 401 || res.status === 403) {
+              location.replace('login.html');
+              return;
+            }
+            loadApp();
+          })
+          .catch(loadApp);
+      })();
+    </script>
     <script>window.__bootlog && window.__bootlog('module script tag executed (module graph may still be loading)');</script>
 </body>
 </html>

@@ -112,6 +112,7 @@ fun main() {
         com.m57.hermescontrol.data.local.AuthManager.init(
             com.m57.hermescontrol.data.local.WebAuthPlatform(),
         )
+        adoptBrowserSession()
         ComposeViewport(viewportContainer = document.body!!) {
             HermesControlTheme(themePreference = ThemePreference.DARK) {
                 // The browser shell draws a branded loading screen and removes it
@@ -393,5 +394,34 @@ private suspend fun fetchGatewayStatus(): GatewayStatusUi {
         )
     } catch (e: Throwable) {
         GatewayStatusUi.Failed(e.message ?: e::class.simpleName ?: "unknown error")
+    }
+}
+
+/**
+ * Adopt the browser session that `login.html` established.
+ *
+ * Sign-in happens on the HTML page, on real DOM inputs, because a Compose field
+ * is painted into a canvas and no password manager can see it. By the time this
+ * module runs, the gate in `index.html` has already confirmed `api/profiles`
+ * answers with a session, so the password has been entered exactly once and this
+ * function only has to tell the app about it.
+ *
+ * These are the three steps `connectBasicAuth` performs after a successful POST,
+ * minus the POST: point the selected profile at the page origin, switch the
+ * WebSocket to a handshake ticket (cookie auth, not a bearer token), and mark the
+ * session authenticated. The cookie itself is held by the browser, so nothing is
+ * written to storage here — a reload re-adopts it the same way.
+ */
+private fun adoptBrowserSession() {
+    runCatching {
+        val manager = com.m57.hermescontrol.data.local.AuthManager
+        val origin = window.location.origin
+        // Only when unset: a profile pointed at a different server keeps it, and
+        // the login page for that server will have set its own cookie.
+        if (manager.getBaseUrl().isBlank()) manager.setBaseUrl(origin)
+        manager.setWsAuthParam("ticket")
+        com.m57.hermescontrol.data.local.AuthSessionState.markAuthenticated()
+        com.m57.hermescontrol.data.remote.ApiClient.rebuild()
+        com.m57.hermescontrol.data.ws.HermesWsClient.connect()
     }
 }
