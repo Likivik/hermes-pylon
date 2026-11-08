@@ -487,6 +487,20 @@ class AuthManagerTest {
         assertEquals("token-for-a", AuthManager.getToken())
     }
 
+    /** Waits for a thread to reach [state]; returns false if it never does. */
+    private fun awaitThreadState(
+        thread: Thread,
+        state: Thread.State,
+        timeoutMs: Long,
+    ): Boolean {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            if (thread.state == state) return true
+            Thread.sleep(5)
+        }
+        return thread.state == state
+    }
+
     @Test
     fun mediaCredentialSnapshotWaitsForCompleteProfileTransition() {
         val profileA = ConnectionProfile("prof-a", "A", baseUrl = "https://same.example.test/", wsAuthParam = "token")
@@ -516,13 +530,26 @@ class AuthManagerTest {
             assertTrue(tokenReadStarted.await(5, TimeUnit.SECONDS))
             var captured: com.m57.hermescontrol.data.remote.MediaCacheScope? = null
             val snapshotFinished = CountDownLatch(1)
-            Thread {
-                captured = GatewayFileClient.currentContext().scope
-                snapshotFinished.countDown()
-            }.start()
-            assertTrue(!snapshotFinished.await(100, TimeUnit.MILLISECONDS))
+            val snapshotThread =
+                Thread {
+                    captured = GatewayFileClient.currentContext().scope
+                    snapshotFinished.countDown()
+                }.apply { start() }
+            // Causal assertion, not a wall-clock one. `currentContext()` reaches
+            // `credentialBoundary()`, which synchronises on the same monitor the
+            // transition holds while it reads the token, so the snapshot thread
+            // must be BLOCKED. The previous form asserted it had not finished
+            // within 100 ms, which is a statement about scheduler latency: on a
+            // loaded runner the thread had simply not started yet, and the test
+            // failed without the code being wrong.
+            assertTrue(
+                "snapshot thread never blocked; state=${snapshotThread.state}",
+                awaitThreadState(snapshotThread, Thread.State.BLOCKED, 5_000),
+            )
+            assertFalse(snapshotFinished.await(0, TimeUnit.MILLISECONDS))
             releaseTokenRead.countDown()
             transition.join(5_000)
+            snapshotThread.join(5_000)
             assertTrue(snapshotFinished.await(5, TimeUnit.SECONDS))
 
             assertTrue(captured == expectedOld || captured == expectedNew)
