@@ -152,6 +152,47 @@
             text-align: center;
         }
 
+        .providers {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+
+        /* Secondary style: the provider is the recommended path, the password
+           form is the fallback, so the hierarchy has to say so. */
+        .provider {
+            display: block;
+            padding: 13px 16px;
+            font-size: 15px;
+            font-weight: 600;
+            text-align: center;
+            text-decoration: none;
+            color: var(--ink);
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+        }
+
+        .provider:hover { border-color: var(--primary); }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 4px 0 16px;
+            font-size: 12px;
+            color: var(--dim);
+        }
+
+        .divider::before,
+        .divider::after {
+            content: "";
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
         .aside {
             margin-top: 22px;
             font-size: 12px;
@@ -178,6 +219,10 @@
       endpoint takes JSON, then removed and followed by a navigation — the
       fallback Chromium documents for fetch-based sign-in.
     -->
+    <div class="providers" id="providers" hidden></div>
+
+    <p class="divider" id="divider" hidden>or sign in with a password</p>
+
     <form id="login" method="post" action="auth/password-login" novalidate>
         <div>
             <label for="username">Username</label>
@@ -206,10 +251,55 @@
         var errorEl = document.getElementById('error');
         var asideEl = document.getElementById('aside');
 
-        // Same probe the app uses: api/status is public, api/profiles is not, so
-        // a 401 here means "no session" and anything else means "already in".
         var PROBE = 'api/profiles';
         var NEXT = 'index.html';
+
+        var providersEl = document.getElementById('providers');
+        var dividerEl = document.getElementById('divider');
+
+        // UI policy, not a lockout: with this false the form is hidden and only
+        // provider sign-in is offered. The dashboard's own /login page still
+        // accepts the password, so recovery stays possible if the provider is
+        // down — set it true again to bring the form back.
+        var ALLOW_PASSWORD = true;
+
+        // Providers come from the server, never from a hardcoded list: the set
+        // depends on what the dashboard has registered, and `basic` (password)
+        // arrives through the same catalogue as Nous.
+        function renderProviders(list) {
+            var links = list.filter(function (p) { return p.supports_password !== true; });
+            if (!links.length) return;
+            links.forEach(function (p) {
+                var a = document.createElement('a');
+                a.className = 'provider';
+                a.href = 'auth/login?provider=' + encodeURIComponent(p.name) +
+                    '&next=' + encodeURIComponent(NEXT);
+                a.textContent = 'Continue with ' + (p.display_name || p.name);
+                providersEl.appendChild(a);
+            });
+            providersEl.hidden = false;
+        }
+
+        function applyPasswordPolicy(list) {
+            var hasPassword = list.some(function (p) { return p.supports_password === true; });
+            // Unknown server (fetch failed, empty list) keeps the form: no data is
+            // not evidence that password auth is gone.
+            var showForm = ALLOW_PASSWORD && (hasPassword || list.length === 0);
+            form.hidden = !showForm;
+            dividerEl.hidden = !showForm || list.length === 0;
+        }
+
+        fetch('api/auth/providers', { cache: 'no-store' })
+            .then(function (res) { return res.ok ? res.json() : { providers: [] }; })
+            .then(function (data) {
+                var list = (data && data.providers) || [];
+                renderProviders(list);
+                applyPasswordPolicy(list);
+            })
+            .catch(function () { applyPasswordPolicy([]); });
+
+        // Same probe the app uses: api/status is public, api/profiles is not, so
+        // a 401 here means "no session" and anything else means "already in".
 
         function fail(text) {
             errorEl.textContent = text;

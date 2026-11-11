@@ -12,6 +12,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -112,7 +113,7 @@ fun main() {
         com.m57.hermescontrol.data.local.AuthManager.init(
             com.m57.hermescontrol.data.local.WebAuthPlatform(),
         )
-        adoptBrowserSession()
+        adoptVerifiedSession()
         ComposeViewport(viewportContainer = document.body!!) {
             HermesControlTheme(themePreference = ThemePreference.DARK) {
                 // The browser shell draws a branded loading screen and removes it
@@ -184,6 +185,17 @@ private sealed interface GatewayStatusUi {
 
 @Composable
 private fun PylonWebEntry() {
+    // A 401 anywhere in the app means the session is gone. On the web that must
+    // leave for the HTML sign-in page rather than fall through to the Compose
+    // one, which no password manager can fill.
+    val sessionExpired by com.m57.hermescontrol.data.local.AuthSessionState.signInRequired.collectAsState()
+    LaunchedEffect(sessionExpired) {
+        if (sessionExpired) {
+            com.m57.hermescontrol.ui.authlogin.handleSignOut(
+                com.m57.hermescontrol.ui.authlogin.SignOutReason.SESSION_EXPIRED,
+            )
+        }
+    }
     // Icon-picker proof surface: `?icons` renders the Material Symbols picker
     // instead of the landing page. Same component the rail would host, so the
     // screenshot is of production code rather than a mock.
@@ -398,30 +410,98 @@ private suspend fun fetchGatewayStatus(): GatewayStatusUi {
 }
 
 /**
- * Adopt the browser session that `login.html` established.
- *
- * Sign-in happens on the HTML page, on real DOM inputs, because a Compose field
- * is painted into a canvas and no password manager can see it. By the time this
- * module runs, the gate in `index.html` has already confirmed `api/profiles`
- * answers with a session, so the password has been entered exactly once and this
- * function only has to tell the app about it.
- *
- * These are the three steps `connectBasicAuth` performs after a successful POST,
- * minus the POST: point the selected profile at the page origin, switch the
- * WebSocket to a handshake ticket (cookie auth, not a bearer token), and mark the
- * session authenticated. The cookie itself is held by the browser, so nothing is
- * written to storage here — a reload re-adopts it the same way.
+ * Kotlin/Wasm only allows `js(...)` as a single expression in a top-level
+ * function body, so the interop read lives here rather than inline.
  */
-private fun adoptBrowserSession() {
+@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)
+private fun pylonSessionState(): String = js("window.__pylonSession || 'unknown'")
+
+/**
+ * Adopt the session that `index.html` verified, and only that.
+ *
+ * The gate probes `api/profiles` before it loads this module and records the
+ * answer on `window.__pylonSession`. Three outcomes matter here:
+ *
+ * - `ok` — the server confirmed a session a moment ago, so the app adopts it
+ *   instead of asking for the password a second time.
+ * - `error` — the server could not be asked. Nothing may be assumed: adopting
+ *   here would invent a session, and every later request would 401 anyway.
+ * - anything else — no adoption; the app's own auth handling takes over.
+ *
+ * This is the same three steps `connectBasicAuth` performs after a successful
+ * POST, minus the POST: point the profile at the page origin, switch the
+ * WebSocket to a handshake ticket (cookie auth, not a bearer token), and mark
+ * the session authenticated. The cookie stays in the browser, so a reload
+ * re-adopts it the same way.
+ */
+private fun adoptVerifiedSession() {
+    if (pylonSessionState() != "ok") return
     runCatching {
         val manager = com.m57.hermescontrol.data.local.AuthManager
         val origin = window.location.origin
-        // Only when unset: a profile pointed at a different server keeps it, and
-        // the login page for that server will have set its own cookie.
+        // Only when unset: a profile pointed at another server keeps it.
         if (manager.getBaseUrl().isBlank()) manager.setBaseUrl(origin)
         manager.setWsAuthParam("ticket")
+
+        // The sign-in page authenticates the browser, so it cannot register the
+        // connection the way the Compose sign-in did — and Settings would open on
+        // an empty Connections list. Naming the page origin as a profile is the
+        // app-side half of adoption, and it lives here rather than on the HTML
+        // page because only the app knows what a profile is.
+        seedProfileForThisOrigin(manager, origin)
+
         com.m57.hermescontrol.data.local.AuthSessionState.markAuthenticated()
         com.m57.hermescontrol.data.remote.ApiClient.rebuild()
         com.m57.hermescontrol.data.ws.HermesWsClient.connect()
     }
+}
+
+/**
+ * Make the page origin visible in Settings → Connections.
+ *
+ * Idempotent: an existing profile for this origin is left exactly as it is, and
+ * an existing selection is kept. Only the "signed in to this web build and the
+ * list is empty" case adds anything, which is every first visit through
+ * `login.html`.
+ */
+private fun seedProfileForThisOrigin(
+    manager: com.m57.hermescontrol.data.local.AuthManager,
+    origin: String,
+) {
+    val existing = manager.getConnectionProfiles()
+    val normalised = origin.trimEnd('/')
+    val match = existing.firstOrNull { it.resolvedBaseUrl.trimEnd('/') == normalised }
+    if (match != null) {
+        if (manager.getSelectedProfileId() != match.id) {
+            manager.saveConnectionProfilesAndSelect(existing, match.id, null)
+        }
+        return
+    }
+    // A clean store starts with one placeholder profile pointing at the build
+    // default (127.0.0.1:9119). Appending beside it would leave the user with a
+    // dead "Default" row they never created, so adopt it instead of adding to it.
+    val pristine =
+        existing.singleOrNull()?.takeIf {
+            it.id == com.m57.hermescontrol.data.local.AuthManager.DEFAULT_PROFILE_ID &&
+                it.resolvedBaseUrl.trimEnd('/') ==
+                com.m57.hermescontrol.data.remote.ServerEndpoint.DEFAULT_BASE_URL.trimEnd('/')
+        }
+    if (pristine != null) {
+        val adopted =
+            pristine.copy(
+                name = window.location.hostname.ifBlank { "Pylon" },
+                baseUrl = origin,
+                wsAuthParam = "ticket",
+            )
+        manager.saveConnectionProfilesAndSelect(listOf(adopted), adopted.id, null)
+        return
+    }
+
+    val profile =
+        com.m57.hermescontrol.data.config.ConnectionProfile(
+            name = window.location.hostname.ifBlank { "Pylon" },
+            baseUrl = origin,
+            wsAuthParam = "ticket",
+        )
+    manager.saveConnectionProfilesAndSelect(existing + profile, profile.id, null)
 }

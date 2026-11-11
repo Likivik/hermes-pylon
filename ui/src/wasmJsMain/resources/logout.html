@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Signing out · Pylon for Hermes</title>
+    <meta name="theme-color" content="#7C5CFF" />
+    <meta name="robots" content="noindex" />
+    <meta name="referrer" content="no-referrer" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <!--
+      Sign-out is a page, not a coroutine.
+
+      The session is an HttpOnly cookie the app cannot read or delete, so only the
+      server can end it. Doing that from inside a ViewModel looked correct and was
+      not: clearing the store recomposes the screen away, the ViewModel is cleared,
+      and the request that was supposed to run is cancelled with it — which is how
+      a "logged out" user used to come straight back into the app on refresh.
+
+      Navigation cannot be cancelled. That is the whole point of this file.
+    -->
+    <style>
+        :root {
+            --surface: #0D0B12;
+            --card: #14111C;
+            --border: #241E33;
+            --primary: #7C5CFF;
+            --primary-press: #6B4BEF;
+            --ink: #EAE7F2;
+            --dim: #9A94A8;
+            --danger: #E65F5A;
+        }
+
+        html, body {
+            height: 100%;
+            margin: 0;
+            background: var(--surface);
+            color: var(--ink);
+            font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        }
+
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100dvh;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+
+        main {
+            width: 100%;
+            max-width: 340px;
+            text-align: center;
+        }
+
+        h1 {
+            margin: 0 0 8px;
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        p {
+            margin: 0 0 22px;
+            font-size: 14px;
+            line-height: 1.5;
+            color: var(--dim);
+        }
+
+        button {
+            width: 100%;
+            padding: 13px 16px;
+            font: inherit;
+            font-size: 15px;
+            font-weight: 600;
+            color: #fff;
+            background: var(--primary);
+            border: 0;
+            border-radius: 12px;
+            cursor: pointer;
+        }
+
+        button:hover { background: var(--primary-press); }
+
+        .link {
+            display: inline-block;
+            margin-top: 18px;
+            font-size: 13px;
+            color: var(--dim);
+        }
+
+        [hidden] { display: none !important; }
+    </style>
+</head>
+<body>
+<main>
+    <h1 id="title">Signing out…</h1>
+    <p id="status">Ending your session.</p>
+
+    <!-- Shown only when this page is opened without the app having asked for it. -->
+    <button id="confirm" type="button" hidden>Sign out</button>
+    <a class="link" id="back" href="index.html" hidden>Back to the app</a>
+</main>
+
+<script>
+    (function () {
+        var title = document.getElementById('title');
+        var status = document.getElementById('status');
+        var confirm = document.getElementById('confirm');
+        var back = document.getElementById('back');
+
+        var MARKER = 'pylon.logout';
+
+        function finish(message) {
+            // Other tabs keep a live authenticated UI until told otherwise; the
+            // gate in index.html listens for this and re-asks the server.
+            try {
+                new BroadcastChannel('pylon-auth').postMessage('signed-out');
+            } catch (e) { /* no BroadcastChannel: the other tab reloads eventually */ }
+            status.textContent = message || 'Signed out. Returning to sign-in…';
+            location.replace('login.html');
+        }
+
+        function endSession() {
+            status.textContent = 'Ending your session.';
+            // credentials: same-origin cookies, which is what the endpoint clears.
+            fetch('auth/logout', {
+                method: 'POST',
+                credentials: 'include',
+                cache: 'no-store',
+                headers: { 'Content-Type': 'application/json' },
+                body: '{}'
+            }).then(function () {
+                // Even a 401/500 means the useful outcome is the same: the user
+                // wanted out, so they leave. A cookie that outlives a failed
+                // request is the server's problem, not a reason to trap them here.
+                finish();
+            }).catch(function () {
+                finish('Could not reach the server. Returning to sign-in…');
+            });
+        }
+
+        var requested = false;
+        try {
+            requested = window.sessionStorage.getItem(MARKER) === '1';
+            window.sessionStorage.removeItem(MARKER);
+        } catch (e) {
+            requested = false;
+        }
+
+        if (requested) {
+            endSession();
+            return;
+        }
+
+        // No marker: the app did not ask for this. Ask the person instead of
+        // acting, so that a link, a prefetch, or an image tag on another site
+        // cannot sign somebody out.
+        title.textContent = 'Sign out of Pylon?';
+        status.textContent = 'This page ends your session on the server.';
+        confirm.hidden = false;
+        back.hidden = false;
+        confirm.addEventListener('click', function () {
+            confirm.disabled = true;
+            endSession();
+        });
+    })();
+</script>
+</body>
+</html>

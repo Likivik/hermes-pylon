@@ -8,6 +8,7 @@ import com.m57.hermescontrol.AppEnvironment
 import com.m57.hermescontrol.data.config.ConnectionProfile
 import com.m57.hermescontrol.data.config.resolveBaseUrl
 import com.m57.hermescontrol.data.local.AuthDefaults
+import com.m57.hermescontrol.data.local.AuthSessionState
 import com.m57.hermescontrol.data.local.authStore
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.CleartextPolicy
@@ -18,6 +19,8 @@ import com.m57.hermescontrol.data.remote.safeApiCall
 import com.m57.hermescontrol.data.theme.ThemePreference
 import com.m57.hermescontrol.data.theme.ThemePreset
 import com.m57.hermescontrol.data.ws.HermesWsClient
+import com.m57.hermescontrol.ui.authlogin.SignOutReason
+import com.m57.hermescontrol.ui.authlogin.handleSignOut
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -408,14 +411,21 @@ class SettingsViewModel(
         authStore.setTypingEffectDelayMs(delayMs)
     }
 
-    /** Clear all auth credentials — logs out and returns to landing screen. */
+    /** Clear all auth credentials — logs out and returns to the sign-in page. */
     fun logout() {
         // Tear down the authenticated socket before discarding credentials;
         // a live socket must never outlive the identity it was opened with.
         disconnectWebSocket()
+        // Web: hand the browser to logout.html and stop there. Clearing the store
+        // first would recompose the app to its own sign-in screen for the frames
+        // the navigation takes to start — that flash is the canvas login the user
+        // used to see. The page ends the session and reloads into a clean state,
+        // so there is nothing left here to clear.
+        if (handleSignOut(SignOutReason.USER_INITIATED)) return
         authStore.setToken(null)
         authStore.setSessionCookie(null)
         authStore.setWsAuthParam("token")
+        AuthSessionState.requireSignIn()
         // Don't rebuild ApiClient here — let the navigation complete first
     }
 
@@ -449,7 +459,10 @@ class SettingsViewModel(
 
     fun testConnection() {
         val state = _uiState.value
-        if (state.token.isBlank()) {
+        // A cookie session has no token by design: the browser holds the session
+        // and every request carries it. Demanding one here reported "Token is
+        // required" on a connection that was working perfectly well.
+        if (!authStore.isGatedMode() && state.token.isBlank()) {
             _uiState.update { it.copy(testResult = "❌ Token is required") }
             return
         }
