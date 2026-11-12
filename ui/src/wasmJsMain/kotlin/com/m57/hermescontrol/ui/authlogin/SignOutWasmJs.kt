@@ -19,14 +19,10 @@ import kotlinx.browser.window
  * of acting, so a hostile link cannot force a visitor's session closed.
  */
 internal actual fun handleSignOut(reason: SignOutReason): Boolean {
-    when (reason) {
-        SignOutReason.USER_INITIATED -> {
-            runCatching { window.sessionStorage.setItem("pylon.logout", "1") }
-            window.location.replace("logout.html")
-        }
-
-        SignOutReason.SESSION_EXPIRED -> window.location.replace("login.html")
+    if (reason == SignOutReason.USER_INITIATED) {
+        runCatching { window.sessionStorage.setItem("pylon.logout", "1") }
     }
+    window.location.replace(signOutPageFor(reason))
     // The navigation has started; the caller must not queue another one.
     return true
 }
