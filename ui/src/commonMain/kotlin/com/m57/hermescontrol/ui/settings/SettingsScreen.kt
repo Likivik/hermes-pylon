@@ -1,6 +1,5 @@
 package com.m57.hermescontrol.ui.settings
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,14 +9,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -48,6 +44,7 @@ import com.m57.hermescontrol.generated.resources.settings_summary_theme_system
 import com.m57.hermescontrol.generated.resources.settings_summary_typing_off
 import com.m57.hermescontrol.generated.resources.settings_summary_typing_on
 import com.m57.hermescontrol.theme.Spacing
+import com.m57.hermescontrol.ui.common.HermesListItem
 import com.m57.hermescontrol.ui.common.HermesScaffold
 import com.m57.hermescontrol.ui.common.NavIcon
 import com.m57.hermescontrol.ui.icons.HermesIcon
@@ -167,42 +164,24 @@ private fun SettingsCategoryCard(items: List<SettingsRow>) {
     ) {
         Column {
             items.forEachIndexed { index, row ->
-                ListItem(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable(onClick = row.onClick),
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                    leadingContent = {
+                HermesListItem(
+                    title = row.label,
+                    subtitle = row.summary,
+                    leading = {
                         HermesSymbol(
                             icon = row.icon,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
                         )
                     },
-                    headlineContent = {
-                        Text(
-                            text = row.label,
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
-                    },
-                    supportingContent =
-                        row.summary?.let { summary ->
-                            {
-                                Text(
-                                    text = summary,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        },
-                    trailingContent = {
+                    trailing = {
                         HermesSymbol(
                             icon = HermesIcon.ArrowForward,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     },
+                    onClick = row.onClick,
                 )
                 if (index < items.lastIndex) {
                     HorizontalDivider(
