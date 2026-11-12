@@ -2,11 +2,13 @@ package com.m57.hermescontrol.ui.common
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -20,6 +22,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -32,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.content_desc_clear_search
@@ -370,4 +375,76 @@ fun InfoRow(
             color = MaterialTheme.colorScheme.onSurface,
         )
     }
+}
+
+// ── HermesListItem — the one list row ─────────────────────────────────
+
+/**
+ * One list entry. Every screen that shows a list of things should use this.
+ *
+ * The slots cover the three row shapes the app actually has: a destination (leading +
+ * title + trailing chevron), a piece of content (leading + title + subtitle + meta +
+ * trailing actions), and a control (leading + title + trailing switch).
+ *
+ * It wraps Material 3 [ListItem] instead of re-implementing a `Row`, for three reasons
+ * that are easy to lose hand-rolling one: `ListItem` owns the container heights for
+ * one/two/three-line rows, it centres `leadingContent` vertically, and it *measures*
+ * the leading slot rather than constraining it — so a caller that leaves the icon size
+ * alone can never have it clipped by the row.
+ */
+@Composable
+fun HermesListItem(
+    title: String,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    leading: @Composable (() -> Unit)? = null,
+    meta: @Composable (RowScope.() -> Unit)? = null,
+    trailing: @Composable (() -> Unit)? = null,
+    onClick: (() -> Unit)? = null,
+    dense: Boolean = false,
+    containerColor: Color = Color.Transparent,
+) {
+    val spacing = LocalSpacing.current
+    ListItem(
+        modifier = if (onClick != null) modifier.clickable(onClick = onClick) else modifier,
+        colors = ListItemDefaults.colors(containerColor = containerColor),
+        leadingContent = leading,
+        headlineContent = {
+            Text(
+                text = title,
+                style =
+                    if (dense) {
+                        MaterialTheme.typography.bodyMedium
+                    } else {
+                        MaterialTheme.typography.bodyLarge
+                    },
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+        supportingContent =
+            if (subtitle == null && meta == null) {
+                null
+            } else {
+                {
+                    Column {
+                        if (subtitle != null) {
+                            Text(
+                                text = subtitle,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        if (meta != null) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+                                content = meta,
+                            )
+                        }
+                    }
+                }
+            },
+        trailingContent = trailing,
+    )
 }
