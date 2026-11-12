@@ -32,7 +32,7 @@ import com.m57.hermescontrol.ui.icons.HermesIcon
 import com.m57.hermescontrol.ui.achievements.AchievementsScreen as AchievementsScreenContent
 import com.m57.hermescontrol.ui.analytics.AnalyticsScreen as AnalyticsScreenContent
 import com.m57.hermescontrol.ui.billing.BillingScreen as BillingScreenContent
-import com.m57.hermescontrol.ui.bots.BotsScreen as BotsScreenContent
+import com.m57.hermescontrol.ui.bots.BotsRoute as BotsRouteContent
 import com.m57.hermescontrol.ui.channels.ChannelsScreen as ChannelsScreenContent
 import com.m57.hermescontrol.ui.config.ConfigScreen as ConfigScreenContent
 import com.m57.hermescontrol.ui.cron.CronJobsScreen as CronJobsScreenContent
@@ -79,7 +79,7 @@ private fun commonScreens(): List<ScreenDefinition> =
             Res.string.screen_bots,
             HermesIcon.SmartToy,
             DrawerSection.CONVERSE,
-        ) { sessionId, openDrawer -> BotsScreenContent(onOpenDrawer = openDrawer) },
+        ) { sessionId, openDrawer -> BotsRouteContent(onOpenDrawer = openDrawer) },
         ScreenDefinition(
             HistoryScreen,
             Res.string.screen_history,
