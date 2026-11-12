@@ -27,3 +27,14 @@ internal enum class SignOutReason {
  *   session alive. false means "the UI handles it", which is what native does.
  */
 internal expect fun handleSignOut(reason: SignOutReason): Boolean
+
+/**
+ * The page that must run for this reason. Kept as data so the decision is testable
+ * without a browser: a user-initiated sign out has a live server session to destroy
+ * (`logout.html`), an expired one has nothing left to destroy (`login.html`).
+ */
+internal fun signOutPageFor(reason: SignOutReason): String =
+    when (reason) {
+        SignOutReason.USER_INITIATED -> "logout.html"
+        SignOutReason.SESSION_EXPIRED -> "login.html"
+    }

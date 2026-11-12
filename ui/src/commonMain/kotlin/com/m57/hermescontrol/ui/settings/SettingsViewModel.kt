@@ -10,6 +10,7 @@ import com.m57.hermescontrol.data.config.resolveBaseUrl
 import com.m57.hermescontrol.data.local.AuthDefaults
 import com.m57.hermescontrol.data.local.AuthSessionState
 import com.m57.hermescontrol.data.local.authStore
+import com.m57.hermescontrol.data.local.missingRequiredToken
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.CleartextPolicy
 import com.m57.hermescontrol.data.remote.NetworkResult
@@ -462,7 +463,7 @@ class SettingsViewModel(
         // A cookie session has no token by design: the browser holds the session
         // and every request carries it. Demanding one here reported "Token is
         // required" on a connection that was working perfectly well.
-        if (!authStore.isGatedMode() && state.token.isBlank()) {
+        if (missingRequiredToken(state.token, authStore.isGatedMode())) {
             _uiState.update { it.copy(testResult = "❌ Token is required") }
             return
         }

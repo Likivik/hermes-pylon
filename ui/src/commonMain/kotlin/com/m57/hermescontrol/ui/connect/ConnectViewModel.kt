@@ -10,6 +10,7 @@ import com.m57.hermescontrol.data.config.resolveBaseUrl
 import com.m57.hermescontrol.data.local.AuthDefaults
 import com.m57.hermescontrol.data.local.AuthSessionState
 import com.m57.hermescontrol.data.local.authStore
+import com.m57.hermescontrol.data.local.missingRequiredToken
 import com.m57.hermescontrol.data.model.StatusResponse
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.CleartextPolicy
@@ -196,7 +197,7 @@ class ConnectViewModel(
         // A gated (cookie) session has no token by design — the dashboard set a
         // session cookie and every request carries it. Requiring a token here
         // rejected a login that had already succeeded.
-        if (!authStore.isGatedMode() && state.token.isBlank()) {
+        if (missingRequiredToken(state.token, authStore.isGatedMode())) {
             // `resolver.get` is `suspend`; the early-return path is not
             // inside a coroutine, so we hoist into a one-shot launch
             // that captures the resolved text and then writes it into

@@ -468,40 +468,14 @@ private fun seedProfileForThisOrigin(
     manager: com.m57.hermescontrol.data.local.AuthManager,
     origin: String,
 ) {
-    val existing = manager.getConnectionProfiles()
-    val normalised = origin.trimEnd('/')
-    val match = existing.firstOrNull { it.resolvedBaseUrl.trimEnd('/') == normalised }
-    if (match != null) {
-        if (manager.getSelectedProfileId() != match.id) {
-            manager.saveConnectionProfilesAndSelect(existing, match.id, null)
-        }
-        return
-    }
-    // A clean store starts with one placeholder profile pointing at the build
-    // default (127.0.0.1:9119). Appending beside it would leave the user with a
-    // dead "Default" row they never created, so adopt it instead of adding to it.
-    val pristine =
-        existing.singleOrNull()?.takeIf {
-            it.id == com.m57.hermescontrol.data.local.AuthManager.DEFAULT_PROFILE_ID &&
-                it.resolvedBaseUrl.trimEnd('/') ==
-                com.m57.hermescontrol.data.remote.ServerEndpoint.DEFAULT_BASE_URL.trimEnd('/')
-        }
-    if (pristine != null) {
-        val adopted =
-            pristine.copy(
-                name = window.location.hostname.ifBlank { "Pylon" },
-                baseUrl = origin,
-                wsAuthParam = "ticket",
-            )
-        manager.saveConnectionProfilesAndSelect(listOf(adopted), adopted.id, null)
-        return
-    }
-
-    val profile =
-        com.m57.hermescontrol.data.config.ConnectionProfile(
-            name = window.location.hostname.ifBlank { "Pylon" },
-            baseUrl = origin,
-            wsAuthParam = "ticket",
-        )
-    manager.saveConnectionProfilesAndSelect(existing + profile, profile.id, null)
+    val seeding =
+        com.m57.hermescontrol.data.local.profileSeedingFor(
+            profiles = manager.getConnectionProfiles(),
+            selectedId = manager.getSelectedProfileId(),
+            origin = origin,
+            displayName = window.location.hostname.ifBlank { "Pylon" },
+            defaultProfileId = com.m57.hermescontrol.data.local.AuthManager.DEFAULT_PROFILE_ID,
+            defaultBaseUrl = com.m57.hermescontrol.data.remote.ServerEndpoint.DEFAULT_BASE_URL,
+        ) ?: return
+    manager.saveConnectionProfilesAndSelect(seeding.profiles, seeding.selectedId, null)
 }
