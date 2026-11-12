@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
@@ -37,6 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.content_desc_clear_search
@@ -394,52 +396,73 @@ fun InfoRow(
  */
 @Composable
 fun HermesListItem(
-    title: String,
     modifier: Modifier = Modifier,
+    title: String? = null,
     subtitle: String? = null,
     leading: @Composable (() -> Unit)? = null,
+    headline: (@Composable () -> Unit)? = null,
+    supporting: (@Composable () -> Unit)? = null,
     meta: @Composable (RowScope.() -> Unit)? = null,
     trailing: @Composable (() -> Unit)? = null,
     onClick: (() -> Unit)? = null,
     dense: Boolean = false,
+    minHeight: Dp? = null,
     containerColor: Color = Color.Transparent,
 ) {
     val spacing = LocalSpacing.current
+    val metaSlot = meta
+    val titleSlot = title
+    val headlineSlot = headline
+    val subtitleSlot = subtitle
+    val supportingSlot = supporting
+    val sized = if (minHeight == null) modifier else modifier.heightIn(min = minHeight)
+    // Material's headlineContent is non-null, so the slot is resolved to one lambda here:
+    // a caller-provided headline, else the title string, else nothing to show.
+    // Material's headlineContent is non-null, so the slot is resolved here into a single
+    // composable lambda: a caller-provided headline, else the title string, else nothing.
+    // The `when` lives inside that lambda because a nullable composable slot cannot be
+    // the initializer of a non-null one — Kotlin widens the branches to a common type.
+    val headlineContent: @Composable () -> Unit = {
+        when {
+            headlineSlot != null -> headlineSlot.invoke()
+            titleSlot != null ->
+                Text(
+                    text = titleSlot,
+                    style =
+                        if (dense) {
+                            MaterialTheme.typography.bodyMedium
+                        } else {
+                            MaterialTheme.typography.bodyLarge
+                        },
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+        }
+    }
+
     ListItem(
-        modifier = if (onClick != null) modifier.clickable(onClick = onClick) else modifier,
+        modifier = if (onClick != null) sized.clickable(onClick = onClick) else sized,
         colors = ListItemDefaults.colors(containerColor = containerColor),
         leadingContent = leading,
-        headlineContent = {
-            Text(
-                text = title,
-                style =
-                    if (dense) {
-                        MaterialTheme.typography.bodyMedium
-                    } else {
-                        MaterialTheme.typography.bodyLarge
-                    },
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        },
+        headlineContent = headlineContent,
         supportingContent =
-            if (subtitle == null && meta == null) {
+            supportingSlot ?: if (subtitleSlot == null && metaSlot == null) {
                 null
             } else {
                 {
                     Column {
-                        if (subtitle != null) {
+                        if (subtitleSlot != null) {
                             Text(
-                                text = subtitle,
+                                text = subtitleSlot,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        if (meta != null) {
+                        if (metaSlot != null) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(spacing.xs),
-                                content = meta,
+                                content = metaSlot,
                             )
                         }
                     }

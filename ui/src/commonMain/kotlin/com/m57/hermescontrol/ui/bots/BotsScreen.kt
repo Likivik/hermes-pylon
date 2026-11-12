@@ -1,20 +1,14 @@
 package com.m57.hermescontrol.ui.bots
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -23,8 +17,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -43,6 +37,7 @@ import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.BotAvatar
 import com.m57.hermescontrol.ui.common.EmptyState
 import com.m57.hermescontrol.ui.common.ErrorState
+import com.m57.hermescontrol.ui.common.HermesListItem
 import com.m57.hermescontrol.ui.common.HermesScaffold
 import com.m57.hermescontrol.ui.common.LoadingState
 import com.m57.hermescontrol.ui.common.NavIcon
@@ -51,9 +46,15 @@ import com.m57.hermescontrol.ui.icons.HermesSymbol
 import com.m57.hermescontrol.ui.icons.MaterialSymbol
 import org.jetbrains.compose.resources.stringResource
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Route: the only part that knows about the ViewModel and the stores.
+ *
+ * Kept separate from [BotsScreen] so the screen can be rendered from state alone —
+ * that is what makes it screenshot-testable and previewable, and what keeps the
+ * "current vs unified row" comparison honest.
+ */
 @Composable
-fun BotsScreen(
+fun BotsRoute(
     modifier: Modifier = Modifier,
     onOpenDrawer: (() -> Unit)? = null,
     viewModel: BotsViewModel = viewModel { BotsViewModel() },
@@ -68,13 +69,42 @@ fun BotsScreen(
         }
     }
 
+    BotsScreen(
+        state = state,
+        selectedProfileId = selectedProfileId,
+        modifier = modifier,
+        onOpenDrawer = onOpenDrawer,
+        onRefresh = { viewModel.loadBots(isRefresh = true) },
+        onRetry = viewModel::loadBots,
+        onToggleShowHidden = viewModel::toggleShowHidden,
+        onSearchQueryChange = viewModel::setSearchQuery,
+        onBotClick = { profile ->
+            NavigationController.openBot(profile, state.sourceConnectionProfileId)
+        },
+    )
+}
+
+/** Screen: a pure function of [state] and its callbacks. No ViewModel, no stores. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun BotsScreen(
+    state: BotsUiState,
+    selectedProfileId: String?,
+    onRefresh: () -> Unit,
+    onRetry: () -> Unit,
+    onToggleShowHidden: () -> Unit,
+    onSearchQueryChange: (String) -> Unit,
+    onBotClick: (ProfileInfo) -> Unit,
+    modifier: Modifier = Modifier,
+    onOpenDrawer: (() -> Unit)? = null,
+) {
     HermesScaffold(
         modifier = modifier,
         title = { Text(stringResource(Res.string.screen_bots)) },
         navigationIcon = onOpenDrawer?.let { NavIcon.Menu(it) },
         actions = {
             if (state.hasHiddenBots) {
-                IconButton(onClick = viewModel::toggleShowHidden) {
+                IconButton(onClick = onToggleShowHidden) {
                     MaterialSymbol(
                         if (state.showHidden) "visibility_off" else "visibility",
                         contentDescription = stringResource(Res.string.bots_toggle_hidden),
@@ -83,12 +113,12 @@ fun BotsScreen(
             }
         },
         isRefreshing = state.isRefreshing,
-        onRefresh = { viewModel.loadBots(isRefresh = true) },
+        onRefresh = onRefresh,
     ) { paddingValues ->
         when {
             state.isLoading && state.profiles.isEmpty() -> LoadingState(Modifier.padding(paddingValues))
             state.errorMessage != null && state.profiles.isEmpty() ->
-                ErrorState(state.errorMessage.orEmpty(), onRetry = viewModel::loadBots)
+                ErrorState(state.errorMessage.orEmpty(), onRetry = onRetry)
             state.displayProfiles.isEmpty() ->
                 EmptyState(
                     title = stringResource(Res.string.bots_empty_title),
@@ -98,7 +128,7 @@ fun BotsScreen(
                 Column(Modifier.fillMaxSize()) {
                     OutlinedTextField(
                         value = state.searchQuery,
-                        onValueChange = viewModel::setSearchQuery,
+                        onValueChange = onSearchQueryChange,
                         leadingIcon = { HermesSymbol(icon = HermesIcon.Search, contentDescription = null) },
                         placeholder = { Text(stringResource(Res.string.bots_search_placeholder)) },
                         singleLine = true,
@@ -111,15 +141,16 @@ fun BotsScreen(
                     ) {
                         items(state.displayProfiles) { profile ->
                             val canOpen = canOpenBot(profile, state.sourceConnectionProfileId, selectedProfileId)
+                            val onThisBotClick: (() -> Unit)? =
+                                if (canOpen) {
+                                    { onBotClick(profile) }
+                                } else {
+                                    null
+                                }
                             BotCard(
                                 profile = profile,
                                 isActive = profile.isActiveAt(state.nowSeconds),
-                                onClick =
-                                    if (canOpen) {
-                                        { NavigationController.openBot(profile, state.sourceConnectionProfileId) }
-                                    } else {
-                                        null
-                                    },
+                                onClick = onThisBotClick,
                             )
                         }
                     }
@@ -143,38 +174,47 @@ private fun BotCard(
     isActive: Boolean,
     onClick: (() -> Unit)?,
 ) {
-    Card(
-        Modifier.fillMaxWidth().clickable(enabled = onClick != null) { onClick?.invoke() },
-        shape = MaterialTheme.shapes.medium,
-    ) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+    HermesListItem(
+        leading = {
             BotAvatar(
                 name = profile.name,
                 avatar = profile.botMeta()?.avatar,
                 size = 44.dp,
                 isActive = isActive,
             )
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
+        },
+        headline = {
+            Text(
+                text = profile.effectiveTitle,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+        supporting = {
+            Column {
+                // Always shown, even when it repeats the title: a bot without a handle
+                // reads as a different kind of row, and the handle is what the gateway
+                // accepts in commands.
                 Text(
-                    profile.effectiveTitle,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    text = "@${profile.name}",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontStyle = FontStyle.Italic,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                if (profile.effectiveTitle != profile.name) {
-                    Text("@${profile.name}", style = MaterialTheme.typography.labelSmall)
-                }
                 if (profile.effectiveDescription.isNotBlank()) {
-                    Spacer(Modifier.height(2.dp))
                     Text(
-                        profile.effectiveDescription,
+                        text = profile.effectiveDescription,
                         style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
-        }
-    }
+        },
+        onClick = onClick,
+        minHeight = 88.dp,
+    )
 }
