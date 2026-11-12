@@ -193,7 +193,10 @@ class ConnectViewModel(
 
     fun connect() {
         val state = _uiState.value
-        if (state.token.isBlank()) {
+        // A gated (cookie) session has no token by design — the dashboard set a
+        // session cookie and every request carries it. Requiring a token here
+        // rejected a login that had already succeeded.
+        if (!authStore.isGatedMode() && state.token.isBlank()) {
             // `resolver.get` is `suspend`; the early-return path is not
             // inside a coroutine, so we hoist into a one-shot launch
             // that captures the resolved text and then writes it into

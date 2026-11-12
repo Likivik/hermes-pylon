@@ -478,10 +478,18 @@
          Compose's login screen cannot host a password manager, so authentication
          lives on login.html and this page only ever boots with a session. The
          probe is api/profiles because api/status is public (200 with no cookie)
-         and would never report "not signed in". A failed probe is not a lockout:
-         if the server cannot be reached the app boots and says so itself. -->
+         and would never report "not signed in".
+
+         The outcome is left on `window.__pylonSession` because the app has to
+         know how it got here: 'ok' means the session was verified a moment ago
+         and can be adopted, 'error' means the server could not be asked at all
+         and no session may be assumed. The app never infers auth from the fact
+         that this file was served. -->
     <script>
       (function () {
+        var PROBE = 'api/profiles';
+        window.__pylonSession = 'unknown';
+
         function loadApp() {
           var s = document.createElement('script');
           s.src = 'ui.js';
@@ -491,15 +499,45 @@
           document.body.appendChild(s);
         }
 
-        fetch('api/profiles', { credentials: 'include', cache: 'no-store' })
-          .then(function (res) {
-            if (res.status === 401 || res.status === 403) {
-              location.replace('login.html');
-              return;
-            }
-            loadApp();
-          })
-          .catch(loadApp);
+        function gate() {
+          fetch(PROBE, { credentials: 'include', cache: 'no-store' })
+            .then(function (res) {
+              if (res.status === 401 || res.status === 403) {
+                window.__pylonSession = 'none';
+                location.replace('login.html');
+                return;
+              }
+              if (!res.ok) {
+                // 404/500: no answer about the session. Boot without adopting.
+                window.__pylonSession = 'error';
+                loadApp();
+                return;
+              }
+              window.__pylonSession = 'ok';
+              loadApp();
+            })
+            .catch(function () {
+              window.__pylonSession = 'error';
+              loadApp();
+            });
+        }
+
+        // A page restored from the back/forward cache resumes with its old JS and
+        // its old idea of the session. Chrome evicts such pages when a secure
+        // cookie changes, but that is a heuristic, not a guarantee: re-ask.
+        window.addEventListener('pageshow', function (event) {
+          if (event.persisted) gate();
+        });
+
+        // Another tab signed out. Nothing to do but re-ask, which the gate does.
+        try {
+          var channel = new BroadcastChannel('pylon-auth');
+          channel.addEventListener('message', function (event) {
+            if (event.data === 'signed-out') gate();
+          });
+        } catch (e) { /* older browsers: pageshow still covers the reload path */ }
+
+        gate();
       })();
     </script>
     <script>window.__bootlog && window.__bootlog('module script tag executed (module graph may still be loading)');</script>
