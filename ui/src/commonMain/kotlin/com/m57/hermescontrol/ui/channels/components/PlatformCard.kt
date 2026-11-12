@@ -39,6 +39,7 @@ import com.m57.hermescontrol.generated.resources.channels_action_test
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.channels.ConfigureForm
+import com.m57.hermescontrol.ui.common.HermesListItem
 import com.m57.hermescontrol.ui.icons.HermesIcon
 import com.m57.hermescontrol.ui.icons.HermesSymbol
 import com.m57.hermescontrol.ui.icons.MaterialSymbol
@@ -110,154 +111,154 @@ fun PlatformCard(
     val style = platformStateStyle(platform.state)
 
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(Spacing.md)) {
-            // ── Top row: icon + name + badge + switch ──
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f),
-                ) {
+        Column {
+            // Header is the shared list row; it owns its own insets, so the card adds none.
+            HermesListItem(
+                leading = {
                     MaterialSymbol(
                         name = style.icon,
                         contentDescription = null,
                         tint = style.color,
-                        modifier = Modifier.size(20.dp),
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                },
+                headline = {
+                    Text(
+                        text = platform.name,
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                },
+                supporting = {
+                    // Same shape as Bots: the badge tops the supporting text, and the
+                    // description aligns with the title rather than with the icon.
                     Column {
-                        Text(
-                            text = platform.name,
-                            style = MaterialTheme.typography.titleMedium,
+                        StateBadge(state = platform.state)
+                        val description = platform.description
+                        if (!description.isNullOrBlank()) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = description,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                },
+                trailing = {
+                    if (isToggling) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
                         )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            StateBadge(state = platform.state)
+                    } else {
+                        Switch(
+                            checked = platform.enabled,
+                            onCheckedChange = onToggle,
+                        )
+                    }
+                },
+            )
+
+            Column(
+                modifier =
+                    Modifier
+                        .padding(horizontal = Spacing.md)
+                        .padding(bottom = Spacing.md),
+            ) {
+                // ── Error message ──
+                val errorMessage = platform.errorMessage
+                if (!errorMessage.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = errorMessage,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+
+                // ── Action buttons ──
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    OutlinedButton(
+                        onClick = onTest,
+                        enabled = !isTesting,
+                    ) {
+                        if (isTesting) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(14.dp),
+                                strokeWidth = 2.dp,
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                        }
+                        Text(
+                            text = stringResource(Res.string.channels_action_test),
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
+
+                    Button(
+                        onClick = { showConfigureForm = !showConfigureForm },
+                    ) {
+                        Text(
+                            text =
+                                if (showConfigureForm) {
+                                    stringResource(Res.string.action_cancel)
+                                } else {
+                                    stringResource(Res.string.channels_action_configure)
+                                },
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
+
+                    // Remove button
+                    IconButton(
+                        onClick = { showRemoveConfirm = true },
+                        enabled = !isRemoving,
+                    ) {
+                        if (isRemoving) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            HermesSymbol(
+                                icon = HermesIcon.Delete,
+                                contentDescription = "Remove platform",
+                                tint = MaterialTheme.colorScheme.error,
+                            )
                         }
                     }
                 }
 
-                if (isToggling) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                    )
-                } else {
-                    Switch(
-                        checked = platform.enabled,
-                        onCheckedChange = onToggle,
-                    )
-                }
-            }
-
-            // ── Description ──
-            val description = platform.description
-            if (!description.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            // ── Error message ──
-            val errorMessage = platform.errorMessage
-            if (!errorMessage.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = errorMessage,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-
-            // ── Action buttons ──
-            Spacer(modifier = Modifier.height(12.dp))
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                OutlinedButton(
-                    onClick = onTest,
-                    enabled = !isTesting,
-                ) {
-                    if (isTesting) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(14.dp),
-                            strokeWidth = 2.dp,
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                    }
-                    Text(
-                        text = stringResource(Res.string.channels_action_test),
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                }
-
-                Button(
-                    onClick = { showConfigureForm = !showConfigureForm },
-                ) {
-                    Text(
-                        text =
-                            if (showConfigureForm) {
-                                stringResource(Res.string.action_cancel)
-                            } else {
-                                stringResource(Res.string.channels_action_configure)
-                            },
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                }
-
-                // Remove button
-                IconButton(
-                    onClick = { showRemoveConfirm = true },
-                    enabled = !isRemoving,
-                ) {
-                    if (isRemoving) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp,
-                        )
-                    } else {
+                // ── Telegram onboarding (only for unconfigured telegram) ──
+                if (platform.id == "telegram" && !platform.configured) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = onStartOnboarding,
+                    ) {
                         HermesSymbol(
-                            icon = HermesIcon.Delete,
-                            contentDescription = "Remove platform",
-                            tint = MaterialTheme.colorScheme.error,
+                            icon = HermesIcon.QrCode,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Set up with QR",
+                            style = MaterialTheme.typography.labelSmall,
                         )
                     }
                 }
-            }
 
-            // ── Telegram onboarding (only for unconfigured telegram) ──
-            if (platform.id == "telegram" && !platform.configured) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(
-                    onClick = onStartOnboarding,
-                ) {
-                    HermesSymbol(
-                        icon = HermesIcon.QrCode,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "Set up with QR",
-                        style = MaterialTheme.typography.labelSmall,
+                // ── Configure form ──
+                if (showConfigureForm) {
+                    ConfigureForm(
+                        platform = platform,
+                        onSave = onSave,
+                        onClose = { showConfigureForm = false },
                     )
                 }
-            }
-
-            // ── Configure form ──
-            if (showConfigureForm) {
-                ConfigureForm(
-                    platform = platform,
-                    onSave = onSave,
-                    onClose = { showConfigureForm = false },
-                )
             }
         }
     }
