@@ -98,13 +98,64 @@ private fun validateEnvField(
 
 // ── Main screen  ──────────────────────────────────────────────────────
 
+/**
+ * Route: the only part that knows the ViewModel. Kept separate from [ChannelsScreen] so
+ * the screen can be rendered from state alone and captured as pixels.
+ */
 @Composable
-fun ChannelsScreen(
+fun ChannelsRoute(
     modifier: Modifier = Modifier,
     onOpenDrawer: (() -> Unit)? = null,
     viewModel: ChannelsViewModel = viewModel { ChannelsViewModel() },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) {
+        viewModel.loadPlatforms()
+    }
+
+    ToastEffect(toastMessage = state.toastMessage, onClearToast = viewModel::clearToast)
+
+    ChannelsScreen(
+        state = state,
+        modifier = modifier,
+        onOpenDrawer = onOpenDrawer,
+        onRefresh = viewModel::loadPlatforms,
+        onRetry = viewModel::loadPlatforms,
+        onToggle = viewModel::togglePlatform,
+        onTest = viewModel::testPlatform,
+        onSave = viewModel::configurePlatform,
+        onRemove = viewModel::removePlatform,
+        onStartOnboarding = viewModel::startTelegramOnboarding,
+        onRestartGateway = viewModel::restartGateway,
+        onDismissOnboarding = viewModel::cancelTelegramOnboarding,
+        onAddAllowedId = viewModel::addOnboardingAllowedId,
+        onRemoveAllowedId = viewModel::removeOnboardingAllowedId,
+        onNewAllowedIdChange = viewModel::setOnboardingNewAllowedId,
+        onApplyOnboarding = viewModel::applyTelegramOnboarding,
+    )
+}
+
+/** Screen: rendering only. Search text is the one piece of local UI state it owns. */
+@Composable
+fun ChannelsScreen(
+    state: ChannelsUiState,
+    onRefresh: () -> Unit,
+    onRetry: () -> Unit,
+    onToggle: (String, Boolean) -> Unit,
+    onTest: (String) -> Unit,
+    onSave: (String, MessagingPlatformUpdate) -> Unit,
+    onRemove: (String) -> Unit,
+    onStartOnboarding: () -> Unit,
+    onRestartGateway: () -> Unit,
+    onDismissOnboarding: () -> Unit,
+    onAddAllowedId: () -> Unit,
+    onRemoveAllowedId: (String) -> Unit,
+    onNewAllowedIdChange: (String) -> Unit,
+    onApplyOnboarding: () -> Unit,
+    modifier: Modifier = Modifier,
+    onOpenDrawer: (() -> Unit)? = null,
+) {
     var query by remember { mutableStateOf("") }
 
     val filteredPlatforms =
@@ -114,21 +165,14 @@ fun ChannelsScreen(
             }
         }
 
-    LaunchedEffect(Unit) {
-        viewModel.loadPlatforms()
-    }
-
-    ToastEffect(toastMessage = state.toastMessage, onClearToast = viewModel::clearToast)
-
-    // ── Telegram onboarding dialog ────────────────────────────────
     if (state.onboardingPhase != OnboardingPhase.IDLE) {
         TelegramOnboardingDialog(
             state = state,
-            onDismiss = { viewModel.cancelTelegramOnboarding() },
-            onAddAllowedId = { viewModel.addOnboardingAllowedId() },
-            onRemoveAllowedId = { viewModel.removeOnboardingAllowedId(it) },
-            onNewAllowedIdChange = { viewModel.setOnboardingNewAllowedId(it) },
-            onApply = { viewModel.applyTelegramOnboarding() },
+            onDismiss = onDismissOnboarding,
+            onAddAllowedId = onAddAllowedId,
+            onRemoveAllowedId = onRemoveAllowedId,
+            onNewAllowedIdChange = onNewAllowedIdChange,
+            onApply = onApplyOnboarding,
         )
     }
 
@@ -136,7 +180,7 @@ fun ChannelsScreen(
         title = { Text(stringResource(Res.string.screen_channels)) },
         navigationIcon = onOpenDrawer?.let { NavIcon.Menu(it) },
         isRefreshing = state.isLoading,
-        onRefresh = { viewModel.loadPlatforms() },
+        onRefresh = onRefresh,
     ) { paddingValues ->
         when {
             state.isLoading && state.platforms.isEmpty() -> {
@@ -146,7 +190,7 @@ fun ChannelsScreen(
             state.errorMessage != null && state.platforms.isEmpty() -> {
                 ErrorState(
                     message = state.errorMessage ?: "",
-                    onRetry = { viewModel.loadPlatforms() },
+                    onRetry = onRetry,
                     modifier = Modifier.padding(paddingValues),
                 )
             }
@@ -156,7 +200,7 @@ fun ChannelsScreen(
                     title = stringResource(Res.string.channels_empty_title),
                     subtitle = stringResource(Res.string.channels_empty_desc),
                     actionLabel = stringResource(Res.string.empty_action_connect_telegram),
-                    onAction = { viewModel.startTelegramOnboarding() },
+                    onAction = onStartOnboarding,
                     modifier = Modifier.padding(paddingValues),
                 )
             }
@@ -169,24 +213,21 @@ fun ChannelsScreen(
                     contentPadding = listContentPadding,
                     verticalArrangement = listItemSpacing,
                 ) {
-                    // ── Restart banner ──
                     if (state.restartNeeded) {
                         item(key = "restart_banner") {
                             RestartBanner(
                                 isRestarting = state.isRestarting,
-                                onRestart = viewModel::restartGateway,
+                                onRestart = onRestartGateway,
                             )
                         }
                     }
 
-                    // ── Gateway-not-running hint ──
                     if (!gatewayRunning && !state.restartNeeded) {
                         item(key = "gateway_offline") {
                             GatewayOfflineBanner(gatewayCommand = state.gatewayStartCommand)
                         }
                     }
 
-                    // ── Search bar ──
                     item(key = "search") {
                         SearchBar(
                             query = query,
@@ -195,22 +236,20 @@ fun ChannelsScreen(
                         )
                     }
 
-                    // ── Channel cards ──
                     items(filteredPlatforms, key = { it.id }) { platform ->
                         PlatformCard(
                             platform = platform,
                             isToggling = state.togglingId == platform.id,
                             isTesting = state.testingId == platform.id,
                             isRemoving = state.removingId == platform.id,
-                            onToggle = { enabled -> viewModel.togglePlatform(platform.id, enabled) },
-                            onTest = { viewModel.testPlatform(platform.id) },
-                            onSave = { env -> viewModel.configurePlatform(platform.id, env) },
-                            onRemove = { viewModel.removePlatform(platform.id) },
-                            onStartOnboarding = { viewModel.startTelegramOnboarding() },
+                            onToggle = { enabled -> onToggle(platform.id, enabled) },
+                            onTest = { onTest(platform.id) },
+                            onSave = { env -> onSave(platform.id, env) },
+                            onRemove = { onRemove(platform.id) },
+                            onStartOnboarding = onStartOnboarding,
                         )
                     }
 
-                    // ── Admin section ──
                     item(key = "admin_section") {
                         AdminSection(
                             envPath = state.envPath,
@@ -221,8 +260,6 @@ fun ChannelsScreen(
         }
     }
 }
-
-// ── Restart banner  ───────────────────────────────────────────────────
 
 @Composable
 private fun RestartBanner(
