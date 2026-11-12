@@ -1,5 +1,6 @@
 package com.m57.hermescontrol.ui.icons
 
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -183,20 +184,33 @@ fun MaterialSymbol(
     }
 
     val symbol = glyph ?: return
-    val fontSize = with(LocalDensity.current) { size.toSp() }
     val semanticsModifier =
         if (contentDescription == null) {
             modifier
         } else {
             modifier.semantics { this.contentDescription = contentDescription }
         }
-    Text(
-        text = symbol,
-        modifier = semanticsModifier,
-        color = tint,
-        fontFamily = if (useSubset) materialSymbolsSubsetFamily(filled) else materialSymbolsFamily(filled),
-        fontSize = fontSize,
-        lineHeight = fontSize,
-        maxLines = 1,
-    )
+    // The glyph is text, so its size is font size — a layout constraint alone does not
+    // scale it. Callers routinely pass `Modifier.size(18.dp)` and leave [size] at its
+    // 24.dp default, which drew a 24sp glyph into an 18dp box: oversized and clipped.
+    // Deriving the font size from the box removes that trap for every call site.
+    BoxWithConstraints(modifier = semanticsModifier) {
+        // Only a fixed box may shrink the glyph: `Modifier.size(x)` arrives tight on both
+        // axes. A loose container (a row, a card) must not influence icon size, or two
+        // rows of different heights end up drawing the same icon at different sizes.
+        val fixed = minWidth == maxWidth && minHeight == maxHeight
+        val boxed = if (maxWidth < maxHeight) maxWidth else maxHeight
+        val effective = if (fixed && boxed.value.isFinite() && boxed < size) boxed else size
+        val fontSize = with(LocalDensity.current) { effective.toSp() }
+        Text(
+            text = symbol,
+            color = tint,
+            fontFamily =
+                if (useSubset) materialSymbolsSubsetFamily(filled) else materialSymbolsFamily(filled),
+            fontSize = fontSize,
+            lineHeight = fontSize,
+            maxLines = 1,
+            softWrap = false,
+        )
+    }
 }
