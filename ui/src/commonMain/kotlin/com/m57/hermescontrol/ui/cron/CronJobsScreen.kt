@@ -1,7 +1,8 @@
 package com.m57.hermescontrol.ui.cron
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -10,10 +11,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -23,6 +26,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -35,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -47,8 +52,6 @@ import com.m57.hermescontrol.generated.resources.action_delete
 import com.m57.hermescontrol.generated.resources.action_discard
 import com.m57.hermescontrol.generated.resources.cron_action_add
 import com.m57.hermescontrol.generated.resources.cron_action_edit
-import com.m57.hermescontrol.generated.resources.cron_action_pause
-import com.m57.hermescontrol.generated.resources.cron_action_resume
 import com.m57.hermescontrol.generated.resources.cron_action_run
 import com.m57.hermescontrol.generated.resources.cron_badge_continuity
 import com.m57.hermescontrol.generated.resources.cron_badge_dispatch_error
@@ -96,6 +99,7 @@ import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.EmptyState
 import com.m57.hermescontrol.ui.common.ErrorState
 import com.m57.hermescontrol.ui.common.ExposedDropdownField
+import com.m57.hermescontrol.ui.common.HermesListItem
 import com.m57.hermescontrol.ui.common.HermesScaffold
 import com.m57.hermescontrol.ui.common.LoadingState
 import com.m57.hermescontrol.ui.common.NavIcon
@@ -108,17 +112,22 @@ import com.m57.hermescontrol.ui.common.listItemSpacing
 import com.m57.hermescontrol.ui.icons.HermesIcon
 import com.m57.hermescontrol.ui.icons.HermesSymbol
 import com.m57.hermescontrol.util.CronExpressionFormatter
+import com.m57.hermescontrol.util.formatIsoTimestamp
 import org.jetbrains.compose.resources.stringResource
 
+/**
+ * Route: the only part that knows about the ViewModel and the stores.
+ *
+ * Kept separate from [CronJobsScreen] so the screen can be rendered from state
+ * alone — that is what makes it screenshot-testable and previewable.
+ */
 @Composable
-fun CronJobsScreen(
+fun CronJobsRoute(
     modifier: Modifier = Modifier,
     onOpenDrawer: (() -> Unit)? = null,
     viewModel: CronJobsViewModel = viewModel { CronJobsViewModel() },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val spacing = LocalSpacing.current
-    var selectedJob by remember { mutableStateOf<CronJob?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.loadCronJobs()
@@ -126,13 +135,73 @@ fun CronJobsScreen(
 
     ToastEffect(toastMessage = state.toastMessage, onClearToast = viewModel::clearToast)
 
+    CronJobsScreen(
+        state = state,
+        modifier = modifier,
+        onOpenDrawer = onOpenDrawer,
+        onRefresh = { viewModel.loadCronJobs() },
+        onRetry = { viewModel.loadCronJobs() },
+        onAddJob = viewModel::openNewJobDialog,
+        onEditJob = viewModel::openEditJobDialog,
+        onToggleEnabled = { job, enabled ->
+            if (enabled) {
+                viewModel.resumeCronJob(job.id)
+            } else {
+                viewModel.pauseCronJob(job.id)
+            }
+        },
+        onRunJob = viewModel::triggerCronJob,
+        onRequestDelete = viewModel::requestDeleteJob,
+        onConfirmDelete = viewModel::confirmDeleteJob,
+        onDismissDelete = viewModel::dismissDeleteDialog,
+        onEditorFieldChange = { name, value -> viewModel.updateEditorField(name, value) },
+        onEditorToggleNoAgent = viewModel::toggleNoAgent,
+        onEditorToggleRunContinuity = viewModel::toggleRunContinuity,
+        onEditorSetMonitorMode = viewModel::setMonitorMode,
+        onEditorSave = viewModel::saveEditor,
+        onEditorDismiss = viewModel::closeEditor,
+        onEditorClearToast = viewModel::clearEditorToast,
+    )
+}
+
+/**
+ * Screen: a pure function of [state] and its callbacks. No ViewModel, no stores.
+ *
+ * The only piece of local UI state it owns is the run-details sheet selection,
+ * which is a view concern rather than a model one.
+ */
+@Composable
+fun CronJobsScreen(
+    state: CronJobsUiState,
+    onRefresh: () -> Unit,
+    onRetry: () -> Unit,
+    onAddJob: () -> Unit,
+    onEditJob: (String) -> Unit,
+    onToggleEnabled: (CronJob, Boolean) -> Unit,
+    onRunJob: (String) -> Unit,
+    onRequestDelete: (CronJob) -> Unit,
+    onConfirmDelete: () -> Unit,
+    onDismissDelete: () -> Unit,
+    onEditorFieldChange: (String, String) -> Unit,
+    onEditorToggleNoAgent: () -> Unit,
+    onEditorToggleRunContinuity: () -> Unit,
+    onEditorSetMonitorMode: (String) -> Unit,
+    onEditorSave: () -> Unit,
+    onEditorDismiss: () -> Unit,
+    onEditorClearToast: () -> Unit,
+    modifier: Modifier = Modifier,
+    onOpenDrawer: (() -> Unit)? = null,
+) {
+    var selectedJob by remember { mutableStateOf<CronJob?>(null) }
+
     HermesScaffold(
+        modifier = modifier,
         title = { Text(stringResource(Res.string.screen_cron)) },
         navigationIcon = onOpenDrawer?.let { NavIcon.Menu(it) },
         isRefreshing = state.isLoading,
-        onRefresh = { viewModel.loadCronJobs() },
+        onRefresh = onRefresh,
         actions = {
-            IconButton(onClick = { viewModel.openNewJobDialog() }) {
+            IconButton(onClick = onAddJob) {
                 HermesSymbol(
                     icon = HermesIcon.Add,
                     contentDescription = stringResource(Res.string.cron_action_add),
@@ -148,7 +217,7 @@ fun CronJobsScreen(
             state.errorMessage != null -> {
                 ErrorState(
                     message = state.errorMessage ?: "Unknown error",
-                    onRetry = { viewModel.loadCronJobs() },
+                    onRetry = onRetry,
                 )
             }
 
@@ -158,7 +227,7 @@ fun CronJobsScreen(
                     title = stringResource(Res.string.cron_empty_title),
                     subtitle = stringResource(Res.string.cron_empty_desc),
                     actionLabel = stringResource(Res.string.empty_action_create_job),
-                    onAction = { viewModel.openNewJobDialog() },
+                    onAction = onAddJob,
                 )
             }
 
@@ -169,161 +238,18 @@ fun CronJobsScreen(
                     verticalArrangement = listItemSpacing,
                 ) {
                     items(state.jobs, key = { it.id }) { job ->
-                        Card(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clickable(onClick = { selectedJob = job }),
-                            colors =
-                                CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                ),
-                        ) {
-                            Column(modifier = Modifier.padding(Spacing.md)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Text(
-                                        text = job.name,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        modifier = Modifier.weight(1f),
-                                    )
-                                    StatusBadge(
-                                        text =
-                                            if (job.state == "active") {
-                                                stringResource(Res.string.cron_status_active)
-                                            } else {
-                                                stringResource(Res.string.cron_status_paused)
-                                            },
-                                        status =
-                                            if (job.state == "active") {
-                                                StatusBadgeType.SUCCESS
-                                            } else {
-                                                StatusBadgeType.NEUTRAL
-                                            },
-                                    )
-                                }
-                                if (job.hasSecondaryBadges()) {
-                                    Spacer(modifier = Modifier.height(Spacing.xs))
-                                    FlowRow(
-                                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                                        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-                                    ) {
-                                        when (job.lastRunStatus) {
-                                            "blocked_config" ->
-                                                StatusBadge(
-                                                    text = stringResource(Res.string.cron_status_blocked_config),
-                                                    status = StatusBadgeType.ERROR,
-                                                )
-                                            "no_change" ->
-                                                StatusBadge(
-                                                    text = stringResource(Res.string.cron_status_no_change),
-                                                    status = StatusBadgeType.INFO,
-                                                )
-                                        }
-                                        if (job.context_from?.contains("self") == true) {
-                                            StatusBadge(
-                                                text = stringResource(Res.string.cron_badge_continuity),
-                                                status = StatusBadgeType.INFO,
-                                            )
-                                        }
-                                        if (job.last_fire_error.hasContent()) {
-                                            StatusBadge(
-                                                text = stringResource(Res.string.cron_badge_dispatch_error),
-                                                status = StatusBadgeType.ERROR,
-                                            )
-                                        }
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(Spacing.xs))
-                                Text(
-                                    text = CronExpressionFormatter.cronToHumanReadable(job.scheduleText),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                Spacer(modifier = Modifier.height(Spacing.xs))
-                                Text(
-                                    text = job.scheduleText,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                )
-                                Spacer(modifier = Modifier.height(Spacing.sm))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.End,
-                                ) {
-                                    IconButton(
-                                        onClick = { viewModel.openEditJobDialog(job.id) },
-                                    ) {
-                                        HermesSymbol(
-                                            icon = HermesIcon.Edit,
-                                            contentDescription = stringResource(Res.string.cron_action_edit),
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
-                                    if (job.state == "active") {
-                                        IconButton(
-                                            onClick = { viewModel.pauseCronJob(job.id) },
-                                        ) {
-                                            HermesSymbol(
-                                                icon = HermesIcon.Pause,
-                                                contentDescription = stringResource(Res.string.cron_action_pause),
-                                                tint = MaterialTheme.colorScheme.primary,
-                                            )
-                                        }
-                                    } else {
-                                        IconButton(
-                                            onClick = { viewModel.resumeCronJob(job.id) },
-                                        ) {
-                                            HermesSymbol(
-                                                icon = HermesIcon.PlayArrow,
-                                                contentDescription = stringResource(Res.string.cron_action_resume),
-                                                tint = MaterialTheme.colorScheme.primary,
-                                            )
-                                        }
-                                    }
-                                    IconButton(
-                                        onClick = { viewModel.triggerCronJob(job.id) },
-                                    ) {
-                                        HermesSymbol(
-                                            icon = HermesIcon.Refresh,
-                                            contentDescription = stringResource(Res.string.cron_action_run),
-                                            tint = MaterialTheme.colorScheme.secondary,
-                                        )
-                                    }
-                                    IconButton(
-                                        onClick = { viewModel.requestDeleteJob(job) },
-                                    ) {
-                                        HermesSymbol(
-                                            icon = HermesIcon.Delete,
-                                            contentDescription = stringResource(Res.string.action_delete),
-                                            tint = MaterialTheme.colorScheme.error,
-                                        )
-                                    }
-                                }
-                            }
-                        }
+                        CronJobRow(
+                            job = job,
+                            onClick = { selectedJob = job },
+                            onEdit = { onEditJob(job.id) },
+                            onToggleEnabled = { enabled -> onToggleEnabled(job, enabled) },
+                            onRun = { onRunJob(job.id) },
+                            onDelete = { onRequestDelete(job) },
+                        )
                     }
                 }
             }
         }
-    }
-
-    // ── Editor Dialog ──
-    if (state.editorState.isOpen) {
-        CronJobEditorDialog(
-            state = state.editorState,
-            onFieldChange = { name, value -> viewModel.updateEditorField(name, value) },
-            onToggleNoAgent = { viewModel.toggleNoAgent() },
-            onToggleRunContinuity = { viewModel.toggleRunContinuity() },
-            onSetMonitorMode = viewModel::setMonitorMode,
-            onSave = { viewModel.saveEditor() },
-            onDismiss = { viewModel.closeEditor() },
-            onClearToast = { viewModel.clearEditorToast() },
-        )
     }
 
     // ── Run Details Dialog ──
@@ -367,22 +293,192 @@ fun CronJobsScreen(
         )
     }
 
+    // ── Editor Dialog ──
+    if (state.editorState.isOpen) {
+        CronJobEditorDialog(
+            state = state.editorState,
+            onFieldChange = onEditorFieldChange,
+            onToggleNoAgent = onEditorToggleNoAgent,
+            onToggleRunContinuity = onEditorToggleRunContinuity,
+            onSetMonitorMode = onEditorSetMonitorMode,
+            onSave = onEditorSave,
+            onDismiss = onEditorDismiss,
+            onClearToast = onEditorClearToast,
+        )
+    }
+
     state.deleteTarget?.let { job ->
         AlertDialog(
-            onDismissRequest = viewModel::dismissDeleteDialog,
+            onDismissRequest = onDismissDelete,
             title = { Text(stringResource(Res.string.cron_delete_title)) },
             text = { Text(stringResource(Res.string.cron_delete_message, job.name)) },
             confirmButton = {
-                TextButton(onClick = viewModel::confirmDeleteJob) {
+                TextButton(onClick = onConfirmDelete) {
                     Text(stringResource(Res.string.action_delete))
                 }
             },
             dismissButton = {
-                TextButton(onClick = viewModel::dismissDeleteDialog) {
+                TextButton(onClick = onDismissDelete) {
                     Text(stringResource(Res.string.action_cancel))
                 }
             },
         )
+    }
+}
+
+/**
+ * One job, one row. The enable switch is the row's trailing control; edit,
+ * run-now and delete stay as explicit actions inside the row.
+ */
+@Composable
+private fun CronJobRow(
+    job: CronJob,
+    onClick: () -> Unit,
+    onEdit: () -> Unit,
+    onToggleEnabled: (Boolean) -> Unit,
+    onRun: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val isActive = job.state == "active"
+    HermesListItem(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick,
+        leading = {
+            Box(
+                modifier =
+                    Modifier
+                        .size(40.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            shape = RoundedCornerShape(10.dp),
+                        ),
+                contentAlignment = Alignment.Center,
+            ) {
+                HermesSymbol(
+                    icon = HermesIcon.Schedule,
+                    contentDescription = null,
+                    size = 22.dp,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
+        },
+        headline = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                Text(
+                    text = job.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                StatusBadge(
+                    text =
+                        if (isActive) {
+                            stringResource(Res.string.cron_status_active)
+                        } else {
+                            stringResource(Res.string.cron_status_paused)
+                        },
+                    status =
+                        if (isActive) {
+                            StatusBadgeType.SUCCESS
+                        } else {
+                            StatusBadgeType.NEUTRAL
+                        },
+                )
+            }
+        },
+        supporting = {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                Text(
+                    text =
+                        "${CronExpressionFormatter.cronToHumanReadable(job.scheduleText)} (${job.scheduleText})",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = lastRunLabel(job),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                )
+                if (job.hasSecondaryBadges()) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    ) {
+                        when (job.lastRunStatus) {
+                            "blocked_config" ->
+                                StatusBadge(
+                                    text = stringResource(Res.string.cron_status_blocked_config),
+                                    status = StatusBadgeType.ERROR,
+                                )
+                            "no_change" ->
+                                StatusBadge(
+                                    text = stringResource(Res.string.cron_status_no_change),
+                                    status = StatusBadgeType.INFO,
+                                )
+                        }
+                        if (job.context_from?.contains("self") == true) {
+                            StatusBadge(
+                                text = stringResource(Res.string.cron_badge_continuity),
+                                status = StatusBadgeType.INFO,
+                            )
+                        }
+                        if (job.last_fire_error.hasContent()) {
+                            StatusBadge(
+                                text = stringResource(Res.string.cron_badge_dispatch_error),
+                                status = StatusBadgeType.ERROR,
+                            )
+                        }
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    IconButton(onClick = onEdit) {
+                        HermesSymbol(
+                            icon = HermesIcon.Edit,
+                            contentDescription = stringResource(Res.string.cron_action_edit),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    IconButton(onClick = onRun) {
+                        HermesSymbol(
+                            icon = HermesIcon.Refresh,
+                            contentDescription = stringResource(Res.string.cron_action_run),
+                            tint = MaterialTheme.colorScheme.secondary,
+                        )
+                    }
+                    IconButton(onClick = onDelete) {
+                        HermesSymbol(
+                            icon = HermesIcon.Delete,
+                            contentDescription = stringResource(Res.string.action_delete),
+                            tint = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+            }
+        },
+        trailing = {
+            Switch(
+                checked = isActive,
+                onCheckedChange = onToggleEnabled,
+            )
+        },
+    )
+}
+
+private fun lastRunLabel(job: CronJob): String {
+    val last = job.last_run_at
+    return if (last.isNullOrBlank()) {
+        "Last run: never"
+    } else {
+        "Last run: ${formatIsoTimestamp(last)}"
     }
 }
 
