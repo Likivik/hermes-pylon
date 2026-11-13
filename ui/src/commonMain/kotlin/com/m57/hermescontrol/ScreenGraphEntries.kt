@@ -39,7 +39,7 @@ import com.m57.hermescontrol.ui.cron.CronJobsScreen as CronJobsScreenContent
 import com.m57.hermescontrol.ui.files.FilesScreen as FilesScreenContent
 import com.m57.hermescontrol.ui.gateway.GatewayScreen as GatewayScreenContent
 import com.m57.hermescontrol.ui.kanban.KanbanScreen as KanbanScreenContent
-import com.m57.hermescontrol.ui.keys.KeysScreen as KeysScreenContent
+import com.m57.hermescontrol.ui.keys.KeysRoute as KeysRouteContent
 import com.m57.hermescontrol.ui.logs.LogsScreen as LogsScreenContent
 import com.m57.hermescontrol.ui.mcp.McpServersScreen as McpServersScreenContent
 import com.m57.hermescontrol.ui.model.ModelScreen as ModelScreenContent
@@ -151,7 +151,7 @@ private fun commonScreens(): List<ScreenDefinition> =
             Res.string.screen_keys,
             HermesIcon.Key,
             DrawerSection.CONFIGURE,
-        ) { sessionId, openDrawer -> KeysScreenContent(onOpenDrawer = openDrawer) },
+        ) { sessionId, openDrawer -> KeysRouteContent(onOpenDrawer = openDrawer) },
         ScreenDefinition(
             ChannelsScreen,
             Res.string.screen_channels,

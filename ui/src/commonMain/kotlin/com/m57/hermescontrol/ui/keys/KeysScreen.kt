@@ -5,8 +5,8 @@
 
 package com.m57.hermescontrol.ui.keys
 
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -50,6 +50,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -57,7 +58,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.m57.hermescontrol.data.model.EnvVarConfig
@@ -104,6 +104,7 @@ import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.EmptyState
 import com.m57.hermescontrol.ui.common.ErrorState
+import com.m57.hermescontrol.ui.common.HermesListItem
 import com.m57.hermescontrol.ui.common.HermesScaffold
 import com.m57.hermescontrol.ui.common.NavIcon
 import com.m57.hermescontrol.ui.common.SearchBar
@@ -121,13 +122,78 @@ private const val FILTER_ALL = "ALL"
 private val keysContentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
 private val keysItemSpacing = Arrangement.spacedBy(12.dp)
 
+// ── Route  ─────────────────────────────────────────────────────────────
+
+/**
+ * Route: the only part that knows the ViewModel. Kept separate from [KeysScreen]
+ * so the screen can be rendered from state alone and captured as pixels.
+ */
 @Composable
-fun KeysScreen(
+fun KeysRoute(
     modifier: Modifier = Modifier,
     onOpenDrawer: (() -> Unit)? = null,
     viewModel: KeysViewModel = viewModel { KeysViewModel() },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) {
+        viewModel.loadKeys()
+    }
+
+    ToastEffect(toastMessage = state.toastMessage, onClearToast = viewModel::clearToast)
+
+    KeysScreen(
+        state = state,
+        modifier = modifier,
+        onOpenDrawer = onOpenDrawer,
+        onRefresh = viewModel::loadKeys,
+        onRetry = viewModel::loadKeys,
+        onOpenAddDialog = viewModel::openAddDialog,
+        onDismissAddDialog = viewModel::dismissAddDialog,
+        onNewKeyNameChange = viewModel::setNewKeyName,
+        onNewKeyValueChange = viewModel::setNewKeyValue,
+        onAddKey = viewModel::addKey,
+        onRequestDelete = viewModel::requestDeleteKey,
+        onDismissDelete = viewModel::dismissDeleteDialog,
+        onConfirmDelete = viewModel::confirmDeleteKey,
+        onReveal = viewModel::revealKey,
+        onHide = viewModel::hideKey,
+        onSaveKey = viewModel::updateKey,
+        onShowToast = viewModel::showToast,
+        onRestartGateway = viewModel::restartGateway,
+    )
+}
+
+// ── Screen  ────────────────────────────────────────────────────────────
+
+/**
+ * Screen: a pure function of [KeysUiState] and its callbacks. No ViewModel.
+ *
+ * The only state it owns is local UI state: the search query and the category
+ * filter. Everything else — the key list, the dialogs, the restart banner —
+ * comes from [state].
+ */
+@Composable
+fun KeysScreen(
+    state: KeysUiState,
+    onRefresh: () -> Unit,
+    onRetry: () -> Unit,
+    onOpenAddDialog: () -> Unit,
+    onDismissAddDialog: () -> Unit,
+    onNewKeyNameChange: (String) -> Unit,
+    onNewKeyValueChange: (String) -> Unit,
+    onAddKey: () -> Unit,
+    onRequestDelete: (String) -> Unit,
+    onDismissDelete: () -> Unit,
+    onConfirmDelete: () -> Unit,
+    onReveal: (String) -> Unit,
+    onHide: (String) -> Unit,
+    onSaveKey: (String, String) -> Unit,
+    onShowToast: (String) -> Unit,
+    onRestartGateway: () -> Unit,
+    modifier: Modifier = Modifier,
+    onOpenDrawer: (() -> Unit)? = null,
+) {
     var query by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf(FILTER_ALL) }
 
@@ -164,16 +230,10 @@ fun KeysScreen(
 
     val hasAnyVars = state.categories.any { it.vars.isNotEmpty() }
 
-    LaunchedEffect(Unit) {
-        viewModel.loadKeys()
-    }
-
-    ToastEffect(toastMessage = state.toastMessage, onClearToast = viewModel::clearToast)
-
-    // ── Delete Confirmation Dialog ──────────────────────────────────────────
+    // ── Delete Confirmation Dialog ──────────────────────────────────────
     state.deleteTargetKey?.let { key ->
         AlertDialog(
-            onDismissRequest = { viewModel.dismissDeleteDialog() },
+            onDismissRequest = onDismissDelete,
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     HermesSymbol(
@@ -191,7 +251,7 @@ fun KeysScreen(
             },
             confirmButton = {
                 Button(
-                    onClick = { viewModel.confirmDeleteKey() },
+                    onClick = onConfirmDelete,
                     colors =
                         ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.error,
@@ -201,33 +261,34 @@ fun KeysScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.dismissDeleteDialog() }) {
+                TextButton(onClick = onDismissDelete) {
                     Text(stringResource(Res.string.action_cancel))
                 }
             },
         )
     }
 
-    // ── Add Key Dialog ──────────────────────────────────────────────────────
+    // ── Add Key Dialog ──────────────────────────────────────────────────
     if (state.showAddDialog) {
         AddKeyDialog(
             newKeyName = state.newKeyName,
             newKeyValue = state.newKeyValue,
             isAdding = state.isAddingKey,
-            onNameChange = viewModel::setNewKeyName,
-            onValueChange = viewModel::setNewKeyValue,
-            onAdd = viewModel::addKey,
-            onDismiss = viewModel::dismissAddDialog,
+            onNameChange = onNewKeyNameChange,
+            onValueChange = onNewKeyValueChange,
+            onAdd = onAddKey,
+            onDismiss = onDismissAddDialog,
         )
     }
 
     HermesScaffold(
+        modifier = modifier,
         title = { Text(stringResource(Res.string.screen_keys)) },
         navigationIcon = onOpenDrawer?.let { NavIcon.Menu(it) },
         isRefreshing = state.isLoading,
-        onRefresh = { viewModel.loadKeys() },
+        onRefresh = onRefresh,
         actions = {
-            IconButton(onClick = { viewModel.openAddDialog() }) {
+            IconButton(onClick = onOpenAddDialog) {
                 HermesSymbol(
                     icon = HermesIcon.Add,
                     contentDescription = stringResource(Res.string.content_desc_add_key),
@@ -243,8 +304,8 @@ fun KeysScreen(
 
                 state.errorMessage != null && !hasAnyVars -> {
                     ErrorState(
-                        message = state.errorMessage ?: "",
-                        onRetry = { viewModel.loadKeys() },
+                        message = state.errorMessage,
+                        onRetry = onRetry,
                         modifier = Modifier.padding(paddingValues),
                     )
                 }
@@ -253,7 +314,7 @@ fun KeysScreen(
                     EmptyState(
                         title = stringResource(Res.string.keys_empty_title),
                         subtitle = stringResource(Res.string.keys_empty_desc),
-                        onAction = { viewModel.loadKeys() },
+                        onAction = onRefresh,
                         actionLabel = stringResource(Res.string.content_desc_refresh),
                         modifier = Modifier.padding(paddingValues),
                     )
@@ -265,17 +326,17 @@ fun KeysScreen(
                         contentPadding = keysContentPadding,
                         verticalArrangement = keysItemSpacing,
                     ) {
-                        // ── 1. Restart banner (pinned at top when dirty) ─────────
+                        // ── 1. Restart banner (pinned at top when dirty) ─────
                         if (state.keysChanged) {
                             item(key = "restart-banner") {
                                 RestartBanner(
                                     isRestarting = state.isRestartingGateway,
-                                    onRestart = viewModel::restartGateway,
+                                    onRestart = onRestartGateway,
                                 )
                             }
                         }
 
-                        // ── 2. Search Bar ────────────────────────────────────────
+                        // ── 2. Search Bar ────────────────────────────────────
                         item(key = "search") {
                             SearchBar(
                                 query = query,
@@ -284,7 +345,7 @@ fun KeysScreen(
                             )
                         }
 
-                        // ── 3. Category Filter Chips ─────────────────────────────
+                        // ── 3. Category Filter Chips ─────────────────────────
                         item(key = "filter-bar") {
                             CategoryFilterBar(
                                 categories = state.categories,
@@ -294,7 +355,7 @@ fun KeysScreen(
                             )
                         }
 
-                        // ── 4. Keys List ─────────────────────────────────────────
+                        // ── 4. Keys List ─────────────────────────────────────
                         if (visibleCategories.isEmpty()) {
                             item(key = "no-results") {
                                 Box(
@@ -325,16 +386,17 @@ fun KeysScreen(
                                 items = section.vars.toList(),
                                 key = { (key, _) -> "key-$key" },
                             ) { (key, config) ->
-                                EnvVarCard(
+                                EnvVarRow(
                                     key = key,
                                     config = config,
+                                    categoryName = section.name,
                                     revealedValue = state.revealedValues[key],
                                     isDeleting = key in state.deletingKeys,
-                                    onReveal = { viewModel.revealKey(key) },
-                                    onHide = { viewModel.hideKey(key) },
-                                    onSave = { value -> viewModel.updateKey(key, value) },
-                                    onRequestDelete = { viewModel.requestDeleteKey(key) },
-                                    onShowToast = { msg -> viewModel.showToast(msg) },
+                                    onReveal = { onReveal(key) },
+                                    onHide = { onHide(key) },
+                                    onSave = { value -> onSaveKey(key, value) },
+                                    onRequestDelete = { onRequestDelete(key) },
+                                    onShowToast = onShowToast,
                                 )
                             }
                         }
@@ -381,22 +443,13 @@ private fun CategoryFilterBar(
             items = categories,
             key = { section -> "filter-${section.name}" },
         ) { section ->
-            val icon: HermesIcon =
-                when (section.name) {
-                    "LLM Providers" -> HermesIcon.SmartToy
-                    "Tool API Keys" -> HermesIcon.Build
-                    "Messaging Platforms" -> HermesIcon.Forum
-                    "Agent Settings" -> HermesIcon.Tune
-                    else -> HermesIcon.Folder
-                }
-
             FilterChip(
                 selected = selectedCategory == section.name,
                 onClick = { onCategorySelected(section.name) },
                 label = { Text("${section.name} (${section.vars.size})") },
                 leadingIcon = {
                     HermesSymbol(
-                        icon = icon,
+                        icon = categoryIcon(section.name),
                         contentDescription = null,
                         modifier = Modifier.size(16.dp),
                     )
@@ -405,6 +458,15 @@ private fun CategoryFilterBar(
         }
     }
 }
+
+private fun categoryIcon(categoryName: String): HermesIcon =
+    when (categoryName) {
+        "LLM Providers" -> HermesIcon.SmartToy
+        "Tool API Keys" -> HermesIcon.Build
+        "Messaging Platforms" -> HermesIcon.Forum
+        "Agent Settings" -> HermesIcon.Tune
+        else -> HermesIcon.Folder
+    }
 
 // ── Add key dialog ───────────────────────────────────────────────────────────
 
@@ -553,12 +615,18 @@ fun SensitiveCopyWarningDialog(
     )
 }
 
-// ── Env var card ──────────────────────────────────────────────────────────────
+// ── Env var row ───────────────────────────────────────────────────────────────
 
+/**
+ * One key, rendered on the shared [HermesListItem]: a category tile, the key name
+ * as the headline, description and value as supporting content, and the row's
+ * controls in the trailing slot.
+ */
 @Composable
-private fun EnvVarCard(
+private fun EnvVarRow(
     key: String,
     config: EnvVarConfig,
+    categoryName: String,
     revealedValue: String?,
     isDeleting: Boolean,
     onReveal: () -> Unit,
@@ -604,100 +672,64 @@ private fun EnvVarCard(
         )
     }
 
-    // Insert zero-width spaces (\u200B) after underscores so line breaks happen cleanly between words
+    // Insert zero-width spaces () after underscores so line breaks happen cleanly between words
     val formattedKeyName = remember(key) { key.replace("_", "_\u200B") }
 
-    Card(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .animateContentSize(),
-        shape = MaterialTheme.shapes.large,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
-        colors =
-            CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-            ),
-    ) {
-        Column(modifier = Modifier.padding(Spacing.md)) {
-            // Header: Key name (breaks cleanly at underscores _) + Delete Button
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top,
+    HermesListItem(
+        leading = {
+            Box(
+                modifier =
+                    Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center,
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = formattedKeyName,
-                        style =
-                            if (key.length > 24) {
-                                MaterialTheme.typography.titleSmall
-                            } else {
-                                MaterialTheme.typography.titleMedium
-                            },
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.SemiBold,
-                        lineHeight = 20.sp,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    StatusBadge(
-                        text =
-                            if (config.isSet) {
-                                stringResource(Res.string.keys_status_configured)
-                            } else {
-                                stringResource(Res.string.keys_status_not_set)
-                            },
-                        status =
-                            if (config.isSet) {
-                                StatusBadgeType.SUCCESS
-                            } else {
-                                StatusBadgeType.WARNING
-                            },
-                    )
-
-                    // Description
-                    val description = config.description
-                    if (!description.isNullOrBlank()) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = description,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                        )
-                    }
-                }
-
-                if (!isEditing) {
-                    IconButton(
-                        onClick = onRequestDelete,
-                        enabled = !isDeleting,
-                    ) {
-                        if (isDeleting) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                        } else {
-                            HermesSymbol(
-                                icon = HermesIcon.Delete,
-                                contentDescription = stringResource(Res.string.content_desc_delete_key),
-                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
-                            )
-                        }
-                    }
-                }
+                HermesSymbol(
+                    icon = categoryIcon(categoryName),
+                    contentDescription = null,
+                    modifier = Modifier.size(22.dp),
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
             }
+        },
+        headline = {
+            Text(
+                text = formattedKeyName,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+        supporting = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                StatusBadge(
+                    text =
+                        if (config.isSet) {
+                            stringResource(Res.string.keys_status_configured)
+                        } else {
+                            stringResource(Res.string.keys_status_not_set)
+                        },
+                    status =
+                        if (config.isSet) {
+                            StatusBadgeType.SUCCESS
+                        } else {
+                            StatusBadgeType.WARNING
+                        },
+                )
 
-            Spacer(modifier = Modifier.height(10.dp))
+                val description = config.description
+                if (!description.isNullOrBlank()) {
+                    Text(
+                        text = description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                    )
+                }
 
-            // Value Display Box (Single-line, horizontally scrollable) or Edit Form
-            if (isEditing) {
-                Column(modifier = Modifier.fillMaxWidth()) {
+                if (isEditing) {
                     OutlinedTextField(
                         value = editedValue,
                         onValueChange = { editedValue = it },
@@ -731,7 +763,6 @@ private fun EnvVarCard(
                             }
                         },
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End,
@@ -747,28 +778,19 @@ private fun EnvVarCard(
                             Text(stringResource(Res.string.action_save))
                         }
                     }
-                }
-            } else {
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Row(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = Spacing.sm),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
+                } else {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Row(
+                        Box(
                             modifier =
                                 Modifier
-                                    .weight(1f)
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = Spacing.sm)
                                     .horizontalScroll(rememberScrollState()),
-                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
                                 text = displayValue,
@@ -784,48 +806,84 @@ private fun EnvVarCard(
                                 softWrap = false,
                             )
                         }
-                        Row {
-                            if (config.isSet) {
-                                IconButton(onClick = if (isRevealed) onHide else onReveal) {
-                                    HermesSymbol(
-                                        icon =
-                                            if (isRevealed) {
-                                                HermesIcon.VisibilityOff
-                                            } else {
-                                                HermesIcon.Visibility
-                                            },
-                                        contentDescription = stringResource(Res.string.keys_action_toggle_visibility),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                                if (isRevealed && !revealedValue.isNullOrEmpty()) {
-                                    IconButton(onClick = {
-                                        pendingCopyValue = revealedValue
-                                    }) {
-                                        HermesSymbol(
-                                            icon = HermesIcon.ContentCopy,
-                                            contentDescription = stringResource(Res.string.keys_action_copy),
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
-                                }
-                            }
-                            IconButton(onClick = {
-                                editedValue = if (isRevealed) revealedValue.orEmpty() else ""
-                                isEditing = true
-                            }) {
+                    }
+                }
+            }
+        },
+        trailing = {
+            if (!isEditing) {
+                // Anchored right: with the reveal and copy buttons conditional, the cluster must
+                // grow leftwards so edit and delete keep the same column on every row.
+                Row(
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (config.isSet) {
+                        IconButton(
+                            onClick = if (isRevealed) onHide else onReveal,
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            HermesSymbol(
+                                icon =
+                                    if (isRevealed) {
+                                        HermesIcon.VisibilityOff
+                                    } else {
+                                        HermesIcon.Visibility
+                                    },
+                                contentDescription = stringResource(Res.string.keys_action_toggle_visibility),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        if (isRevealed && !revealedValue.isNullOrEmpty()) {
+                            IconButton(
+                                onClick = { pendingCopyValue = revealedValue },
+                                modifier = Modifier.size(40.dp),
+                            ) {
                                 HermesSymbol(
-                                    icon = HermesIcon.Edit,
-                                    contentDescription = stringResource(Res.string.content_desc_edit),
-                                    tint = MaterialTheme.colorScheme.primary,
+                                    icon = HermesIcon.ContentCopy,
+                                    contentDescription = stringResource(Res.string.keys_action_copy),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                         }
                     }
+                    IconButton(
+                        modifier = Modifier.size(40.dp),
+                        onClick = {
+                            editedValue = if (isRevealed) revealedValue.orEmpty() else ""
+                            isEditing = true
+                        },
+                    ) {
+                        HermesSymbol(
+                            icon = HermesIcon.Edit,
+                            contentDescription = stringResource(Res.string.content_desc_edit),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    IconButton(
+                        onClick = onRequestDelete,
+                        enabled = !isDeleting,
+                        modifier = Modifier.size(40.dp),
+                    ) {
+                        if (isDeleting) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        } else {
+                            HermesSymbol(
+                                icon = HermesIcon.Delete,
+                                contentDescription = stringResource(Res.string.content_desc_delete_key),
+                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                            )
+                        }
+                    }
                 }
             }
-        }
-    }
+        },
+        minHeight = 88.dp,
+    )
 }
 
 // ── Restart banner ────────────────────────────────────────────────────────────
