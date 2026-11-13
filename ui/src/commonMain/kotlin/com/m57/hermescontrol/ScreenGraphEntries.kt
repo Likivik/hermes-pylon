@@ -52,7 +52,7 @@ import com.m57.hermescontrol.ui.settings.SettingsScreen as SettingsScreenContent
 import com.m57.hermescontrol.ui.skills.SkillsScreen as SkillsScreenContent
 import com.m57.hermescontrol.ui.system.SystemScreen as SystemScreenContent
 import com.m57.hermescontrol.ui.toolsets.ToolsetsScreen as ToolsetsScreenContent
-import com.m57.hermescontrol.ui.webhooks.WebhooksScreen as WebhooksScreenContent
+import com.m57.hermescontrol.ui.webhooks.WebhooksRoute as WebhooksRouteContent
 
 /**
  * Every screen the app ships, assembled once for all targets.
@@ -103,7 +103,7 @@ private fun commonScreens(): List<ScreenDefinition> =
             Res.string.screen_webhooks,
             HermesIcon.Webhook,
             DrawerSection.AUTOMATE,
-        ) { sessionId, openDrawer -> WebhooksScreenContent(onOpenDrawer = openDrawer) },
+        ) { sessionId, openDrawer -> WebhooksRouteContent(onOpenDrawer = openDrawer) },
         ScreenDefinition(
             KanbanScreen,
             Res.string.screen_kanban,
