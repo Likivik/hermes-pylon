@@ -54,9 +54,7 @@ class ChannelsScreenRoboTest {
                     onRefresh = {},
                     onRetry = {},
                     onToggle = { _, _ -> },
-                    onTest = {},
-                    onSave = { _, _ -> },
-                    onRemove = {},
+                    onOpen = {},
                     onStartOnboarding = {},
                     onRestartGateway = {},
                     onDismissOnboarding = {},
@@ -114,6 +112,6 @@ private val FakePlatforms =
             enabled = false,
             configured = false,
             gatewayRunning = true,
-            state = "unconfigured",
+            state = "not_configured",
         ),
     )
