@@ -53,6 +53,7 @@ import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.nav_drawer_subtitle
 import com.m57.hermescontrol.generated.resources.nav_drawer_title
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
+import com.m57.hermescontrol.ui.channels.ChannelDetailRoute
 import com.m57.hermescontrol.ui.common.DisableDrawerGestures
 import com.m57.hermescontrol.ui.common.DrawerGestureController
 import com.m57.hermescontrol.ui.common.LocalDrawerGestureController
@@ -104,6 +105,13 @@ private fun appEntryProvider(
         addEntryProvider(clazz = screen.key::class) {
             screen.content(sessionId, openDrawer)
         }
+    }
+
+    entry<ChannelDetailScreenKey> { key ->
+        ChannelDetailRoute(
+            platformId = key.platformId,
+            onBack = { NavigationController.goBack() },
+        )
     }
 
     // ── Settings drill-down sub-pages ───────────────────────────────────
@@ -183,6 +191,7 @@ private val navStateConfiguration: SavedStateConfiguration =
                     subclass(LogsScreen.serializer())
                     subclass(PluginsScreen.serializer())
                     subclass(ChannelsScreen.serializer())
+                    subclass(ChannelDetailScreenKey.serializer())
                     subclass(KeysScreen.serializer())
                     subclass(SystemScreen.serializer())
                     subclass(KanbanScreen.serializer())
