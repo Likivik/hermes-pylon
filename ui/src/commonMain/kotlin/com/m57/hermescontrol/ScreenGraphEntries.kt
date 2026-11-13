@@ -33,7 +33,7 @@ import com.m57.hermescontrol.ui.achievements.AchievementsScreen as AchievementsS
 import com.m57.hermescontrol.ui.analytics.AnalyticsScreen as AnalyticsScreenContent
 import com.m57.hermescontrol.ui.billing.BillingScreen as BillingScreenContent
 import com.m57.hermescontrol.ui.bots.BotsRoute as BotsRouteContent
-import com.m57.hermescontrol.ui.channels.ChannelsScreen as ChannelsScreenContent
+import com.m57.hermescontrol.ui.channels.ChannelsRoute as ChannelsRouteContent
 import com.m57.hermescontrol.ui.config.ConfigScreen as ConfigScreenContent
 import com.m57.hermescontrol.ui.cron.CronJobsScreen as CronJobsScreenContent
 import com.m57.hermescontrol.ui.files.FilesScreen as FilesScreenContent
@@ -157,7 +157,7 @@ private fun commonScreens(): List<ScreenDefinition> =
             Res.string.screen_channels,
             HermesIcon.ListAlt,
             DrawerSection.CONFIGURE,
-        ) { sessionId, openDrawer -> ChannelsScreenContent(onOpenDrawer = openDrawer) },
+        ) { sessionId, openDrawer -> ChannelsRouteContent(onOpenDrawer = openDrawer) },
         ScreenDefinition(
             ProvidersScreen,
             Res.string.screen_providers,
