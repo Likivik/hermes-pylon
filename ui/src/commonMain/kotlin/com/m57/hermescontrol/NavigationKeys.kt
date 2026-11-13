@@ -41,6 +41,9 @@ import kotlinx.serialization.Serializable
 
 @Serializable data object ChannelsScreen : NavKey
 
+/** One channel's own page: Test / Configure / Remove, or setup when it is not configured. */
+@Serializable data class ChannelDetailScreenKey(val platformId: String) : NavKey
+
 @Serializable data object KeysScreen : NavKey
 
 @Serializable data object SystemScreen : NavKey

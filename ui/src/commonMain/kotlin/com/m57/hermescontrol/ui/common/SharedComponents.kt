@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -22,6 +23,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -29,12 +31,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -382,6 +388,68 @@ fun InfoRow(
 // ── HermesListItem — the one list row ─────────────────────────────────
 
 /**
+ * The numbers and the one compound control the list rows share. A row stays a single action;
+ * a cluster of controls is a value handed to its `trailing` slot, never a parameter on the row.
+ */
+object HermesListDefaults {
+    /** Fixed row height. Fixing it also centres every slot, which Material does not do for three-line rows. */
+    val RowHeight: Dp = 88.dp
+    val BrandTileSize: Dp = 40.dp
+    val BrandMarkSize: Dp = 22.dp
+    val ClusterDividerHeight: Dp = 32.dp
+    val ClusterDividerThickness: Dp = 1.5.dp
+
+    /**
+     * Switch, hairline, chevron — the arrangement used by system settings that keep "only the
+     * toggle toggles" while still opening a detail page. The gap is measured to the chevron's
+     * ink, not to its 48 dp touch box, so both sides of the divider look equal.
+     */
+    @Composable
+    fun toggleTrailing(
+        checked: Boolean,
+        onToggle: (Boolean) -> Unit,
+    ): @Composable () -> Unit =
+        {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // The chevron is an affordance, not a target: the row itself opens the page,
+                // so a second click path here would only duplicate it.
+                Icon(
+                    imageVector = ChevronRight,
+                    contentDescription = null,
+                    modifier = Modifier.size(28.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                VerticalDivider(
+                    modifier =
+                        Modifier
+                            .padding(end = 20.dp)
+                            .height(ClusterDividerHeight),
+                    thickness = ClusterDividerThickness,
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                )
+                Switch(checked = checked, onCheckedChange = onToggle)
+            }
+        }
+}
+
+private val ChevronRight: ImageVector =
+    ImageVector
+        .Builder(
+            name = "chevron_right",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).addPath(
+            pathData =
+                addPathNodes(
+                    "M9.29 6.71a1 1 0 0 0 0 1.41L13.17 12l-3.88 3.88a1 1 0 1 0 1.41 1.41" +
+                        "l4.59-4.59a1 1 0 0 0 0-1.41L10.7 6.7a1 1 0 0 0-1.41 0z",
+                ),
+            fill = SolidColor(androidx.compose.ui.graphics.Color.White),
+        ).build()
+
+/**
  * One list entry. Every screen that shows a list of things should use this.
  *
  * The slots cover the three row shapes the app actually has: a destination (leading +
@@ -394,6 +462,7 @@ fun InfoRow(
  * the leading slot rather than constraining it — so a caller that leaves the icon size
  * alone can never have it clipped by the row.
  */
+
 @Composable
 fun HermesListItem(
     modifier: Modifier = Modifier,
@@ -407,6 +476,7 @@ fun HermesListItem(
     onClick: (() -> Unit)? = null,
     dense: Boolean = false,
     minHeight: Dp? = null,
+    rowHeight: Dp? = null,
     containerColor: Color = Color.Transparent,
 ) {
     val spacing = LocalSpacing.current
@@ -415,14 +485,57 @@ fun HermesListItem(
     val headlineSlot = headline
     val subtitleSlot = subtitle
     val supportingSlot = supporting
-    val sized = if (minHeight == null) modifier else modifier.heightIn(min = minHeight)
+    // A fixed rowHeight makes every row identical, and lets the slots centre themselves:
+    // Material top-aligns leading/trailing content on three-line items, which leaves a switch
+    // sitting high while the text block runs lower.
+    val sized =
+        when {
+            rowHeight != null -> modifier.height(rowHeight)
+            minHeight != null -> modifier.heightIn(min = minHeight)
+            else -> modifier
+        }
+    val centreSlot: @Composable (@Composable () -> Unit) -> Unit =
+        if (rowHeight == null) {
+            { slot -> slot() }
+        } else {
+            { slot ->
+                Box(
+                    modifier = Modifier.fillMaxHeight(),
+                    contentAlignment = Alignment.Center,
+                ) { slot() }
+            }
+        }
     // Material's headlineContent is non-null, so the slot is resolved to one lambda here:
     // a caller-provided headline, else the title string, else nothing to show.
     // Material's headlineContent is non-null, so the slot is resolved here into a single
     // composable lambda: a caller-provided headline, else the title string, else nothing.
     // The `when` lives inside that lambda because a nullable composable slot cannot be
     // the initializer of a non-null one — Kotlin widens the branches to a common type.
-    val headlineContent: @Composable () -> Unit = {
+    val supportingBlock: (@Composable () -> Unit)? =
+        supportingSlot ?: if (subtitleSlot == null && metaSlot == null) {
+            null
+        } else {
+            {
+                Column {
+                    if (subtitleSlot != null) {
+                        Text(
+                            text = subtitleSlot,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (metaSlot != null) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+                            content = metaSlot,
+                        )
+                    }
+                }
+            }
+        }
+
+    val headlineOnly: @Composable () -> Unit = {
         when {
             headlineSlot != null -> headlineSlot.invoke()
             titleSlot != null ->
@@ -440,34 +553,37 @@ fun HermesListItem(
         }
     }
 
+    // With a fixed rowHeight the headline and its supporting text become one centred block.
+    // Material top-aligns three-line content while centring nothing else, so leaving the slots
+    // separate puts the icon, the text and the switch on three different centres.
+    val headlineContent: @Composable () -> Unit =
+        if (rowHeight == null) {
+            headlineOnly
+        } else {
+            {
+                Box(
+                    modifier = Modifier.fillMaxHeight(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column {
+                        headlineOnly()
+                        supportingBlock?.invoke()
+                    }
+                }
+            }
+        }
+
     ListItem(
         modifier = if (onClick != null) sized.clickable(onClick = onClick) else sized,
         colors = ListItemDefaults.colors(containerColor = containerColor),
-        leadingContent = leading,
+        leadingContent = leading?.let { slot -> { centreSlot(slot) } },
         headlineContent = headlineContent,
         supportingContent =
-            supportingSlot ?: if (subtitleSlot == null && metaSlot == null) {
-                null
+            if (rowHeight == null) {
+                supportingBlock
             } else {
-                {
-                    Column {
-                        if (subtitleSlot != null) {
-                            Text(
-                                text = subtitleSlot,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        if (metaSlot != null) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(spacing.xs),
-                                content = metaSlot,
-                            )
-                        }
-                    }
-                }
+                null
             },
-        trailingContent = trailing,
+        trailingContent = trailing?.let { slot -> { centreSlot(slot) } },
     )
 }
