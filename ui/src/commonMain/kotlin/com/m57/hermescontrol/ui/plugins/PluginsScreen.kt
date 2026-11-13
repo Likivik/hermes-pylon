@@ -18,6 +18,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
@@ -35,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -86,15 +88,62 @@ import com.m57.hermescontrol.ui.icons.HermesIcon
 import com.m57.hermescontrol.ui.icons.HermesSymbol
 import org.jetbrains.compose.resources.stringResource
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PluginsScreen(
+fun PluginsRoute(
     modifier: Modifier = Modifier,
     onOpenDrawer: (() -> Unit)? = null,
     viewModel: PluginsViewModel = viewModel { PluginsViewModel() },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
+    LaunchedEffect(Unit) { viewModel.loadPlugins() }
+
+    ToastEffect(toastMessage = state.toastMessage, onClearToast = viewModel::clearToast)
+
+    PluginsScreen(
+        state = state,
+        modifier = modifier,
+        onOpenDrawer = onOpenDrawer,
+        onRefresh = viewModel::loadPlugins,
+        onMemoryProviderChange = viewModel::updateMemoryProvider,
+        onContextEngineChange = viewModel::updateContextEngine,
+        onSaveProviders = viewModel::savePluginProviders,
+        onInstallUrlChange = viewModel::updateInstallUrl,
+        onInstallForceChange = viewModel::updateInstallForce,
+        onInstallEnableChange = viewModel::updateInstallEnable,
+        onInstall = { viewModel.installPluginFromUrl() },
+        onTogglePlugin = viewModel::togglePlugin,
+        onToggleVisibility = viewModel::togglePluginVisibility,
+        onUpdatePlugin = { name -> viewModel.updatePlugin(name) },
+        onActivatePlugin = viewModel::activatePlugin,
+        onRequestRemove = viewModel::requestRemovePlugin,
+        onConfirmRemove = viewModel::confirmRemovePlugin,
+        onCancelRemove = viewModel::cancelRemovePlugin,
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PluginsScreen(
+    state: PluginsUiState,
+    modifier: Modifier = Modifier,
+    onOpenDrawer: (() -> Unit)? = null,
+    onRefresh: () -> Unit,
+    onMemoryProviderChange: (String) -> Unit,
+    onContextEngineChange: (String) -> Unit,
+    onSaveProviders: () -> Unit,
+    onInstallUrlChange: (String) -> Unit,
+    onInstallForceChange: (Boolean) -> Unit,
+    onInstallEnableChange: (Boolean) -> Unit,
+    onInstall: () -> Unit,
+    onTogglePlugin: (PluginInfo) -> Unit,
+    onToggleVisibility: (PluginInfo) -> Unit,
+    onUpdatePlugin: (String) -> Unit,
+    onActivatePlugin: (PluginInfo) -> Unit,
+    onRequestRemove: (String) -> Unit,
+    onConfirmRemove: () -> Unit,
+    onCancelRemove: () -> Unit,
+) {
     var query by remember { mutableStateOf("") }
     var showDetail by remember { mutableStateOf<PluginInfo?>(null) }
 
@@ -106,16 +155,10 @@ fun PluginsScreen(
             }
         }
 
-    LaunchedEffect(Unit) {
-        viewModel.loadPlugins()
-    }
-
-    ToastEffect(toastMessage = state.toastMessage, onClearToast = viewModel::clearToast)
-
     // Remove confirmation dialog
     if (state.removeConfirmPlugin != null) {
         AlertDialog(
-            onDismissRequest = { viewModel.cancelRemovePlugin() },
+            onDismissRequest = onCancelRemove,
             title = { Text(stringResource(Res.string.plugins_remove_confirm_title)) },
             text = {
                 Text(
@@ -127,14 +170,14 @@ fun PluginsScreen(
             },
             confirmButton = {
                 TextButton(
-                    onClick = { viewModel.confirmRemovePlugin() },
+                    onClick = onConfirmRemove,
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
                 ) {
                     Text(stringResource(Res.string.plugins_action_remove))
                 }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.cancelRemovePlugin() }) {
+                TextButton(onClick = onCancelRemove) {
                     Text(stringResource(Res.string.common_cancel))
                 }
             },
@@ -143,7 +186,7 @@ fun PluginsScreen(
 
     PluginsScaffold(
         isRefreshing = state.isLoading,
-        onReload = viewModel::loadPlugins,
+        onReload = onRefresh,
         onOpenDrawer = onOpenDrawer,
     ) { paddingValues ->
         when {
@@ -154,7 +197,7 @@ fun PluginsScreen(
             state.errorMessage != null -> {
                 ErrorState(
                     message = state.errorMessage ?: "",
-                    onRetry = { viewModel.loadPlugins() },
+                    onRetry = onRefresh,
                     modifier = Modifier.padding(paddingValues),
                 )
             }
@@ -163,62 +206,78 @@ fun PluginsScreen(
                 EmptyState(
                     title = stringResource(Res.string.plugins_empty_title),
                     subtitle = stringResource(Res.string.plugins_empty_desc),
-                    onAction = { viewModel.loadPlugins() },
+                    onAction = onRefresh,
                     actionLabel = stringResource(Res.string.content_desc_refresh),
                     modifier = Modifier.padding(paddingValues),
                 )
             }
 
             else -> {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = listContentPadding,
-                    verticalArrangement = listItemSpacing,
-                ) {
-                    // Provider selection section
-                    if (state.memoryOptions.isNotEmpty() || state.contextOptions.isNotEmpty()) {
-                        item(key = "providers") {
-                            ProviderSelectionSection(state, viewModel)
+                Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+                    // Pinned above the list: as a list item it sat below the provider and
+                    // install sections, which scrolled it off the first screen.
+                    SearchBar(
+                        query = query,
+                        onQueryChange = { query = it },
+                        placeholder = "Search plugins...",
+                        modifier = Modifier.padding(horizontal = Spacing.md),
+                    )
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = listContentPadding,
+                        verticalArrangement = listItemSpacing,
+                    ) {
+                        // Provider selection section
+                        if (state.memoryOptions.isNotEmpty() || state.contextOptions.isNotEmpty()) {
+                            item(key = "providers") {
+                                ProviderSelectionSection(
+                                    state = state,
+                                    onMemoryProviderChange = onMemoryProviderChange,
+                                    onContextEngineChange = onContextEngineChange,
+                                    onSaveProviders = onSaveProviders,
+                                )
+                            }
                         }
-                    }
 
-                    // Install section
-                    item(key = "install") {
-                        InstallSection(state, viewModel)
-                    }
-
-                    // Search bar
-                    item(key = "search") {
-                        SearchBar(
-                            query = query,
-                            onQueryChange = { query = it },
-                            placeholder = "Search plugins...",
-                        )
-                    }
-
-                    // Plugin list
-                    items(filteredPlugins, key = { it.name }) { plugin ->
-                        PluginCard(
-                            plugin = plugin,
-                            state = state,
-                            viewModel = viewModel,
-                            onClick = { showDetail = plugin },
-                        )
-                    }
-
-                    // Orphan dashboard plugins section
-                    if (state.orphanPlugins.isNotEmpty()) {
-                        item(key = "orphan-header") {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = stringResource(Res.string.plugins_orphan_heading),
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(vertical = Spacing.sm),
+                        // Install section
+                        item(key = "install") {
+                            InstallSection(
+                                state = state,
+                                onUrlChange = onInstallUrlChange,
+                                onForceChange = onInstallForceChange,
+                                onEnableChange = onInstallEnableChange,
+                                onInstall = onInstall,
                             )
                         }
-                        items(state.orphanPlugins, key = { "orphan-${it.name}" }) { plugin ->
-                            OrphanPluginCard(plugin = plugin, onClick = { showDetail = plugin })
+
+                        // Plugin list
+                        items(filteredPlugins, key = { it.name }) { plugin ->
+                            PluginCard(
+                                plugin = plugin,
+                                busy = state.rowBusy == plugin.name,
+                                onToggle = { onTogglePlugin(plugin) },
+                                onRemove = { onRequestRemove(plugin.name) },
+                                onToggleVisibility = { onToggleVisibility(plugin) },
+                                onUpdate = { onUpdatePlugin(plugin.name) },
+                                onActivate = { onActivatePlugin(plugin) },
+                                onClick = { showDetail = plugin },
+                            )
+                        }
+
+                        // Orphan dashboard plugins section
+                        if (state.orphanPlugins.isNotEmpty()) {
+                            item(key = "orphan-header") {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = stringResource(Res.string.plugins_orphan_heading),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(vertical = Spacing.sm),
+                                )
+                            }
+                            items(state.orphanPlugins, key = { "orphan-${it.name}" }) { plugin ->
+                                OrphanPluginCard(plugin = plugin, onClick = { showDetail = plugin })
+                            }
                         }
                     }
                 }
@@ -255,11 +314,16 @@ fun PluginsScaffold(
 @Composable
 private fun ProviderSelectionSection(
     state: PluginsUiState,
-    viewModel: PluginsViewModel,
+    onMemoryProviderChange: (String) -> Unit,
+    onContextEngineChange: (String) -> Unit,
+    onSaveProviders: () -> Unit,
 ) {
     val providerDefaultsLabel = stringResource(Res.string.plugins_provider_defaults)
 
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+    ) {
         Column(modifier = Modifier.padding(Spacing.md)) {
             Text(
                 text = stringResource(Res.string.plugins_providers_heading),
@@ -293,9 +357,9 @@ private fun ProviderSelectionSection(
                     },
                 onOptionSelected = { selected ->
                     if (selected == providerDefaultsLabel) {
-                        viewModel.updateMemoryProvider(PluginsUiState.MEMORY_PROVIDER_BUILTIN)
+                        onMemoryProviderChange(PluginsUiState.MEMORY_PROVIDER_BUILTIN)
                     } else {
-                        viewModel.updateMemoryProvider(selected)
+                        onMemoryProviderChange(selected)
                     }
                 },
             )
@@ -312,13 +376,13 @@ private fun ProviderSelectionSection(
                 label = stringResource(Res.string.plugins_context_engine_label),
                 options = listOf("compressor") + state.contextOptions.map { it.name },
                 selectedValue = state.contextEngine,
-                onOptionSelected = { viewModel.updateContextEngine(it) },
+                onOptionSelected = onContextEngineChange,
             )
 
             Spacer(modifier = Modifier.height(12.dp))
 
             Button(
-                onClick = { viewModel.savePluginProviders() },
+                onClick = onSaveProviders,
                 enabled = !state.providerBusy,
             ) {
                 if (state.providerBusy) {
@@ -338,9 +402,15 @@ private fun ProviderSelectionSection(
 @Composable
 private fun InstallSection(
     state: PluginsUiState,
-    viewModel: PluginsViewModel,
+    onUrlChange: (String) -> Unit,
+    onForceChange: (Boolean) -> Unit,
+    onEnableChange: (Boolean) -> Unit,
+    onInstall: () -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+    ) {
         Column(modifier = Modifier.padding(Spacing.md)) {
             Text(
                 text = stringResource(Res.string.plugins_install_heading),
@@ -356,7 +426,7 @@ private fun InstallSection(
 
             OutlinedTextField(
                 value = state.installUrl,
-                onValueChange = { viewModel.updateInstallUrl(it) },
+                onValueChange = onUrlChange,
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("owner/repo, owner/repo/subdir, or https://...") },
                 singleLine = true,
@@ -373,7 +443,7 @@ private fun InstallSection(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Switch(
                         checked = state.installForce,
-                        onCheckedChange = { viewModel.updateInstallForce(it) },
+                        onCheckedChange = onForceChange,
                         enabled = !state.installBusy,
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -385,7 +455,7 @@ private fun InstallSection(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Switch(
                         checked = state.installEnable,
-                        onCheckedChange = { viewModel.updateInstallEnable(it) },
+                        onCheckedChange = onEnableChange,
                         enabled = !state.installBusy,
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -399,7 +469,7 @@ private fun InstallSection(
             Spacer(modifier = Modifier.height(12.dp))
 
             Button(
-                onClick = { viewModel.installPluginFromUrl() },
+                onClick = onInstall,
                 enabled = !state.installBusy && state.installUrl.isNotBlank(),
             ) {
                 if (state.installBusy) {
@@ -425,14 +495,20 @@ private fun InstallSection(
 @Composable
 private fun PluginCard(
     plugin: PluginInfo,
-    state: PluginsUiState,
-    viewModel: PluginsViewModel,
+    busy: Boolean,
+    onToggle: () -> Unit,
+    onRemove: () -> Unit,
+    onToggleVisibility: () -> Unit,
+    onUpdate: () -> Unit,
+    onActivate: () -> Unit,
     onClick: () -> Unit,
 ) {
-    val busy = state.rowBusy == plugin.name
     val statusColors = LocalHermesStatusColors.current
 
-    Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+    ) {
         Column(modifier = Modifier.padding(Spacing.md)) {
             // Header row: name + toggle
             Row(
@@ -464,7 +540,7 @@ private fun PluginCard(
                 if (plugin.installed) {
                     Switch(
                         checked = plugin.enabled,
-                        onCheckedChange = { viewModel.togglePlugin(plugin) },
+                        onCheckedChange = { onToggle() },
                     )
                 }
             }
@@ -533,7 +609,7 @@ private fun PluginCard(
                     // Visibility toggle (only for plugins with dashboard manifest)
                     if (plugin.hasDashboardManifest) {
                         IconButton(
-                            onClick = { viewModel.togglePluginVisibility(plugin) },
+                            onClick = onToggleVisibility,
                             enabled = !busy,
                             modifier = Modifier.size(32.dp),
                         ) {
@@ -554,7 +630,7 @@ private fun PluginCard(
                     // Update button
                     if (plugin.canUpdateGit) {
                         OutlinedButton(
-                            onClick = { viewModel.updatePlugin(plugin.name) },
+                            onClick = onUpdate,
                             enabled = !busy,
                         ) {
                             Text(stringResource(Res.string.plugins_action_update))
@@ -565,7 +641,7 @@ private fun PluginCard(
                     // Remove button with confirmation
                     if (plugin.canRemove) {
                         OutlinedButton(
-                            onClick = { viewModel.requestRemovePlugin(plugin.name) },
+                            onClick = onRemove,
                             enabled = !busy,
                             colors =
                                 ButtonDefaults.outlinedButtonColors(
@@ -583,7 +659,7 @@ private fun PluginCard(
                     }
                 } else {
                     Button(
-                        onClick = { viewModel.activatePlugin(plugin) },
+                        onClick = onActivate,
                         enabled = !busy,
                     ) {
                         Text(stringResource(Res.string.plugins_action_install))
@@ -599,7 +675,10 @@ private fun OrphanPluginCard(
     plugin: PluginInfo,
     onClick: () -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+    ) {
         Row(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
