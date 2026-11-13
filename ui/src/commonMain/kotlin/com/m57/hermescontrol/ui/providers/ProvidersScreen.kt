@@ -1,6 +1,8 @@
 package com.m57.hermescontrol.ui.providers
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,10 +14,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -28,8 +29,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -59,6 +62,7 @@ import com.m57.hermescontrol.generated.resources.screen_providers
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.ui.common.EmptyState
 import com.m57.hermescontrol.ui.common.ErrorState
+import com.m57.hermescontrol.ui.common.HermesListItem
 import com.m57.hermescontrol.ui.common.HermesScaffold
 import com.m57.hermescontrol.ui.common.NavIcon
 import com.m57.hermescontrol.ui.common.SkeletonListState
@@ -71,7 +75,7 @@ import com.m57.hermescontrol.ui.mcp.rememberExternalUrlLauncher
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
-fun ProvidersScreen(
+fun ProvidersRoute(
     modifier: Modifier = Modifier,
     onOpenDrawer: (() -> Unit)? = null,
     viewModel: ProvidersViewModel = viewModel { ProvidersViewModel() },
@@ -83,15 +87,44 @@ fun ProvidersScreen(
 
     ToastEffect(toastMessage = state.toastMessage, onClearToast = viewModel::clearToast)
 
+    ProvidersScreen(
+        state = state,
+        modifier = modifier,
+        onOpenDrawer = onOpenDrawer,
+        onRefresh = { viewModel.load() },
+        onStartFlow = viewModel::startOAuthFlow,
+        onDisconnect = viewModel::disconnectProvider,
+        onCodeChange = viewModel::onCodeInputChange,
+        onSubmitCode = viewModel::submitOAuthCode,
+        onCancelFlow = viewModel::cancelOAuthFlow,
+        onDismissFlow = viewModel::dismissFlow,
+        onOpenBrowser = { url -> launcher.openExternalUrl(url) },
+    )
+}
+
+@Composable
+fun ProvidersScreen(
+    state: ProvidersUiState,
+    modifier: Modifier = Modifier,
+    onOpenDrawer: (() -> Unit)? = null,
+    onRefresh: () -> Unit,
+    onStartFlow: (OAuthProvider) -> Unit,
+    onDisconnect: (String) -> Unit,
+    onCodeChange: (String) -> Unit,
+    onSubmitCode: () -> Unit,
+    onCancelFlow: () -> Unit,
+    onDismissFlow: () -> Unit,
+    onOpenBrowser: (String) -> Unit,
+) {
     // Re-auth dialog
     if (state.flowPhase != OAuthFlowPhase.IDLE && state.flowProvider != null) {
         OAuthFlowDialog(
             state = state,
-            onCodeChange = viewModel::onCodeInputChange,
-            onSubmitCode = viewModel::submitOAuthCode,
-            onCancel = viewModel::cancelOAuthFlow,
-            onDismissFlow = viewModel::dismissFlow,
-            onOpenBrowser = { url -> launcher.openExternalUrl(url) },
+            onCodeChange = onCodeChange,
+            onSubmitCode = onSubmitCode,
+            onCancel = onCancelFlow,
+            onDismissFlow = onDismissFlow,
+            onOpenBrowser = onOpenBrowser,
         )
     }
 
@@ -99,7 +132,7 @@ fun ProvidersScreen(
         title = { Text(stringResource(Res.string.screen_providers)) },
         navigationIcon = onOpenDrawer?.let { NavIcon.Menu(it) },
         isRefreshing = state.isLoading,
-        onRefresh = { viewModel.load() },
+        onRefresh = onRefresh,
     ) { paddingValues ->
         when {
             state.isLoading && state.providers.isEmpty() -> {
@@ -109,7 +142,7 @@ fun ProvidersScreen(
             state.errorMessage != null && state.providers.isEmpty() -> {
                 ErrorState(
                     message = state.errorMessage ?: "",
-                    onRetry = { viewModel.load() },
+                    onRetry = onRefresh,
                     modifier = Modifier.padding(paddingValues),
                 )
             }
@@ -129,12 +162,12 @@ fun ProvidersScreen(
                     verticalArrangement = listItemSpacing,
                 ) {
                     items(state.providers, key = { it.id }) { provider ->
-                        ProviderCard(
+                        ProviderRow(
                             provider = provider,
                             isActing = state.actingId == provider.id,
                             flowPhase = state.flowPhase,
-                            onConnect = { viewModel.startOAuthFlow(provider) },
-                            onDisconnect = { viewModel.disconnectProvider(provider.id) },
+                            onConnect = { onStartFlow(provider) },
+                            onDisconnect = { onDisconnect(provider.id) },
                         )
                     }
                 }
@@ -143,8 +176,9 @@ fun ProvidersScreen(
     }
 }
 
+/** One provider, as the shared list row: state tile, name, state line and its action. */
 @Composable
-private fun ProviderCard(
+private fun ProviderRow(
     provider: OAuthProvider,
     isActing: Boolean,
     flowPhase: OAuthFlowPhase,
@@ -155,32 +189,24 @@ private fun ProviderCard(
     val isExternal = provider.flow == "external"
     val flowActive = flowPhase != OAuthFlowPhase.IDLE && flowPhase != OAuthFlowPhase.DONE
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-    ) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.Top,
-        ) {
-            HermesSymbol(
+    HermesListItem(
+        leading = {
+            ProviderTile(
                 icon = providerStatusIcon(provider),
-                contentDescription = null,
                 tint = providerStatusColor(provider),
-                modifier = Modifier.size(20.dp),
             )
-            Spacer(modifier = Modifier.width(10.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = provider.name,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+        },
+        headline = {
+            Text(
+                text = provider.name,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+        supporting = {
+            Column {
                 Text(
                     text = providerStatusLabel(provider),
                     style = MaterialTheme.typography.labelSmall,
@@ -245,7 +271,30 @@ private fun ProviderCard(
                     }
                 }
             }
-        }
+        },
+    )
+}
+
+/** A 40 dp tile so every provider's mark sits on the same floor as the channel rows. */
+@Composable
+private fun ProviderTile(
+    icon: HermesIcon,
+    tint: Color,
+) {
+    Box(
+        modifier =
+            Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+        contentAlignment = Alignment.Center,
+    ) {
+        HermesSymbol(
+            icon = icon,
+            contentDescription = null,
+            tint = tint,
+            modifier = Modifier.size(22.dp),
+        )
     }
 }
 
