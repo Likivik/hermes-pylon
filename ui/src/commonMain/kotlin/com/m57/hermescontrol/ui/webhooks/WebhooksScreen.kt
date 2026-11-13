@@ -1,6 +1,5 @@
 package com.m57.hermescontrol.ui.webhooks
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -13,6 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -24,6 +24,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SuggestionChip
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -71,6 +72,7 @@ import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.DetailDialog
 import com.m57.hermescontrol.ui.common.EmptyState
 import com.m57.hermescontrol.ui.common.ErrorState
+import com.m57.hermescontrol.ui.common.HermesListItem
 import com.m57.hermescontrol.ui.common.HermesScaffold
 import com.m57.hermescontrol.ui.common.NavIcon
 import com.m57.hermescontrol.ui.common.SearchBar
@@ -85,15 +87,72 @@ import com.m57.hermescontrol.ui.icons.HermesIcon
 import com.m57.hermescontrol.ui.icons.HermesSymbol
 import org.jetbrains.compose.resources.stringResource
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Route: the only part that knows the ViewModel. Kept separate from [WebhooksScreen]
+ * so the screen can be rendered from state alone and captured as pixels.
+ */
 @Composable
-fun WebhooksScreen(
+fun WebhooksRoute(
     modifier: Modifier = Modifier,
     onOpenDrawer: (() -> Unit)? = null,
     viewModel: WebhooksViewModel = viewModel { WebhooksViewModel() },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
+    LaunchedEffect(Unit) {
+        viewModel.loadWebhooks()
+    }
+
+    ToastEffect(toastMessage = state.toastMessage, onClearToast = viewModel::clearToast)
+
+    WebhooksScreen(
+        state = state,
+        modifier = modifier,
+        onOpenDrawer = onOpenDrawer,
+        onRefresh = { viewModel.loadWebhooks() },
+        onRetry = { viewModel.loadWebhooks() },
+        onToggleGlobal = { enabled -> viewModel.toggleWebhooks(enabled) },
+        onToggleSubscription = { name, enabled -> viewModel.toggleSubscription(name, enabled) },
+        onShowCreateDialog = viewModel::showCreateDialog,
+        onDismissCreateDialog = viewModel::dismissCreateDialog,
+        onCreateFormNameChange = viewModel::updateCreateFormName,
+        onCreateFormDescriptionChange = viewModel::updateCreateFormDescription,
+        onCreateFormEventsChange = viewModel::updateCreateFormEvents,
+        onCreateFormDeliverChange = viewModel::updateCreateFormDeliver,
+        onCreateFormSecretChange = viewModel::updateCreateFormSecret,
+        onCreateSubscription = viewModel::createSubscription,
+        onPromptDeleteSubscription = viewModel::promptDeleteSubscription,
+        onDismissDeleteDialog = viewModel::dismissDeleteDialog,
+        onConfirmDeleteSubscription = viewModel::confirmDeleteSubscription,
+    )
+}
+
+/**
+ * Screen: rendering only. The search query and the detail-dialog selection are the
+ * only pieces of local UI state it owns.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun WebhooksScreen(
+    state: WebhooksUiState,
+    onRefresh: () -> Unit,
+    onRetry: () -> Unit,
+    onToggleGlobal: (Boolean) -> Unit,
+    onToggleSubscription: (String, Boolean) -> Unit,
+    onShowCreateDialog: () -> Unit,
+    onDismissCreateDialog: () -> Unit,
+    onCreateFormNameChange: (String) -> Unit,
+    onCreateFormDescriptionChange: (String) -> Unit,
+    onCreateFormEventsChange: (String) -> Unit,
+    onCreateFormDeliverChange: (String) -> Unit,
+    onCreateFormSecretChange: (String) -> Unit,
+    onCreateSubscription: () -> Unit,
+    onPromptDeleteSubscription: (WebhookSubscription) -> Unit,
+    onDismissDeleteDialog: () -> Unit,
+    onConfirmDeleteSubscription: () -> Unit,
+    modifier: Modifier = Modifier,
+    onOpenDrawer: (() -> Unit)? = null,
+) {
     var query by remember { mutableStateOf("") }
     var showDetail by remember { mutableStateOf<WebhookSubscription?>(null) }
 
@@ -106,23 +165,17 @@ fun WebhooksScreen(
             }
         }
 
-    LaunchedEffect(Unit) {
-        viewModel.loadWebhooks()
-    }
-
-    ToastEffect(toastMessage = state.toastMessage, onClearToast = viewModel::clearToast)
-
     // ── Delete Confirmation Dialog ──
     state.deleteTarget?.let { target ->
         AlertDialog(
-            onDismissRequest = { viewModel.dismissDeleteDialog() },
+            onDismissRequest = onDismissDeleteDialog,
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     HermesSymbol(
                         icon = HermesIcon.Delete,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(20.dp),
+                        size = 20.dp,
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(stringResource(Res.string.webhooks_dialog_delete_title))
@@ -133,7 +186,7 @@ fun WebhooksScreen(
             },
             confirmButton = {
                 Button(
-                    onClick = { viewModel.confirmDeleteSubscription() },
+                    onClick = onConfirmDeleteSubscription,
                     enabled = !state.isDeleting,
                     colors =
                         ButtonDefaults.buttonColors(
@@ -153,7 +206,7 @@ fun WebhooksScreen(
             },
             dismissButton = {
                 TextButton(
-                    onClick = { viewModel.dismissDeleteDialog() },
+                    onClick = onDismissDeleteDialog,
                     enabled = !state.isDeleting,
                 ) {
                     Text(stringResource(Res.string.action_cancel))
@@ -165,13 +218,13 @@ fun WebhooksScreen(
     // ── Create Subscription Dialog ──
     if (state.showCreateDialog) {
         AlertDialog(
-            onDismissRequest = { viewModel.dismissCreateDialog() },
+            onDismissRequest = onDismissCreateDialog,
             title = { Text(stringResource(Res.string.webhooks_dialog_create_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
                         value = state.createFormName,
-                        onValueChange = viewModel::updateCreateFormName,
+                        onValueChange = onCreateFormNameChange,
                         label = { Text(stringResource(Res.string.webhooks_field_name)) },
                         placeholder = { Text(stringResource(Res.string.webhooks_hint_name)) },
                         singleLine = true,
@@ -181,7 +234,7 @@ fun WebhooksScreen(
 
                     OutlinedTextField(
                         value = state.createFormDescription,
-                        onValueChange = viewModel::updateCreateFormDescription,
+                        onValueChange = onCreateFormDescriptionChange,
                         label = { Text(stringResource(Res.string.webhooks_field_description)) },
                         placeholder = { Text("What this webhook does...") },
                         singleLine = true,
@@ -190,7 +243,7 @@ fun WebhooksScreen(
 
                     OutlinedTextField(
                         value = state.createFormEvents,
-                        onValueChange = viewModel::updateCreateFormEvents,
+                        onValueChange = onCreateFormEventsChange,
                         label = { Text(stringResource(Res.string.webhooks_field_events)) },
                         placeholder = { Text(stringResource(Res.string.webhooks_hint_events)) },
                         singleLine = true,
@@ -199,7 +252,7 @@ fun WebhooksScreen(
 
                     OutlinedTextField(
                         value = state.createFormDeliver,
-                        onValueChange = viewModel::updateCreateFormDeliver,
+                        onValueChange = onCreateFormDeliverChange,
                         label = { Text(stringResource(Res.string.webhooks_field_deliver)) },
                         placeholder = { Text(stringResource(Res.string.webhooks_hint_deliver)) },
                         singleLine = true,
@@ -208,7 +261,7 @@ fun WebhooksScreen(
 
                     OutlinedTextField(
                         value = state.createFormSecret,
-                        onValueChange = viewModel::updateCreateFormSecret,
+                        onValueChange = onCreateFormSecretChange,
                         label = { Text(stringResource(Res.string.webhooks_field_secret)) },
                         placeholder = { Text(stringResource(Res.string.webhooks_hint_secret)) },
                         singleLine = true,
@@ -226,7 +279,7 @@ fun WebhooksScreen(
             },
             confirmButton = {
                 Button(
-                    onClick = { viewModel.createSubscription() },
+                    onClick = onCreateSubscription,
                     enabled = !state.isActionRunning,
                 ) {
                     if (state.isActionRunning) {
@@ -241,7 +294,7 @@ fun WebhooksScreen(
             },
             dismissButton = {
                 TextButton(
-                    onClick = { viewModel.dismissCreateDialog() },
+                    onClick = onDismissCreateDialog,
                     enabled = !state.isActionRunning,
                 ) {
                     Text(stringResource(Res.string.action_cancel))
@@ -251,12 +304,13 @@ fun WebhooksScreen(
     }
 
     HermesScaffold(
+        modifier = modifier,
         title = { Text(stringResource(Res.string.screen_webhooks)) },
         navigationIcon = onOpenDrawer?.let { NavIcon.Menu(it) },
         isRefreshing = state.isLoading,
-        onRefresh = { viewModel.loadWebhooks() },
+        onRefresh = onRefresh,
         actions = {
-            IconButton(onClick = { viewModel.showCreateDialog() }) {
+            IconButton(onClick = onShowCreateDialog) {
                 HermesSymbol(
                     icon = HermesIcon.Add,
                     contentDescription = stringResource(Res.string.webhooks_action_add),
@@ -272,7 +326,7 @@ fun WebhooksScreen(
             state.errorMessage != null && state.baseUrl == null -> {
                 ErrorState(
                     message = state.errorMessage ?: "",
-                    onRetry = { viewModel.loadWebhooks() },
+                    onRetry = onRetry,
                     modifier = Modifier.padding(paddingValues),
                 )
             }
@@ -324,7 +378,7 @@ fun WebhooksScreen(
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Switch(
                                     checked = state.enabled,
-                                    onCheckedChange = { viewModel.toggleWebhooks(it) },
+                                    onCheckedChange = onToggleGlobal,
                                 )
                             }
                         }
@@ -381,7 +435,7 @@ fun WebhooksScreen(
                                     },
                                 onAction =
                                     if (state.subscriptions.isEmpty()) {
-                                        { viewModel.showCreateDialog() }
+                                        onShowCreateDialog
                                     } else {
                                         null
                                     },
@@ -389,11 +443,11 @@ fun WebhooksScreen(
                         }
                     } else {
                         items(filteredSubscriptions, key = { it.name }) { sub ->
-                            SubscriptionCard(
+                            SubscriptionRow(
                                 sub = sub,
                                 isToggling = state.togglingName == sub.name,
-                                onToggle = { enabled -> viewModel.toggleSubscription(sub.name, enabled) },
-                                onDelete = { viewModel.promptDeleteSubscription(sub) },
+                                onToggle = { enabled -> onToggleSubscription(sub.name, enabled) },
+                                onDelete = { onPromptDeleteSubscription(sub) },
                                 onClick = { showDetail = sub },
                             )
                         }
@@ -412,8 +466,12 @@ fun WebhooksScreen(
     }
 }
 
+/**
+ * One subscription, rendered on the shared [HermesListItem] so the row matches
+ * every other list in the app.
+ */
 @Composable
-private fun SubscriptionCard(
+private fun SubscriptionRow(
     sub: WebhookSubscription,
     isToggling: Boolean,
     onToggle: (Boolean) -> Unit,
@@ -422,140 +480,154 @@ private fun SubscriptionCard(
 ) {
     val isEnabled = sub.enabled ?: true
 
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        colors =
-            CardDefaults.cardColors(
-                containerColor =
+    HermesListItem(
+        modifier = Modifier.fillMaxWidth(),
+        leading = {
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color =
                     if (isEnabled) {
-                        MaterialTheme.colorScheme.surface
+                        MaterialTheme.colorScheme.primaryContainer
                     } else {
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                        MaterialTheme.colorScheme.surfaceVariant
                     },
-            ),
-    ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(Spacing.md),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            // Header row: Name + Toggle + Delete
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.size(40.dp),
             ) {
                 Row(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f),
                 ) {
-                    Text(
-                        text = sub.name.replaceFirstChar { it.uppercase() },
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color =
+                    HermesSymbol(
+                        icon = HermesIcon.Webhook,
+                        contentDescription = null,
+                        size = 22.dp,
+                        tint =
                             if (isEnabled) {
-                                MaterialTheme.colorScheme.onSurface
+                                MaterialTheme.colorScheme.onPrimaryContainer
                             } else {
-                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                MaterialTheme.colorScheme.onSurfaceVariant
                             },
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
                     )
-                    if (sub.secret_set == true) {
+                }
+            }
+        },
+        headline = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = sub.name.replaceFirstChar { it.uppercase() },
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold,
+                    color =
+                        if (isEnabled) {
+                            MaterialTheme.colorScheme.onSurface
+                        } else {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                if (sub.secret_set == true) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    HermesSymbol(
+                        icon = HermesIcon.Lock,
+                        contentDescription = "Secret configured",
+                        size = 14.dp,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                // Delivery target badge
+                sub.deliver?.let { deliver ->
+                    if (deliver.isNotBlank() && deliver != "log") {
                         Spacer(modifier = Modifier.width(6.dp))
-                        HermesSymbol(
-                            icon = HermesIcon.Lock,
-                            contentDescription = "Secret configured",
-                            modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                    // Delivery target badge
-                    sub.deliver?.let { deliver ->
-                        if (deliver.isNotBlank() && deliver != "log") {
-                            Spacer(modifier = Modifier.width(6.dp))
-                            StatusBadge(
-                                text = deliver,
-                                status = StatusBadgeType.INFO,
-                            )
-                        }
-                    }
-                }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (isToggling) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            strokeWidth = 2.dp,
-                        )
-                    } else {
-                        Switch(
-                            checked = isEnabled,
-                            onCheckedChange = onToggle,
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(4.dp))
-                    IconButton(
-                        onClick = onDelete,
-                        modifier = Modifier.size(32.dp),
-                    ) {
-                        HermesSymbol(
-                            icon = HermesIcon.Delete,
-                            contentDescription = "Delete subscription",
-                            modifier = Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                        StatusBadge(
+                            text = deliver,
+                            status = StatusBadgeType.INFO,
                         )
                     }
                 }
             }
+        },
+        supporting = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                sub.description?.let { desc ->
+                    if (desc.isNotBlank()) {
+                        Text(
+                            text = desc,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
 
-            // Description
-            sub.description?.let { desc ->
-                if (desc.isNotBlank()) {
-                    Text(
-                        text = desc,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                sub.events?.let { events ->
+                    if (events.isNotEmpty()) {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            events.forEach { event ->
+                                SuggestionChip(
+                                    onClick = {},
+                                    label = {
+                                        Text(
+                                            text = event,
+                                            style = MaterialTheme.typography.labelSmall,
+                                        )
+                                    },
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Text(
+                    text = sub.url,
+                    style =
+                        MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = FontFamily.Monospace,
+                        ),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        },
+        trailing = {
+            // Anchored right: the spinner and the toggle are conditional, so the cluster must
+            // grow leftwards and keep delete in the same column on every row.
+            Row(
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (isToggling) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Switch(
+                        checked = isEnabled,
+                        onCheckedChange = onToggle,
+                    )
+                }
+                Spacer(modifier = Modifier.width(4.dp))
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    HermesSymbol(
+                        icon = HermesIcon.Delete,
+                        contentDescription = "Delete subscription",
+                        size = 18.dp,
+                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
                     )
                 }
             }
-
-            // Event chips
-            sub.events?.let { events ->
-                if (events.isNotEmpty()) {
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        events.forEach { event ->
-                            SuggestionChip(
-                                onClick = {},
-                                label = {
-                                    Text(
-                                        text = event,
-                                        style = MaterialTheme.typography.labelSmall,
-                                    )
-                                },
-                            )
-                        }
-                    }
-                }
-            }
-
-            // URL
-            Text(
-                text = sub.url,
-                style =
-                    MaterialTheme.typography.bodySmall.copy(
-                        fontFamily = FontFamily.Monospace,
-                    ),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
+        },
+        onClick = onClick,
+    )
 }
