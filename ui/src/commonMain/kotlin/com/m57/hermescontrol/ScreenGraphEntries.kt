@@ -35,7 +35,7 @@ import com.m57.hermescontrol.ui.billing.BillingScreen as BillingScreenContent
 import com.m57.hermescontrol.ui.bots.BotsRoute as BotsRouteContent
 import com.m57.hermescontrol.ui.channels.ChannelsRoute as ChannelsRouteContent
 import com.m57.hermescontrol.ui.config.ConfigScreen as ConfigScreenContent
-import com.m57.hermescontrol.ui.cron.CronJobsScreen as CronJobsScreenContent
+import com.m57.hermescontrol.ui.cron.CronJobsRoute as CronJobsRouteContent
 import com.m57.hermescontrol.ui.files.FilesScreen as FilesScreenContent
 import com.m57.hermescontrol.ui.gateway.GatewayScreen as GatewayScreenContent
 import com.m57.hermescontrol.ui.kanban.KanbanScreen as KanbanScreenContent
@@ -97,7 +97,7 @@ private fun commonScreens(): List<ScreenDefinition> =
             Res.string.screen_cron,
             HermesIcon.Schedule,
             DrawerSection.AUTOMATE,
-        ) { sessionId, openDrawer -> CronJobsScreenContent(onOpenDrawer = openDrawer) },
+        ) { sessionId, openDrawer -> CronJobsRouteContent(onOpenDrawer = openDrawer) },
         ScreenDefinition(
             WebhooksScreen,
             Res.string.screen_webhooks,
