@@ -43,7 +43,7 @@ import com.m57.hermescontrol.ui.keys.KeysRoute as KeysRouteContent
 import com.m57.hermescontrol.ui.logs.LogsScreen as LogsScreenContent
 import com.m57.hermescontrol.ui.mcp.McpServersScreen as McpServersScreenContent
 import com.m57.hermescontrol.ui.model.ModelScreen as ModelScreenContent
-import com.m57.hermescontrol.ui.plugins.PluginsScreen as PluginsScreenContent
+import com.m57.hermescontrol.ui.plugins.PluginsRoute as PluginsScreenContent
 import com.m57.hermescontrol.ui.process.ProcessesScreen as ProcessesScreenContent
 import com.m57.hermescontrol.ui.profiles.ProfilesScreen as ProfilesScreenContent
 import com.m57.hermescontrol.ui.providers.ProvidersRoute as ProvidersScreenContent
