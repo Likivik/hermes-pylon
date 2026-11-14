@@ -1,6 +1,7 @@
 package com.m57.hermescontrol.ui.skills
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -44,6 +46,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -95,6 +99,7 @@ import com.m57.hermescontrol.ui.common.DetailRow
 import com.m57.hermescontrol.ui.common.EmptyState
 import com.m57.hermescontrol.ui.common.ErrorState
 import com.m57.hermescontrol.ui.common.FilterChipRow
+import com.m57.hermescontrol.ui.common.HermesListItem
 import com.m57.hermescontrol.ui.common.HermesScaffold
 import com.m57.hermescontrol.ui.common.LoadingState
 import com.m57.hermescontrol.ui.common.NavIcon
@@ -111,32 +116,78 @@ const val CATEGORY_ALL = "All"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SkillsScreen(
+fun SkillsRoute(
     modifier: Modifier = Modifier,
     onOpenDrawer: () -> Unit = {},
     viewModel: SkillsViewModel = viewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) { viewModel.loadSkills() }
+
+    ToastEffect(toastMessage = state.toastMessage, onClearToast = viewModel::clearToast)
+
+    SkillsScreen(
+        state = state,
+        modifier = modifier,
+        onOpenDrawer = onOpenDrawer,
+        onRefresh = viewModel::loadSkills,
+        onSearchHub = viewModel::searchHub,
+        onUpdateFromHub = viewModel::updateSkillsFromHub,
+        onSetViewMode = viewModel::setViewMode,
+        onToggle = viewModel::toggleSkill,
+        onEdit = viewModel::loadSkillContent,
+        onUninstall = viewModel::uninstallSkill,
+        onSetSourceFilter = viewModel::setSourceFilter,
+        onHubQueryChange = viewModel::setHubQuery,
+        onClearHubSearch = viewModel::clearHubSearch,
+        onInstall = viewModel::installSkill,
+        onPreviewHubSkill = viewModel::previewHubSkill,
+        onSaveContent = { name, content -> viewModel.saveSkillContent(name, content) },
+        onClearEditor = viewModel::clearEditor,
+        onClearSaveSuccess = viewModel::clearSaveSuccess,
+        onClearPreview = viewModel::clearPreview,
+    )
+}
+
+@Composable
+fun SkillsScreen(
+    state: SkillsUiState,
+    modifier: Modifier = Modifier,
+    onOpenDrawer: () -> Unit = {},
+    onRefresh: () -> Unit,
+    onSearchHub: (String) -> Unit,
+    onUpdateFromHub: () -> Unit,
+    onSetViewMode: (SkillsViewMode) -> Unit,
+    onToggle: (Skill) -> Unit,
+    onEdit: (String) -> Unit,
+    onUninstall: (String) -> Unit,
+    onSetSourceFilter: (String?) -> Unit,
+    onHubQueryChange: (String) -> Unit,
+    onClearHubSearch: () -> Unit,
+    onInstall: (String) -> Unit,
+    onPreviewHubSkill: (String) -> Unit,
+    onSaveContent: (String, String) -> Unit,
+    onClearEditor: () -> Unit,
+    onClearSaveSuccess: () -> Unit,
+    onClearPreview: () -> Unit,
+) {
     var query by remember { mutableStateOf("") }
     var selectedStatus by remember { mutableStateOf(SkillFilter.ALL_STATUSES) }
     var selectedCategory by remember { mutableStateOf(CATEGORY_ALL) }
-
-    LaunchedEffect(Unit) {
-        viewModel.loadSkills()
-    }
 
     SkillsScaffold(
         modifier = modifier,
         isRefreshing = state.isLoading,
         onReload = {
             when (state.viewMode) {
-                SkillsViewMode.INSTALLED -> viewModel.loadSkills()
-                SkillsViewMode.HUB -> viewModel.searchHub(state.hubQuery)
+                SkillsViewMode.INSTALLED -> onRefresh()
+                SkillsViewMode.HUB -> onSearchHub(state.hubQuery)
             }
         },
         onUpdateFromHub =
             if (state.viewMode == SkillsViewMode.INSTALLED) {
-                viewModel::updateSkillsFromHub
+                onUpdateFromHub
             } else {
                 null
             },
@@ -154,14 +205,14 @@ fun SkillsScreen(
             ) {
                 SegmentedButton(
                     selected = state.viewMode == SkillsViewMode.INSTALLED,
-                    onClick = { viewModel.setViewMode(SkillsViewMode.INSTALLED) },
+                    onClick = { onSetViewMode(SkillsViewMode.INSTALLED) },
                     shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
                 ) {
                     Text(stringResource(Res.string.skills_mode_installed))
                 }
                 SegmentedButton(
                     selected = state.viewMode == SkillsViewMode.HUB,
-                    onClick = { viewModel.setViewMode(SkillsViewMode.HUB) },
+                    onClick = { onSetViewMode(SkillsViewMode.HUB) },
                     shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
                 ) {
                     Text(stringResource(Res.string.skills_mode_hub))
@@ -178,15 +229,15 @@ fun SkillsScreen(
                         onStatusChange = { selectedStatus = it },
                         selectedCategory = selectedCategory,
                         onCategoryChange = { selectedCategory = it },
-                        onToggle = viewModel::toggleSkill,
-                        onEdit = viewModel::loadSkillContent,
-                        onUninstall = viewModel::uninstallSkill,
-                        onSetSourceFilter = viewModel::setSourceFilter,
+                        onToggle = onToggle,
+                        onEdit = onEdit,
+                        onUninstall = onUninstall,
+                        onSetSourceFilter = onSetSourceFilter,
                         sourceFilter = state.sourceFilter,
                         isUninstalling = state.isUninstalling,
                         uninstallingSkillName = state.uninstallingSkillName,
-                        onRefresh = viewModel::loadSkills,
-                        onBrowseHub = { viewModel.setViewMode(SkillsViewMode.HUB) },
+                        onRefresh = onRefresh,
+                        onBrowseHub = { onSetViewMode(SkillsViewMode.HUB) },
                     )
                 }
 
@@ -194,11 +245,11 @@ fun SkillsScreen(
                     HubBrowseView(
                         state = state,
                         hubQuery = state.hubQuery,
-                        onHubQueryChange = viewModel::setHubQuery,
-                        onSearch = viewModel::searchHub,
-                        onClearSearch = viewModel::clearHubSearch,
-                        onInstall = viewModel::installSkill,
-                        onPreviewHubSkill = viewModel::previewHubSkill,
+                        onHubQueryChange = onHubQueryChange,
+                        onSearch = onSearchHub,
+                        onClearSearch = onClearHubSearch,
+                        onInstall = onInstall,
+                        onPreviewHubSkill = onPreviewHubSkill,
                         isInstalling = state.isInstalling,
                         installingSkillName = state.installingSkillName,
                     )
@@ -216,9 +267,9 @@ fun SkillsScreen(
             initialContent = state.skillContent,
             isSaving = state.isSavingContent,
             saveSuccess = state.saveContentSuccess,
-            onSave = { content -> viewModel.saveSkillContent(skillName, content) },
-            onDismiss = { viewModel.clearEditor() },
-            onClearSaveSuccess = { viewModel.clearSaveSuccess() },
+            onSave = { content -> onSaveContent(skillName, content) },
+            onDismiss = onClearEditor,
+            onClearSaveSuccess = onClearSaveSuccess,
         )
     }
 
@@ -227,14 +278,9 @@ fun SkillsScreen(
             skillName = skillName,
             isLoading = state.isLoadingPreview,
             content = state.previewSkillContent,
-            onDismiss = { viewModel.clearPreview() },
+            onDismiss = onClearPreview,
         )
     }
-
-    ToastEffect(
-        toastMessage = state.toastMessage,
-        onClearToast = viewModel::clearToast,
-    )
 }
 
 @Composable
@@ -436,87 +482,62 @@ private fun SkillCard(
     isUninstalling: Boolean,
     onClick: () -> Unit,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).clickable(onClick = onClick),
-        colors =
-            CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(
-                modifier = Modifier.weight(1f).padding(horizontal = Spacing.sm, vertical = Spacing.sm),
-            ) {
-                // ── Top row: name + source badge + toggle ──
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = skill.name,
-                        style =
-                            MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.SemiBold,
-                            ),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    skill.source?.let { source ->
-                        Spacer(modifier = Modifier.width(6.dp))
-                        SourceBadge(source = source)
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Switch(
-                        checked = skill.enabled,
-                        onCheckedChange = { onToggle() },
-                    )
+    HermesListItem(
+        onClick = onClick,
+        leading = { SkillTile() },
+        headline = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = skill.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                skill.source?.let { source ->
+                    Spacer(modifier = Modifier.width(6.dp))
+                    SourceBadge(source = source)
                 }
-
-                // ── Category ──
-                skill.category?.let { cat ->
-                    Spacer(modifier = Modifier.height(2.dp))
+            }
+        },
+        supporting = {
+            Column {
+                skill.category?.let { category ->
                     Text(
-                        text = cat,
+                        text = category,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-
-                // ── Description ──
-                skill.description?.let { desc ->
-                    Spacer(modifier = Modifier.height(4.dp))
+                skill.description?.let { description ->
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = desc,
-                        style = MaterialTheme.typography.bodyMedium,
+                        text = description,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-
-                // ── Action buttons row ──
-                if (onUninstall != null) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        IconButton(onClick = onAction) {
-                            HermesSymbol(
-                                icon = HermesIcon.Edit,
-                                contentDescription = stringResource(Res.string.content_desc_edit_skill),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = onAction, modifier = Modifier.size(40.dp)) {
+                        HermesSymbol(
+                            icon = HermesIcon.Edit,
+                            contentDescription = stringResource(Res.string.content_desc_edit_skill),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (onUninstall != null) {
                         IconButton(
                             onClick = onUninstall,
                             enabled = !isUninstalling,
+                            modifier = Modifier.size(40.dp),
                         ) {
                             if (isUninstalling) {
                                 CircularProgressIndicator(
@@ -533,25 +554,39 @@ private fun SkillCard(
                             }
                         }
                     }
-                } else {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End,
-                    ) {
-                        IconButton(onClick = onAction) {
-                            HermesSymbol(
-                                icon = HermesIcon.Edit,
-                                contentDescription = stringResource(Res.string.content_desc_edit_skill),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
                 }
             }
-        }
+        },
+        trailing = {
+            Switch(
+                checked = skill.enabled,
+                onCheckedChange = { onToggle() },
+            )
+        },
+        containerColor = Color.Transparent,
+    )
+}
+
+/** A 40 dp tile so a skill row lines up with every other list row in the app. */
+@Composable
+private fun SkillTile() {
+    Box(
+        modifier =
+            Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+        contentAlignment = Alignment.Center,
+    ) {
+        HermesSymbol(
+            icon = HermesIcon.Extension,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(22.dp),
+        )
     }
 }
+
 // ── Source Badge ───────────────────────────────────────────────────────
 
 @Composable

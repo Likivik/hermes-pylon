@@ -74,7 +74,7 @@ class SkillsReloadWiringTest {
             )
         every { viewModel.uiState } returns MutableStateFlow(state).asStateFlow()
         composeRule.setContent {
-            SkillsScreen(viewModel = viewModel)
+            SkillsRoute(viewModel = viewModel)
         }
         composeRule.waitForIdle()
         clearMocks(viewModel, answers = false, recordedCalls = true)
