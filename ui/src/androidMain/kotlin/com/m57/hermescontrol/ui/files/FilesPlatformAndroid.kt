@@ -101,3 +101,7 @@ private class PendingPick {
         onError = null
     }
 }
+
+/** Desktop and Android stage a real file, so the screen opens it by path. */
+@Composable
+actual fun rememberDownloadedFileLauncher(): ((DownloadedFile) -> Unit)? = null
