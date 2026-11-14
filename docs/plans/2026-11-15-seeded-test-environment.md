@@ -64,12 +64,12 @@ Three layers with three different jobs. Keeping them separate is what stops this
 
 ### Phase 0 — isolation first
 
-1. Dedicated user `pylon-test`, home `/var/lib/pylon-test`, data at `/var/lib/pylon-test/data`. Nothing test-related lives under `/var/lib/hermes`.
-2. Ports `127.0.0.1:19119` (gateway) and `127.0.0.1:18080` (preview), far from the real `9119`/`8080`.
-3. Chrome profile at `/var/lib/pylon-test/chrome` — **outside the real home**, which is the point of the whole exercise.
-4. `deploy/test/pylon-test.service`: `User=pylon-test`, `ProtectSystem=strict`, `ProtectHome=yes`, `ReadWritePaths=/var/lib/pylon-test`, `PrivateTmp=yes`, `NoNewPrivileges=yes`, `IPAddressDeny=any`, `RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6`. No provider keys in the unit's `Environment`.
-5. Pre-write `config.yaml` and `.env` before first boot — the setup wizard is interactive and must never be reached.
-6. Accept criterion: from inside the service's namespace, `/var/lib/hermes` is unreadable, and `curl` to any external host fails.
+1. **Rootless pod, no OS user, no systemd unit.** Everything runs as the invoking user on an internal podman network; `deploy/test/pod.sh up|down|wipe|status`. Verified here: podman 6.1.4, userns `0→976`, a published port on an `--internal` network answers on the host while container egress is blocked.
+2. Ports `127.0.0.1:19119` (dashboard) and `127.0.0.1:18080` (app dist), far from the real `9119`/`8080`.
+3. Chrome stays on the host, on its own profile — the pod publishes a loopback port, so no browser belongs in the image.
+4. Containers: `stub_provider` (loopback `:19200`), `gateway` (`gateway run`, s6-supervised), `dashboard` (`--host 0.0.0.0 --port 9119 --no-open --skip-build`), `dist` (static server for the built app). All share the pod's loopback.
+5. Config through `hermes config set` inside the container — never a hand-written `config.yaml`. The fixture password is hashed with the gateway's own `plugins.dashboard_auth.basic.hash_password`.
+6. Accept criteria, all verified: dashboard `200` and dist `200` from the host; `curl` to an external host fails inside the containers; `/api/env` is `401` without a session and `200` with one.
 
 ### Phase 1 — capability matrix (**done**: see `2026-11-15-capability-matrix.md`)
 
@@ -79,7 +79,7 @@ Three layers with three different jobs. Keeping them separate is what stops this
 ### Phase 2 — the seed
 
 9. `deploy/test/seed.py`, one function per domain, each returning the count it wrote; order matters (providers before channels, files before sessions).
-10. Fixture set: **Files** `/seed` with `notes.md` (1 KB), `diagram.png` (~40 KB), `archive.zip` (~200 KB), one subfolder, one empty folder · **Sessions** 3 finished sessions with fixed titles · **Cron** `daily-digest` enabled, `weekly-report` paused · **Channels** Telegram configured+connected, Slack available, WhatsApp available · **Webhooks** 2 subscriptions with fixed URLs · **Logs** 50 lines at fixed levels · **Bots** `default`, `seed-bot`.
+10. Fixture set: **Files** `/opt/data/seed` with `notes.md` (1 KB), `diagram.png` (~40 KB), `archive.zip` (~200 KB), one subfolder, one empty folder · **Sessions** 3 finished sessions with fixed titles · **Cron** `daily-digest` enabled, `weekly-report` paused · **Channels** Telegram configured+connected, Slack available, WhatsApp available · **Webhooks** 2 subscriptions with fixed URLs · **Logs** 50 lines at fixed levels · **Bots** `default`, `seed-bot`.
 11. `deploy/test/verify.py` asserts the count per domain through the same endpoints the app uses; prints expected vs actual and exits non-zero.
 
 ### Phase 3 — point the app at it
@@ -106,7 +106,7 @@ Three layers with three different jobs. Keeping them separate is what stops this
 
 ## Files likely to change
 
-- `deploy/test/` — `pylon-test.service`, `config.yaml.tmpl`, `seed.py`, `verify.py`, `auth.py`, `browser.py`, `run.sh`, `preview.sh`, `README.md`.
+- `deploy/test/` — `pod.sh`, `stub_provider.py`, `seed.py`, `verify.py`, `auth.py`, `browser.py`, `run.sh`, `README.md` (no unit file, no config template: config is set through `hermes config set`).
 - `ui/src/wasmJsMain/kotlin/com/m57/hermescontrol/ui/files/FilesPlatformWasm.kt` — stable input `id` (step 15).
 - `.github/workflows/` — one optional nightly job.
 - No other app code expected; if a base-URL override is missing, that is a config gap to fix in the same PR that needs it.
@@ -126,11 +126,12 @@ Three layers with three different jobs. Keeping them separate is what stops this
 - **`IPAddressDeny=any` can block loopback on some systemd versions** — verify early, with `IPAddressAllow=localhost`, or the gateway cannot talk to itself and the whole stack looks broken for the wrong reason.
 - **Not every screen is seedable.** OAuth and model calls stay manual; the coverage table says so rather than pretending.
 - **A fixture password in plain sight is safe only while the service has no real data and no network reach.** Both are load-bearing; if either weakens, the password moves.
-- **Version pinning:** no image digest to pin, so pin the Hermes release tag in the unit and bump it deliberately.
+- **Image pinning:** `:latest` is refused; pin the repo digest `docker.io/nousresearch/hermes-agent@sha256:1a355ebc8981a4b72a28f4e47e347ba4f0f172b43dc876e5768d175a07c67b22` (3.26 GB, v0.23.1) and bump deliberately. An image ID is not a digest — pulling by `sha256:ed43…` (the image ID) fails.
+- **Live findings from the first real runs (2026-11-15):** `hermes gateway start/run` has **no** `--host`/`--port` flags; the app-facing HTTP surface is the **dashboard** (`dashboard --host 0.0.0.0 --port 9119 --no-open --skip-build`), not the gateway's OpenAI-compatible `api_server` (enabled via `API_SERVER_HOST=0.0.0.0` + `API_SERVER_KEY`, which refuses keys shorter than 16 characters). The dashboard **refuses a non-loopback bind until an auth provider is registered** — `dashboard.basic_auth.username` + `password_hash` must be set first; `pod.sh` now hashes the fixture password with the gateway's own helper and configures it before starting the dashboard. Verified from the host: dashboard `200`, dist `200`, `/api/env` `401` without a session and `200` with one, egress blocked inside both containers. **Subsequent full run (same day): green end to end** — `pod.sh up` completed, and `seed.py` + `verify.py` ran unattended with the fixture password: 13 fixtures across 5 domains (`files 3`, `env 3`, `cron 2`, `webhooks 2`, `profiles 2`), exit 0. Login provider id is `basic`; the managed-files root is `/opt/data`, so fixtures live at `/opt/data/seed`; the webhooks platform must be enabled (`POST api/webhooks/enable`) before creating subscriptions.
 
 ## Open questions
 
-1. Exact `IPAddressAllow=localhost` syntax on this systemd version — settled in phase 0, not by guessing.
+1. ~~Exact `IPAddressAllow=localhost` syntax on this systemd version~~ — moot: the pod's `--internal` network was verified to block egress while still serving published ports.
 2. Does any tested screen need egress? If yes, allowlist that host only.
 3. Nightly, or label-triggered on PRs touching `ui/`?
 4. Should the live checks publish a JSON report as a CI artifact so a failure is reviewable without a local run?

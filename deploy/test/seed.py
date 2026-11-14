@@ -12,6 +12,7 @@ Each function returns how many records it wrote; `verify.py` asserts those count
 from __future__ import annotations
 
 import base64
+import http.cookiejar
 import json
 import os
 import sys
@@ -23,8 +24,29 @@ BASE = os.environ.get("PYLON_TEST_BASE", "http://127.0.0.1:19119").rstrip("/")
 TOKEN = os.environ.get("PYLON_TEST_TOKEN", "")
 TIMEOUT = 15
 
+# The harness signs in the way a human would: the fixture password against the
+# registered `basic` provider. No token extraction, no manual step.
+LOGIN_USER = os.environ.get("PYLON_TEST_USER", "seed")
+LOGIN_PASSWORD = os.environ.get("PYLON_TEST_PASSWORD", "test-password")
+JAR = http.cookiejar.CookieJar()
+OPENER = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(JAR))
+
+
+def login() -> None:
+    body = json.dumps({"provider": "basic", "username": LOGIN_USER, "password": LOGIN_PASSWORD}).encode()
+    request = urllib.request.Request(f"{BASE}/auth/password-login", data=body, method="POST")
+    request.add_header("content-type", "application/json")
+    try:
+        with OPENER.open(request, timeout=TIMEOUT) as response:
+            if response.status >= 300:
+                raise SystemExit(f"login failed: {response.status}")
+    except urllib.error.HTTPError as error:
+        raise SystemExit(f"login failed: {error.code} {error.read().decode(errors='replace')[:200]}") from error
+    if not JAR:
+        raise SystemExit("login returned no session cookies")
+
 # Fixed content: same names, same sizes, every run.
-FIXTURES_DIR = "/seed"
+FIXTURES_DIR = "/opt/data/seed"
 FIXTURE_FILES = {
     "notes.md": b"# Seeded notes\n\nFixed content for the Files screen.\n" * 20,
     "diagram.png": b"\x89PNG\r\n\x1a\n" + b"seed-fixture" * 2500,
@@ -40,7 +62,7 @@ def call(method: str, path: str, body: dict | None = None) -> tuple[int, object]
     if TOKEN:
         request.add_header("authorization", f"Bearer {TOKEN}")
     try:
-        with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
+        with OPENER.open(request, timeout=TIMEOUT) as response:
             raw = response.read()
             return response.status, (json.loads(raw) if raw else None)
     except urllib.error.HTTPError as error:
@@ -60,14 +82,15 @@ def seed_files() -> int:
     require("POST", "api/files/mkdir", {"path": FIXTURES_DIR})
     require("POST", "api/files/mkdir", {"path": f"{FIXTURES_DIR}/empty"})
     for name, content in FIXTURE_FILES.items():
+        mime = "image/png" if name.endswith(".png") else "application/zip" if name.endswith(".zip") else "text/markdown"
         require(
             "POST",
             "api/files/upload",
             {
                 "path": f"{FIXTURES_DIR}/{name}",
-                # The app uploads through the same field; base64 keeps this text-only.
-                "content": base64.b64encode(content).decode(),
-                "encoding": "base64",
+                # The app sends a data URL; base64 keeps this text-only.
+                "data_url": f"data:{mime};base64,{base64.b64encode(content).decode()}",
+                "overwrite": True,
             },
         )
     return len(FIXTURE_FILES)
@@ -105,6 +128,8 @@ def seed_cron() -> int:
 
 
 def seed_webhooks() -> int:
+    # The platform ships disabled; the app enables it from the Webhooks page.
+    require("POST", "api/webhooks/enable", {"enabled": True})
     hooks = [
         {"name": "seed-message", "url": "https://example.test/hook", "events": ["message.created"]},
         {"name": "seed-session", "url": "https://example.test/done", "events": ["session.finished"]},
@@ -134,6 +159,8 @@ SEEDS = {
 
 
 def main() -> None:
+    if not TOKEN:
+        login()
     wanted = sys.argv[1:] or list(SEEDS)
     counts: dict[str, int] = {}
     for name in wanted:
