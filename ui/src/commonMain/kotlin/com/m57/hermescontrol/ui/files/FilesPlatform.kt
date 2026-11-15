@@ -62,3 +62,12 @@ interface FilesPlatform {
 
 @Composable
 expect fun rememberFilesPlatform(): FilesPlatform
+
+/**
+ * A way to hand in-memory bytes to the user, for platforms with no filesystem.
+ *
+ * The browser downloads through a blob URL and an anchor; Android and the desktop stage a real
+ * file and open it, so they return null here.
+ */
+@Composable
+expect fun rememberDownloadedFileLauncher(): ((DownloadedFile) -> Unit)?

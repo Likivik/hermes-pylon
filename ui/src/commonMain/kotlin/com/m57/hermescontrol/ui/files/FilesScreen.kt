@@ -5,7 +5,6 @@ package com.m57.hermescontrol.ui.files
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -19,8 +18,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -39,6 +36,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -74,6 +73,8 @@ import com.m57.hermescontrol.generated.resources.screen_files
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.EmptyState
 import com.m57.hermescontrol.ui.common.ErrorState
+import com.m57.hermescontrol.ui.common.HermesIconTile
+import com.m57.hermescontrol.ui.common.HermesListItem
 import com.m57.hermescontrol.ui.common.HermesScaffold
 import com.m57.hermescontrol.ui.common.NavIcon
 import com.m57.hermescontrol.ui.common.SecureGatewayMediaPlayer
@@ -111,7 +112,7 @@ fun FilesScreen(
     modifier: Modifier = Modifier,
     onOpenDrawer: (() -> Unit)? = null,
     viewModel: FilesViewModel = viewModel { FilesViewModel() },
-    launchDownloadedFile: ((DownloadedFile) -> Unit)? = null,
+    launchDownloadedFile: ((DownloadedFile) -> Unit)? = rememberDownloadedFileLauncher(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
@@ -383,8 +384,7 @@ private fun BreadcrumbBar(
 @Composable
 private fun FileRow(
     entry: ManagedFileEntry? = null,
-    icon: HermesIcon =
-        entry?.let { fileIcon(it) } ?: HermesIcon.Folder,
+    icon: HermesIcon = entry?.let { fileIcon(it) } ?: HermesIcon.Folder,
     name: String = entry?.name ?: "",
     subtitle: String? = null,
     isBusy: Boolean,
@@ -392,65 +392,55 @@ private fun FileRow(
     onDelete: (() -> Unit)? = null,
 ) {
     val resolvedSubtitle = subtitle ?: entry?.let { fileSubtitle(it) }
-    Card(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clickable(enabled = !isBusy, onClick = onClick),
-        colors =
-            CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-            ),
-        shape = MaterialTheme.shapes.medium,
-    ) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            HermesSymbol(
-                icon = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(28.dp),
+    HermesListItem(
+        onClick = if (isBusy) null else onClick,
+        leading = {
+            HermesIconTile(icon = icon)
+        },
+        headline = {
+            Text(
+                text = name,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = name,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (resolvedSubtitle != null) {
+        },
+        supporting =
+            resolvedSubtitle?.let { sub ->
+                {
                     Text(
-                        text = resolvedSubtitle,
+                        text = sub,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-            }
-            if (isBusy) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(18.dp),
-                    strokeWidth = 2.dp,
-                )
-            } else if (onDelete != null && entry != null && !entry.isDirectory) {
-                IconButton(onClick = onDelete) {
-                    HermesSymbol(
-                        icon = HermesIcon.Delete,
-                        contentDescription = stringResource(Res.string.files_action_delete_named, entry.name),
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(20.dp),
+            },
+        trailing = {
+            when {
+                isBusy ->
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
                     )
-                }
+
+                onDelete != null && entry != null && !entry.isDirectory ->
+                    IconButton(onClick = onDelete, modifier = Modifier.size(40.dp)) {
+                        HermesSymbol(
+                            icon = HermesIcon.Delete,
+                            contentDescription = stringResource(Res.string.files_action_delete_named, entry.name),
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+
+                else -> Unit
             }
-        }
-    }
+        },
+        containerColor = Color.Transparent,
+    )
 }
 
 // ── Create directory dialog ──────────────────────────────────────────────────

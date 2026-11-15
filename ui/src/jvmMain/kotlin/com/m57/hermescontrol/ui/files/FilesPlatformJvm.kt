@@ -73,3 +73,7 @@ internal fun humanSize(bytes: Long): String {
     }
     return "${(value * 10).toLong() / 10.0} ${units[unit]}"
 }
+
+/** Desktop and Android stage a real file, so the screen opens it by path. */
+@Composable
+actual fun rememberDownloadedFileLauncher(): ((DownloadedFile) -> Unit)? = null
