@@ -310,7 +310,7 @@ fun WebhooksScreen(
         isRefreshing = state.isLoading,
         onRefresh = onRefresh,
         actions = {
-            IconButton(onClick = onShowCreateDialog) {
+            IconButton(onClick = onShowCreateDialog, modifier = Modifier.size(40.dp)) {
                 HermesSymbol(
                     icon = HermesIcon.Add,
                     contentDescription = stringResource(Res.string.webhooks_action_add),

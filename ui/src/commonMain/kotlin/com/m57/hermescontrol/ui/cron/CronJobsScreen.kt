@@ -201,7 +201,7 @@ fun CronJobsScreen(
         isRefreshing = state.isLoading,
         onRefresh = onRefresh,
         actions = {
-            IconButton(onClick = onAddJob) {
+            IconButton(onClick = onAddJob, modifier = Modifier.size(40.dp)) {
                 HermesSymbol(
                     icon = HermesIcon.Add,
                     contentDescription = stringResource(Res.string.cron_action_add),
@@ -440,21 +440,21 @@ private fun CronJobRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
                 ) {
-                    IconButton(onClick = onEdit) {
+                    IconButton(onClick = onEdit, modifier = Modifier.size(40.dp)) {
                         HermesSymbol(
                             icon = HermesIcon.Edit,
                             contentDescription = stringResource(Res.string.cron_action_edit),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    IconButton(onClick = onRun) {
+                    IconButton(onClick = onRun, modifier = Modifier.size(40.dp)) {
                         HermesSymbol(
                             icon = HermesIcon.Refresh,
                             contentDescription = stringResource(Res.string.cron_action_run),
                             tint = MaterialTheme.colorScheme.secondary,
                         )
                     }
-                    IconButton(onClick = onDelete) {
+                    IconButton(onClick = onDelete, modifier = Modifier.size(40.dp)) {
                         HermesSymbol(
                             icon = HermesIcon.Delete,
                             contentDescription = stringResource(Res.string.action_delete),
