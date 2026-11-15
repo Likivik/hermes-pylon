@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.m57.hermescontrol.data.model.ManagedFileEntry
+import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.action_cancel
 import com.m57.hermescontrol.generated.resources.content_desc_refresh
@@ -107,31 +108,140 @@ private fun filesText(text: FilesUiText): String =
         stringResource(text.key, *text.args.toTypedArray())
     }
 
+/**
+ * What the Files screen can do. [FilesRoute] implements this over the ViewModel; the screen
+ * takes it so it can render from state alone, which is what makes it testable.
+ */
+interface FilesActions {
+    fun refresh()
+
+    fun navigateTo(entry: ManagedFileEntry)
+
+    fun navigateUp()
+
+    fun navigateToCrumb(path: String)
+
+    fun openCreateDir()
+
+    fun dismissCreateDir()
+
+    fun setNewDirName(name: String)
+
+    fun createDir()
+
+    fun requestDelete(entry: ManagedFileEntry)
+
+    fun dismissDelete()
+
+    fun confirmDelete()
+
+    fun uploadFile(
+        name: String,
+        bytes: ByteArray,
+        mimeType: String,
+    )
+
+    fun downloadFile(
+        entry: ManagedFileEntry,
+        staging: String,
+        onResult: (NetworkResult<DownloadedFile>) -> Unit,
+    )
+
+    fun showToast(message: FilesUiText)
+
+    fun clearToast()
+
+    fun clearTransientState()
+}
+
 @Composable
-fun FilesScreen(
+fun FilesRoute(
     modifier: Modifier = Modifier,
     onOpenDrawer: (() -> Unit)? = null,
     viewModel: FilesViewModel = viewModel { FilesViewModel() },
     launchDownloadedFile: ((DownloadedFile) -> Unit)? = rememberDownloadedFileLauncher(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val scope = rememberCoroutineScope()
-    var mediaPlayerRequest by remember { mutableStateOf<SecureGatewayMediaRequest?>(null) }
-
     LaunchedEffect(viewModel) {
         viewModel.refresh()
     }
+    DisposableEffect(Unit) {
+        onDispose { viewModel.clearTransientState() }
+    }
+    val actions =
+        remember(viewModel) {
+            object : FilesActions {
+                override fun refresh() = viewModel.refresh()
+
+                override fun navigateTo(entry: ManagedFileEntry) = viewModel.navigateTo(entry)
+
+                override fun navigateUp() = viewModel.navigateUp()
+
+                override fun navigateToCrumb(path: String) = viewModel.navigateToCrumb(path)
+
+                override fun openCreateDir() = viewModel.openCreateDir()
+
+                override fun dismissCreateDir() = viewModel.dismissCreateDir()
+
+                override fun setNewDirName(name: String) = viewModel.setNewDirName(name)
+
+                override fun createDir() = viewModel.createDir()
+
+                override fun requestDelete(entry: ManagedFileEntry) = viewModel.requestDelete(entry)
+
+                override fun dismissDelete() = viewModel.dismissDelete()
+
+                override fun confirmDelete() = viewModel.confirmDelete()
+
+                override fun uploadFile(
+                    name: String,
+                    bytes: ByteArray,
+                    mimeType: String,
+                ) = viewModel.uploadFile(name, bytes, mimeType)
+
+                override fun downloadFile(
+                    entry: ManagedFileEntry,
+                    staging: String,
+                    onResult: (NetworkResult<DownloadedFile>) -> Unit,
+                ) = viewModel.downloadFile(entry, staging, onResult)
+
+                override fun showToast(message: FilesUiText) = viewModel.showToast(message)
+
+                override fun clearToast() = viewModel.clearToast()
+
+                override fun clearTransientState() = viewModel.clearTransientState()
+            }
+        }
+    FilesScreen(
+        state = state,
+        actions = actions,
+        modifier = modifier,
+        onOpenDrawer = onOpenDrawer,
+        launchDownloadedFile = launchDownloadedFile,
+    )
+}
+
+@Composable
+fun FilesScreen(
+    state: FilesUiState,
+    actions: FilesActions,
+    modifier: Modifier = Modifier,
+    onOpenDrawer: (() -> Unit)? = null,
+    launchDownloadedFile: ((DownloadedFile) -> Unit)? = null,
+) {
+    val scope = rememberCoroutineScope()
+    var mediaPlayerRequest by remember { mutableStateOf<SecureGatewayMediaRequest?>(null) }
 
     val filesPlatform = rememberFilesPlatform()
     val uploadFile: () -> Unit = {
         filesPlatform.pickFile(
             mimeType = "*/*",
             onPicked = { picked ->
-                scope.launch { viewModel.uploadFile(picked.name, picked.bytes, picked.mimeType) }
+                scope.launch { actions.uploadFile(picked.name, picked.bytes, picked.mimeType) }
             },
             onError = { message ->
                 if (message != null) {
-                    viewModel.showToast(
+                    actions.showToast(
                         FilesUiText(Res.string.files_error_read_selected, listOf(message)),
                     )
                 }
@@ -139,31 +249,27 @@ fun FilesScreen(
         )
     }
 
-    DisposableEffect(Unit) {
-        onDispose { viewModel.clearTransientState() }
-    }
-
     val hasEntries = state.entries.isNotEmpty()
 
     ToastEffect(
         toastMessage = state.toastMessage?.let { filesText(it) },
-        onClearToast = viewModel::clearToast,
+        onClearToast = actions::clearToast,
     )
 
     // ── Create-directory dialog ────────────────────────────────────────
     if (state.isCreatingDir) {
         CreateDirDialog(
             name = state.newDirName,
-            onNameChange = viewModel::setNewDirName,
-            onConfirm = viewModel::createDir,
-            onDismiss = viewModel::dismissCreateDir,
+            onNameChange = actions::setNewDirName,
+            onConfirm = actions::createDir,
+            onDismiss = actions::dismissCreateDir,
         )
     }
 
     // ── Delete confirmation dialog ─────────────────────────────────────
     state.deleteTarget?.let { entry ->
         AlertDialog(
-            onDismissRequest = viewModel::dismissDelete,
+            onDismissRequest = actions::dismissDelete,
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     HermesSymbol(
@@ -186,7 +292,7 @@ fun FilesScreen(
             },
             confirmButton = {
                 Button(
-                    onClick = viewModel::confirmDelete,
+                    onClick = actions::confirmDelete,
                     colors =
                         ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.error,
@@ -196,7 +302,7 @@ fun FilesScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = viewModel::dismissDelete) {
+                TextButton(onClick = actions::dismissDelete) {
                     Text(stringResource(Res.string.action_cancel))
                 }
             },
@@ -207,10 +313,10 @@ fun FilesScreen(
         title = { Text(stringResource(Res.string.screen_files)) },
         navigationIcon = onOpenDrawer?.let { NavIcon.Menu(it) },
         isRefreshing = state.isLoading,
-        onRefresh = viewModel::refresh,
+        onRefresh = actions::refresh,
         actions = {
             if (state.parentPath != null) {
-                IconButton(onClick = viewModel::navigateUp) {
+                IconButton(onClick = actions::navigateUp) {
                     HermesSymbol(
                         icon = HermesIcon.ArrowUpward,
                         contentDescription = stringResource(Res.string.files_action_up),
@@ -234,7 +340,7 @@ fun FilesScreen(
                 state.errorMessage != null && !hasEntries -> {
                     ErrorState(
                         message = state.errorMessage?.let { filesText(it) }.orEmpty(),
-                        onRetry = viewModel::refresh,
+                        onRetry = actions::refresh,
                         modifier = Modifier.padding(paddingValues),
                     )
                 }
@@ -243,7 +349,7 @@ fun FilesScreen(
                     EmptyState(
                         title = stringResource(Res.string.files_empty_title),
                         subtitle = stringResource(Res.string.files_empty_desc),
-                        onAction = viewModel::refresh,
+                        onAction = actions::refresh,
                         actionLabel = stringResource(Res.string.content_desc_refresh),
                         modifier = Modifier.padding(paddingValues),
                     )
@@ -259,7 +365,7 @@ fun FilesScreen(
                         item(key = "breadcrumb") {
                             BreadcrumbBar(
                                 crumbs = state.crumbs,
-                                onCrumbClick = viewModel::navigateToCrumb,
+                                onCrumbClick = actions::navigateToCrumb,
                             )
                         }
 
@@ -271,7 +377,7 @@ fun FilesScreen(
                                     name = "..",
                                     subtitle = stringResource(Res.string.files_action_up),
                                     isBusy = false,
-                                    onClick = viewModel::navigateUp,
+                                    onClick = actions::navigateUp,
                                 )
                             }
                         }
@@ -286,14 +392,14 @@ fun FilesScreen(
                                 isBusy = entry.path in state.busyPaths || state.openingPath == entry.path,
                                 onClick = {
                                     if (entry.isDirectory) {
-                                        viewModel.navigateTo(entry)
+                                        actions.navigateTo(entry)
                                     } else {
                                         when (val route = routeManagedFileOpen(entry)) {
                                             is SecureMediaOpenRoute.Player -> mediaPlayerRequest = route.request
                                             SecureMediaOpenRoute.DownloadAndOpen ->
                                                 openManagedFile(
                                                     entry,
-                                                    viewModel,
+                                                    actions,
                                                     filesPlatform,
                                                     scope,
                                                     launchDownloadedFile,
@@ -303,7 +409,7 @@ fun FilesScreen(
                                         }
                                     }
                                 },
-                                onDelete = { viewModel.requestDelete(entry) },
+                                onDelete = { actions.requestDelete(entry) },
                             )
                         }
                     }
@@ -311,7 +417,7 @@ fun FilesScreen(
             }
 
             FloatingActionButton(
-                onClick = viewModel::openCreateDir,
+                onClick = actions::openCreateDir,
                 modifier =
                     Modifier
                         .align(Alignment.BottomEnd)
@@ -519,17 +625,17 @@ private fun fileSubtitle(entry: ManagedFileEntry): String {
  */
 private fun openManagedFile(
     entry: ManagedFileEntry,
-    viewModel: FilesViewModel,
+    actions: FilesActions,
     platform: FilesPlatform,
     scope: CoroutineScope,
     launchDownloadedFile: ((DownloadedFile) -> Unit)? = null,
 ) {
     val staging = platform.stagingDirectory()
     if (staging == null && launchDownloadedFile == null) {
-        viewModel.showToast(FilesUiText(Res.string.files_error_open, emptyList()))
+        actions.showToast(FilesUiText(Res.string.files_error_open, emptyList()))
         return
     }
-    viewModel.downloadFile(entry, staging.orEmpty()) { result ->
+    actions.downloadFile(entry, staging.orEmpty()) { result ->
         when (result) {
             is com.m57.hermescontrol.data.remote.NetworkResult.Success -> {
                 val data = result.data
@@ -544,7 +650,7 @@ private fun openManagedFile(
                             name = data.name,
                             mimeType = data.mimeType,
                         ).onFailure {
-                            viewModel.showToast(
+                            actions.showToast(
                                 FilesUiText(
                                     Res.string.files_error_open,
                                     listOf(it.message.orEmpty()),
@@ -578,7 +684,7 @@ private fun openManagedFile(
                                 listOf(error.message),
                             )
                     }
-                viewModel.showToast(message)
+                actions.showToast(message)
             }
         }
     }
