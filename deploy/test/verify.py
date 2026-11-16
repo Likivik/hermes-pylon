@@ -12,7 +12,7 @@ from __future__ import annotations
 import os
 import sys
 
-from seed import FIXTURE_FILES, FIXTURES_DIR, call
+from seed import FIXTURE_FILES, FIXTURES_DIR, call, login
 
 EXPECTED = {
     "files": len(FIXTURE_FILES),
@@ -28,12 +28,18 @@ def count_files() -> int:
     if not isinstance(payload, dict):
         return -1
     entries = payload.get("entries") or payload.get("files") or []
-    return sum(1 for entry in entries if not entry.get("isDirectory") and entry.get("name") in FIXTURE_FILES)
+    return sum(1 for entry in entries if not (entry.get("is_directory") or entry.get("isDirectory")) and entry.get("name") in FIXTURE_FILES)
+
+
+FIXTURE_ENV = {"OPENROUTER_API_KEY", "ANTHROPIC_API_KEY", "TELEGRAM_BOT_TOKEN"}
 
 
 def count_env() -> int:
+    # /api/env returns every variable in the container (392 of them); count only ours.
     _, payload = call("GET", "api/env")
-    return len(payload) if isinstance(payload, dict) else -1
+    if isinstance(payload, dict):
+        return sum(1 for name in FIXTURE_ENV if name in payload)
+    return -1
 
 
 def count_cron() -> int:
@@ -62,6 +68,7 @@ def main() -> None:
         "webhooks": count_webhooks,
         "profiles": count_profiles,
     }
+    login()
     failures = []
     seen: dict[str, int] = {}
     for name, expected in EXPECTED.items():
