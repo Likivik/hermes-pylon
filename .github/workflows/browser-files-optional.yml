@@ -13,6 +13,7 @@ jobs:
       - name: Start the seeded pod
         env:
           PYLON_TEST_DIST: ${{ github.workspace }}/deploy/test/empty-dist
+          PYLON_TEST_IMAGE: docker.io/nousresearch/hermes-agent@sha256:1a355ebc8981a4b72a28f4e47e347ba4f0f172b43dc876e5768d175a07c67b22
         run: |
           mkdir -p "$PYLON_TEST_DIST"
           podman --version
