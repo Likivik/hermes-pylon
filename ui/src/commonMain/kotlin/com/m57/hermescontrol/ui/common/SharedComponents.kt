@@ -49,6 +49,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -507,6 +509,11 @@ object HermesListDefaults {
     fun toggleTrailing(
         checked: Boolean,
         onToggle: (Boolean) -> Unit,
+        /**
+         * Accessible name for the switch. Without it a screen reader announces a bare
+         * "switch, off" with no idea which channel it belongs to.
+         */
+        label: String? = null,
     ): @Composable () -> Unit =
         {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -526,7 +533,16 @@ object HermesListDefaults {
                     thickness = ClusterDividerThickness,
                     color = MaterialTheme.colorScheme.outlineVariant,
                 )
-                Switch(checked = checked, onCheckedChange = onToggle)
+                Switch(
+                    checked = checked,
+                    onCheckedChange = onToggle,
+                    modifier =
+                        if (label == null) {
+                            Modifier
+                        } else {
+                            Modifier.semantics { contentDescription = label }
+                        },
+                )
             }
         }
 }
