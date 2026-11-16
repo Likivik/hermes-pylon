@@ -1,0 +1,46 @@
+# Optional. Manual dispatch only - never runs on push, never a required check.
+name: Browser files check (optional)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  files:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start the seeded pod
+        env:
+          PYLON_TEST_DIST: ${{ github.workspace }}/deploy/test/empty-dist
+        run: |
+          mkdir -p "$PYLON_TEST_DIST"
+          podman --version
+          bash deploy/test/pod.sh up
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Playwright
+        working-directory: deploy/test/browser
+        run: |
+          npm install
+          npx playwright install --with-deps chromium
+
+      - name: Run the Files transport check
+        working-directory: deploy/test/browser
+        env:
+          PYLON_URL: http://127.0.0.1:19119
+          PYLON_USER: seed
+          PYLON_PASSWORD: ${{ secrets.PYLON_TEST_PASSWORD }}
+          PYLON_SKIP_APP: "1"
+        run: npm test
+
+      - name: Pod state on failure
+        if: failure()
+        run: podman pod ps && podman logs pylon-test-dashboard 2>&1 | tail -50 || true
+
+      - name: Stop the pod
+        if: always()
+        run: bash deploy/test/pod.sh down || true
