@@ -10,9 +10,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Build the web bundle
+        run: ./gradlew :ui:wasmJsBrowserDistribution -x kotlinWasmBinaryenSetup
+
       - name: Start the seeded pod
         env:
-          PYLON_TEST_DIST: ${{ github.workspace }}/deploy/test/empty-dist
+          PYLON_TEST_DIST: ${{ github.workspace }}/ui/build/dist/wasmJs/productionExecutable
           PYLON_TEST_IMAGE: docker.io/nousresearch/hermes-agent@sha256:1a355ebc8981a4b72a28f4e47e347ba4f0f172b43dc876e5768d175a07c67b22
         run: |
           mkdir -p "$PYLON_TEST_DIST"
@@ -35,7 +43,6 @@ jobs:
           PYLON_URL: http://127.0.0.1:19119
           PYLON_USER: seed
           PYLON_PASSWORD: ${{ secrets.PYLON_TEST_PASSWORD }}
-          PYLON_SKIP_APP: "1"
         run: npm test
 
       - name: Pod state on failure
