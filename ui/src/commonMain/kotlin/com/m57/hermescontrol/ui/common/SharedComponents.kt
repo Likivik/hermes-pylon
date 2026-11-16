@@ -9,38 +9,48 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -387,13 +397,104 @@ fun InfoRow(
 
 // ── HermesListItem — the one list row ─────────────────────────────────
 
-/**
- * The numbers and the one compound control the list rows share. A row stays a single action;
- * a cluster of controls is a value handed to its `trailing` slot, never a parameter on the row.
- */
+/** The row tile: 40 dp, 10 dp radius, 22 dp glyph. One of these, not six copies. */
+@Composable
+fun HermesIconTile(
+    icon: HermesIcon,
+    modifier: Modifier = Modifier,
+    tint: Color = MaterialTheme.colorScheme.primary,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    contentDescription: String? = null,
+) {
+    Box(
+        modifier =
+            modifier
+                .size(HermesListDefaults.TileSize)
+                .clip(RoundedCornerShape(HermesListDefaults.TileRadius))
+                .background(containerColor),
+        contentAlignment = Alignment.Center,
+    ) {
+        HermesSymbol(
+            icon = icon,
+            contentDescription = contentDescription,
+            tint = tint,
+            modifier = Modifier.size(HermesListDefaults.TileGlyphSize),
+        )
+    }
+}
+
+/** A row control: 40 dp target, 20 dp glyph. Material's default is 48 dp, which crowds a row. */
+@Composable
+fun HermesIconButton(
+    icon: HermesIcon,
+    contentDescription: String?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    enabled: Boolean = true,
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = modifier.size(HermesListDefaults.IconButtonSize),
+        enabled = enabled,
+    ) {
+        HermesSymbol(
+            icon = icon,
+            contentDescription = contentDescription,
+            tint = tint,
+            modifier = Modifier.size(HermesListDefaults.IconButtonGlyphSize),
+        )
+    }
+}
+
+/** The three button roles. Filled is primary, outlined is secondary, text-in-error is destructive. */
+enum class HermesButtonVariant { PRIMARY, SECONDARY, DESTRUCTIVE }
+
+@Composable
+fun HermesButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    variant: HermesButtonVariant = HermesButtonVariant.PRIMARY,
+    enabled: Boolean = true,
+    loading: Boolean = false,
+) {
+    val content: @Composable () -> Unit = {
+        if (loading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.onPrimary,
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+        }
+        Text(text = text, style = MaterialTheme.typography.labelLarge)
+    }
+    when (variant) {
+        HermesButtonVariant.PRIMARY ->
+            Button(onClick = onClick, modifier = modifier, enabled = enabled && !loading) { content() }
+
+        HermesButtonVariant.SECONDARY ->
+            OutlinedButton(onClick = onClick, modifier = modifier, enabled = enabled && !loading) { content() }
+
+        HermesButtonVariant.DESTRUCTIVE ->
+            TextButton(
+                onClick = onClick,
+                modifier = modifier,
+                enabled = enabled && !loading,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            ) { content() }
+    }
+}
+
 object HermesListDefaults {
     /** Fixed row height. Fixing it also centres every slot, which Material does not do for three-line rows. */
     val RowHeight: Dp = 88.dp
+    val TileSize: Dp = 40.dp
+    val TileRadius: Dp = 10.dp
+    val TileGlyphSize: Dp = 22.dp
+    val IconButtonSize: Dp = 40.dp
+    val IconButtonGlyphSize: Dp = 20.dp
     val BrandTileSize: Dp = 40.dp
     val BrandMarkSize: Dp = 22.dp
     val ClusterDividerHeight: Dp = 32.dp
@@ -408,6 +509,11 @@ object HermesListDefaults {
     fun toggleTrailing(
         checked: Boolean,
         onToggle: (Boolean) -> Unit,
+        /**
+         * Accessible name for the switch. Without it a screen reader announces a bare
+         * "switch, off" with no idea which channel it belongs to.
+         */
+        label: String? = null,
     ): @Composable () -> Unit =
         {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -416,7 +522,7 @@ object HermesListDefaults {
                 Icon(
                     imageVector = ChevronRight,
                     contentDescription = null,
-                    modifier = Modifier.size(28.dp),
+                    modifier = Modifier.size(24.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 VerticalDivider(
@@ -427,7 +533,16 @@ object HermesListDefaults {
                     thickness = ClusterDividerThickness,
                     color = MaterialTheme.colorScheme.outlineVariant,
                 )
-                Switch(checked = checked, onCheckedChange = onToggle)
+                Switch(
+                    checked = checked,
+                    onCheckedChange = onToggle,
+                    modifier =
+                        if (label == null) {
+                            Modifier
+                        } else {
+                            Modifier.semantics { contentDescription = label }
+                        },
+                )
             }
         }
 }

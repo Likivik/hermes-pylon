@@ -379,6 +379,7 @@ private fun ChannelRow(
             HermesListDefaults.toggleTrailing(
                 checked = platform.enabled,
                 onToggle = onToggle,
+                label = platform.name,
             ),
         // Tapping the row opens the page; the switch and the chevron are separate targets that
         // consume their own taps, so a toggle never navigates and a chevron never toggles.
