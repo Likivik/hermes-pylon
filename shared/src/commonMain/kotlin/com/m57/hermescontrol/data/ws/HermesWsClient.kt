@@ -481,6 +481,34 @@ object HermesWsClient {
         _connectionStatus.value = ConnectionStatus.DISCONNECTED
     }
 
+    /**
+     * Drop a stale AUTH_EXPIRED so the next connect() is allowed.
+     *
+     * connect() deliberately refuses to run from AUTH_EXPIRED, on the assumption
+     * that only a sign-in can clear it. A browser reload that adopts a verified
+     * session is exactly that case: the session is proven live, yet the persisted
+     * status still says otherwise, so the app hangs on "Reconnecting..." while REST
+     * keeps working. Call this only once a session has actually been verified.
+     */
+    fun clearStaleAuthExpiry() {
+        synchronized(connectionLock) {
+            val status = _connectionStatus.value
+            val stuck =
+                status == ConnectionStatus.AUTH_EXPIRED ||
+                    (
+                        webSocket == null &&
+                            (
+                                status == ConnectionStatus.CONNECTING ||
+                                    status == ConnectionStatus.RECONNECTING
+                            )
+                    )
+            if (stuck) {
+                _connectionStatus.value = ConnectionStatus.DISCONNECTED
+                HermesLog.d(TAG, "cleared stale $status after a verified session")
+            }
+        }
+    }
+
     @VisibleForTesting
     fun shouldReconnectAfterNetworkRestore(autoReconnect: Boolean): Boolean =
         !isConnected &&
@@ -518,6 +546,10 @@ object HermesWsClient {
                     HermesLog.d(TAG, "Already connected — skipping")
                     return
                 }
+                // Permanent diagnostic: a hung "Reconnecting" banner with no
+                // socket dial in the access log is impossible to tell apart from
+                // a rejected upgrade. This line says which one it is.
+                HermesLog.d(TAG, "connect() called; status=${_connectionStatus.value}")
                 // Guard against re-entrant connect() while a connection is
                 // already in flight. Only start from a terminal state.
                 if (_connectionStatus.value == ConnectionStatus.CONNECTING ||

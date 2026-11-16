@@ -123,6 +123,21 @@ fun main() {
         com.m57.hermescontrol.data.ws.HermesWsClient.installTransport(
             com.m57.hermescontrol.data.ws.KtorWsTransport(),
         )
+        // The browser reloads constantly, and a failed earlier session leaves AUTH_EXPIRED
+        // behind; connect() refuses to run from it, so the app would sit on
+        // "Reconnecting..." while REST works. The session above is verified, so clear it.
+        com.m57.hermescontrol.data.ws.HermesWsClient.clearStaleAuthExpiry()
+        // The gated handshake mints its ticket through this client; without it
+        // refreshWsTicketIfNeeded() returns "temporarily unavailable" forever and
+        // the app sits on "Reconnecting..." while REST keeps working. Same client
+        // the Android entry installs (HermesControlApp.kt).
+        com.m57.hermescontrol.data.ws.HermesWsClient.installHttpClient(
+            com.m57.hermescontrol.data.remote.createGatewayTransportClient(
+                com.m57.hermescontrol.data.remote.GatewayClientKind.Session,
+                config = com.m57.hermescontrol.data.remote.HermesHttpConfig.Probe,
+            ),
+        )
+        com.m57.hermescontrol.data.ws.HermesWsClient.connect()
         ComposeViewport(viewportContainer = document.body!!) {
             HermesControlTheme(themePreference = ThemePreference.DARK) {
                 // The browser shell draws a branded loading screen and removes it
