@@ -16,7 +16,7 @@ jobs:
           java-version: "21"
 
       - name: Build the web bundle
-        run: ./gradlew :ui:wasmJsBrowserDistribution -x kotlinWasmBinaryenSetup
+        run: ./gradlew :ui:wasmJsBrowserDistribution
 
       - name: Start the seeded pod
         env:
