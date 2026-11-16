@@ -36,7 +36,7 @@ import com.m57.hermescontrol.ui.bots.BotsRoute as BotsRouteContent
 import com.m57.hermescontrol.ui.channels.ChannelsRoute as ChannelsRouteContent
 import com.m57.hermescontrol.ui.config.ConfigScreen as ConfigScreenContent
 import com.m57.hermescontrol.ui.cron.CronJobsRoute as CronJobsRouteContent
-import com.m57.hermescontrol.ui.files.FilesScreen as FilesScreenContent
+import com.m57.hermescontrol.ui.files.FilesRoute as FilesScreenContent
 import com.m57.hermescontrol.ui.gateway.GatewayScreen as GatewayScreenContent
 import com.m57.hermescontrol.ui.kanban.KanbanScreen as KanbanScreenContent
 import com.m57.hermescontrol.ui.keys.KeysRoute as KeysRouteContent
