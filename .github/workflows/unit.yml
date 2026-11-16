@@ -75,6 +75,13 @@ jobs:
           python3 scripts/check_kmp_boundary.py
           python3 scripts/test_check_kmp_boundary.py
 
+      # A platform entry that forgets a WS seam degrades into a permanent
+      # "Reconnecting..." banner with no error, so the wiring is checked statically.
+      - name: Check the WS entry seams
+        run: |
+          python3 scripts/check_entry_seams.py
+          cd scripts && python3 -m unittest test_check_entry_seams
+
       # The shared data/logic layer: ChatViewModel reducers, rail grouping + order
       # persistence, rename fast-path. JUnit + Robolectric, ~7 min.
       - name: Run unit tests (debug)

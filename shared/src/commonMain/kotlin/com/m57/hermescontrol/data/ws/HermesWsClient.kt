@@ -624,7 +624,15 @@ object HermesWsClient {
         try {
             val client =
                 httpClient
-                    ?: return TicketRefreshResult(TicketRefreshStatus.TRANSIENT_FAILURE)
+                    ?: run {
+                        HermesLog.e(
+                            TAG,
+                            "WS client has no HTTP client: the platform entry must call " +
+                                "HermesWsClient.installHttpClient(...). No socket can be " +
+                                "dialled until it does.",
+                        )
+                        return TicketRefreshResult(TicketRefreshStatus.MISSING_HTTP_CLIENT)
+                    }
             val url = auth.endpointForBuild().baseUrl.resolve("api/auth/ws-ticket").toString()
 
             return withContext(ioDispatcher) {
@@ -669,6 +677,14 @@ object HermesWsClient {
         READY,
         AUTHENTICATION_FAILED,
         TRANSIENT_FAILURE,
+
+        /**
+         * The platform entry never called [installHttpClient]. This is a wiring bug, not a
+         * network condition: retrying cannot fix it, and silently degrading to
+         * [TRANSIENT_FAILURE] hides it behind a permanent "Reconnecting..." banner. The web
+         * entry shipped without this seam once and the failure took an evening to find.
+         */
+        MISSING_HTTP_CLIENT,
     }
 
     /**
@@ -1422,6 +1438,16 @@ object HermesWsClient {
                     if (generation != connectionGeneration.get()) return
                     intentionalClose.set(true)
                     _connectionStatus.value = ConnectionStatus.AUTH_EXPIRED
+                }
+                return
+            }
+
+            TicketRefreshStatus.MISSING_HTTP_CLIENT -> {
+                // Not a transient condition, so no reconnect is scheduled: the entry is
+                // mis-wired and only a new install can change that.
+                synchronized(connectionLock) {
+                    if (generation != connectionGeneration.get()) return
+                    _connectionStatus.value = ConnectionStatus.DISCONNECTED
                 }
                 return
             }

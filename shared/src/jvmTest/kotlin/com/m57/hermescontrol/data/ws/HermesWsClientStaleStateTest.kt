@@ -103,8 +103,9 @@ class HermesWsClientStaleStateTest {
     }
 
     /**
-     * The stuck shape: an attempt that can never mint a ticket must not dial, and must
-     * leave a state the client can recover from.
+     * The stuck shape: an attempt that can never mint a ticket must not dial, and the
+     * client must report a wiring fault rather than a transient one — `RECONNECTING`
+     * here would promise a retry that cannot succeed and rebuild the silent banner.
      */
     @Test
     fun `an attempt that cannot mint a ticket never dials`() {
@@ -116,6 +117,11 @@ class HermesWsClientStaleStateTest {
         assertTrue(
             transport.connectedUrls.isEmpty(),
             "nothing may dial before a ticket is minted",
+        )
+        assertEquals(
+            ConnectionStatus.DISCONNECTED,
+            HermesWsClient.connectionStatus.value,
+            "a missing HTTP client is a wiring bug: no reconnect, no banner, an error log",
         )
     }
 
