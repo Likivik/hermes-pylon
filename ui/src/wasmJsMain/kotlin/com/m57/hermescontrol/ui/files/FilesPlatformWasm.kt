@@ -13,15 +13,19 @@ import kotlin.io.encoding.ExperimentalEncodingApi
  */
 @JsFun(
     """(accept, onData, onError) => {
-        const input = document.createElement('input');
-        input.type = 'file';
-        if (accept) input.accept = accept;
-        input.style.display = 'none';
-        document.body.appendChild(input);
-        const done = () => { input.remove(); };
-        input.addEventListener('change', () => {
+        let input = document.getElementById('pylon-file-input');
+        if (!input) {
+            input = document.createElement('input');
+            input.type = 'file';
+            input.id = 'pylon-file-input';
+            input.style.display = 'none';
+            document.body.appendChild(input);
+        }
+        input.accept = accept || '';
+        input.onchange = () => {
             const file = input.files && input.files[0];
-            if (!file) { onError('No file chosen'); done(); return; }
+            const reset = () => { input.value = ''; };
+            if (!file) { onError('No file chosen'); reset(); return; }
             const reader = new FileReader();
             reader.onload = () => {
                 const view = new Uint8Array(reader.result);
@@ -31,11 +35,11 @@ import kotlin.io.encoding.ExperimentalEncodingApi
                     binary += String.fromCharCode.apply(null, view.subarray(i, i + chunk));
                 }
                 onData(file.name, file.type || 'application/octet-stream', btoa(binary));
-                done();
+                reset();
             };
-            reader.onerror = () => { onError('Could not read that file'); done(); };
+            reader.onerror = () => { onError('Could not read that file'); reset(); };
             reader.readAsArrayBuffer(file);
-        });
+        };
         input.click();
     }""",
 )
@@ -44,6 +48,33 @@ private external fun jsOpenFilePicker(
     onData: (String, String, String) -> Unit,
     onError: (String) -> Unit,
 )
+
+/**
+ * Creates the picker node without opening a dialog.
+ *
+ * The input is a singleton with a stable id so automation can address it with
+ * `DOM.setFileInputFiles`; a transient node removed after `change` is invisible to any
+ * harness, which is exactly what made the upload flow untestable before.
+ */
+@JsFun(
+    """(accept) => {
+        let input = document.getElementById('pylon-file-input');
+        if (!input) {
+            input = document.createElement('input');
+            input.type = 'file';
+            input.id = 'pylon-file-input';
+            input.style.display = 'none';
+            document.body.appendChild(input);
+        }
+        input.accept = accept || '';
+        return true;
+    }""",
+)
+private external fun jsEnsureFileInput(accept: String?): Boolean
+
+private fun ensureFileInput(accept: String? = null) {
+    jsEnsureFileInput(accept)
+}
 
 @JsFun(
     """(name, mime, base64) => {
@@ -114,6 +145,8 @@ private external fun jsTimeString(ms: Double): String
 @Composable
 actual fun rememberFilesPlatform(): FilesPlatform =
     remember {
+        // Create the picker node up front so automation can address it before any click.
+        ensureFileInput()
         object : FilesPlatform {
             override val canPickFiles = true
             override val canOpenDownloads = false

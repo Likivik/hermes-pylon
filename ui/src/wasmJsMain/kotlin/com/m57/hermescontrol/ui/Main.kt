@@ -114,6 +114,15 @@ fun main() {
             com.m57.hermescontrol.data.local.WebAuthPlatform(),
         )
         adoptVerifiedSession()
+        // The browser entry must install the same WS seams the Android entry does.
+        // Without them every socket call throws "WsAuthConfig not installed" during
+        // the first composition and the app renders nothing at all.
+        com.m57.hermescontrol.data.ws.HermesWsClient.installAuth(
+            com.m57.hermescontrol.data.local.AuthManager,
+        )
+        com.m57.hermescontrol.data.ws.HermesWsClient.installTransport(
+            com.m57.hermescontrol.data.ws.KtorWsTransport(),
+        )
         ComposeViewport(viewportContainer = document.body!!) {
             HermesControlTheme(themePreference = ThemePreference.DARK) {
                 // The browser shell draws a branded loading screen and removes it
