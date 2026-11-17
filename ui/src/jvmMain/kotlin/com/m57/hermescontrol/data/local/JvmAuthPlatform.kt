@@ -6,6 +6,7 @@ import com.m57.hermescontrol.data.config.serverStoreStorage
 import com.m57.hermescontrol.data.remote.CookiePlatform
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.data.security.SecretStore
+import com.m57.hermescontrol.util.HermesLog
 import kotlinx.coroutines.CoroutineScope
 import java.nio.file.Files
 import java.nio.file.Path
@@ -103,10 +104,18 @@ internal fun pylonConfigDir(): Path {
     return dir
 }
 
+private const val JVM_AUTH_TAG = "JvmAuthPlatform"
+
+/**
+ * A read failure here is not "no secrets stored" — it is "the file exists and we could not
+ * read it", and returning an empty set silently signs the user out. The path is logged;
+ * the contents never are.
+ */
 private fun loadProperties(file: Path): Properties {
     val props = Properties()
     if (Files.exists(file)) {
         runCatching { Files.newInputStream(file).use(props::load) }
+            .onFailure { HermesLog.w(JVM_AUTH_TAG, "could not read $file: ${it.message ?: it::class.simpleName}") }
     }
     return props
 }
@@ -126,7 +135,15 @@ private fun storeProperties(
                 tmp,
                 setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE),
             )
+        }.onFailure {
+            // Security-relevant: without this the secrets file keeps the umask default and
+            // may be readable by other users on the machine.
+            HermesLog.w(JVM_AUTH_TAG, "could not tighten permissions on $tmp: ${it.message ?: it::class.simpleName}")
         }
         Files.move(tmp, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+    }.onFailure {
+        // A swallowed write failure meant the app believed secrets were saved and the next
+        // launch disagreed, with nothing in the log to explain it.
+        HermesLog.w(JVM_AUTH_TAG, "could not store secrets in $file: ${it.message ?: it::class.simpleName}")
     }
 }
