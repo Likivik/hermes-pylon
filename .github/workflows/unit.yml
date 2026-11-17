@@ -82,6 +82,13 @@ jobs:
           python3 scripts/check_entry_seams.py
           cd scripts && python3 -m unittest test_check_entry_seams
 
+      # An `actual` can be empty, a TODO, or a capability that always answers the same
+      # constant and still compile green — silently disabling a feature on one platform.
+      - name: Check the actual implementations
+        run: |
+          python3 scripts/check_actuals.py
+          cd scripts && python3 -m unittest test_check_actuals
+
       # The shared data/logic layer: ChatViewModel reducers, rail grouping + order
       # persistence, rename fast-path. JUnit + Robolectric, ~7 min.
       - name: Run unit tests (debug)
