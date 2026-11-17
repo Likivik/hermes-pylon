@@ -551,10 +551,30 @@
             var vv = window.visualViewport;
             if (!vv) return;
             var current = -1;
+            /** The element the IME would target: Compose Web drives a real DOM input. */
+            function activeTextElement() {
+                var el = document.activeElement;
+                if (!el) return null;
+                var tag = (el.tagName || "").toLowerCase();
+                if (tag === "input" || tag === "textarea") return el;
+                return el.isContentEditable ? el : null;
+            }
             function sync() {
                 var h = Math.round(vv.height);
                 if (h === current) return;
+                // 120px is the "keyboard is up" threshold: browser chrome collapsing moves
+                // the viewport by tens of px, a soft keyboard by hundreds.
+                var keyboardOpen = h < window.innerHeight - 120;
+                var keyboardWasOpen = current >= 0 && current < window.innerHeight - 120;
                 current = h;
+                if (keyboardWasOpen && !keyboardOpen) {
+                    // The keyboard was dismissed by its own hide key, so focus never moved
+                    // and the DOM input is still active — a tap on the same field then
+                    // fires no focus event and the IME stays shut until the user focuses
+                    // something else first. Blur it here so the next tap refocuses.
+                    var el = activeTextElement();
+                    if (el) el.blur();
+                }
                 document.body.style.height = h + "px";
                 // Compose Web sizes its canvas from a *window* resize signal. Changing the
                 // container height alone fires nothing, so the layout kept its old size and
