@@ -1,5 +1,6 @@
 package com.m57.hermescontrol.ui.chat
 
+import com.m57.hermescontrol.data.model.SessionInfo
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -57,5 +58,59 @@ class RailSessionsTest {
         assertEquals("desktop", session?.source)
         assertFalse(session!!.isAutomation)
         assertTrue(railSessionOf(raw("cron_x_20261117_040000", source = "cron"))!!.isAutomation)
+    }
+
+    // ── REST rows: the rail's real source ─────────────────────────────────
+
+    private fun info(
+        id: String,
+        title: String? = "t",
+        startedAt: Double? = 1_700_000_000.0,
+        lastActive: Double? = null,
+        source: String? = null,
+    ): SessionInfo =
+        SessionInfo(
+            id = id,
+            title = title,
+            started_at = startedAt,
+            last_active = lastActive,
+            source = source,
+            message_count = 1,
+        )
+
+    @Test
+    fun `REST last_active is the fold axis, not the creation time`() {
+        val row = info("s1", startedAt = 1_700_000_000.0, lastActive = 1_760_000_000.0)
+        assertEquals(1_760_000_000L, railSessionOf(row)?.lastActive)
+    }
+
+    @Test
+    fun `a row without last_active falls back to started_at`() {
+        val row = info("s1", startedAt = 1_700_000_000.0, lastActive = null)
+        assertEquals(1_700_000_000L, railSessionOf(row)?.lastActive)
+    }
+
+    @Test
+    fun `REST rows keep the server's last-activity order`() {
+        val rows =
+            listOf(
+                info("recent", startedAt = 1_600_000_000.0, lastActive = 1_760_000_000.0),
+                info("older", startedAt = 1_750_000_000.0, lastActive = 1_750_100_000.0),
+            )
+        // The first row was created earlier but used later; sorting on started_at would
+        // invert this, which is the bug this change exists to fix.
+        assertEquals(listOf("recent", "older"), railSessionsOf(rows).map { it.id })
+    }
+
+    @Test
+    fun `REST rows go through the same cron filter`() {
+        val rows = listOf(info("cron_j_20261117_040000", source = "cron"), info("s1"), info("cron_k_20261117_050000"))
+        assertEquals(listOf("s1"), railSessionsOf(rows).map { it.id })
+    }
+
+    @Test
+    fun `a blank REST title falls back instead of rendering empty`() {
+        assertEquals("Untitled", railSessionOf(info("s1", title = "  "))?.title)
+        assertEquals("Untitled", railSessionOf(info("s1", title = null))?.title)
     }
 }

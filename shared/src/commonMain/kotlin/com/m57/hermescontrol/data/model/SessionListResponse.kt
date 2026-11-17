@@ -18,6 +18,13 @@ data class SessionInfo(
     val status: String? = null,
     val preview: String? = null,
     val started_at: Double? = null,
+    /**
+     * Unix seconds of the session's **last activity** as the gateway records it
+     * (`sessions.last_activity_at`). REST exposes it; the `session.list` RPC does not,
+     * which is why the rail reads REST. Null on rows that predate the heartbeat — callers
+     * fall back to [started_at], a lower bound on the same value.
+     */
+    val last_active: Double? = null,
     val source: String? = null,
     val parent_session_id: String? = null,
     val display_name: String? = null,
