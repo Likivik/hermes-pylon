@@ -6,7 +6,26 @@ import com.m57.hermescontrol.data.config.serverStoreStorage
 import com.m57.hermescontrol.data.remote.CookiePlatform
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.data.security.SecretStore
+import com.m57.hermescontrol.util.HermesLog
 import kotlinx.coroutines.CoroutineScope
+
+/**
+ * The `@JsFun` bridges below already swallow browser exceptions and report failure as
+ * `false`/`null`. The silent path was that nobody looked at the `false`: a blocked or
+ * full `sessionStorage` (private mode, quota, third-party cookie rules) made every write
+ * fail while the app behaved as if it had saved — the same shape as the reload that
+ * looked like a sign-out.
+ *
+ * The message names the operation, never the key or the value.
+ */
+private const val WEB_AUTH_TAG = "WebAuthPlatform"
+
+private fun storeWarn(operation: String) {
+    HermesLog.w(
+        WEB_AUTH_TAG,
+        "$operation failed: browser storage is blocked or full; the value will not survive a reload",
+    )
+}
 
 /**
  * The browser side of [AuthPlatform].
@@ -64,7 +83,7 @@ internal class TabSecretStore : SecretStore {
 
     override fun getString(logicalKey: String): String? {
         values[logicalKey]?.let { return it }
-        val stored = runCatching { jsSessionGet(PREFIX + logicalKey) }.getOrNull() ?: return null
+        val stored = jsSessionGet(PREFIX + logicalKey) ?: return null
         values[logicalKey] = stored
         return stored
     }
@@ -75,10 +94,10 @@ internal class TabSecretStore : SecretStore {
     ) {
         if (value == null) {
             values.remove(logicalKey)
-            runCatching { jsSessionRemove(PREFIX + logicalKey) }
+            if (!jsSessionRemove(PREFIX + logicalKey)) storeWarn("secret remove")
         } else {
             values[logicalKey] = value
-            runCatching { jsSessionSet(PREFIX + logicalKey, value) }
+            if (!jsSessionSet(PREFIX + logicalKey, value)) storeWarn("secret write")
         }
     }
 
@@ -88,7 +107,7 @@ internal class TabSecretStore : SecretStore {
             val count = jsSessionLength()
             for (i in 0 until count) {
                 val key = jsSessionKey(i) ?: continue
-                if (key.startsWith(PREFIX + prefix)) jsSessionRemove(key)
+                if (key.startsWith(PREFIX + prefix) && !jsSessionRemove(key)) storeWarn("secret delete-prefix")
             }
         }
     }
@@ -106,7 +125,7 @@ internal class TabCookiePlatform : CookiePlatform {
     override fun getSessionCookie(): String? {
         val id = current ?: return null
         byServer[id]?.let { return it }
-        val stored = runCatching { jsSessionGet(COOKIE_PREFIX + id) }.getOrNull() ?: return null
+        val stored = jsSessionGet(COOKIE_PREFIX + id) ?: return null
         byServer[id] = stored
         return stored
     }
@@ -118,10 +137,10 @@ internal class TabCookiePlatform : CookiePlatform {
         val id = current ?: return
         if (cookie == null) {
             byServer.remove(id)
-            runCatching { jsSessionRemove(COOKIE_PREFIX + id) }
+            if (!jsSessionRemove(COOKIE_PREFIX + id)) storeWarn("cookie remove")
         } else {
             byServer[id] = cookie
-            runCatching { jsSessionSet(COOKIE_PREFIX + id, cookie) }
+            if (!jsSessionSet(COOKIE_PREFIX + id, cookie)) storeWarn("cookie write")
         }
     }
 
