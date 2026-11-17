@@ -47,6 +47,9 @@ import com.m57.hermescontrol.theme.presets.NeonNoirLightStatusColors
  * light wallpaper-derived scheme without the common code having to know
  * about Android's `Build.VERSION_CODES.S`, `LocalContext`, or the
  * platform-side `dynamic{Black,Light}ColorScheme` factories.
+ *
+ * Contract: `null` means the platform has no wallpaper-derived scheme (web, desktop) and
+ * the caller must fall back to the app palette. Null is a normal answer, not a failure.
  */
 @Composable
 expect fun dynamicColorSchemeOrNull(darkTheme: Boolean): ColorScheme?
