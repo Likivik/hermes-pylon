@@ -82,10 +82,18 @@ class FilesScreenTest {
     @Test
     fun everyClickableNodeAnnouncesSomething() =
         runComposeUiTest {
-            // The browser semantics tree exposes additional clickable nodes that carry
-            // neither text nor contentDescription (the JVM tree does not), so this
-            // assertion fails there for a reason that is not yet understood. It stays
-            // JVM-only and the web gap is recorded rather than papered over.
+            // JVM-only, with the reason measured rather than assumed.
+            //
+            // The browser tree reports five nameless clickable nodes here — the icon-only
+            // buttons (40-56 dp, role=Button) — and it did so with the label on the icon,
+            // with `clearAndSetSemantics`, and with the label on the button itself. Across
+            // every dump, no node on web carried a ContentDescription at all, while the rows
+            // were named via Text. So the photo is either a real web a11y gap in how
+            // ContentDescription reaches the accessibility tree, or the wasm test harness
+            // not surfacing it; three placements failing identically favours the harness, and
+            // neither answer justifies a green assertion that hides it. The fix that IS
+            // proven: icons no longer spill their ligature glyph into the tree
+            // (MaterialSymbols.kt), and icon buttons now carry their label on the button node.
             if (isWebTestTarget()) return@runComposeUiTest
             setContent {
                 FilesScreen(
@@ -104,8 +112,8 @@ class FilesScreenTest {
                 }
             assertTrue(
                 unnamed.isEmpty(),
-                "clickable nodes with no name: " +
-                    unnamed.size.toString(),
+                "clickable nodes with no name: " + unnamed.size + " at " +
+                    unnamed.joinToString(" | ") { it.boundsInRoot.toString() },
             )
         }
 }

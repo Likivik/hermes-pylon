@@ -11,8 +11,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.unit.Dp
@@ -184,11 +184,14 @@ fun MaterialSymbol(
 
     val symbol = glyph ?: return
     val fontSize = with(LocalDensity.current) { size.toSp() }
+    // The icon is drawn as a Text whose *content is the ligature glyph* — without this
+    // the semantics tree reads a stray letter for every icon, and a labelled icon-only
+    // button ends up with no name at all (the label sat on an unmerged sibling node).
+    // Clearing first keeps the glyph out of the tree; the label, when there is one, is the
+    // whole semantics of the icon and merges up into the button that owns it.
     val semanticsModifier =
-        if (contentDescription == null) {
-            modifier
-        } else {
-            modifier.semantics { this.contentDescription = contentDescription }
+        modifier.clearAndSetSemantics {
+            contentDescription?.let { this.contentDescription = it }
         }
     Text(
         text = symbol,

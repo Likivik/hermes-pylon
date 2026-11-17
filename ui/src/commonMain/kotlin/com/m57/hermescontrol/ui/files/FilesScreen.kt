@@ -37,6 +37,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -316,14 +318,19 @@ fun FilesScreen(
         onRefresh = actions::refresh,
         actions = {
             if (state.parentPath != null) {
-                IconButton(onClick = actions::navigateUp) {
-                    HermesSymbol(
-                        icon = HermesIcon.ArrowUpward,
-                        contentDescription = stringResource(Res.string.files_action_up),
-                    )
+                val upLabel = stringResource(Res.string.files_action_up)
+                IconButton(
+                    onClick = actions::navigateUp,
+                    modifier = Modifier.semantics { contentDescription = upLabel },
+                ) {
+                    HermesSymbol(icon = HermesIcon.ArrowUpward, contentDescription = upLabel)
                 }
             }
-            IconButton(onClick = uploadFile) {
+            val uploadLabel = stringResource(Res.string.files_action_upload)
+            IconButton(
+                onClick = uploadFile,
+                modifier = Modifier.semantics { contentDescription = uploadLabel },
+            ) {
                 HermesSymbol(
                     icon = HermesIcon.Upload,
                     contentDescription = stringResource(Res.string.files_action_upload),
@@ -416,19 +423,18 @@ fun FilesScreen(
                 }
             }
 
+            val newFolderLabel = stringResource(Res.string.files_action_new_folder)
             FloatingActionButton(
                 onClick = actions::openCreateDir,
                 modifier =
                     Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(Spacing.md),
+                        .padding(Spacing.md)
+                        .semantics { contentDescription = newFolderLabel },
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             ) {
-                HermesSymbol(
-                    icon = HermesIcon.CreateNewFolder,
-                    contentDescription = stringResource(Res.string.files_action_new_folder),
-                )
+                HermesSymbol(icon = HermesIcon.CreateNewFolder, contentDescription = newFolderLabel)
             }
         }
     }
@@ -532,15 +538,23 @@ private fun FileRow(
                         strokeWidth = 2.dp,
                     )
 
-                onDelete != null && entry != null && !entry.isDirectory ->
-                    IconButton(onClick = onDelete, modifier = Modifier.size(40.dp)) {
+                onDelete != null && entry != null && !entry.isDirectory -> {
+                    val deleteLabel = stringResource(Res.string.files_action_delete_named, entry.name)
+                    IconButton(
+                        onClick = onDelete,
+                        modifier =
+                            Modifier.size(40.dp).semantics {
+                                contentDescription = deleteLabel
+                            },
+                    ) {
                         HermesSymbol(
                             icon = HermesIcon.Delete,
-                            contentDescription = stringResource(Res.string.files_action_delete_named, entry.name),
+                            contentDescription = deleteLabel,
                             tint = MaterialTheme.colorScheme.error,
                             modifier = Modifier.size(20.dp),
                         )
                     }
+                }
 
                 else -> Unit
             }
