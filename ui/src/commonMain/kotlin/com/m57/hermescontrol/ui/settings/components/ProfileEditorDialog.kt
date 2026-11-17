@@ -4,8 +4,13 @@ package com.m57.hermescontrol.ui.settings.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -55,10 +60,14 @@ fun ProfileEditorDialog(
         }
 
     androidx.compose.material3.AlertDialog(
+        modifier = Modifier.windowInsetsPadding(WindowInsets.ime),
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = onNameChange,
@@ -134,6 +143,7 @@ fun DeleteProfileConfirmDialog(
     onDismiss: () -> Unit,
 ) {
     androidx.compose.material3.AlertDialog(
+        modifier = Modifier.windowInsetsPadding(WindowInsets.ime),
         onDismissRequest = onDismiss,
         title = { Text(stringResource(Res.string.settings_delete_confirm_title)) },
         text = {
