@@ -350,6 +350,12 @@ class ChatViewModel(
         // immediately after basic-auth login because this guard returned early).
         val isGated =
             runCatching { authStore.isGatedMode() }
+                .onFailure {
+                    // Falling back to token auth here makes the connect return early for a
+                    // cookie-only dashboard — the same failure shape as issue #640, where
+                    // chat showed "reconnect" straight after login. Never silent.
+                    HermesLog.w(TAG, "authStore.isGatedMode() failed; assuming token auth: ${it.message}")
+                }
                 .getOrNull() ?: false
         if (!isGated) {
             val token = authStore.getToken() ?: return
@@ -3917,6 +3923,8 @@ class ChatViewModel(
                         },
                     ).also { if (!it) failureMessage = "Request was not accepted" }
                 } else {
+                    // The failure is surfaced to the user as `failureMessage`, so this one
+                    // is handled rather than silent (inventory: handled).
                     runCatching {
                         wsClient.privilegedRequest(method = method, binding = binding, params = params).await()
                     }.fold(
@@ -4152,6 +4160,10 @@ class ChatViewModel(
                     )
                 } ?: runCatching {
                     wsClient.privilegedRequest(method = method, binding = claimed.binding, params = params).await()
+                }.onFailure {
+                    // The prompt stays up on failure, which is right, but without this line
+                    // nobody can tell a rejected password from a broken socket.
+                    HermesLog.w(TAG, "privileged request failed while answering a prompt: ${it.message}")
                 }.isSuccess
             if (accepted) {
                 _uiState.update { if (it.sudoPrompt == claimed) it.copy(sudoPrompt = null) else it }
@@ -4194,6 +4206,10 @@ class ChatViewModel(
                     )
                 } ?: runCatching {
                     wsClient.privilegedRequest(method = method, binding = claimed.binding, params = params).await()
+                }.onFailure {
+                    // The prompt stays up on failure, which is right, but without this line
+                    // nobody can tell a rejected password from a broken socket.
+                    HermesLog.w(TAG, "privileged request failed while answering a prompt: ${it.message}")
                 }.isSuccess
             if (accepted) {
                 _uiState.update { if (it.secretPrompt == claimed) it.copy(secretPrompt = null) else it }
