@@ -284,6 +284,8 @@ object HermesWsClient {
                 while (connected.get()) {
                     delay(HEARTBEAT_INTERVAL_MS)
                     if (!connected.get()) break
+                    // Intentional: a failed probe IS the signal. Logging every silent
+                    // heartbeat would bury real failures (inventory: intentional-ignore).
                     val alive = runCatching { ping(LIVENESS_PROBE_TIMEOUT_MS) }.isSuccess
                     if (!alive && monotonicTimeMs() - lastPongTimestamp > STALE_THRESHOLD_MS) {
                         synchronized(connectionLock) {
@@ -356,6 +358,12 @@ object HermesWsClient {
             isNetworkAvailable.collect { connected ->
                 val autoReconnect =
                     runCatching { auth.isAutoReconnect() }
+                        .onFailure {
+                            HermesLog.w(
+                                TAG,
+                                "auth.isAutoReconnect() failed; treating auto-reconnect as off: ${it.message}",
+                            )
+                        }
                         .getOrDefault(false)
                 if (connected && shouldReconnectAfterNetworkRestore(autoReconnect)) {
                     HermesLog.d(TAG, "Network restored — triggering immediate reconnect")
@@ -1579,6 +1587,14 @@ object HermesWsClient {
             val isGated =
                 runCatching {
                     auth.isGatedMode()
+                }.onFailure {
+                    // The dangerous default: treating a gated deployment as token auth is
+                    // how a session ends up reconnecting forever against a cookie-only
+                    // dashboard. Loud on purpose.
+                    HermesLog.w(
+                        TAG,
+                        "auth.isGatedMode() failed; falling back to token auth, which may be wrong: ${it.message}",
+                    )
                 }.getOrDefault(false)
             if (isGated && !intentionalClose.get() &&
                 ticketAuthRetryUsed.compareAndSet(false, true)
