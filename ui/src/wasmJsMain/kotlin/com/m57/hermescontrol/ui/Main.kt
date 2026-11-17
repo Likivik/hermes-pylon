@@ -163,6 +163,10 @@ fun main() {
                     //   2. the default font — glyphs resolve asynchronously too.
                     // Awaiting the font alone was not enough: the overlay left
                     // ~0.8 s before any text existed.
+                    // Best-effort by design: these warm the resource and font caches so the
+                    // landing paints with real text. A failure costs a fallback font for one
+                    // frame, while blocking here would delay the shell — so they stay
+                    // unlogged on purpose (inventory: intentional-ignore).
                     runCatching {
                         getString(Res.string.landing_title)
                         getString(Res.string.landing_subtitle)
@@ -477,6 +481,14 @@ private fun adoptVerifiedSession() {
         com.m57.hermescontrol.data.local.AuthSessionState.markAuthenticated()
         com.m57.hermescontrol.data.remote.ApiClient.rebuild()
         com.m57.hermescontrol.data.ws.HermesWsClient.connect()
+    }.onFailure {
+        // Never silent: a failure here can leave the profile on token auth (or with no
+        // base URL), which is the shape of the "Reconnecting..." banner this campaign
+        // spent an evening on. The exception summary is enough to tell which step broke.
+        com.m57.hermescontrol.util.HermesLog.w(
+            "WebSession",
+            "session adoption failed: ${it.message ?: it::class.simpleName}",
+        )
     }
 }
 
