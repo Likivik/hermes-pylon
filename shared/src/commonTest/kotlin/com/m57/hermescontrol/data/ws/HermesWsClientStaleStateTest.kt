@@ -143,6 +143,11 @@ class HermesWsClientStaleStateTest {
                 HermesWsClient.connectionStatus.value,
                 "a missing HTTP client is a wiring bug: no reconnect, no banner, an error log",
             )
+            assertEquals(
+                "missing-http-client",
+                HermesWsClient.lastHandshakeFailure,
+                "the published diagnostic must name the wiring bug, not a word that implies a retry",
+            )
         }
 
     @Test

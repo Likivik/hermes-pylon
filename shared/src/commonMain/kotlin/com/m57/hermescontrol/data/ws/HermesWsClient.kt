@@ -269,6 +269,8 @@ object HermesWsClient {
 
     @Volatile
     var lastPongTimestamp: Long = 0L
+
+    private var _lastHandshakeFailure: String? = null
         private set
 
     val isHealthy: Boolean
@@ -337,6 +339,14 @@ object HermesWsClient {
 
     /** Observable connection status */
     val connectionStatus: StateFlow<ConnectionStatus> = _connectionStatus.asStateFlow()
+
+    /**
+     * Why the last handshake did not proceed, in one word: `auth`, `missing-http-client`,
+     * `transient`, `ready`. Carries no URL, no query string and no ticket — it exists so a
+     * browser test (and a human in devtools) can tell a wiring bug from a transient failure.
+     */
+    val lastHandshakeFailure: String?
+        get() = _lastHandshakeFailure
 
     // ── Credential warning (issue #534) ─────────────────────────────────
     // Backend surfaces `credential_warning` in `gateway.ready` / `session.info`
@@ -1438,9 +1448,10 @@ object HermesWsClient {
             return
         }
         when (ticketResult.status) {
-            TicketRefreshStatus.READY -> Unit
+            TicketRefreshStatus.READY -> _lastHandshakeFailure = "ready"
 
             TicketRefreshStatus.AUTHENTICATION_FAILED -> {
+                _lastHandshakeFailure = "auth"
                 HermesLog.w(TAG, "Aborting openSocket: dashboard authentication rejected")
                 synchronized(connectionLock) {
                     if (generation != connectionGeneration.get()) return
@@ -1451,6 +1462,7 @@ object HermesWsClient {
             }
 
             TicketRefreshStatus.MISSING_HTTP_CLIENT -> {
+                _lastHandshakeFailure = "missing-http-client"
                 // Not a transient condition, so no reconnect is scheduled: the entry is
                 // mis-wired and only a new install can change that.
                 synchronized(connectionLock) {
@@ -1461,6 +1473,7 @@ object HermesWsClient {
             }
 
             TicketRefreshStatus.TRANSIENT_FAILURE -> {
+                _lastHandshakeFailure = "transient"
                 HermesLog.w(TAG, "Deferring openSocket: WS ticket refresh temporarily unavailable")
                 synchronized(connectionLock) {
                     if (generation != connectionGeneration.get()) return

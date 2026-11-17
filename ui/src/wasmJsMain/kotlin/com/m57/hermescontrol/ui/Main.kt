@@ -140,6 +140,9 @@ fun main() {
         com.m57.hermescontrol.data.ws.HermesWsClient.connect()
         ComposeViewport(viewportContainer = document.body!!) {
             HermesControlTheme(themePreference = ThemePreference.DARK) {
+                // Plan §1.5: publish status + handshake-failure word for the browser test
+                // and for devtools. Redaction-safe by construction (WsDiagnostics.kt).
+                LaunchedEffect(Unit) { publishWsState() }
                 // The browser shell draws a branded loading screen and removes it
                 // on this signal. Removing it when the container appears is too
                 // early: Compose has a container but has painted nothing, so the
