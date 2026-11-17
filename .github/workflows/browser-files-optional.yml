@@ -49,7 +49,11 @@ jobs:
 
       - name: Pod state on failure
         if: failure()
-        run: podman pod ps && podman logs pylon-test-dashboard 2>&1 | tail -50 || true
+        run: |
+          podman pod ps
+          podman logs pylon-test-dashboard 2>&1 | tail -50 || true
+          echo "--- dist proxy (static + /api + websocket relay) ---"
+          podman logs pylon-test-dist 2>&1 | tail -60 || true
 
       - name: Stop the pod
         if: always()
