@@ -89,6 +89,12 @@ jobs:
           python3 scripts/check_actuals.py
           cd scripts && python3 -m unittest test_check_actuals
 
+      # A new silent catch fails here; the existing tail is a budget that may only shrink.
+      - name: Check swallowed exceptions
+        run: |
+          python3 scripts/check_swallowed_exceptions.py
+          cd scripts && python3 -m unittest test_check_swallowed_exceptions
+
       # The shared data/logic layer: ChatViewModel reducers, rail grouping + order
       # persistence, rename fast-path. JUnit + Robolectric, ~7 min.
       - name: Run unit tests (debug)
