@@ -857,9 +857,8 @@ class ChatViewModel(
             }
 
             WsMethods.SESSION_LIST -> {
-                // Signal only. The reply's rows are a hand-picked summary without
-                // `last_active`, so the rail re-reads REST instead of merging this copy;
-                // one source is what makes "newest response wins" sufficient.
+                // Signal only. REST is the source: its rows carry `last_active`, and a
+                // second ordered copy here would need merging — the bug class this avoids.
                 requestRailRefresh(force = true)
             }
 
