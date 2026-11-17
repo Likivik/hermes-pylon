@@ -103,6 +103,13 @@ jobs:
       - name: Run :shared wasmJs tests
         run: ./gradlew :shared:wasmJsBrowserTest --no-daemon -Dorg.gradle.workers.max=2
 
+      # :ui compiles for wasm but its tests were JVM-only, so nothing checked how the
+      # shared UI behaves in a browser. Two assertions cannot run here yet — compose
+      # resource loading and a semantics-tree difference — and they guard themselves
+      # with isWebTestTarget() rather than being deleted: the rest of the suite runs.
+      - name: Run :ui wasmJs tests
+        run: ./gradlew :ui:wasmJsBrowserTest --no-daemon -Dorg.gradle.workers.max=2
+
       - name: Upload unit test reports
         if: failure()
         uses: actions/upload-artifact@v5
