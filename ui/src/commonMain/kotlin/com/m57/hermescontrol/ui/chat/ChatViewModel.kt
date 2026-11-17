@@ -849,15 +849,16 @@ class ChatViewModel(
             WsMethods.SESSION_LIST -> {
                 val resultMap = result as? Map<String, Any?> ?: return
                 val sessionsList = resultMap["sessions"] as? List<Map<String, Any?>> ?: return
-                val sessions =
-                    sessionsList.map { s ->
-                        SessionUi(
-                            id = s["id"] as? String ?: "",
-                            title = s["title"] as? String ?: "Untitled",
-                            messageCount = (s["message_count"] as? Double)?.toInt() ?: 0,
-                            lastActive = (s["started_at"] as? Double)?.toLong() ?: 0L,
-                        )
-                    }
+                // Cron runs are one session per tick (36 a workday for a */20 job), so
+                // they stay out of the rail and live in History -> Automations. The count
+                // is logged because a silently shortened list is its own bug.
+                val sessions = railSessions(sessionsList)
+                if (sessions.size != sessionsList.size) {
+                    HermesLog.i(
+                        "ChatVM",
+                        "rail hid ${sessionsList.size - sessions.size} automation sessions",
+                    )
+                }
                 HermesLog.i(
                     "ChatVM",
                     "session.list result processed: ${sessions.size} sessions: ${sessions.map { it.id }}",

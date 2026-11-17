@@ -113,6 +113,8 @@ data class SessionUi(
     val depth: Int = 0,
     // Unix seconds of last activity (from session.list "started_at"); 0 = unknown
     val lastActive: Long = 0L,
+    // Gateway `source` ("cron", "desktop", …) when the payload carries it; null otherwise.
+    val source: String? = null,
 ) {
     /**
      * Stale = known activity and idle for 7+ days. lastActive == 0 means
