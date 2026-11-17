@@ -48,9 +48,11 @@ ALLOW: dict[str, str] = {
         "this constant IS the platform answer the tests consult; a non-constant would be circular"
     ),
     "shared/src/wasmJsMain/kotlin/com/m57/hermescontrol/data/remote/NetworkRetry.wasmJs.kt:isRetryable": (
-        "KNOWN DEFECT, not a contract: every web error is treated as retryable, so a 4xx "
-        "retries until backoff caps. Accepted here only so the gate can land; fixing it is "
-        "recorded work in the silent-failure plan (§4)."
+        "contract, verified 2026-11-17: fetch reports one opaque transport failure, so the "
+        "JVM taxonomy has nothing to match. This is consulted only from the IOException "
+        "branch (NetworkResult.kt:134); HTTP 4xx/429/5xx are classified separately at "
+        "NetworkResult.kt:117, so status errors never reach it. An earlier note here called "
+        "this a defect — that was wrong and is retracted."
     ),
 }
 
