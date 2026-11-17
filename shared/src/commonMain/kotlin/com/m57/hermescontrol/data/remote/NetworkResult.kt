@@ -82,7 +82,12 @@ fun mapHttpError(
     return NetworkError.Http(code, message)
 }
 
-/** Whether an [IOException] is worth retrying. Platform-specific: see the actuals. */
+/**
+ * Contract: consulted **only** from the `IOException` branch of [safeApiCall]. HTTP status
+ * codes never reach it — 4xx returns a typed failure, 5xx/429 have their own retry rule.
+ * `true` means another attempt is worthwhile; `false` means the failure is structural
+ * (DNS, TLS) and retrying cannot help.
+ */
 expect fun isRetryable(e: IOException): Boolean
 
 fun jitteredBackoff(baseMs: Long): Long {

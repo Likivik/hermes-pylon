@@ -68,6 +68,10 @@ expect fun rememberFilesPlatform(): FilesPlatform
  *
  * The browser downloads through a blob URL and an anchor; Android and the desktop stage a real
  * file and open it, so they return null here.
+ *
+ * Contract: non-null means this platform hands bytes to a launcher (the browser's blob
+ * URL). Null means the bytes were staged to a real file and the screen opens it by path.
+ * **Null does not mean "download unsupported"** — both paths deliver the file.
  */
 @Composable
 expect fun rememberDownloadedFileLauncher(): ((DownloadedFile) -> Unit)?
