@@ -115,3 +115,32 @@ Industry practice (TanStack Query semantics) applied to what upstream's
 Tests in this PR, or a separate tests PR first? Recent precedent (#200) shipped
 `RailSessionsTest` with the implementation and you approved it; the older standing
 rule said separate. Plan assumes **same PR** unless you say otherwise.
+
+## Implementation status (2026-11-17)
+
+- **A — model + mapper: DONE** (#202). `SessionInfo.last_active`; `railSessionOf` /
+  `railSessionsOf`; fold axis `last_active ?: started_at`; the raw-map mapper prefers
+  the same field. Five REST-row tests, including the inversion case that would pass on
+  the old code only by accident.
+- **B — transport + reconciliation: DONE** (#202). REST is the source; the WS
+  `session.list` reply is a signal; monotonic request token; mid-flight forced refresh
+  coalesced (a dropped one left the spinner stuck); failure keeps last-good rows with
+  10 s → 5 min backoff; `ON_START` refresh; pagination 100/page to 300; `profile`
+  passed from `selectedProfileId()`.
+- **C — the `limit=500` defect: DONE** (#202). Now `getSession(sessionId)`.
+- **D — verification: PARTIAL, device half confirmed.** Bundle rebuilt from
+  `main@origin` at 20:51 and served (`ca3d6d91…wasm`, 12,272,191 B, HTTP 200); the rail
+  was then checked on the phone and **confirmed working** — order and `old·N` fold both
+  behave. Still open: the live REST-vs-WS payload diff on the two-profile fixture,
+  blocked because the preview browser sessions were logged out (logging in is not
+  something the assistant does) and the test pod was stopped, so that fixture is not
+  currently running.
+
+**Deviations from the plan, stated rather than hidden:** the *rail stale* indicator was
+dropped (P2) — failures are logged with their backoff, but no visual flag exists; and no
+polling timer was added, because the socket already supplies invalidation.
+
+**Follow-up queued, not done:** the gateway one-liner
+(`"last_active": tip_row.get("last_activity_at") or started_at` in
+`_session_row_summary`) is still the correct fix upstream — this plan only removes our
+dependency on it.
