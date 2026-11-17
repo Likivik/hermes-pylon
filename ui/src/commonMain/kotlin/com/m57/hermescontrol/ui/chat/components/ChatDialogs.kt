@@ -3,10 +3,15 @@ package com.m57.hermescontrol.ui.chat.components
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -55,6 +60,10 @@ fun VaultPromptDialog(
     var identifier by remember(prompt.binding, prompt.method) { mutableStateOf(prompt.identifier.orEmpty()) }
     val saveLogin = prompt.method == "vault.save_login"
     AlertDialog(
+        // The app is edge-to-edge, so adjustResize no longer moves anything: insets must be
+        // applied by hand. A dialog is its own window, so the screen-level imePadding() in
+        // ChatScreen cannot help here (same pattern as ModelPickerDialog).
+        modifier = Modifier.windowInsetsPadding(WindowInsets.ime),
         onDismissRequest = { if (!prompt.isSubmitting) onDismiss() },
         title = {
             Text(
@@ -66,7 +75,10 @@ fun VaultPromptDialog(
             )
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 prompt.prompt?.takeIf(String::isNotBlank)?.let { Text(it) }
                 if (saveLogin) {
                     Text(
@@ -146,6 +158,10 @@ fun SudoPromptDialog(
     var password by remember(binding) { mutableStateOf("") }
 
     AlertDialog(
+        // The app is edge-to-edge, so adjustResize no longer moves anything: insets must be
+        // applied by hand. A dialog is its own window, so the screen-level imePadding() in
+        // ChatScreen cannot help here (same pattern as ModelPickerDialog).
+        modifier = Modifier.windowInsetsPadding(WindowInsets.ime),
         onDismissRequest = { if (!isSubmitting) onDismiss() },
         title = { Text(stringResource(Res.string.chat_sudo_title)) },
         text = {
@@ -214,6 +230,10 @@ fun SecretPromptDialog(
     val labelText = envVar?.takeIf { it.isNotBlank() } ?: stringResource(Res.string.chat_secret_value)
 
     AlertDialog(
+        // The app is edge-to-edge, so adjustResize no longer moves anything: insets must be
+        // applied by hand. A dialog is its own window, so the screen-level imePadding() in
+        // ChatScreen cannot help here (same pattern as ModelPickerDialog).
+        modifier = Modifier.windowInsetsPadding(WindowInsets.ime),
         onDismissRequest = { if (!isSubmitting) onDismiss() },
         title = { Text(titleText) },
         text = {
@@ -271,6 +291,10 @@ fun ReloginDialog(
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     AlertDialog(
+        // The app is edge-to-edge, so adjustResize no longer moves anything: insets must be
+        // applied by hand. A dialog is its own window, so the screen-level imePadding() in
+        // ChatScreen cannot help here (same pattern as ModelPickerDialog).
+        modifier = Modifier.windowInsetsPadding(WindowInsets.ime),
         onDismissRequest = { if (!isLoading) onDismiss() },
         title = { Text(stringResource(Res.string.chat_relogin_title)) },
         text = {

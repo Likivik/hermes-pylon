@@ -541,5 +541,32 @@
       })();
     </script>
     <script>window.__bootlog && window.__bootlog('module script tag executed (module graph may still be loading)');</script>
+<script>
+        /* A mobile keyboard shrinks the *visual* viewport but not a 100%-height body, and
+           `overflow: hidden` means nothing scrolls either — so a focused field ends up
+           behind the keyboard with no way to reach it. Sizing the body to the visual
+           viewport makes Compose lay out in the space that is actually visible, which
+           moves dialogs and the composer up instead of hiding them. */
+        (function () {
+            var vv = window.visualViewport;
+            if (!vv) return;
+            var current = -1;
+            function sync() {
+                var h = Math.round(vv.height);
+                if (h === current) return;
+                current = h;
+                document.body.style.height = h + "px";
+                // Compose Web sizes its canvas from a *window* resize signal. Changing the
+                // container height alone fires nothing, so the layout kept its old size and
+                // the keyboard still covered the field. Bubbling a synthetic resize makes
+                // Compose lay out again inside the space that is actually visible.
+                window.dispatchEvent(new Event("resize"));
+            }
+            vv.addEventListener("resize", sync);
+            vv.addEventListener("scroll", sync);
+            window.addEventListener("orientationchange", sync);
+            sync();
+        })();
+    </script>
 </body>
 </html>
