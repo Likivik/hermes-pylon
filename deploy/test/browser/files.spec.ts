@@ -46,7 +46,59 @@ test("the app boots without a composition error", async ({ page }) => {
   test.skip(process.env.PYLON_SKIP_APP === "1", "app dist not built in this run");
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto("/");
+  await page.goto(`${APP_URL}/?profile=default`);
   await page.waitForTimeout(15_000);
+  // "It booted" means Compose actually painted — the dashboard's HTML has no canvas, so a
+  // bare error-string check passed even when the app never loaded.
+  expect(await page.locator("canvas").count(), "Compose painted").toBeGreaterThan(0);
   expect(errors.join("\n")).not.toContain("WsAuthConfig not installed");
+});
+
+const APP_URL = process.env.PYLON_APP_URL ?? "http://127.0.0.1:18080";
+
+test("the socket reaches CONNECTED and never reports a missing seam", async ({ page }) => {
+  // Measured 2026-11-17 (run 44017932767): the app in this pod is served by a plain
+  // `python3 -m http.server` with no /api proxy, so the bundle loads but cannot dial —
+  // every socket call has nowhere to go. Asserting CONNECTED here would need a proxy in
+  // front of the dist container, which is a harness change, not a test change. The state
+  // machine itself is covered in HermesWsClientStaleStateTest (jvmTest).
+  test.skip(true, "the pod's dist container has no /api proxy, so the app cannot dial");
+  test.skip(!PASSWORD, "PYLON_PASSWORD is required");
+
+  // page.request shares the page's cookie jar, so the app boots signed in.
+  const login = await page.request.post("/auth/password-login", {
+    data: { provider: "basic", username: USER, password: PASSWORD },
+  });
+  expect(login.status(), "sign-in").toBe(200);
+
+  // The dashboard answers on 19119 and serves its own HTML; the pylon bundle is the
+  // preview container on 18080. Testing "/" against the dashboard is how the earlier boot
+  // test passed without ever loading the app.
+  await page.goto(`${APP_URL}/?profile=default`);
+  // Plan §1.5: window.__hermesWsState is published by the web entry, redaction-safe.
+  try {
+    await expect
+      .poll(() => page.evaluate(() => (window as any).__hermesWsState?.status ?? "absent"), {
+        timeout: 30_000,
+        intervals: [500, 1000, 2000],
+      })
+      .toBe("CONNECTED");
+  } catch (error) {
+    // Say *why* the state is absent rather than just that it is.
+    const diag = await page.evaluate(() => ({
+      href: location.href,
+      title: document.title,
+      pylonReady: typeof (window as any).__pylonReady,
+      hasCanvas: !!document.querySelector("canvas"),
+      wsState: typeof (window as any).__hermesWsState,
+    }));
+    throw new Error(`${(error as Error).message} :: diag=${JSON.stringify(diag)}`);
+  }
+
+  const failure = await page.evaluate(() => (window as any).__hermesWsState?.lastFailure);
+  // A missing HTTP client is a wiring bug in the entry, not a transient failure: it must
+  // never be the reason a shipping build fails to dial (regression guard for the
+  // "Reconnecting..." bug).
+  expect(failure, "handshake must not report a missing seam").not.toBe("missing-http-client");
+  expect(failure, "handshake reached READY").toBe("ready");
 });
