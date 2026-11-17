@@ -1,5 +1,6 @@
 package com.m57.hermescontrol.ui.chat
 
+import com.m57.hermescontrol.data.model.SessionInfo
 import com.m57.hermescontrol.ui.sessions.AUTOMATION_SOURCE
 
 /**
@@ -25,7 +26,7 @@ fun railSessionOf(raw: Map<String, Any?>): SessionUi? {
         id = id,
         title = raw["title"] as? String ?: "Untitled",
         messageCount = (raw["message_count"] as? Double)?.toInt() ?: 0,
-        lastActive = (raw["started_at"] as? Double)?.toLong() ?: 0L,
+        lastActive = (raw["last_active"] as? Double ?: raw["started_at"] as? Double)?.toLong() ?: 0L,
         source = raw["source"] as? String,
     )
 }
@@ -38,3 +39,25 @@ fun railSessionOf(raw: Map<String, Any?>): SessionUi? {
  */
 fun railSessions(raw: List<Map<String, Any?>>): List<SessionUi> =
     raw.mapNotNull(::railSessionOf).filterNot { it.isAutomation }
+
+/**
+ * Maps one `GET /api/sessions` row — the rail's real source.
+ *
+ * REST carries `last_active`, the gateway's own activity timestamp, which the
+ * `session.list` RPC drops. `started_at` is a lower bound on the same value, so it is
+ * the fallback for rows that predate the heartbeat — never the primary.
+ */
+fun railSessionOf(info: SessionInfo): SessionUi? {
+    if (info.id.isEmpty()) return null
+    return SessionUi(
+        id = info.id,
+        title = info.title?.takeIf { it.isNotBlank() } ?: "Untitled",
+        messageCount = info.message_count ?: 0,
+        lastActive = (info.last_active ?: info.started_at)?.toLong() ?: 0L,
+        source = info.source,
+    )
+}
+
+/** [railSessions] over decoded REST rows: same cron rule, same order as the server sent. */
+fun railSessionsOf(rows: List<SessionInfo>): List<SessionUi> =
+    rows.mapNotNull(::railSessionOf).filterNot { it.isAutomation }

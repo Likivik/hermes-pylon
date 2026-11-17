@@ -1714,7 +1714,7 @@ class ChatViewModelTest {
         }
 
     @Test
-    fun testSessionListRpcResult() =
+    fun testSessionListRpcResult_doesNotPopulateTheRail() =
         runTest {
             val viewModel = createViewModel()
             advanceUntilIdle()
@@ -1742,21 +1742,12 @@ class ChatViewModelTest {
             )
             advanceUntilIdle()
 
-            assertEquals(1, viewModel.uiState.value.sessions.size)
-            assertEquals(
-                "session-123",
-                viewModel.uiState.value.sessions[0]
-                    .id,
-            )
-            assertEquals(
-                "My Session Title",
-                viewModel.uiState.value.sessions[0]
-                    .title,
-            )
-            assertEquals(
-                12,
-                viewModel.uiState.value.sessions[0]
-                    .messageCount,
+            // The rail reads REST, which carries `last_active`; this reply is a signal to
+            // re-read, never the rows themselves. Populating from it would resurrect the
+            // creation-time stale fold this change removed.
+            assertTrue(
+                "session.list rows must not become rail rows",
+                viewModel.uiState.value.sessions.isEmpty(),
             )
         }
 
@@ -3738,17 +3729,14 @@ class ChatViewModelTest {
             val (viewModel, _) = createViewModelWithSession()
             val api = ApiClient.hermesApi
             var countRequested = false
-            coEvery { api.getSessions(any(), any(), any()) } answers {
+            // The server count comes from the one row, not from a 500-row listing: the
+            // listing route caps `limit` at 100, so that call never succeeded.
+            coEvery { api.getSession("session-root") } answers {
                 countRequested = true
                 GatewayResponse.success(
-                    com.m57.hermescontrol.data.model.SessionListResponse(
-                        sessions =
-                            listOf(
-                                com.m57.hermescontrol.data.model.SessionInfo(
-                                    id = "session-root",
-                                    message_count = 200,
-                                ),
-                            ),
+                    com.m57.hermescontrol.data.model.SessionInfo(
+                        id = "session-root",
+                        message_count = 200,
                     ),
                 )
             }

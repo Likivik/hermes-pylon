@@ -106,6 +106,9 @@ fun ChatLifecycleEffects(
                     Lifecycle.Event.ON_START -> {
                         viewModel.refreshSettings()
                         viewModel.refreshCurrentSession()
+                        // Coming back to the app is the one moment the rail is guaranteed
+                        // stale: refresh quietly, without the pull-to-refresh spinner.
+                        viewModel.onAppForegrounded()
                     }
 
                     else -> {}

@@ -14,6 +14,7 @@ import com.m57.hermescontrol.data.model.Attachment
 import com.m57.hermescontrol.data.model.AttachmentSource
 import com.m57.hermescontrol.data.model.ModelProvider
 import com.m57.hermescontrol.data.model.PinnedModel
+import com.m57.hermescontrol.data.model.SessionInfo
 import com.m57.hermescontrol.data.model.SessionMessage
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.AuthPayloads
@@ -49,6 +50,7 @@ import com.m57.hermescontrol.generated.resources.chat_model_switch_session_chang
 import com.m57.hermescontrol.generated.resources.chat_new_session_failed
 import com.m57.hermescontrol.generated.resources.chat_privileged_not_acknowledged
 import com.m57.hermescontrol.ui.common.StringResolver
+import com.m57.hermescontrol.ui.sessions.AUTOMATION_SOURCE
 import com.m57.hermescontrol.util.HermesLog
 import com.m57.hermescontrol.util.isRunningUnderTest
 import com.m57.hermescontrol.util.nowMillis
@@ -95,6 +97,14 @@ private const val SESSION_CREATE_MAX_ATTEMPTS = 3
  */
 private const val REDIRECT_UNSUPPORTED_CODE = 4010
 private const val MAX_RETIRED_RESUME_REQUESTS = 64
+
+// ── Rail (REST) ───────────────────────────────────────────────────────────
+
+/** Route caps `limit` at 100; see `hermes_cli/web_routers/sessions.py`. */
+private const val RAIL_PAGE_SIZE = 100
+private const val RAIL_MAX_PAGES = 3
+private const val RAIL_MIN_INTERVAL_MS = 10_000L
+private const val RAIL_BACKOFF_MAX_MS = 300_000L
 
 private data class PendingRpcRequest(
     val method: String,
@@ -847,30 +857,10 @@ class ChatViewModel(
             }
 
             WsMethods.SESSION_LIST -> {
-                val resultMap = result as? Map<String, Any?> ?: return
-                val sessionsList = resultMap["sessions"] as? List<Map<String, Any?>> ?: return
-                // Cron runs are one session per tick (36 a workday for a */20 job), so
-                // they stay out of the rail and live in History -> Automations. The count
-                // is logged because a silently shortened list is its own bug.
-                val sessions = railSessions(sessionsList)
-                if (sessions.size != sessionsList.size) {
-                    HermesLog.i(
-                        "ChatVM",
-                        "rail hid ${sessionsList.size - sessions.size} automation sessions",
-                    )
-                }
-                HermesLog.i(
-                    "ChatVM",
-                    "session.list result processed: ${sessions.size} sessions: ${sessions.map { it.id }}",
-                )
-                _uiState.update { state ->
-                    val newTitle = sessions.find { s -> s.id == state.currentSessionId }?.title
-                    state.copy(
-                        sessions = sessions,
-                        chatTitle = newTitle ?: state.chatTitle,
-                        railRefreshing = false,
-                    )
-                }
+                // Signal only. The reply's rows are a hand-picked summary without
+                // `last_active`, so the rail re-reads REST instead of merging this copy;
+                // one source is what makes "newest response wins" sufficient.
+                requestRailRefresh(force = true)
             }
 
             WsMethods.SESSION_RESUME -> {
@@ -2236,25 +2226,143 @@ class ChatViewModel(
             }
     }
 
+    // ── Rail refresh (REST) ──────────────────────────────────────────────
+    //
+    // The rail reads REST, not the `session.list` RPC: REST returns the gateway's own
+    // rows, so `last_active` — the activity timestamp the stale fold needs — survives.
+    // The RPC builds a hand-picked summary and drops that field.
+    //
+    // Reconciliation is "newest response wins". The WS `session.list` reply is only a
+    // signal that the list changed, never a second copy to merge: a monotonic token
+    // keeps a slow response from painting over a newer list, and a failure keeps the
+    // last-good rows instead of blanking the rail.
+
+    private var railSeq = 0L
+    private var railInFlight = false
+    private var railPendingForce = false
+    private var railFailures = 0
+    private var railNextAllowedAt = 0L
+
     fun loadSessions() {
+        // The RPC round-trip stays as the *trigger* — the rest of the app still expects
+        // this handshake — but its rows are ignored: the rail's rows come from REST,
+        // which carries `last_active` (see fetchRail).
         viewModelScope.launch(io) {
             wsClient.send(
                 WsMethods.SESSION_LIST,
                 onSent = { id -> trackRequest(id, WsMethods.SESSION_LIST) },
             )
         }
+        requestRailRefresh(force = false)
     }
 
     /**
      * User-triggered rail refresh (pull-to-refresh / the top-bar refresh icon).
-     * Re-lists sessions so the rail reflects SERVER truth — titles, deletions
-     * and ordering are all owned by the gateway, and the rename/delete paths
-     * update the rail optimistically.
+     * Re-lists sessions so the rail reflects SERVER truth — titles, deletions and
+     * ordering are owned by the gateway, and the rename/delete paths update the rail
+     * optimistically.
      */
     fun refreshSessions() {
         _uiState.update { it.copy(railRefreshing = true) }
-        loadSessions()
+        requestRailRefresh(force = true)
     }
+
+    /** Foreground re-entry: refresh quietly — the user did not ask for a spinner. */
+    fun onAppForegrounded() = requestRailRefresh(force = true)
+
+    private fun requestRailRefresh(force: Boolean) {
+        if (railInFlight) {
+            // A forced refresh that arrives mid-flight must still happen: dropping it
+            // would keep the pull-to-refresh spinner on until the next signal. Coalesce
+            // it into one follow-up instead of queueing a burst.
+            if (force) railPendingForce = true
+            return
+        }
+        val now = nowMillis()
+        if (!force && now < railNextAllowedAt) return
+        railInFlight = true
+        val token = ++railSeq
+        viewModelScope.launch(io) {
+            try {
+                fetchRail(token)
+            } finally {
+                railInFlight = false
+                if (railPendingForce) {
+                    railPendingForce = false
+                    requestRailRefresh(force = true)
+                }
+            }
+        }
+    }
+
+    private suspend fun fetchRail(token: Long) {
+        val started = nowMillis()
+        val rows = ArrayList<SessionInfo>()
+        var offset = 0
+        var pages = 0
+        var failure: String? = null
+        // Page rather than trust one call: the route caps `limit` at 100, and quietly
+        // showing 100 of 400 sessions would be a regression against the RPC's 200.
+        while (pages < RAIL_MAX_PAGES) {
+            val result =
+                safeApiCall {
+                    ApiClient.hermesApi.getSessions(
+                        limit = RAIL_PAGE_SIZE,
+                        offset = offset,
+                        order = "recent",
+                        excludeSources = AUTOMATION_SOURCE,
+                        profile = selectedProfileId().takeIf { it.isNotBlank() },
+                    )
+                }
+            when (result) {
+                is NetworkResult.Success -> {
+                    val page = result.data.sessions.orEmpty()
+                    pages++
+                    rows += page
+                    offset += page.size
+                    if (page.size < RAIL_PAGE_SIZE || rows.size >= result.data.total) break
+                }
+                is NetworkResult.Failure -> {
+                    failure = result.error.message
+                    break
+                }
+            }
+        }
+        if (failure != null) {
+            railFailures++
+            val backoff = railBackoffMs(railFailures)
+            railNextAllowedAt = nowMillis() + backoff
+            HermesLog.w(
+                "ChatVM",
+                "rail refresh failed ($failure); keeping ${_uiState.value.sessions.size} rows, " +
+                    "next attempt in ${backoff / 1000}s",
+            )
+            _uiState.update { it.copy(railRefreshing = false) }
+            return
+        }
+        if (token != railSeq) return
+        val sessions = railSessionsOf(rows)
+        if (rows.size != sessions.size) {
+            HermesLog.i("ChatVM", "rail hid ${rows.size - sessions.size} automation sessions")
+        }
+        HermesLog.i(
+            "ChatVM",
+            "rail refreshed: ${sessions.size} sessions in $pages page(s), ${nowMillis() - started}ms",
+        )
+        railFailures = 0
+        railNextAllowedAt = nowMillis() + RAIL_MIN_INTERVAL_MS
+        _uiState.update { state ->
+            val newTitle = sessions.find { s -> s.id == state.currentSessionId }?.title
+            state.copy(
+                sessions = sessions,
+                chatTitle = newTitle ?: state.chatTitle,
+                railRefreshing = false,
+            )
+        }
+    }
+
+    private fun railBackoffMs(failures: Int): Long =
+        (RAIL_MIN_INTERVAL_MS shl (failures - 1).coerceIn(0, 5)).coerceAtMost(RAIL_BACKOFF_MAX_MS)
 
     private fun fetchCommandCatalog() {
         viewModelScope.launch(io) {
@@ -3055,12 +3163,13 @@ class ChatViewModel(
         if (known != null) return known.takeIf { isHistoryRefreshCurrent(fence, owner) }
         val result =
             withContext(io) {
-                safeApiCall { ApiClient.hermesApi.getSessions(limit = 500, offset = 0, order = "recent") }
+                // One precise row, not a 500-row listing: the route caps `limit` at 100,
+                // so the old `getSessions(limit = 500)` here could never succeed.
+                safeApiCall { ApiClient.hermesApi.getSession(sessionId) }
             }
         if (result is NetworkResult.Success) {
             if (!isHistoryRefreshCurrent(fence, owner)) return null
-            val sessions = result.data.sessions.orEmpty()
-            val count = sessions.find { it.id == sessionId }?.message_count
+            val count = result.data.message_count
             if (count != null) {
                 _uiState.update { current ->
                     if (!isHistoryRefreshCurrent(fence, owner)) return@update current

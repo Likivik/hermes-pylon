@@ -168,6 +168,12 @@ class HermesGatewayApi(
         order: String = "recent",
         source: String? = null,
         excludeSources: String? = null,
+        /**
+         * Profile whose session store to list. The WS socket is already profile-scoped;
+         * this route is not, so omitting it silently lists the **default** profile's
+         * sessions for a user working in any other one.
+         */
+        profile: String? = null,
     ): GatewayResponse<SessionListResponse> =
         get(
             queryPath(
@@ -177,6 +183,7 @@ class HermesGatewayApi(
                 "order" to order,
                 "source" to source,
                 "exclude_sources" to excludeSources,
+                "profile" to profile,
             ),
         )
 
