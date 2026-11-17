@@ -15,10 +15,10 @@ from __future__ import annotations
 
 import http.server
 import os
-import select
 import socket
 import socketserver
 import sys
+import threading
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -162,22 +162,33 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             if b" 101 " not in header:
                 self.log_message("ws relay rejection body: %r", early[:200])
 
-            sockets = [self.connection, upstream]
+            def upstream_to_client() -> None:
+                try:
+                    while True:
+                        chunk = upstream.recv(65536)
+                        if not chunk:
+                            self.log_message("ws relay closed by upstream")
+                            break
+                        self.wfile.write(chunk)
+                        self.wfile.flush()
+                except OSError as error:
+                    self.log_message("ws relay upstream read failed: %s", error)
+                finally:
+                    self.close_connection = True
+
+            pump = threading.Thread(target=upstream_to_client, daemon=True)
+            pump.start()
+
+            # Read the client through `rfile`, not the socket: after the handshake the
+            # browser's first frame may already sit in the handler's read buffer, and a
+            # select() on the raw socket would never see it — so the gateway waits for a
+            # frame that did arrive, times out and closes (measured, run 44022570983).
             while True:
-                readable, _, errored = select.select(sockets, [], sockets, 60)
-                if errored:
-                    return
-                if not readable:
-                    continue  # idle websocket: keep it open
-                for source in readable:
-                    data = source.recv(65536)
-                    if not data:
-                        self.log_message(
-                            "ws relay closed by %s",
-                            "client" if source is self.connection else "upstream",
-                        )
-                        return
-                    (upstream if source is self.connection else self.connection).sendall(data)
+                chunk = self.rfile.read1(65536)
+                if not chunk:
+                    self.log_message("ws relay closed by client")
+                    break
+                upstream.sendall(chunk)
         finally:
             upstream.close()
 

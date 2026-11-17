@@ -92,7 +92,6 @@ test("the socket reaches CONNECTED and never reports a missing seam", async ({ p
   // close is the gateway's post-upgrade policy, not the relay — and asserting CONNECTED
   // here would need that policy understood. The client state machine is covered by
   // HermesWsClientStaleStateTest (jvmTest) in the meantime.
-  test.skip(true, "gateway closes the upgraded socket; post-upgrade policy undiagnosed");
   test.skip(!PASSWORD, "PYLON_PASSWORD is required");
 
   await signIn(page);
