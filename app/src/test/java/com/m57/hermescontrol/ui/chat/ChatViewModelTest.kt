@@ -38,6 +38,7 @@ import com.m57.hermescontrol.ui.chat.fakes.FakeChatMessageDao
 import com.m57.hermescontrol.ui.chat.fakes.FakeChatPersistenceRepository
 import com.m57.hermescontrol.ui.chat.fakes.FakeSlashUsageStore
 import com.m57.hermescontrol.ui.chat.fakes.testChatEnvironment
+import com.m57.hermescontrol.ui.chat.rail.RailLoadStatus
 import com.m57.hermescontrol.ui.common.FakeStringResolver
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -804,7 +805,7 @@ class ChatViewModelTest {
                         fakeSlashUsageStore,
                         testDispatcher,
                         io = testDispatcher,
-                        selectedProfileId = { selectedProfile.value },
+                        selectedGatewayId = { selectedProfile.value },
                         selectedProfileIds = selectedProfile,
                     ),
                 )
@@ -3540,7 +3541,7 @@ class ChatViewModelTest {
                         fakeSlashUsageStore,
                         testDispatcher,
                         io = testDispatcher,
-                        selectedProfileId = { selectedProfile.value },
+                        selectedGatewayId = { selectedProfile.value },
                         selectedProfileIds = selectedProfile,
                     ),
                 )
@@ -5604,5 +5605,68 @@ class ChatViewModelTest {
             advanceUntilIdle()
 
             assertEquals("session-456", viewModel.uiState.value.currentSessionId)
+        }
+
+    @Test
+    fun railFailureKeepsLastGoodRowsAndSaysWhy() =
+        runTest {
+            val (viewModel, sessionId) = createViewModelWithSession()
+            coEvery { ApiClient.hermesApi.getSessions(any(), any(), any(), any(), any(), null) } returns
+                GatewayResponse.success(
+                    com.m57.hermescontrol.data.model.SessionListResponse(
+                        sessions =
+                            listOf(
+                                com.m57.hermescontrol.data.model.SessionInfo(id = sessionId, message_count = 1),
+                            ),
+                        total = 1,
+                    ),
+                )
+            viewModel.refreshSessions()
+            advanceUntilIdle()
+            assertEquals(1, viewModel.uiState.value.sessions.size)
+
+            coEvery {
+                ApiClient.hermesApi.getSessions(any(), any(), any(), any(), any(), any())
+            } returns GatewayResponse.error(500, "boom")
+            viewModel.refreshSessions()
+            advanceUntilIdle()
+
+            // Last-good rows survive, and the reason is recorded instead of the
+            // rail silently rendering nothing.
+            assertEquals("last-good rows survive", 1, viewModel.uiState.value.sessions.size)
+            val status = viewModel.uiState.value.railStatus
+            assertTrue("failure must be visible, got $status", status is RailLoadStatus.Unavailable)
+            assertEquals("HTTP 500", (status as RailLoadStatus.Unavailable).reason)
+        }
+
+    @Test
+    fun railUnauthorizedAsksForSignIn() =
+        runTest {
+            val (viewModel, _) = createViewModelWithSession()
+            coEvery {
+                ApiClient.hermesApi.getSessions(any(), any(), any(), any(), any(), any())
+            } returns GatewayResponse.error(401, "no_cookie")
+
+            viewModel.refreshSessions()
+            advanceUntilIdle()
+
+            val status = viewModel.uiState.value.railStatus
+            assertTrue("401 must be visible, got $status", status is RailLoadStatus.Unavailable)
+            assertTrue("401 must ask for sign-in", (status as RailLoadStatus.Unavailable).needsSignIn)
+        }
+
+    @Test
+    fun railEmptySuccessIsEmptyNotAFailure() =
+        runTest {
+            val (viewModel, _) = createViewModelWithSession()
+            coEvery { ApiClient.hermesApi.getSessions(any(), any(), any(), any(), any(), null) } returns
+                GatewayResponse.success(
+                    com.m57.hermescontrol.data.model.SessionListResponse(sessions = emptyList()),
+                )
+
+            viewModel.refreshSessions()
+            advanceUntilIdle()
+
+            assertEquals(RailLoadStatus.Empty, viewModel.uiState.value.railStatus)
         }
 }

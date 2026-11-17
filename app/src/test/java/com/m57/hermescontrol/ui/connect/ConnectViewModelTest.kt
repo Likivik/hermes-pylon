@@ -1,6 +1,6 @@
 package com.m57.hermescontrol.ui.connect
 
-import com.m57.hermescontrol.data.config.ConnectionProfile
+import com.m57.hermescontrol.data.config.GatewayInstance
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.model.StatusResponse
 import com.m57.hermescontrol.data.remote.ApiClient
@@ -74,9 +74,9 @@ class ConnectViewModelTest {
         every {
             AuthManager.endpoint()
         } answers { ServerEndpoint.parse("https://127.0.0.1:9119/", CleartextPolicy.ALLOW_WITH_WARNING) }
-        every { AuthManager.getConnectionProfiles() } returns emptyList()
-        every { AuthManager.saveConnectionProfiles(any()) } returns Unit
-        every { AuthManager.saveConnectionProfilesAndSelect(any(), any(), any()) } returns Unit
+        every { AuthManager.getGatewayInstances() } returns emptyList()
+        every { AuthManager.saveGatewayInstances(any()) } returns Unit
+        every { AuthManager.saveGatewayInstancesAndSelect(any(), any(), any()) } returns Unit
         every { AuthManager.getProfileToken(any()) } returns null
         every { AuthManager.setProfileToken(any(), any()) } returns Unit
         every { AuthManager.getSelectedProfileId() } returns null
@@ -161,7 +161,7 @@ class ConnectViewModelTest {
     fun `newer status probe wins for unchanged profile fingerprint`() =
         runTest {
             val profile =
-                ConnectionProfile(
+                GatewayInstance(
                     id = "profile",
                     name = "Profile",
                     baseUrl = "https://127.0.0.1:9119/",
@@ -170,7 +170,7 @@ class ConnectViewModelTest {
             val firstStarted = CompletableDeferred<Unit>()
             val firstResult = CompletableDeferred<GatewayResponse<StatusResponse>>()
             var callCount = 0
-            every { AuthManager.getConnectionProfiles() } returns listOf(profile)
+            every { AuthManager.getGatewayInstances() } returns listOf(profile)
             every { AuthManager.getSelectedProfileId() } returns "profile"
             every { AuthManager.getProfileToken("profile") } returns "profile-token"
             every { AuthManager.getToken() } returns "profile-token"
@@ -438,7 +438,7 @@ class ConnectViewModelTest {
     @Test
     fun testSelectProfile_updatesState() {
         val profile =
-            ConnectionProfile(
+            GatewayInstance(
                 id = "test-id",
                 name = "Test Profile",
                 baseUrl = "https://192.168.1.100:8080/",
@@ -446,7 +446,7 @@ class ConnectViewModelTest {
         every { AuthManager.getProfileToken("test-id") } returns "profile-token"
 
         val viewModel = ConnectViewModel(resolver)
-        viewModel.selectProfile(profile)
+        viewModel.selectGateway(profile)
 
         val state = viewModel.uiState.value
         assertEquals("Test Profile", state.profileName)
@@ -481,12 +481,12 @@ class ConnectViewModelTest {
             viewModel.connect()
             advanceUntilIdle()
 
-            val savedProfiles = slot<List<ConnectionProfile>>()
-            val selectedProfileId = slot<String>()
+            val savedProfiles = slot<List<GatewayInstance>>()
+            val selectedGatewayId = slot<String>()
             verify(exactly = 1) {
-                AuthManager.saveConnectionProfilesAndSelect(
+                AuthManager.saveGatewayInstancesAndSelect(
                     capture(savedProfiles),
-                    capture(selectedProfileId),
+                    capture(selectedGatewayId),
                     "valid-token",
                 )
             }
@@ -494,7 +494,7 @@ class ConnectViewModelTest {
             assertEquals("New Profile", savedProfile.name)
             assertEquals("https://127.0.0.1:9119/", savedProfile.baseUrl)
             assertEquals("token", savedProfile.wsAuthParam)
-            assertEquals(savedProfile.id, selectedProfileId.captured)
+            assertEquals(savedProfile.id, selectedGatewayId.captured)
             verify { ApiClient.rebuild() }
 
             val state = viewModel.uiState.value
@@ -506,14 +506,14 @@ class ConnectViewModelTest {
     @Test
     fun testLoadSavedValues_withProfiles_loadsSelected() {
         val profile =
-            ConnectionProfile(
+            GatewayInstance(
                 id = "prof-1",
                 name = "Work",
                 baseUrl = "https://10.0.0.1:9119/",
             )
         every { AuthManager.getToken() } returns ""
         every { AuthManager.getBaseUrl() } returns "https://127.0.0.1:9119/"
-        every { AuthManager.getConnectionProfiles() } returns listOf(profile)
+        every { AuthManager.getGatewayInstances() } returns listOf(profile)
         every { AuthManager.getSelectedProfileId() } returns "prof-1"
 
         val viewModel = ConnectViewModel(resolver)
@@ -528,12 +528,12 @@ class ConnectViewModelTest {
     @Test
     fun testLoadSavedValues_withStaleSelectedId_fallsBackToDefaults() {
         val profile =
-            ConnectionProfile(
+            GatewayInstance(
                 id = "prof-1",
                 name = "Work",
                 baseUrl = "https://10.0.0.1:9119/",
             )
-        every { AuthManager.getConnectionProfiles() } returns listOf(profile)
+        every { AuthManager.getGatewayInstances() } returns listOf(profile)
         every { AuthManager.getSelectedProfileId() } returns "nonexistent-id"
         every { AuthManager.getBaseUrl() } returns "https://127.0.0.1:9119/"
 
@@ -550,13 +550,13 @@ class ConnectViewModelTest {
         every { AuthManager.getProfileToken(any()) } returns null
 
         val profile =
-            ConnectionProfile(
+            GatewayInstance(
                 id = "prof-2",
                 name = "NoToken",
                 baseUrl = "http://10.0.0.2:9220/",
             )
         val viewModel = ConnectViewModel(resolver)
-        viewModel.selectProfile(profile)
+        viewModel.selectGateway(profile)
 
         assertEquals("", viewModel.uiState.value.token)
         assertEquals("NoToken", viewModel.uiState.value.profileName)
@@ -587,7 +587,7 @@ class ConnectViewModelTest {
 
             verify { AuthManager.setToken("standalone-token") }
             verify { AuthManager.setBaseUrl("http://10.0.0.1:9119/") }
-            verify(exactly = 0) { AuthManager.saveConnectionProfiles(any()) }
+            verify(exactly = 0) { AuthManager.saveGatewayInstances(any()) }
         }
 
     @Test
@@ -611,10 +611,10 @@ class ConnectViewModelTest {
     fun testMultipleProfiles_loadedOnInit() {
         val profiles =
             listOf(
-                ConnectionProfile("a", "Alpha", baseUrl = "http://10.0.0.1:9119/"),
-                ConnectionProfile("b", "Beta", baseUrl = "http://10.0.0.2:9220/"),
+                GatewayInstance("a", "Alpha", baseUrl = "http://10.0.0.1:9119/"),
+                GatewayInstance("b", "Beta", baseUrl = "http://10.0.0.2:9220/"),
             )
-        every { AuthManager.getConnectionProfiles() } returns profiles
+        every { AuthManager.getGatewayInstances() } returns profiles
         every { AuthManager.getSelectedProfileId() } returns null
 
         val viewModel = ConnectViewModel(resolver)

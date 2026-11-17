@@ -23,6 +23,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -36,11 +39,11 @@ import com.m57.hermescontrol.generated.resources.gateway_action_restart
 import com.m57.hermescontrol.generated.resources.gateway_action_start
 import com.m57.hermescontrol.generated.resources.gateway_action_stop
 import com.m57.hermescontrol.generated.resources.gateway_label_version
-import com.m57.hermescontrol.generated.resources.gateway_sec_active_platforms
 import com.m57.hermescontrol.generated.resources.gateway_sec_controls
 import com.m57.hermescontrol.generated.resources.gateway_status_running
 import com.m57.hermescontrol.generated.resources.gateway_status_stopped
 import com.m57.hermescontrol.generated.resources.screen_gateway
+import com.m57.hermescontrol.generated.resources.settings_logout
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.ErrorState
@@ -51,6 +54,10 @@ import com.m57.hermescontrol.ui.common.SkeletonListState
 import com.m57.hermescontrol.ui.common.ToastEffect
 import com.m57.hermescontrol.ui.icons.HermesIcon
 import com.m57.hermescontrol.ui.icons.HermesSymbol
+import com.m57.hermescontrol.ui.settings.SettingsViewModel
+import com.m57.hermescontrol.ui.settings.components.GatewayInstancesSection
+import com.m57.hermescontrol.ui.settings.components.TestConnectionButton
+import com.m57.hermescontrol.ui.settings.components.TestResultCard
 import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -62,7 +69,12 @@ fun GatewayScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val statusColors = LocalHermesStatusColors.current
-    val profileId by authStore.selectedProfileIdFlow.collectAsStateWithLifecycle()
+    val profileId by authStore.selectedGatewayIdFlow.collectAsStateWithLifecycle()
+    // Gateway instances live here now: this screen is the one place that manages
+    // gateways, both the saved list and the running process.
+    val settingsViewModel: SettingsViewModel = viewModel { SettingsViewModel() }
+    val settingsState by settingsViewModel.uiState.collectAsStateWithLifecycle()
+    var passwordVisible by remember { mutableStateOf(false) }
 
     LaunchedEffect(profileId) {
         viewModel.onProfileChanged(profileId)
@@ -119,6 +131,27 @@ fun GatewayScreen(
                             verticalArrangement = Arrangement.spacedBy(16.dp),
                         ) {
                             val isRunning = status?.gateway_running == true
+
+                            GatewayInstancesSection(
+                                state = settingsState,
+                                viewModel = settingsViewModel,
+                                passwordVisible = passwordVisible,
+                                onPasswordVisibilityToggle = { passwordVisible = !passwordVisible },
+                            )
+                            TestResultCard(testResult = settingsState.testResult)
+                            TestConnectionButton(
+                                isTesting = settingsState.isTesting,
+                                onTest = settingsViewModel::testConnection,
+                            )
+                            Button(
+                                onClick = { settingsViewModel.logout() },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors =
+                                    ButtonDefaults.buttonColors(
+                                        containerColor = statusColors.error,
+                                        contentColor = statusColors.onError,
+                                    ),
+                            ) { Text(stringResource(Res.string.settings_logout)) }
 
                             GatewayPressureAdvisory(status)
 
@@ -245,60 +278,6 @@ fun GatewayScreen(
                                         CircularProgressIndicator(
                                             modifier = Modifier.align(Alignment.CenterHorizontally),
                                         )
-                                    }
-                                }
-                            }
-
-                            // Platforms Card
-                            status?.gateway_platforms?.let { platforms ->
-                                if (platforms.isNotEmpty()) {
-                                    Card(
-                                        modifier = Modifier.fillMaxWidth(),
-                                    ) {
-                                        Column(
-                                            modifier =
-                                                Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(Spacing.md),
-                                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                                        ) {
-                                            Text(
-                                                text = stringResource(Res.string.gateway_sec_active_platforms),
-                                                style = MaterialTheme.typography.titleMedium,
-                                                fontWeight = FontWeight.SemiBold,
-                                            )
-
-                                            platforms.forEach { (platform, pStatus) ->
-                                                Row(
-                                                    modifier =
-                                                        Modifier
-                                                            .fillMaxWidth()
-                                                            .padding(vertical = Spacing.xs),
-                                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                ) {
-                                                    Text(
-                                                        text = platform.replaceFirstChar { it.uppercase() },
-                                                        style = MaterialTheme.typography.bodyLarge,
-                                                        fontWeight = FontWeight.Medium,
-                                                    )
-                                                    val stateText = pStatus?.state?.uppercase() ?: "UNKNOWN"
-                                                    val badgeColor =
-                                                        when (stateText) {
-                                                            "RUNNING" -> statusColors.success
-                                                            "STOPPED" -> statusColors.error
-                                                            "ERROR" -> statusColors.warning
-                                                            else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                                        }
-                                                    Text(
-                                                        text = stateText,
-                                                        style = MaterialTheme.typography.bodyMedium,
-                                                        color = badgeColor,
-                                                        fontWeight = FontWeight.Bold,
-                                                    )
-                                                }
-                                            }
-                                        }
                                     }
                                 }
                             }

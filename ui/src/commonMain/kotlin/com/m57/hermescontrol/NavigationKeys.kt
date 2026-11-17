@@ -62,8 +62,6 @@ import kotlinx.serialization.Serializable
 
 // ── Settings drill-down sub-pages ──────────────────────────────────────
 
-@Serializable data object SettingsConnection : NavKey
-
 @Serializable data object SettingsAppearance : NavKey
 
 @Serializable data object SettingsLanguage : NavKey

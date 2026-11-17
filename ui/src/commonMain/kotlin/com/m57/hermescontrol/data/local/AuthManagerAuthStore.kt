@@ -1,6 +1,6 @@
 package com.m57.hermescontrol.data.local
 
-import com.m57.hermescontrol.data.config.ConnectionProfile
+import com.m57.hermescontrol.data.config.GatewayInstance
 import com.m57.hermescontrol.data.model.PinnedModel
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.data.theme.ThemePreference
@@ -18,28 +18,27 @@ import kotlinx.coroutines.flow.StateFlow
 internal object AuthManagerAuthStore : AuthStore {
     override val chatFontScaleStops: List<Float> get() = AuthManager.chatFontScaleStops
 
-    override val selectedProfileIdFlow: StateFlow<String> get() = AuthManager.selectedProfileIdFlow
+    override val selectedGatewayIdFlow: StateFlow<String> get() = AuthManager.selectedGatewayIdFlow
 
     override fun getSelectedProfileId(): String? = AuthManager.getSelectedProfileId()
 
     override fun setSelectedProfileId(id: String?) = AuthManager.setSelectedProfileId(id)
 
-    override fun getConnectionProfiles(): List<ConnectionProfile> = AuthManager.getConnectionProfiles()
+    override fun getGatewayInstances(): List<GatewayInstance> = AuthManager.getGatewayInstances()
 
-    override fun saveConnectionProfiles(profiles: List<ConnectionProfile>) =
-        AuthManager.saveConnectionProfiles(profiles)
+    override fun saveGatewayInstances(profiles: List<GatewayInstance>) = AuthManager.saveGatewayInstances(profiles)
 
-    override fun saveConnectionProfilesAndToken(
-        profiles: List<ConnectionProfile>,
+    override fun saveGatewayInstancesAndToken(
+        profiles: List<GatewayInstance>,
         profileId: String,
         token: String?,
-    ) = AuthManager.saveConnectionProfilesAndToken(profiles, profileId, token)
+    ) = AuthManager.saveGatewayInstancesAndToken(profiles, profileId, token)
 
-    override fun saveConnectionProfilesAndSelect(
-        profiles: List<ConnectionProfile>,
+    override fun saveGatewayInstancesAndSelect(
+        profiles: List<GatewayInstance>,
         profileId: String,
         token: String?,
-    ) = AuthManager.saveConnectionProfilesAndSelect(profiles, profileId, token)
+    ) = AuthManager.saveGatewayInstancesAndSelect(profiles, profileId, token)
 
     override fun ensureDefaultProfile() = AuthManager.ensureDefaultProfile()
 

@@ -106,7 +106,7 @@ class E2eIntegrationTest {
         every {
             AuthManager.endpoint()
         } answers { ServerEndpoint.parse("https://127.0.0.1:9119/", CleartextPolicy.ALLOW_WITH_WARNING) }
-        every { AuthManager.getConnectionProfiles() } returns emptyList()
+        every { AuthManager.getGatewayInstances() } returns emptyList()
         every { AuthManager.getSelectedProfileId() } returns null
 
         // Mock Application string resources (no real resources in unit tests)
@@ -117,7 +117,7 @@ class E2eIntegrationTest {
         every { AuthManager.ensureDefaultSelected() } returns Unit
         every { AuthManager.getProfileToken(any()) } returns null
         every { AuthManager.setProfileToken(any(), any()) } returns Unit
-        every { AuthManager.saveConnectionProfiles(any()) } returns Unit
+        every { AuthManager.saveGatewayInstances(any()) } returns Unit
         every { AuthManager.getPinnedModels() } returns emptyList()
         every { AuthManager.savePinnedModels(any()) } returns Unit
         every { AuthManager.getPinnedSessionIds(AuthManager.DEFAULT_PROFILE_ID) } returns emptyList()

@@ -39,7 +39,7 @@ import com.m57.hermescontrol.generated.resources.settings_title_edit_profile
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
-fun ProfileEditorDialog(
+fun GatewayEditorDialog(
     isEditing: Boolean,
     name: String,
     baseUrl: String,

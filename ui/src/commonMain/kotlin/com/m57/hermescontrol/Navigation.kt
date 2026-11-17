@@ -62,7 +62,6 @@ import com.m57.hermescontrol.ui.settings.SettingsAboutPage
 import com.m57.hermescontrol.ui.settings.SettingsAppearancePage
 import com.m57.hermescontrol.ui.settings.SettingsBehaviorPage
 import com.m57.hermescontrol.ui.settings.SettingsChatPage
-import com.m57.hermescontrol.ui.settings.SettingsConnectionPage
 import com.m57.hermescontrol.ui.settings.SettingsDiagnosticsPage
 import com.m57.hermescontrol.ui.settings.SettingsLanguagePage
 import com.m57.hermescontrol.ui.settings.SettingsViewModel
@@ -119,13 +118,6 @@ private fun appEntryProvider(
     // single source of truth that prevents the drawer-scrim stuck-open bug
     // (issue #619). No global gesture set, no closeDrawer callback, no
     // LaunchedEffect(snapTo(Closed)) — the scaffold reconciles automatically.
-    entry<SettingsConnection> {
-        SettingsConnectionPage(
-            onBack = { NavigationController.goBack() },
-            onLogout = { /* handled by caller via goBack fallback */ },
-            viewModel = viewModel { SettingsViewModel() },
-        )
-    }
     entry<SettingsAppearance> {
         SettingsAppearancePage(
             onBack = { NavigationController.goBack() },
@@ -200,7 +192,6 @@ private val navStateConfiguration: SavedStateConfiguration =
                     subclass(AnalyticsScreen.serializer())
                     subclass(BillingScreen.serializer())
                     subclass(FilesScreen.serializer())
-                    subclass(SettingsConnection.serializer())
                     subclass(SettingsAppearance.serializer())
                     subclass(SettingsLanguage.serializer())
                     subclass(SettingsChat.serializer())
@@ -227,7 +218,7 @@ fun MainNavigation() {
     val serverState by AuthManager.serverStore.stateFlow.collectAsState()
     val selectedAuthParam =
         serverState.connectionProfiles
-            .firstOrNull { it.id == serverState.selectedProfileId }
+            .firstOrNull { it.id == serverState.selectedGatewayId }
             ?.wsAuthParam
             ?.takeIf { it.isNotBlank() }
             ?: serverState.wsAuthParam

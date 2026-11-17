@@ -6,7 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
-import com.m57.hermescontrol.data.config.ConnectionProfile
+import com.m57.hermescontrol.data.config.GatewayInstance
 import com.m57.hermescontrol.data.local.AuthSessionState
 import com.m57.hermescontrol.data.local.authStore
 import com.m57.hermescontrol.data.local.defaultServerBaseUrl
@@ -71,7 +71,7 @@ data class AuthLoginUiState(
     val authMode: DashboardAuthMode? = null,
     val connectionSuccess: Boolean = false,
     val errorMessage: String? = null,
-    val loggedInProfiles: List<ConnectionProfile> = emptyList(),
+    val loggedInProfiles: List<GatewayInstance> = emptyList(),
 )
 
 /**
@@ -100,7 +100,7 @@ class AuthLoginViewModel(
     }
 
     fun loadLoggedInProfiles() {
-        val allProfiles = authStore.getConnectionProfiles()
+        val allProfiles = authStore.getGatewayInstances()
         val loggedIn =
             allProfiles.filter { profile ->
                 val token = authStore.getProfileToken(profile.id)

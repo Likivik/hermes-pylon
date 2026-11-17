@@ -1,10 +1,10 @@
 package com.m57.hermescontrol.data.local
 
-import com.m57.hermescontrol.data.config.ConnectionProfile
+import com.m57.hermescontrol.data.config.GatewayInstance
 
 /** What the profile list should become, or nothing to change. */
 internal data class ProfileSeeding(
-    val profiles: List<ConnectionProfile>,
+    val profiles: List<GatewayInstance>,
     val selectedId: String,
 )
 
@@ -24,7 +24,7 @@ internal data class ProfileSeeding(
  * - anything else: append a new profile for the origin.
  */
 internal fun profileSeedingFor(
-    profiles: List<ConnectionProfile>,
+    profiles: List<GatewayInstance>,
     selectedId: String?,
     origin: String,
     displayName: String,
@@ -54,7 +54,7 @@ internal fun profileSeedingFor(
     }
 
     val created =
-        ConnectionProfile(
+        GatewayInstance(
             name = displayName,
             baseUrl = origin,
             wsAuthParam = wsAuthParam,

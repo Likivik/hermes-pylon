@@ -79,7 +79,7 @@ class SessionsViewModel(
     private val ioDispatcher: CoroutineDispatcher = AppEnvironment.current.io,
     private val liveStatusSource: SessionLiveStatusSource =
         HermesSessionLiveStatusSource(
-            selectedProfileIdsProvider = { authStore.selectedProfileIdFlow },
+            selectedProfileIdsProvider = { authStore.selectedGatewayIdFlow },
             selectedProfileIdProvider = { authStore.getSelectedProfileId() },
         ),
 ) : ViewModel(), ToastHost {

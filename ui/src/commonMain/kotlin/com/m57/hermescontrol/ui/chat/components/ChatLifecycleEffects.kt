@@ -50,7 +50,7 @@ fun ChatLifecycleEffects(
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val activeProfileId: String by
-        authStore.selectedProfileIdFlow.collectAsStateWithLifecycle(AuthDefaults.PROFILE_ID)
+        authStore.selectedGatewayIdFlow.collectAsStateWithLifecycle(AuthDefaults.PROFILE_ID)
 
     // Publish the notification session ID to the ViewModel synchronously
     SideEffect {

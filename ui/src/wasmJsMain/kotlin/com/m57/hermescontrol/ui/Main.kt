@@ -509,12 +509,12 @@ private fun seedProfileForThisOrigin(
 ) {
     val seeding =
         com.m57.hermescontrol.data.local.profileSeedingFor(
-            profiles = manager.getConnectionProfiles(),
+            profiles = manager.getGatewayInstances(),
             selectedId = manager.getSelectedProfileId(),
             origin = origin,
             displayName = window.location.hostname.ifBlank { "Pylon" },
             defaultProfileId = com.m57.hermescontrol.data.local.AuthManager.DEFAULT_PROFILE_ID,
             defaultBaseUrl = com.m57.hermescontrol.data.remote.ServerEndpoint.DEFAULT_BASE_URL,
         ) ?: return
-    manager.saveConnectionProfilesAndSelect(seeding.profiles, seeding.selectedId, null)
+    manager.saveGatewayInstancesAndSelect(seeding.profiles, seeding.selectedId, null)
 }

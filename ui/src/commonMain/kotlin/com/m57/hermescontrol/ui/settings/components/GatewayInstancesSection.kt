@@ -47,7 +47,7 @@ import com.m57.hermescontrol.ui.settings.SettingsViewModel
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
-fun ConnectionSection(
+fun GatewayInstancesSection(
     state: SettingsUiState,
     viewModel: SettingsViewModel,
     passwordVisible: Boolean,
@@ -64,13 +64,13 @@ fun ConnectionSection(
             Spacer(modifier = Modifier.height(4.dp))
 
             state.profiles.forEach { profile ->
-                val isActive = profile.id == state.selectedProfileId
+                val isActive = profile.id == state.selectedGatewayId
                 Card(
                     modifier =
                         Modifier
                             .fillMaxWidth()
                             .padding(vertical = 2.dp)
-                            .clickable(role = Role.Button) { viewModel.selectProfile(profile.id) },
+                            .clickable(role = Role.Button) { viewModel.selectGateway(profile.id) },
                     colors =
                         CardDefaults.cardColors(
                             containerColor =
@@ -169,7 +169,7 @@ fun ConnectionSection(
     // ── Dialogs ──────────────────────────────────────────────────────────
 
     if (state.showProfileDialog) {
-        ProfileEditorDialog(
+        GatewayEditorDialog(
             isEditing = state.editingProfileId != null,
             name = state.dialogProfileName,
             baseUrl = state.dialogProfileBaseUrl,

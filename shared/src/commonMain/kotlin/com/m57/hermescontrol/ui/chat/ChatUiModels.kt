@@ -7,6 +7,7 @@ import com.m57.hermescontrol.data.ws.CommandCatalog
 import com.m57.hermescontrol.data.ws.ConnectionStatus
 import com.m57.hermescontrol.data.ws.PrivilegedRequestBinding
 import com.m57.hermescontrol.data.ws.ServerRequestBinding
+import com.m57.hermescontrol.ui.chat.rail.RailLoadStatus
 import com.m57.hermescontrol.ui.common.SecureGatewayMediaRequest
 import com.m57.hermescontrol.util.nowMillis
 
@@ -23,6 +24,12 @@ data class ChatUiState(
     val isSessionReady: Boolean = false,
     val sessions: List<SessionUi> = emptyList(),
     val railRefreshing: Boolean = false,
+    /**
+     * Rows plus the reason there are none. The rail renders [RailLoadStatus.Unavailable]
+     * as a retry affordance instead of vanishing, so a failed fetch can never be
+     * mistaken for "you have no chats".
+     */
+    val railStatus: RailLoadStatus = RailLoadStatus.Loading,
     val chatTitle: String = "Hermes",
     val connectionStatus: ConnectionStatus = ConnectionStatus.DISCONNECTED,
     val statusPill: String? = null,

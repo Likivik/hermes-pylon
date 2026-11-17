@@ -5,6 +5,7 @@ import com.m57.hermescontrol.util.ioDispatcher
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsChannel
+import io.ktor.http.HttpHeaders
 import io.ktor.http.isSuccess
 import io.ktor.utils.io.readRemaining
 import kotlinx.coroutines.CancellationException
@@ -33,11 +34,15 @@ object DashboardSessionTokenRefresher {
     // redundant GET at the dashboard SPA (thundering-herd guard).
     private val refreshMutex = Mutex()
 
-    suspend fun refresh(): String? =
+    suspend fun refresh(cookieHeader: String? = null): String? =
         refreshMutex.withLock {
             try {
                 val boundary = AuthManager.credentialBoundary()
-                val token = fetch(boundary.endpoint.baseUrl.toString()) ?: return@withLock null
+                val token =
+                    fetch(
+                        boundary.endpoint.baseUrl.toString(),
+                        cookieHeader = cookieHeader,
+                    ) ?: return@withLock null
                 token.takeIf { AuthManager.commitRefreshedToken(boundary, it) }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -57,10 +62,20 @@ object DashboardSessionTokenRefresher {
         baseUrl: String,
         client: HttpClient = probeClient,
         dispatcher: CoroutineDispatcher = ioDispatcher,
+        cookieHeader: String? = null,
     ): String? =
         try {
             withContext(dispatcher) {
-                val response = client.get(baseUrl)
+                val response =
+                    client.get(baseUrl) {
+                        // Gated mode has no bearer to refresh with: the SPA hands the
+                        // token out only to a request that already carries the session
+                        // cookie. Without this the probe reads a login redirect and
+                        // reports "no token" for the wrong reason.
+                        if (!cookieHeader.isNullOrBlank()) {
+                            headers.append(HttpHeaders.Cookie, cookieHeader)
+                        }
+                    }
                 if (!response.status.isSuccess()) return@withContext null
                 val bytes =
                     response.bodyAsChannel()

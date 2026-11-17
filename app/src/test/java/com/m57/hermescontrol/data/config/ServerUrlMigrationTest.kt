@@ -26,7 +26,7 @@ class ServerUrlMigrationTest {
             ServerStoreState(
                 connectionProfiles =
                     listOf(
-                        ConnectionProfile(
+                        GatewayInstance(
                             id = "legacy",
                             name = "Legacy",
                             host = "2001:db8::1",
@@ -34,13 +34,13 @@ class ServerUrlMigrationTest {
                             baseUrl = null,
                         ),
                     ),
-                selectedProfileId = "legacy",
+                selectedGatewayId = "legacy",
             )
 
         val migrated = ServerUrlMigration.migrateState(legacy)
         val profile = migrated.connectionProfiles.single()
 
-        assertEquals("legacy", migrated.selectedProfileId)
+        assertEquals("legacy", migrated.selectedGatewayId)
         assertEquals("http://[2001:db8::1]:9443/", profile.baseUrl)
     }
 
