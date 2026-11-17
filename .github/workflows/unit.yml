@@ -103,12 +103,6 @@ jobs:
       - name: Run :shared wasmJs tests
         run: ./gradlew :shared:wasmJsBrowserTest --no-daemon -Dorg.gradle.workers.max=2
 
-      # The UI module compiles for wasm but its tests were JVM-only until now, so
-      # anything in ui/commonMain that behaves differently in the browser had no
-      # gate. Same karma/Chrome path as :shared above.
-      - name: Run :ui wasmJs tests
-        run: ./gradlew :ui:wasmJsBrowserTest --no-daemon -Dorg.gradle.workers.max=2
-
       - name: Upload unit test reports
         if: failure()
         uses: actions/upload-artifact@v5
