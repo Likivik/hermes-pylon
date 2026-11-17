@@ -1,8 +1,10 @@
 package com.m57.hermescontrol.data.ws
 
 import com.m57.hermescontrol.data.remote.ServerEndpoint
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -22,8 +24,11 @@ private const val WS_URL = "ws://127.0.0.1:19119/api/ws"
  * ticket needs an HTTP client, the client was never installed, so every attempt ended
  * in flight with no socket — and stayed there.
  *
- * [HermesWsClient.clearStaleAuthExpiry] is the escape hatch; these tests hold it to that.
- * They run on a plain JVM through the seams: no Android, no network, no pylon.
+ * These tests live in `commonTest` on purpose: the same file executes on the JVM and in
+ * the browser (`wasmJsBrowserTest`), which is the only way a platform difference in this
+ * state machine shows up before users hit it. `runBlocking` does not exist on wasm, so
+ * waits go through [Dispatchers.Default] with real time — virtual time inside `runTest`
+ * cannot observe work launched on the client's own scope.
  */
 class HermesWsClientStaleStateTest {
     /** Loopback mode: the client has a token, so it dials straight away. */
@@ -74,33 +79,47 @@ class HermesWsClientStaleStateTest {
         return transport
     }
 
-    @Test
-    fun `loopback mode dials on the first connect`() {
-        val transport = install(LoopbackAuth())
+    /** Real-time wait: the client works on its own scope, which virtual time cannot drive. */
+    private suspend fun settle(millis: Long = 400) {
+        withContext(Dispatchers.Default) { delay(millis) }
+    }
 
-        HermesWsClient.connect()
-
-        runBlocking {
-            withTimeout(2_000) { transport.firstConnect.await() }
+    private suspend fun awaitFirstDial(
+        transport: RecordingWsTransport,
+        timeoutMillis: Long = 5_000,
+    ) {
+        withContext(Dispatchers.Default) {
+            withTimeout(timeoutMillis) { transport.firstConnect.await() }
         }
-        assertEquals(1, transport.connectedUrls.size, "the first connect dials exactly once")
     }
 
     @Test
-    fun `a second connect while one is in flight is refused`() {
-        val transport = install(LoopbackAuth())
+    fun `loopback mode dials on the first connect`() =
+        runTest {
+            val transport = install(LoopbackAuth())
 
-        HermesWsClient.connect()
-        runBlocking { withTimeout(2_000) { transport.firstConnect.await() } }
-        HermesWsClient.connect()
-        runBlocking { delay(200) }
+            HermesWsClient.connect()
+            awaitFirstDial(transport)
 
-        assertEquals(
-            1,
-            transport.connectedUrls.size,
-            "re-entrant connect must not open a second socket",
-        )
-    }
+            assertEquals(1, transport.connectedUrls.size, "the first connect dials exactly once")
+        }
+
+    @Test
+    fun `a second connect while one is in flight is refused`() =
+        runTest {
+            val transport = install(LoopbackAuth())
+
+            HermesWsClient.connect()
+            awaitFirstDial(transport)
+            HermesWsClient.connect()
+            settle(200)
+
+            assertEquals(
+                1,
+                transport.connectedUrls.size,
+                "re-entrant connect must not open a second socket",
+            )
+        }
 
     /**
      * The stuck shape: an attempt that can never mint a ticket must not dial, and the
@@ -108,33 +127,35 @@ class HermesWsClientStaleStateTest {
      * here would promise a retry that cannot succeed and rebuild the silent banner.
      */
     @Test
-    fun `an attempt that cannot mint a ticket never dials`() {
-        val transport = install(UnminatableGatedAuth())
+    fun `an attempt that cannot mint a ticket never dials`() =
+        runTest {
+            val transport = install(UnminatableGatedAuth())
 
-        HermesWsClient.connect()
-        runBlocking { delay(400) }
+            HermesWsClient.connect()
+            settle()
 
-        assertTrue(
-            transport.connectedUrls.isEmpty(),
-            "nothing may dial before a ticket is minted",
-        )
-        assertEquals(
-            ConnectionStatus.DISCONNECTED,
-            HermesWsClient.connectionStatus.value,
-            "a missing HTTP client is a wiring bug: no reconnect, no banner, an error log",
-        )
-    }
+            assertTrue(
+                transport.connectedUrls.isEmpty(),
+                "nothing may dial before a ticket is minted",
+            )
+            assertEquals(
+                ConnectionStatus.DISCONNECTED,
+                HermesWsClient.connectionStatus.value,
+                "a missing HTTP client is a wiring bug: no reconnect, no banner, an error log",
+            )
+        }
 
     @Test
-    fun `clearing is a no-op when there is nothing stale`() {
-        install(LoopbackAuth())
+    fun `clearing is a no-op when there is nothing stale`() =
+        runTest {
+            install(LoopbackAuth())
 
-        HermesWsClient.clearStaleAuthExpiry()
+            HermesWsClient.clearStaleAuthExpiry()
 
-        assertEquals(
-            ConnectionStatus.DISCONNECTED,
-            HermesWsClient.connectionStatus.value,
-            "an idle client stays idle",
-        )
-    }
+            assertEquals(
+                ConnectionStatus.DISCONNECTED,
+                HermesWsClient.connectionStatus.value,
+                "an idle client stays idle",
+            )
+        }
 }
