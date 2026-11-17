@@ -75,8 +75,18 @@ class DiagnosticsViewModel {
         val storeFacts =
             runCatching {
                 Triple(authStore.getBaseUrl(), authStore.getToken(), authStore.getSelectedProfileId())
+            }.onFailure {
+                // The diagnostics panel silently lost its store details; a panel whose job is
+                // reporting state must say when it could not read that state.
+                HermesLog.w("Diagnostics", "could not read auth store facts: ${it.message}")
             }.getOrNull()
-        val endpoint = runCatching { GatewayPlatform.endpoint() }
+        val endpoint =
+            runCatching { GatewayPlatform.endpoint() }
+                .onFailure {
+                    // Falls back to the endpoint already shown, which is right, but the
+                    // panel should record that the fresh read failed.
+                    HermesLog.w("Diagnostics", "could not resolve the gateway endpoint: ${it.message}")
+                }
 
         _state.update { current ->
             current.copy(

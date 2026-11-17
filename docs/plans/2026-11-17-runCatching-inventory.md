@@ -127,3 +127,18 @@ Rules: auth/session/token paths are `MUST-NOT-BE-SILENT` regardless of shape; tr
 - Whether a swallowed failure is safe to swallow — that is the per-site judgement the classification pass makes.
 - Whether the block guards something the user can see; shape alone cannot separate a cosmetic decode retry from a session refresh.
 - The 2 empty `catch` blocks are not `runCatching`: `PreferencesStoreWasm.kt:31` is JavaScript inside a Kotlin raw string, `AuthManager.kt:550` is a coroutine cancel. Both benign.
+## Classification status (updated 2026-11-17)
+
+**Resolved in code:**
+- `WebAuthPlatform.kt` — 8 sites: writes check the bridge result and log; reads simplified. Root cause was the ignored `false`, not the `runCatching`.
+- `JvmAuthPlatform.kt` — 3 sites: read/write failures log; the swallowed `setPosixFilePermissions` failure (security-relevant) now warns.
+- `ui/src/wasmJsMain/.../Main.kt` — 4 sites: failed session adoption logs (the banner shape); 3 landing preloads documented as intentional.
+- `HermesWsClient.kt` + `KtorWsTransport.kt` — 4 sites: `isGatedMode()`/`isAutoReconnect()` failures log (they silently flipped the handshake mode); heartbeat probe and close-echo marked intentional.
+- `ChatViewModel.kt` — 4 sites: the connect guard's auth-mode fallback logs (issue #640 shape); both privilege prompts log; the bulk request marked handled.
+- `DiagnosticsViewModel.kt` — 4 sites: store-fact and endpoint reads log; the other two already surfaced a verdict to the panel.
+
+**Classified as handled, no change needed:**
+- `BillingViewModel.kt` — 4 sites, each with `.onFailure` that sets `errorMessage` for the UI.
+
+**Remaining:**
+- `ImageBytesResolver.kt` (4), `MediaPlaybackAndroid.kt` (10, expected log-and-continue), and the 34 "review" sites where shape alone cannot decide.
