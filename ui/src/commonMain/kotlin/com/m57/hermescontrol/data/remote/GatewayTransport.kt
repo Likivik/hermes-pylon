@@ -4,6 +4,7 @@ import com.m57.hermescontrol.data.local.AuthManager
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpSend
 import io.ktor.client.plugins.plugin
+import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 
@@ -99,18 +100,30 @@ private fun HttpClient.withSessionBearer(): HttpClient =
                 request.headers[HttpHeaders.Authorization] = it
             }
             val call = execute(request)
-            // Only loopback mode can refresh a bearer; in gated mode the cookie
-            // is the credential and the 401 belongs to safeApiCall's
-            // expired-session recovery.
             if (call.response.status != HttpStatusCode.Unauthorized) return@intercept call
-            if (AuthManager.isGatedMode()) return@intercept call
-            val fresh = DashboardSessionTokenRefresher.refresh() ?: return@intercept call
+            // Recover the credential once. Token mode refreshes the bearer; gated
+            // mode has no bearer, so the probe carries the session cookie and the
+            // SPA hands a token back. Measured: a stale/invalid bearer *plus* a
+            // valid cookie is a 401, so this retry only ever adds a token the
+            // gateway has just authenticated.
+            val fresh =
+                DashboardSessionTokenRefresher.refresh(
+                    cookieHeader = jarCookieHeader(request),
+                ) ?: return@intercept call
             // Re-execute the same builder with the refreshed value: exactly one
             // retry, mirroring the old Authenticator's `priorResponse != null` guard.
             request.headers[HttpHeaders.Authorization] = "Bearer $fresh"
             execute(request)
         }
     }
+
+/** The jar's cookies for this request URL as one header value, or null. */
+private fun jarCookieHeader(request: HttpRequestBuilder): String? {
+    if (!CookieManager.isInitialized()) return null
+    val cookies = CookieManager.cookieJar.loadForRequest(request.url.build())
+    if (cookies.isEmpty()) return null
+    return cookies.joinToString("; ") { "${it.name}=${it.value}" }
+}
 
 /**
  * Media transport: one credential snapshot, no jar, no retry.

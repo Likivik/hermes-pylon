@@ -5,7 +5,7 @@ package com.m57.hermescontrol.ui.connect
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.m57.hermescontrol.AppEnvironment
-import com.m57.hermescontrol.data.config.ConnectionProfile
+import com.m57.hermescontrol.data.config.GatewayInstance
 import com.m57.hermescontrol.data.config.resolveBaseUrl
 import com.m57.hermescontrol.data.local.AuthDefaults
 import com.m57.hermescontrol.data.local.AuthSessionState
@@ -49,8 +49,8 @@ data class ConnectUiState(
     val errorMessage: String? = null,
     val profileName: String = "",
     val saveProfile: Boolean = false,
-    val profiles: List<ConnectionProfile> = emptyList(),
-    val selectedProfile: ConnectionProfile? = null,
+    val profiles: List<GatewayInstance> = emptyList(),
+    val selectedProfile: GatewayInstance? = null,
     val authMode: String = "token",
     val status: StatusResponse? = null,
 )
@@ -81,7 +81,7 @@ class ConnectViewModel(
     fun loadSavedValues() {
         val savedToken = authStore.getToken() ?: ""
         val savedBaseUrl = authStore.getBaseUrl()
-        val profiles = authStore.getConnectionProfiles()
+        val profiles = authStore.getGatewayInstances()
         val selectedId = authStore.getSelectedProfileId()
         val selectedProfile = profiles.firstOrNull { it.id == selectedId }
         val resolvedBaseUrl = selectedProfile?.resolveBaseUrl(savedBaseUrl) ?: savedBaseUrl
@@ -113,7 +113,7 @@ class ConnectViewModel(
         _uiState.update { it.copy(saveProfile = value) }
     }
 
-    fun selectProfile(profile: ConnectionProfile) {
+    fun selectGateway(profile: GatewayInstance) {
         authStore.setSelectedProfileId(profile.id)
         val token = authStore.getProfileToken(profile.id) ?: ""
         val endpoint =
@@ -257,7 +257,7 @@ class ConnectViewModel(
                     AuthSessionState.markAuthenticated()
 
                     if (state.saveProfile) {
-                        val currentProfiles = authStore.getConnectionProfiles()
+                        val currentProfiles = authStore.getGatewayInstances()
                         val existingIndex =
                             currentProfiles.indexOfFirst {
                                 it.name.equals(
@@ -272,7 +272,7 @@ class ConnectViewModel(
                                     wsAuthParam = "token",
                                 )
                             } else {
-                                ConnectionProfile(
+                                GatewayInstance(
                                     name = state.profileName,
                                     baseUrl = state.baseUrl,
                                     wsAuthParam = "token",
@@ -284,7 +284,7 @@ class ConnectViewModel(
                             } else {
                                 currentProfiles + targetProfile
                             }
-                        authStore.saveConnectionProfilesAndSelect(
+                        authStore.saveGatewayInstancesAndSelect(
                             updatedProfiles,
                             targetProfile.id,
                             state.token,

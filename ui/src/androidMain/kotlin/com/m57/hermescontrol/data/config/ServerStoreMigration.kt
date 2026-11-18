@@ -66,7 +66,7 @@ class ServerStoreMigration(
         val connectionProfiles =
             if (connectionProfilesRaw != null) {
                 try {
-                    HermesJson.instance.decodeFromString<List<ConnectionProfile>>(connectionProfilesRaw)
+                    HermesJson.instance.decodeFromString<List<GatewayInstance>>(connectionProfilesRaw)
                 } catch (e: Exception) {
                     emptyList()
                 }
@@ -74,7 +74,7 @@ class ServerStoreMigration(
                 emptyList()
             }
 
-        val selectedProfileId = prefs.getString("selected_profile_id", null)?.takeIf { it.isNotBlank() }
+        val selectedGatewayId = prefs.getString("selected_profile_id", null)?.takeIf { it.isNotBlank() }
 
         val pinnedModelsRaw = prefs.getString("pinned_models", null)
         val pinnedModels =
@@ -111,7 +111,7 @@ class ServerStoreMigration(
                                 ).baseUrl.toString(),
                     )
                 },
-            selectedProfileId = selectedProfileId,
+            selectedGatewayId = selectedGatewayId,
             pinnedModels = pinnedModels,
             wsAuthParam = wsAuthParam,
             typingEffectEnabled = typingEffectEnabled,

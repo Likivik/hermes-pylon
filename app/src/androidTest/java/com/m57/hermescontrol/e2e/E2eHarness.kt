@@ -5,7 +5,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import com.m57.hermescontrol.data.config.ConnectionProfile
+import com.m57.hermescontrol.data.config.GatewayInstance
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.remote.AuthPayloads
 import com.m57.hermescontrol.data.remote.GatewayClientKind
@@ -81,7 +81,7 @@ object E2eHarness {
         // 9119 caused a doomed first connect (e2e-37 log: ConnectException to
         // ws://127.0.0.1:9119/ws before the real socket opened).
         val profile =
-            ConnectionProfile(
+            GatewayInstance(
                 id = AuthManager.DEFAULT_PROFILE_ID,
                 name = "E2E",
                 baseUrl = baseUrl,
@@ -91,7 +91,7 @@ object E2eHarness {
                 // override is never reached. "token" takes the non-gated path where
                 // the offline refresh is best-effort, so the override URL wins.
             )
-        AuthManager.saveConnectionProfilesAndSelect(
+        AuthManager.saveGatewayInstancesAndSelect(
             profiles = listOf(profile),
             profileId = AuthManager.DEFAULT_PROFILE_ID,
             token = "e2e-token",
@@ -136,7 +136,7 @@ object E2eHarness {
      *  1. POST `/auth/password-login` with `{provider:"basic", username, password, next:""}`
      *     via the shared `OkHttpProvider.probe` client. The probe carries the
      *     `PersistentCookieJar`, so the Set-Cookie response lands in the
-     *     active serverId scope (set by `saveConnectionProfilesAndSelect`).
+     *     active serverId scope (set by `saveGatewayInstancesAndSelect`).
      *  2. Save the profile with `baseUrl="http://127.0.0.1:8642/"` and set
      *     `wsAuthParam="ticket"` on the SELECTED profile, putting
      *     `AuthManager.isGatedMode()` into true. Subsequent
@@ -156,7 +156,7 @@ object E2eHarness {
         }
         // Pin the cookie scope to the default profile id BEFORE the login so
         // the Set-Cookie response lands in the same scope the selected profile
-        // will own after saveConnectionProfilesAndSelect(). Without this, a
+        // will own after saveGatewayInstancesAndSelect(). Without this, a
         // previous real-gateway test that switched the scope elsewhere would
         // leave the cookies stranded in that other scope and the ticket mint
         // would miss them.
@@ -171,7 +171,7 @@ object E2eHarness {
         // We pinned the cookie scope to DEFAULT_PROFILE_ID and called
         // beginAuthentication() above, mirroring AuthLoginViewModel — the
         // pinned scope means the cookies land in the same scope the selected
-        // profile will own after saveConnectionProfilesAndSelect().
+        // profile will own after saveGatewayInstancesAndSelect().
         // Ktor on the app's own transport: the cookie jar is still open from
         // beginAuthentication() above, so the Set-Cookie on this response lands
         // in the pinned DEFAULT_PROFILE_ID scope.
@@ -207,14 +207,14 @@ object E2eHarness {
         }
 
         val profile =
-            ConnectionProfile(
+            GatewayInstance(
                 id = AuthManager.DEFAULT_PROFILE_ID,
                 name = "E2E-REAL",
                 baseUrl = baseUrl,
                 // ticket mode: real ws-ticket flow against the real gateway.
                 wsAuthParam = "ticket",
             )
-        AuthManager.saveConnectionProfilesAndSelect(
+        AuthManager.saveGatewayInstancesAndSelect(
             profiles = listOf(profile),
             profileId = AuthManager.DEFAULT_PROFILE_ID,
             token = "e2e-token", // placeholder; real auth via ticket

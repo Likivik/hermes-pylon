@@ -1,6 +1,6 @@
 package com.m57.hermescontrol.data.local
 
-import com.m57.hermescontrol.data.config.ConnectionProfile
+import com.m57.hermescontrol.data.config.GatewayInstance
 import com.m57.hermescontrol.data.model.PinnedModel
 import com.m57.hermescontrol.data.remote.CleartextPolicy
 import com.m57.hermescontrol.data.remote.ServerEndpoint
@@ -19,12 +19,12 @@ import kotlinx.coroutines.flow.asStateFlow
  * (DataStore / SQLDelight) is added.
  */
 class InMemoryAuthStore : AuthStore {
-    private val _selectedProfileIdFlow = MutableStateFlow(DEFAULT_PROFILE_ID)
+    private val _selectedGatewayIdFlow = MutableStateFlow(DEFAULT_PROFILE_ID)
     override val chatFontScaleStops: List<Float> = CHAT_FONT_SCALE_STOPS
 
-    override val selectedProfileIdFlow: StateFlow<String> = _selectedProfileIdFlow.asStateFlow()
+    override val selectedGatewayIdFlow: StateFlow<String> = _selectedGatewayIdFlow.asStateFlow()
 
-    private var profiles: List<ConnectionProfile> = emptyList()
+    private var profiles: List<GatewayInstance> = emptyList()
     private val tokens = mutableMapOf<String, String>()
     private val pinnedSessions = mutableMapOf<String, List<String>>()
     private var pinnedModels: List<PinnedModel> = emptyList()
@@ -42,20 +42,20 @@ class InMemoryAuthStore : AuthStore {
     private var typingEffectDelayMs = 24
     private var appLanguage = "en"
 
-    override fun getSelectedProfileId(): String? = _selectedProfileIdFlow.value
+    override fun getSelectedProfileId(): String? = _selectedGatewayIdFlow.value
 
     override fun setSelectedProfileId(id: String?) {
-        _selectedProfileIdFlow.value = id ?: DEFAULT_PROFILE_ID
+        _selectedGatewayIdFlow.value = id ?: DEFAULT_PROFILE_ID
     }
 
-    override fun getConnectionProfiles(): List<ConnectionProfile> = profiles
+    override fun getGatewayInstances(): List<GatewayInstance> = profiles
 
-    override fun saveConnectionProfiles(profiles: List<ConnectionProfile>) {
+    override fun saveGatewayInstances(profiles: List<GatewayInstance>) {
         this.profiles = profiles
     }
 
-    override fun saveConnectionProfilesAndToken(
-        profiles: List<ConnectionProfile>,
+    override fun saveGatewayInstancesAndToken(
+        profiles: List<GatewayInstance>,
         profileId: String,
         token: String?,
     ) {
@@ -63,12 +63,12 @@ class InMemoryAuthStore : AuthStore {
         setProfileToken(profileId, token)
     }
 
-    override fun saveConnectionProfilesAndSelect(
-        profiles: List<ConnectionProfile>,
+    override fun saveGatewayInstancesAndSelect(
+        profiles: List<GatewayInstance>,
         profileId: String,
         token: String?,
     ) {
-        saveConnectionProfilesAndToken(profiles, profileId, token)
+        saveGatewayInstancesAndToken(profiles, profileId, token)
         setSelectedProfileId(profileId)
     }
 
@@ -77,13 +77,13 @@ class InMemoryAuthStore : AuthStore {
     }
 
     override fun ensureDefaultSelected() {
-        if (_selectedProfileIdFlow.value.isBlank()) _selectedProfileIdFlow.value = DEFAULT_PROFILE_ID
+        if (_selectedGatewayIdFlow.value.isBlank()) _selectedGatewayIdFlow.value = DEFAULT_PROFILE_ID
     }
 
-    override fun getToken(): String? = tokens[_selectedProfileIdFlow.value]
+    override fun getToken(): String? = tokens[_selectedGatewayIdFlow.value]
 
     override fun setToken(token: String?) {
-        val id = _selectedProfileIdFlow.value
+        val id = _selectedGatewayIdFlow.value
         if (token.isNullOrBlank()) tokens.remove(id) else tokens[id] = token
     }
 
@@ -131,13 +131,13 @@ class InMemoryAuthStore : AuthStore {
     }
 
     override fun getPinnedSessionIds(profileId: String?): List<String> =
-        pinnedSessions[profileId ?: _selectedProfileIdFlow.value].orEmpty()
+        pinnedSessions[profileId ?: _selectedGatewayIdFlow.value].orEmpty()
 
     override fun savePinnedSessionIds(
         pinnedSessionIds: List<String>,
         profileId: String?,
     ) {
-        pinnedSessions[profileId ?: _selectedProfileIdFlow.value] = pinnedSessionIds
+        pinnedSessions[profileId ?: _selectedGatewayIdFlow.value] = pinnedSessionIds
     }
 
     override fun clearPinnedSessionIds(profileId: String) {

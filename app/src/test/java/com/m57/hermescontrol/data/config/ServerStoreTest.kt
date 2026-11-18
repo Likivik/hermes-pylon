@@ -23,7 +23,7 @@ class ServerStoreTest {
         assertTrue(state.autoReconnect)
         assertEquals("token", state.wsAuthParam)
         assertTrue(state.connectionProfiles.isEmpty())
-        assertNull(state.selectedProfileId)
+        assertNull(state.selectedGatewayId)
         assertEquals(1.0f, state.chatFontScale)
         assertFalse(state.useDynamicColors)
     }
@@ -58,7 +58,7 @@ class ServerStoreTest {
     @Test
     fun testPureOps_addOrUpdate() {
         val state = ServerStoreState()
-        val profile = ConnectionProfile(id = "1", name = "Test", host = "10.0.0.1", port = 8080)
+        val profile = GatewayInstance(id = "1", name = "Test", host = "10.0.0.1", port = 8080)
 
         val newState = state.addOrUpdate(profile)
         assertEquals(1, newState.connectionProfiles.size)
@@ -77,28 +77,28 @@ class ServerStoreTest {
         val state =
             ServerStoreState(
                 connectionProfiles = emptyList(),
-                selectedProfileId = "orphaned-id",
+                selectedGatewayId = "orphaned-id",
             )
         val healed = state.selfHealed()
-        assertNull(healed.selectedProfileId)
+        assertNull(healed.selectedGatewayId)
     }
 
     @Test
     fun testResolvedHostAndPort() {
-        val profile = ConnectionProfile(id = "prof-1", name = "Custom", host = "10.0.0.5", port = 8000)
+        val profile = GatewayInstance(id = "prof-1", name = "Custom", host = "10.0.0.5", port = 8000)
         val state =
             ServerStoreState(
                 host = "127.0.0.1",
                 port = 9119,
                 connectionProfiles = listOf(profile),
-                selectedProfileId = "prof-1",
+                selectedGatewayId = "prof-1",
             )
 
         assertEquals("10.0.0.5", state.resolvedHost)
         assertEquals(8000, state.resolvedPort)
 
         // Unselected
-        val unselectedState = state.copy(selectedProfileId = null)
+        val unselectedState = state.copy(selectedGatewayId = null)
         assertEquals("127.0.0.1", unselectedState.resolvedHost)
         assertEquals(9119, unselectedState.resolvedPort)
     }

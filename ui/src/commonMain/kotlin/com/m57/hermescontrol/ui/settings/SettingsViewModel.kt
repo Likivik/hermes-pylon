@@ -5,7 +5,7 @@ package com.m57.hermescontrol.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.m57.hermescontrol.AppEnvironment
-import com.m57.hermescontrol.data.config.ConnectionProfile
+import com.m57.hermescontrol.data.config.GatewayInstance
 import com.m57.hermescontrol.data.config.resolveBaseUrl
 import com.m57.hermescontrol.data.local.AuthDefaults
 import com.m57.hermescontrol.data.local.AuthSessionState
@@ -47,8 +47,8 @@ data class SettingsUiState(
     val isSaved: Boolean = false,
     val typingEffectEnabled: Boolean = false,
     val typingEffectDelayMs: Int = 30,
-    val profiles: List<ConnectionProfile> = emptyList(),
-    val selectedProfileId: String? = null,
+    val profiles: List<GatewayInstance> = emptyList(),
+    val selectedGatewayId: String? = null,
     val renameProfileName: String = "",
     val appLanguage: String = "system",
     // Profile add/edit dialog
@@ -97,7 +97,7 @@ class SettingsViewModel(
         val chatFontScale = authStore.getChatFontScale()
         val typingEffectEnabled = authStore.isTypingEffectEnabled()
         val typingEffectDelayMs = authStore.getTypingEffectDelayMs()
-        val profiles = authStore.getConnectionProfiles()
+        val profiles = authStore.getGatewayInstances()
         val appLanguage = authStore.getAppLanguage()
         val renameProfileName =
             profiles.firstOrNull { p -> p.id == selectedId }?.name ?: ""
@@ -116,14 +116,14 @@ class SettingsViewModel(
                 typingEffectEnabled = typingEffectEnabled,
                 typingEffectDelayMs = typingEffectDelayMs,
                 profiles = profiles,
-                selectedProfileId = selectedId,
+                selectedGatewayId = selectedId,
                 renameProfileName = renameProfileName,
                 appLanguage = appLanguage,
             )
         }
     }
 
-    fun selectProfile(profileId: String?) {
+    fun selectGateway(profileId: String?) {
         val profileChanged = profileId != authStore.getSelectedProfileId()
         if (profileChanged) {
             disconnectWebSocket()
@@ -141,8 +141,8 @@ class SettingsViewModel(
         if (wasSelected) {
             disconnectWebSocket()
         }
-        val updatedProfiles = authStore.getConnectionProfiles().filter { it.id != profileId }
-        authStore.saveConnectionProfiles(updatedProfiles)
+        val updatedProfiles = authStore.getGatewayInstances().filter { it.id != profileId }
+        authStore.saveGatewayInstances(updatedProfiles)
         authStore.setProfileToken(profileId, null)
         authStore.clearPinnedSessionIds(profileId)
         // Never leave selection null (issue #478): if the deleted profile was selected,
@@ -177,7 +177,7 @@ class SettingsViewModel(
     }
 
     fun openEditProfile(profileId: String) {
-        val profile = authStore.getConnectionProfiles().firstOrNull { it.id == profileId } ?: return
+        val profile = authStore.getGatewayInstances().firstOrNull { it.id == profileId } ?: return
         val token = authStore.getProfileToken(profileId) ?: ""
         _uiState.update {
             it.copy(
@@ -239,7 +239,7 @@ class SettingsViewModel(
 
         if (name.isBlank()) return
 
-        val profiles = authStore.getConnectionProfiles().toMutableList()
+        val profiles = authStore.getGatewayInstances().toMutableList()
         val editingId = state.editingProfileId
         var reconnectWebSocket = false
 
@@ -269,19 +269,19 @@ class SettingsViewModel(
                     baseUrl = endpoint.baseUrl.toString(),
                 )
             if (tokenChanged) {
-                authStore.saveConnectionProfilesAndToken(profiles, editingId, token)
+                authStore.saveGatewayInstancesAndToken(profiles, editingId, token)
             } else {
-                authStore.saveConnectionProfiles(profiles)
+                authStore.saveGatewayInstances(profiles)
             }
         } else {
             // Add new profile
             val newProfile =
-                ConnectionProfile(
+                GatewayInstance(
                     name = name,
                     baseUrl = endpoint.baseUrl.toString(),
                 )
             profiles.add(newProfile)
-            authStore.saveConnectionProfiles(profiles)
+            authStore.saveGatewayInstances(profiles)
             authStore.setProfileToken(newProfile.id, "")
             disconnectWebSocket()
             authStore.setSelectedProfileId(newProfile.id)
@@ -299,7 +299,7 @@ class SettingsViewModel(
     // ── Delete confirmation ──────────────────────────────────────────────
 
     fun requestDeleteProfile(profileId: String) {
-        val profile = authStore.getConnectionProfiles().firstOrNull { it.id == profileId }
+        val profile = authStore.getGatewayInstances().firstOrNull { it.id == profileId }
         _uiState.update {
             it.copy(
                 showDeleteConfirm = true,

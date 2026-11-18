@@ -60,18 +60,18 @@ fun BotsRoute(
     viewModel: BotsViewModel = viewModel { BotsViewModel() },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val selectedProfileId by authStore.selectedProfileIdFlow.collectAsStateWithLifecycle()
+    val selectedGatewayId by authStore.selectedGatewayIdFlow.collectAsStateWithLifecycle()
 
-    LaunchedEffect(selectedProfileId, state.sourceConnectionProfileId) {
+    LaunchedEffect(selectedGatewayId, state.sourceConnectionProfileId) {
         val sourceProfileId = state.sourceConnectionProfileId
-        if (sourceProfileId != null && sourceProfileId != selectedProfileId && !state.isLoading) {
+        if (sourceProfileId != null && sourceProfileId != selectedGatewayId && !state.isLoading) {
             viewModel.loadBots()
         }
     }
 
     BotsScreen(
         state = state,
-        selectedProfileId = selectedProfileId,
+        selectedGatewayId = selectedGatewayId,
         modifier = modifier,
         onOpenDrawer = onOpenDrawer,
         onRefresh = { viewModel.loadBots(isRefresh = true) },
@@ -89,7 +89,7 @@ fun BotsRoute(
 @Composable
 fun BotsScreen(
     state: BotsUiState,
-    selectedProfileId: String?,
+    selectedGatewayId: String?,
     onRefresh: () -> Unit,
     onRetry: () -> Unit,
     onToggleShowHidden: () -> Unit,
@@ -140,7 +140,7 @@ fun BotsScreen(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         items(state.displayProfiles) { profile ->
-                            val canOpen = canOpenBot(profile, state.sourceConnectionProfileId, selectedProfileId)
+                            val canOpen = canOpenBot(profile, state.sourceConnectionProfileId, selectedGatewayId)
                             val onThisBotClick: (() -> Unit)? =
                                 if (canOpen) {
                                     { onBotClick(profile) }

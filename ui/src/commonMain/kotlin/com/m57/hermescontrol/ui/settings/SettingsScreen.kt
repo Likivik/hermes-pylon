@@ -22,7 +22,6 @@ import com.m57.hermescontrol.SettingsAbout
 import com.m57.hermescontrol.SettingsAppearance
 import com.m57.hermescontrol.SettingsBehavior
 import com.m57.hermescontrol.SettingsChat
-import com.m57.hermescontrol.SettingsConnection
 import com.m57.hermescontrol.SettingsDiagnostics
 import com.m57.hermescontrol.SettingsLanguage
 import com.m57.hermescontrol.data.theme.ThemePreference
@@ -32,12 +31,10 @@ import com.m57.hermescontrol.generated.resources.settings_sec_about
 import com.m57.hermescontrol.generated.resources.settings_sec_appearance
 import com.m57.hermescontrol.generated.resources.settings_sec_behavior
 import com.m57.hermescontrol.generated.resources.settings_sec_chat
-import com.m57.hermescontrol.generated.resources.settings_sec_connection
 import com.m57.hermescontrol.generated.resources.settings_sec_diagnostics
 import com.m57.hermescontrol.generated.resources.settings_sec_language
 import com.m57.hermescontrol.generated.resources.settings_summary_off
 import com.m57.hermescontrol.generated.resources.settings_summary_on
-import com.m57.hermescontrol.generated.resources.settings_summary_profiles
 import com.m57.hermescontrol.generated.resources.settings_summary_theme_dark
 import com.m57.hermescontrol.generated.resources.settings_summary_theme_light
 import com.m57.hermescontrol.generated.resources.settings_summary_theme_system
@@ -81,20 +78,6 @@ fun SettingsScreen(
                             label = stringResource(Res.string.settings_sec_language),
                             summary = languageLabel(state.appLanguage),
                             onClick = { NavigationController.navigateTo(SettingsLanguage) },
-                        ),
-                        SettingsRow(
-                            icon = HermesIcon.ListAlt,
-                            label = stringResource(Res.string.settings_sec_connection),
-                            summary =
-                                if (state.profiles.isNotEmpty()) {
-                                    stringResource(
-                                        Res.string.settings_summary_profiles,
-                                        state.profiles.size,
-                                    )
-                                } else {
-                                    null
-                                },
-                            onClick = { NavigationController.navigateTo(SettingsConnection) },
                         ),
                         SettingsRow(
                             icon = HermesIcon.Palette,

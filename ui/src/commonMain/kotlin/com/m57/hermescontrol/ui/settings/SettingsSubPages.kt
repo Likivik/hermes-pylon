@@ -2,33 +2,23 @@ package com.m57.hermescontrol.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.m57.hermescontrol.generated.resources.Res
-import com.m57.hermescontrol.generated.resources.settings_logout
 import com.m57.hermescontrol.generated.resources.settings_sec_about
 import com.m57.hermescontrol.generated.resources.settings_sec_appearance
 import com.m57.hermescontrol.generated.resources.settings_sec_behavior
 import com.m57.hermescontrol.generated.resources.settings_sec_chat
-import com.m57.hermescontrol.generated.resources.settings_sec_connection
 import com.m57.hermescontrol.generated.resources.settings_sec_diagnostics
 import com.m57.hermescontrol.generated.resources.settings_sec_language
 import com.m57.hermescontrol.theme.Spacing
@@ -39,10 +29,7 @@ import com.m57.hermescontrol.ui.settings.components.AboutSection
 import com.m57.hermescontrol.ui.settings.components.AppearanceSection
 import com.m57.hermescontrol.ui.settings.components.BehaviorSection
 import com.m57.hermescontrol.ui.settings.components.ChatSection
-import com.m57.hermescontrol.ui.settings.components.ConnectionSection
 import com.m57.hermescontrol.ui.settings.components.LanguageSection
-import com.m57.hermescontrol.ui.settings.components.TestConnectionButton
-import com.m57.hermescontrol.ui.settings.components.TestResultCard
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -54,62 +41,6 @@ import org.jetbrains.compose.resources.stringResource
  * modal drawer's swipe gestures are disabled and the drawer auto-closes when a
  * sub-page is entered — the single source of truth introduced in issue #619.
  */
-
-@Composable
-fun SettingsConnectionPage(
-    onBack: () -> Unit,
-    onLogout: () -> Unit,
-    viewModel: SettingsViewModel = viewModel { SettingsViewModel() },
-) {
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
-    var passwordVisible by remember { mutableStateOf(false) }
-
-    HermesScaffold(
-        title = { Text(stringResource(Res.string.settings_sec_connection)) },
-        navigationIcon = NavIcon.Back(onBack),
-        // Non-primary drill-down: opt out of drawer gestures so the scrim can't
-        // get stuck open (issue #619). DrawerGestureController handles the close.
-        drawerGesturesEnabled = false,
-    ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = Spacing.md, vertical = Spacing.sm),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            ConnectionSection(
-                state = state,
-                viewModel = viewModel,
-                passwordVisible = passwordVisible,
-                onPasswordVisibilityToggle = { passwordVisible = !passwordVisible },
-            )
-
-            TestResultCard(testResult = state.testResult)
-            TestConnectionButton(
-                isTesting = state.isTesting,
-                onTest = viewModel::testConnection,
-            )
-
-            Spacer(modifier = Modifier.height(2.dp))
-
-            Button(
-                onClick = {
-                    viewModel.logout()
-                    onLogout()
-                },
-                modifier = Modifier.fillMaxWidth(),
-                colors =
-                    ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error,
-                    ),
-            ) {
-                Text(stringResource(Res.string.settings_logout))
-            }
-        }
-    }
-}
 
 @Composable
 fun SettingsAppearancePage(

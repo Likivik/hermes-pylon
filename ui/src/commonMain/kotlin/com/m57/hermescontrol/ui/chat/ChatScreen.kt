@@ -62,6 +62,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.m57.hermescontrol.HistoryScreen
 import com.m57.hermescontrol.NavigationController
+import com.m57.hermescontrol.data.local.AuthSessionState
 import com.m57.hermescontrol.data.local.rememberPreferencesStore
 import com.m57.hermescontrol.data.model.capabilitiesFor
 import com.m57.hermescontrol.data.ws.ConnectionStatus
@@ -451,6 +452,7 @@ fun ChatScreen(
                         order = homeOrder,
                         archiveOpen = archiveOpen,
                         reordering = reordering,
+                        status = state.railStatus,
                     ),
                 onEvent = { event ->
                     when (event) {
@@ -465,6 +467,10 @@ fun ChatScreen(
                         is RailEvent.Reorder -> viewModel.setRailOrder(event.order)
                         is RailEvent.ToggleReorder -> reordering = !reordering
                         is RailEvent.ArchiveToggle -> archiveOpen = event.open
+                        // The rail only emits these when it has no rows: retry the
+                        // listing, or go to sign-in when the session expired.
+                        is RailEvent.Retry -> viewModel.refreshSessions()
+                        is RailEvent.SignIn -> AuthSessionState.requireSignIn()
                     }
                 },
             )

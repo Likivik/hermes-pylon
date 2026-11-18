@@ -430,3 +430,12 @@ compose.resources {
     // dependency arrives.
     generateResClass = always
 }
+
+// Dev bundle only: webpack's default devtool is `eval`, which the dashboard's
+// CSP (`script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob:`) blocks.
+// Source maps keep the dev build debuggable without `unsafe-eval`.
+tasks.withType<org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpack>().configureEach {
+    if (name.contains("Development", ignoreCase = true)) {
+        devtool = "source-map"
+    }
+}

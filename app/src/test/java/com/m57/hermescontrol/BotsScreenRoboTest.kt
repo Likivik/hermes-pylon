@@ -54,7 +54,7 @@ class BotsScreenRoboTest {
             ) {
                 BotsScreen(
                     state = state,
-                    selectedProfileId = "profile-1",
+                    selectedGatewayId = "profile-1",
                     onRefresh = {},
                     onRetry = {},
                     onToggleShowHidden = {},

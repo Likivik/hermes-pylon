@@ -5,23 +5,23 @@ package com.m57.hermescontrol.data.config
 import com.m57.hermescontrol.data.remote.CleartextPolicy
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 
-fun ServerStoreState.addOrUpdate(profile: ConnectionProfile): ServerStoreState {
+fun ServerStoreState.addOrUpdate(profile: GatewayInstance): ServerStoreState {
     val updated = connectionProfiles.filter { it.id != profile.id } + profile
     return copy(connectionProfiles = updated)
 }
 
 fun ServerStoreState.selfHealed(): ServerStoreState {
-    val hasActive = connectionProfiles.any { it.id == selectedProfileId }
-    val newSelected = if (selectedProfileId != null && !hasActive) null else selectedProfileId
+    val hasActive = connectionProfiles.any { it.id == selectedGatewayId }
+    val newSelected = if (selectedGatewayId != null && !hasActive) null else selectedGatewayId
 
     return copy(
-        selectedProfileId = newSelected,
+        selectedGatewayId = newSelected,
     )
 }
 
 val ServerStoreState.resolvedBaseUrl: String
     get() {
-        val selected = connectionProfiles.firstOrNull { it.id == selectedProfileId }
+        val selected = connectionProfiles.firstOrNull { it.id == selectedGatewayId }
         if (selected != null) return selected.resolveBaseUrl(baseUrl)
         return baseUrl
             ?.let {

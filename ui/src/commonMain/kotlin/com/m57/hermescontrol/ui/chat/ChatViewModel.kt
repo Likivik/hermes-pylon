@@ -19,6 +19,7 @@ import com.m57.hermescontrol.data.model.SessionMessage
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.AuthPayloads
 import com.m57.hermescontrol.data.remote.HermesJson
+import com.m57.hermescontrol.data.remote.NetworkError
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.attachmentReader
 import com.m57.hermescontrol.data.remote.mediaStore
@@ -49,6 +50,8 @@ import com.m57.hermescontrol.generated.resources.chat_model_switch_no_session
 import com.m57.hermescontrol.generated.resources.chat_model_switch_session_changed
 import com.m57.hermescontrol.generated.resources.chat_new_session_failed
 import com.m57.hermescontrol.generated.resources.chat_privileged_not_acknowledged
+import com.m57.hermescontrol.ui.chat.rail.RailLoadStatus
+import com.m57.hermescontrol.ui.chat.rail.railLoadStatusOf
 import com.m57.hermescontrol.ui.common.StringResolver
 import com.m57.hermescontrol.ui.sessions.AUTOMATION_SOURCE
 import com.m57.hermescontrol.util.HermesLog
@@ -64,6 +67,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -160,10 +164,10 @@ class ChatViewModel(
      * retry path explicitly, so existing suites keep their previous timing.
      */
     private val sessionCreateRetryDelayMs: Long? = null,
-    private val selectedProfileId: () -> String = {
+    private val selectedGatewayId: () -> String = {
         AppEnvironment.current.auth.getSelectedProfileId() ?: AuthDefaults.PROFILE_ID
     },
-    selectedProfileIds: kotlinx.coroutines.flow.Flow<String> = AppEnvironment.current.auth.selectedProfileIdFlow,
+    selectedProfileIds: kotlinx.coroutines.flow.Flow<String> = AppEnvironment.current.auth.selectedGatewayIdFlow,
     private val preferences: PreferencesStore = environment.preferences,
     private val attachmentOpener: AttachmentOpener = environment.attachmentOpener,
     /** IO dispatcher for background work; injectable so tests can drive it deterministically. */
@@ -285,6 +289,20 @@ class ChatViewModel(
     var initialSessionId: String? = null
 
     init {
+        viewModelScope.launch(io) {
+            // Switching the gateway profile re-scopes the listing: refresh the rail
+            // at once instead of waiting for the next foreground or socket signal.
+            // A "profile" switch in this app is a *connection* switch: a different
+            // server, with a different session store. Drop the old server's rows at
+            // once and re-list from the new one instead of showing stale sessions.
+            AppEnvironment.current.auth.selectedGatewayIdFlow
+                .drop(1)
+                .distinctUntilChanged()
+                .collect {
+                    _uiState.update { it.copy(sessions = emptyList(), railStatus = RailLoadStatus.Loading) }
+                    requestRailRefresh(force = true)
+                }
+        }
         refreshSettings()
 
         viewModelScope.launch {
@@ -1219,7 +1237,7 @@ class ChatViewModel(
         val storageSessionId = state.currentSessionId ?: return false
         val agentSessionId = runtimeSessionId ?: return false
         val dispatchGeneration = conversationGeneration
-        val dispatchConnection = wsClient.connectionBinding(selectedProfileId()) ?: return false
+        val dispatchConnection = wsClient.connectionBinding(selectedGatewayId()) ?: return false
 
         val trimmed = text.trim()
         if (trimmed.startsWith("/", ignoreCase = true)) {
@@ -1500,7 +1518,7 @@ class ChatViewModel(
         CacheLoadFence(
             storageSessionId = sessionId,
             runtimeSessionId = runtimeSessionId,
-            profileId = selectedProfileId(),
+            profileId = selectedGatewayId(),
             generation = conversationGeneration,
         )
 
@@ -1510,12 +1528,12 @@ class ChatViewModel(
     ): Boolean =
         activeCacheLoadOwner == owner &&
             fence.generation == conversationGeneration &&
-            fence.profileId == selectedProfileId() &&
+            fence.profileId == selectedGatewayId() &&
             fence.storageSessionId == _uiState.value.currentSessionId &&
             fence.runtimeSessionId == runtimeSessionId
 
     private fun captureHistoryLoadFence(sessionId: String): HistoryLoadFence? {
-        val profileId = selectedProfileId()
+        val profileId = selectedGatewayId()
         val connectionBinding = wsClient.connectionBinding(profileId) ?: return null
         return HistoryLoadFence(
             storageSessionId = sessionId,
@@ -1529,7 +1547,7 @@ class ChatViewModel(
 
     private fun isHistoryLoadFenceCurrent(fence: HistoryLoadFence): Boolean =
         fence.generation == conversationGeneration &&
-            fence.profileId == selectedProfileId() &&
+            fence.profileId == selectedGatewayId() &&
             fence.storageSessionId == _uiState.value.currentSessionId &&
             fence.runtimeSessionId == runtimeSessionId &&
             fence.transcriptRevision == repo.replacementGeneration(fence.storageSessionId) &&
@@ -1578,7 +1596,7 @@ class ChatViewModel(
     ) {
         val storageSessionId = _uiState.value.currentSessionId ?: return
         val agentSessionId = runtimeSessionId ?: return
-        val profileId = selectedProfileId()
+        val profileId = selectedGatewayId()
         val connectionBinding = wsClient.connectionBinding(profileId) ?: return
         val fence =
             UndoFence(
@@ -1611,7 +1629,7 @@ class ChatViewModel(
 
     private fun isUndoFenceCurrent(fence: UndoFence): Boolean =
         fence.generation == conversationGeneration &&
-            fence.profileId == selectedProfileId() &&
+            fence.profileId == selectedGatewayId() &&
             fence.storageSessionId == _uiState.value.currentSessionId &&
             fence.runtimeSessionId == runtimeSessionId &&
             wsClient.isConnectionBindingCurrent(fence.connectionBinding)
@@ -2299,7 +2317,14 @@ class ChatViewModel(
         val rows = ArrayList<SessionInfo>()
         var offset = 0
         var pages = 0
-        var failure: String? = null
+        var failure: NetworkError? = null
+        // No `profile` parameter, ever. Profile identity is gateway-owned: the
+        // route resolves a client-supplied id against its profile registry and
+        // answers 404 for an id it does not know (that is what blanked the rail —
+        // the app's selected-profile id is client state, not a server fact). With
+        // the parameter omitted the route reads "this process's own state.db",
+        // the same rows the dashboard shows. Real multi-profile scoping must use
+        // an id the server itself handed out, not auth state.
         // Page rather than trust one call: the route caps `limit` at 100, and quietly
         // showing 100 of 400 sessions would be a regression against the RPC's 200.
         while (pages < RAIL_MAX_PAGES) {
@@ -2310,7 +2335,6 @@ class ChatViewModel(
                         offset = offset,
                         order = "recent",
                         excludeSources = AUTOMATION_SOURCE,
-                        profile = selectedProfileId().takeIf { it.isNotBlank() },
                     )
                 }
             when (result) {
@@ -2322,7 +2346,7 @@ class ChatViewModel(
                     if (page.size < RAIL_PAGE_SIZE || rows.size >= result.data.total) break
                 }
                 is NetworkResult.Failure -> {
-                    failure = result.error.message
+                    failure = result.error
                     break
                 }
             }
@@ -2331,12 +2355,15 @@ class ChatViewModel(
             railFailures++
             val backoff = railBackoffMs(railFailures)
             railNextAllowedAt = nowMillis() + backoff
+            // Keep the last-good rows and record *why* they are missing: the rail
+            // renders the reason as a retry affordance instead of vanishing.
+            val status = railLoadStatusOf(_uiState.value.sessions.size, failure)
             HermesLog.w(
                 "ChatVM",
                 "rail refresh failed ($failure); keeping ${_uiState.value.sessions.size} rows, " +
-                    "next attempt in ${backoff / 1000}s",
+                    "status=$status, next attempt in ${backoff / 1000}s",
             )
-            _uiState.update { it.copy(railRefreshing = false) }
+            _uiState.update { it.copy(railRefreshing = false, railStatus = status) }
             return
         }
         if (token != railSeq) return
@@ -2356,6 +2383,7 @@ class ChatViewModel(
                 sessions = sessions,
                 chatTitle = newTitle ?: state.chatTitle,
                 railRefreshing = false,
+                railStatus = railLoadStatusOf(sessions.size, null),
             )
         }
     }
@@ -2688,7 +2716,7 @@ class ChatViewModel(
     private fun recordAcceptedSlash(command: String) {
         val commandName = command.split(" ", limit = 2)[0].lowercase()
         viewModelScope.launch {
-            slashUsageStore.recordUse(selectedProfileId(), commandName)
+            slashUsageStore.recordUse(selectedGatewayId(), commandName)
         }
     }
 
@@ -3832,7 +3860,7 @@ class ChatViewModel(
     }
 
     private fun handleServerRequestCancelled(event: WsEvent.ServerRequestCancelled) {
-        if (event.sourceProfileId != selectedProfileId() || event.connectionGeneration == null) return
+        if (event.sourceProfileId != selectedGatewayId() || event.connectionGeneration == null) return
         when (event.method) {
             "approval" ->
                 _uiState.update { state ->
@@ -4372,7 +4400,7 @@ class ChatViewModel(
     ): PrivilegedRequestBinding? {
         if (requestId.isBlank()) return null
         if (generation == null) return null
-        if (profileId.isNullOrBlank() || profileId != selectedProfileId()) return null
+        if (profileId.isNullOrBlank() || profileId != selectedGatewayId()) return null
         val runtimeId = eventSessionId?.takeIf { it.isNotBlank() } ?: return null
         if (runtimeId != runtimeSessionId) return null
         return PrivilegedRequestBinding(
@@ -4534,7 +4562,7 @@ class ChatViewModel(
     }
 
     private fun captureResumeFence(sessionId: String): ResumeFence? {
-        val profileId = selectedProfileId()
+        val profileId = selectedGatewayId()
         val binding = wsClient.connectionBinding(profileId) ?: return null
         return ResumeFence(
             storageSessionId = sessionId,
@@ -4552,7 +4580,7 @@ class ChatViewModel(
         allowSessionChange: Boolean = false,
     ): Boolean =
         fence.generation == conversationGeneration &&
-            fence.profileId == selectedProfileId() &&
+            fence.profileId == selectedGatewayId() &&
             (allowSessionChange || fence.storageSessionId == _uiState.value.currentSessionId) &&
             (allowRuntimeChange || fence.runtimeSessionId == runtimeSessionId) &&
             fence.transcriptRevision == repo.replacementGeneration(fence.storageSessionId) &&

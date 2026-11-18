@@ -16,7 +16,7 @@ import kotlin.uuid.Uuid
  * equivalent `ServerStoreState.resolvedBaseUrl` for store-level queries).
  */
 @Serializable
-data class ConnectionProfile(
+data class GatewayInstance(
     val id: String = Uuid.random().toString(),
     val name: String,
     /** Legacy fields retained only so pre-base-URL profiles can migrate. */
@@ -41,7 +41,7 @@ data class ConnectionProfile(
  * default legacy loopback values are placeholders, so they remain the final
  * fallback rather than masking the URL used for a successful login.
  */
-fun ConnectionProfile.resolveBaseUrl(topLevelBaseUrl: String?): String {
+fun GatewayInstance.resolveBaseUrl(topLevelBaseUrl: String?): String {
     baseUrl?.let {
         return ServerEndpoint.parse(
             it,

@@ -1,6 +1,6 @@
 package com.m57.hermescontrol.data.local
 
-import com.m57.hermescontrol.data.config.ConnectionProfile
+import com.m57.hermescontrol.data.config.GatewayInstance
 import com.m57.hermescontrol.data.model.PinnedModel
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.data.theme.ThemePreference
@@ -24,25 +24,25 @@ interface AuthStore {
     /** Selectable chat font scales, ascending. */
     val chatFontScaleStops: List<Float>
 
-    val selectedProfileIdFlow: StateFlow<String>
+    val selectedGatewayIdFlow: StateFlow<String>
 
     fun getSelectedProfileId(): String?
 
     fun setSelectedProfileId(id: String?)
 
     // ── Connection profiles ─────────────────────────────────────────────
-    fun getConnectionProfiles(): List<ConnectionProfile>
+    fun getGatewayInstances(): List<GatewayInstance>
 
-    fun saveConnectionProfiles(profiles: List<ConnectionProfile>)
+    fun saveGatewayInstances(profiles: List<GatewayInstance>)
 
-    fun saveConnectionProfilesAndToken(
-        profiles: List<ConnectionProfile>,
+    fun saveGatewayInstancesAndToken(
+        profiles: List<GatewayInstance>,
         profileId: String,
         token: String?,
     )
 
-    fun saveConnectionProfilesAndSelect(
-        profiles: List<ConnectionProfile>,
+    fun saveGatewayInstancesAndSelect(
+        profiles: List<GatewayInstance>,
         profileId: String,
         token: String?,
     )

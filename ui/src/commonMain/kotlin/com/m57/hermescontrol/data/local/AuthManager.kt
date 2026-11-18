@@ -2,7 +2,7 @@
 
 package com.m57.hermescontrol.data.local
 
-import com.m57.hermescontrol.data.config.ConnectionProfile
+import com.m57.hermescontrol.data.config.GatewayInstance
 import com.m57.hermescontrol.data.config.ServerStore
 import com.m57.hermescontrol.data.config.ServerStoreState
 import com.m57.hermescontrol.data.config.resolveBaseUrl
@@ -97,8 +97,8 @@ object AuthManager : WsAuthConfig {
     @Volatile
     var beforeTokenFlowPublicationForTest: (() -> Unit)? = null
 
-    private val _selectedProfileIdFlow = MutableStateFlow(DEFAULT_PROFILE_ID)
-    val selectedProfileIdFlow: StateFlow<String> = _selectedProfileIdFlow.asStateFlow()
+    private val _selectedGatewayIdFlow = MutableStateFlow(DEFAULT_PROFILE_ID)
+    val selectedGatewayIdFlow: StateFlow<String> = _selectedGatewayIdFlow.asStateFlow()
 
     /**
      * Initialise from a platform bundle. `AuthPlatform` supplies the server
@@ -124,8 +124,8 @@ object AuthManager : WsAuthConfig {
 
             // Initialize the encrypted cookie store. Its initial scope loads on IO.
             val initialProfileId =
-                store.getLatestState().selectedProfileId?.takeIf { it.isNotBlank() } ?: DEFAULT_PROFILE_ID
-            _selectedProfileIdFlow.value = initialProfileId
+                store.getLatestState().selectedGatewayId?.takeIf { it.isNotBlank() } ?: DEFAULT_PROFILE_ID
+            _selectedGatewayIdFlow.value = initialProfileId
             platform.initializeCookieStore(initialProfileId)
 
             scope.launch {
@@ -147,8 +147,8 @@ object AuthManager : WsAuthConfig {
             scope.launch {
                 store.stateFlow.collect { state ->
                     synchronized(monitor) {
-                        val latestProfileId = store.getLatestState().selectedProfileId
-                        _selectedProfileIdFlow.value = normalizedProfileId(latestProfileId)
+                        val latestProfileId = store.getLatestState().selectedGatewayId
+                        _selectedGatewayIdFlow.value = normalizedProfileId(latestProfileId)
                         syncCookieStoreForProfile(latestProfileId)
                     }
                     _themePreferenceFlow.value = state.themePreference
@@ -191,7 +191,7 @@ object AuthManager : WsAuthConfig {
      */
     fun getWsAuthParam(): String {
         val state = serverStore.getLatestState()
-        val selectedId = state.selectedProfileId?.takeIf { it.isNotBlank() }
+        val selectedId = state.selectedGatewayId?.takeIf { it.isNotBlank() }
         val profileMode =
             state.connectionProfiles
                 .firstOrNull { it.id == selectedId }
@@ -253,14 +253,14 @@ object AuthManager : WsAuthConfig {
 
     // ── Connection Profiles ──────────────────────────────────────────────
 
-    fun getConnectionProfiles(): List<ConnectionProfile> = serverStore.getLatestState().connectionProfiles
+    fun getGatewayInstances(): List<GatewayInstance> = serverStore.getLatestState().connectionProfiles
 
-    fun saveConnectionProfiles(profiles: List<ConnectionProfile>) {
+    fun saveGatewayInstances(profiles: List<GatewayInstance>) {
         synchronized(monitor) { serverStore.update { it.copy(connectionProfiles = profiles) } }
     }
 
-    fun saveConnectionProfilesAndToken(
-        profiles: List<ConnectionProfile>,
+    fun saveGatewayInstancesAndToken(
+        profiles: List<GatewayInstance>,
         profileId: String,
         token: String?,
     ) {
@@ -275,13 +275,13 @@ object AuthManager : WsAuthConfig {
         }
     }
 
-    fun saveConnectionProfilesAndSelect(
-        profiles: List<ConnectionProfile>,
+    fun saveGatewayInstancesAndSelect(
+        profiles: List<GatewayInstance>,
         profileId: String,
         token: String?,
     ) {
         synchronized(monitor) {
-            serverStore.update { it.copy(connectionProfiles = profiles, selectedProfileId = profileId) }
+            serverStore.update { it.copy(connectionProfiles = profiles, selectedGatewayId = profileId) }
             requireSecureStorage().putString(authSecretKey("token_$profileId"), token)
             cachedToken = token
             tokenInitialized = true
@@ -304,7 +304,7 @@ object AuthManager : WsAuthConfig {
     fun ensureDefaultProfile() {
         val state = serverStore.getLatestState()
         val hasDefault = state.connectionProfiles.any { it.id == DEFAULT_PROFILE_ID }
-        val needsSelection = state.selectedProfileId.isNullOrBlank()
+        val needsSelection = state.selectedGatewayId.isNullOrBlank()
 
         if (!needsSelection && (hasDefault || state.connectionProfiles.isNotEmpty())) return
 
@@ -314,13 +314,13 @@ object AuthManager : WsAuthConfig {
                 s.copy(
                     connectionProfiles =
                         listOf(
-                            ConnectionProfile(
+                            GatewayInstance(
                                 id = DEFAULT_PROFILE_ID,
                                 name = DEFAULT_PROFILE_NAME,
                                 baseUrl = s.resolvedBaseUrl,
                             ),
                         ),
-                    selectedProfileId = DEFAULT_PROFILE_ID,
+                    selectedGatewayId = DEFAULT_PROFILE_ID,
                 )
             }
             return
@@ -328,7 +328,7 @@ object AuthManager : WsAuthConfig {
 
         // Profiles exist but nothing is selected: pick the first one so selection is non-null.
         if (needsSelection) {
-            serverStore.update { s -> s.copy(selectedProfileId = s.connectionProfiles.first().id) }
+            serverStore.update { s -> s.copy(selectedGatewayId = s.connectionProfiles.first().id) }
         }
     }
 
@@ -342,7 +342,7 @@ object AuthManager : WsAuthConfig {
 
     /**
      * One-time migration: fold the legacy standalone ([KEY_LEGACY_TOKEN]) credentials into the
-     * new default [ConnectionProfile]. Runs once per install, guarded by
+     * new default [GatewayInstance]. Runs once per install, guarded by
      * [KEY_LEGACY_DEFAULT_MIGRATED].
      */
     private fun migrateLegacyDefaultIfNeeded(storage: SecretStore) {
@@ -414,13 +414,13 @@ object AuthManager : WsAuthConfig {
     }
 
     override fun getSelectedProfileId(): String? {
-        val id = serverStore.getLatestState().selectedProfileId
+        val id = serverStore.getLatestState().selectedGatewayId
         return if (id.isNullOrBlank()) null else id
     }
 
     fun setSelectedProfileId(id: String?) {
         synchronized(monitor) {
-            serverStore.update { it.copy(selectedProfileId = id) }
+            serverStore.update { it.copy(selectedGatewayId = id) }
             cachedToken = null
             tokenInitialized = false
             syncCookieStoreForProfile(id)
@@ -439,7 +439,7 @@ object AuthManager : WsAuthConfig {
     fun credentialBoundary(): CredentialBoundary =
         synchronized(monitor) {
             val state = serverStore.getLatestState()
-            val selectedId = state.selectedProfileId?.takeIf(String::isNotBlank)
+            val selectedId = state.selectedGatewayId?.takeIf(String::isNotBlank)
             val profileId = selectedId ?: DEFAULT_PROFILE_ID
             currentProfileBoundary(state, profileId)
                 ?.copy(token = selectedId?.let(::getProfileToken))
@@ -464,7 +464,7 @@ object AuthManager : WsAuthConfig {
 
             requireSecureStorage().putString(authSecretKey("token_${boundary.profileId}"), token)
             val active =
-                normalizedProfileId(state.selectedProfileId) == boundary.profileId &&
+                normalizedProfileId(state.selectedGatewayId) == boundary.profileId &&
                     currentProfile.matches(boundary)
             if (active) {
                 cachedToken = token
@@ -567,7 +567,7 @@ object AuthManager : WsAuthConfig {
     }
 
     private fun getTokenInternal(storage: SecretStore): String? {
-        val selectedId = serverStore.getLatestState().selectedProfileId?.takeIf { it.isNotBlank() }
+        val selectedId = serverStore.getLatestState().selectedGatewayId?.takeIf { it.isNotBlank() }
         return if (selectedId != null) {
             storage.getString(authSecretKey("token_$selectedId"))
         } else {

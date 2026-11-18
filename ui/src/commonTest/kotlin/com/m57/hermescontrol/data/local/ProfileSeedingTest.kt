@@ -1,6 +1,6 @@
 package com.m57.hermescontrol.data.local
 
-import com.m57.hermescontrol.data.config.ConnectionProfile
+import com.m57.hermescontrol.data.config.GatewayInstance
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -15,10 +15,10 @@ class ProfileSeedingTest {
     private val defaultBaseUrl = "https://127.0.0.1:9119/"
 
     private fun pristineDefault() =
-        ConnectionProfile(id = AuthManager.DEFAULT_PROFILE_ID, name = "Default", baseUrl = defaultBaseUrl)
+        GatewayInstance(id = AuthManager.DEFAULT_PROFILE_ID, name = "Default", baseUrl = defaultBaseUrl)
 
     private fun seed(
-        profiles: List<ConnectionProfile>,
+        profiles: List<GatewayInstance>,
         selectedId: String? = null,
         origin: String = ORIGIN,
     ) = profileSeedingFor(
@@ -43,7 +43,7 @@ class ProfileSeedingTest {
 
     @Test
     fun existingProfileForTheOriginIsSelectedNotDuplicated() {
-        val existing = ConnectionProfile(name = "work", baseUrl = ORIGIN)
+        val existing = GatewayInstance(name = "work", baseUrl = ORIGIN)
 
         val seeded = seed(listOf(existing), selectedId = "other")
 
@@ -53,15 +53,15 @@ class ProfileSeedingTest {
 
     @Test
     fun alreadySelectedProfileIsLeftCompletelyAlone() {
-        val existing = ConnectionProfile(name = "work", baseUrl = ORIGIN)
+        val existing = GatewayInstance(name = "work", baseUrl = ORIGIN)
 
         assertNull(seed(listOf(existing), selectedId = existing.id))
     }
 
     @Test
     fun aUserMadeProfileIsNeverReplaced() {
-        val mine = ConnectionProfile(name = "mine", baseUrl = "https://elsewhere:9119")
-        val mine2 = ConnectionProfile(name = "mine2", baseUrl = "https://another:9119")
+        val mine = GatewayInstance(name = "mine", baseUrl = "https://elsewhere:9119")
+        val mine2 = GatewayInstance(name = "mine2", baseUrl = "https://another:9119")
 
         val seeded = seed(listOf(mine, mine2))!!
 
@@ -73,7 +73,7 @@ class ProfileSeedingTest {
 
     @Test
     fun trailingSlashDoesNotCreateASecondProfile() {
-        val existing = ConnectionProfile(name = "work", baseUrl = ORIGIN)
+        val existing = GatewayInstance(name = "work", baseUrl = ORIGIN)
 
         assertNull(seed(listOf(existing), selectedId = existing.id, origin = "$ORIGIN/"))
     }
