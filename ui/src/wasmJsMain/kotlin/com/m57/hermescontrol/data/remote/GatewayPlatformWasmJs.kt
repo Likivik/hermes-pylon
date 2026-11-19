@@ -21,13 +21,16 @@ internal actual object GatewayPlatform {
     }
 }
 
-internal actual fun createGatewayHttpClient(auth: GatewayClientAuth): HttpClient =
+internal actual fun createGatewayHttpClient(
+    auth: GatewayClientAuth,
+    profile: String?,
+): HttpClient =
     when (auth) {
         // Same-origin browser session: cookies travel with the request.
-        GatewayClientAuth.SessionCredentials -> createHermesHttpClient()
+        GatewayClientAuth.SessionCredentials -> createHermesHttpClient(HermesHttpConfig.Default.copy(profile = profile))
         is GatewayClientAuth.FixedBearer -> {
             val token = auth.token
-            createHermesHttpClient().config {
+            createHermesHttpClient(HermesHttpConfig.Default.copy(profile = profile)).config {
                 if (token.isNotBlank()) {
                     defaultRequest {
                         headers.append(HttpHeaders.Authorization, "Bearer $token")

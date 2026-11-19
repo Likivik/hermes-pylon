@@ -79,6 +79,7 @@ import com.m57.hermescontrol.data.model.SessionLiveStatus
 import com.m57.hermescontrol.data.model.SessionSearchResult
 import com.m57.hermescontrol.data.model.SessionTreeItem
 import com.m57.hermescontrol.data.model.flattenSessionTree
+import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.action_cancel
 import com.m57.hermescontrol.generated.resources.action_delete
@@ -146,6 +147,7 @@ import com.m57.hermescontrol.ui.common.listItemSpacing
 import com.m57.hermescontrol.ui.icons.HermesIcon
 import com.m57.hermescontrol.ui.icons.HermesSymbol
 import com.m57.hermescontrol.ui.icons.MaterialSymbol
+import com.m57.hermescontrol.ui.profiles.ProfileProvider
 import com.m57.hermescontrol.util.formatMonthDayHourMinute
 import com.m57.hermescontrol.util.nowMillis
 import kotlinx.serialization.json.Json
@@ -338,14 +340,17 @@ fun SessionsScreen(
     onOpenDrawer: (() -> Unit)? = null,
     viewModel: SessionsViewModel? = null,
 ) {
-    val activeProfileId =
+    val gatewayInstanceId =
         AppEnvironment.current.auth.getSelectedProfileId() ?: AuthDefaults.PROFILE_ID
     val screenViewModel =
         viewModel
             ?: androidx.lifecycle.viewmodel.compose.viewModel(
-                key = "sessions-$activeProfileId",
+                key = "sessions-$gatewayInstanceId",
             ) {
-                SessionsViewModel(AuthManagerSessionPinStore(activeProfileId))
+                SessionsViewModel(
+                    pinStore = AuthManagerSessionPinStore(gatewayInstanceId),
+                    profileProvider = ProfileProvider { ApiClient.currentProfileName() },
+                )
             }
     val state by screenViewModel.uiState.collectAsStateWithLifecycle()
     val spacing = LocalSpacing.current
@@ -658,7 +663,7 @@ fun SessionsScreen(
                                                         } else {
                                                             NavigationController.queuePendingSession(
                                                                 sessionId = session.id,
-                                                                profileId = activeProfileId,
+                                                                profileId = gatewayInstanceId,
                                                             )
                                                             NavigationController.navigateTo(ChatScreen)
                                                         }
@@ -839,7 +844,7 @@ fun SessionsScreen(
                                         } else {
                                             NavigationController.queuePendingSession(
                                                 sessionId = session.id,
-                                                profileId = activeProfileId,
+                                                profileId = gatewayInstanceId,
                                             )
                                             NavigationController.navigateTo(ChatScreen)
                                         }

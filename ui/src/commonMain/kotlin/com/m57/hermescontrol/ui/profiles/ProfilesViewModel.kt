@@ -31,6 +31,10 @@ data class ProfilesUiState(
     val isLoading: Boolean = false,
     val profiles: List<ProfileInfo> = emptyList(),
     val activeProfileName: String? = null,
+    /** What the gateway process actually serves (`current`); may lag the selection. */
+    val activatedProfileName: String? = null,
+    /** Set while the selection has not been activated by the gateway. */
+    val pendingProfileName: String? = null,
     val selectedSoulContent: String? = null,
     val isLoadingSoul: Boolean = false,
     val errorMessage: String? = null,
@@ -69,6 +73,14 @@ class ProfilesViewModel(
                                 isLoading = false,
                                 profiles = profilesResult.data.profiles.orEmpty(),
                                 activeProfileName = activeResult.data.active,
+                                activatedProfileName = activeResult.data.current,
+                            )
+                        }
+                        // First sight of the gateway: adopt the serving profile as the
+                        // selection, so requests are scoped before the user picks anything.
+                        if (ApiClient.selectedProfileId == null) {
+                            ApiClient.setSelectedProfile(
+                                activeResult.data.current ?: activeResult.data.active,
                             )
                         }
                     } else {
@@ -92,10 +104,19 @@ class ProfilesViewModel(
         }
     }
 
+    /**
+     * Select a profile and scope the app to it.
+     *
+     * Success means the *app* now reads that profile's data — the client is rebuilt with
+     * `profile=<name>`, so every request follows. It does **not** mean the gateway process
+     * switched: `POST /api/profiles/active` only writes a preference, and `current` does not
+     * follow it (measured; see #208). When the two differ the UI says so instead of claiming
+     * a switch that did not happen.
+     */
     fun selectActiveProfile(name: String) {
-        val originalActive = _uiState.value.activeProfileName
-        // Optimistically update active profile name
-        _uiState.update { it.copy(activeProfileName = name) }
+        val previous = _uiState.value.activeProfileName
+        ProfileScope.repository.select(name)
+        _uiState.update { it.copy(activeProfileName = name, pendingProfileName = name) }
 
         viewModelScope.launch {
             val result =
@@ -104,14 +125,34 @@ class ProfilesViewModel(
                 }
             when (result) {
                 is NetworkResult.Success -> {
-                    _uiState.update { it.copy(toastMessage = "Switched to profile $name") }
+                    val pair =
+                        withContext(ioDispatcher) {
+                            safeApiCall { ApiClient.hermesApi.getActiveProfile() }
+                        }
+                    val activated = (pair as? NetworkResult.Success)?.data?.current
+                    val outcome = profileSwitchOutcome(name, activated)
+                    _uiState.update {
+                        it.copy(
+                            activatedProfileName = activated,
+                            pendingProfileName = (outcome as? ProfileSwitch.Pending)?.selected,
+                            toastMessage =
+                                when (outcome) {
+                                    is ProfileSwitch.Activated -> "Switched to profile $name"
+                                    is ProfileSwitch.Pending ->
+                                        "Browsing $name — the gateway still serves ${outcome.serving ?: "another profile"}"
+                                },
+                        )
+                    }
                     loadProfiles()
                 }
 
                 is NetworkResult.Failure -> {
+                    // The request never landed: put the app back where the user was.
+                    ApiClient.setSelectedProfile(previous)
                     _uiState.update {
                         it.copy(
-                            activeProfileName = originalActive,
+                            activeProfileName = previous,
+                            pendingProfileName = null,
                             toastMessage = "Failed to switch profile: ${result.error.message}",
                         )
                     }

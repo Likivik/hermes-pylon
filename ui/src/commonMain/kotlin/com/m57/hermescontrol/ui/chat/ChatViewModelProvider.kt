@@ -7,6 +7,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.m57.hermescontrol.ui.common.ComposeResourcesStringResolver
+import com.m57.hermescontrol.ui.profiles.ProfileProvider
+import com.m57.hermescontrol.ui.profiles.ProfileScope
 
 /**
  * The platform services chat needs, built for whichever target is running.
@@ -32,6 +34,8 @@ fun rememberChatViewModel(): ChatViewModel {
                         environment = environment,
                         resolver = resolver,
                         startCleanup = true,
+                        profileProvider = ProfileProvider { ProfileScope.repository.resolve() },
+                        profileChanges = ProfileScope.repository.selected,
                     )
                 }
             },

@@ -14,6 +14,8 @@ import com.m57.hermescontrol.data.model.McpServerToggleRequest
 import com.m57.hermescontrol.data.model.MemoryResetRequest
 import com.m57.hermescontrol.data.model.MessagingPlatformUpdate
 import com.m57.hermescontrol.data.model.PluginProvidersPutRequest
+import com.m57.hermescontrol.data.model.PruneRequest
+import com.m57.hermescontrol.data.model.SessionFence
 import com.m57.hermescontrol.data.model.SessionRenameRequest
 import com.m57.hermescontrol.data.model.SetActiveProfileRequest
 import com.m57.hermescontrol.data.model.TelegramOnboardingApplyRequest
@@ -37,6 +39,9 @@ import io.ktor.http.headersOf
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -125,7 +130,7 @@ class HermesGatewayApiTest {
                 }
 
             val response =
-                api(engine).bulkDeleteSessions(BulkDeleteRequest(ids = listOf("session_1"), delete_all = false))
+                api(engine).bulkDeleteSessions(BulkDeleteRequest(ids = listOf("session_1"), deleteAll = false))
 
             assertEquals("/api/sessions/bulk-delete", path)
             assertEquals("POST", method)
@@ -222,8 +227,13 @@ class HermesGatewayApiTest {
             )
         }
 
+    /**
+     * Retargeted: the gateway exposes one mutation route per session (PATCH
+     * `/api/sessions/{id}`, `web_routers/sessions.py:933`), not `PUT .../rename`, and it
+     * refuses an unfenced write with 409. The old test pinned the wrong route and body.
+     */
     @Test
-    fun renameSession_putsSnakeCaseBody() =
+    fun renameSession_patchesTheSessionRouteWithAFence() =
         runTest {
             var pathAndQuery: String? = null
             var method: String? = null
@@ -235,12 +245,41 @@ class HermesGatewayApiTest {
                     sent = b
                 }
 
-            val response = api(engine).renameSession("session_1", SessionRenameRequest("New title"))
+            val response =
+                api(engine).renameSession(
+                    "session_1",
+                    SessionRenameRequest(
+                        title = "New title",
+                        profile = "default",
+                        requestId = "req-1",
+                        expectedRevision = 3,
+                        expectedGeneration = 1,
+                    ),
+                )
 
-            assertEquals("/api/sessions/session_1/rename", pathAndQuery)
-            assertEquals("PUT", method)
-            assertEquals("""{"title":"New title"}""", sent)
+            assertEquals("/api/sessions/session_1", pathAndQuery)
+            assertEquals("PATCH", method)
+            val body = HermesJson.instance.parseToJsonElement(sent!!).jsonObject
+            assertEquals("New title", body["title"]!!.jsonPrimitive.content)
+            assertEquals("default", body["profile"]!!.jsonPrimitive.content)
+            assertEquals("req-1", body["request_id"]!!.jsonPrimitive.content)
+            assertEquals(3, body["expected_revision"]!!.jsonPrimitive.int)
+            assertEquals(1, body["expected_generation"]!!.jsonPrimitive.int)
             assertTrue(response.isSuccessful)
+        }
+
+    @Test
+    fun renameSession_omitsAFenceTheRowDidNotProvide() =
+        runTest {
+            var sent: String? = null
+            val engine = jsonResponder("", HttpStatusCode.NoContent) { _, _, b -> sent = b }
+
+            api(engine).renameSession("session_1", SessionRenameRequest(title = "x", requestId = "req-2"))
+
+            val body = HermesJson.instance.parseToJsonElement(sent!!).jsonObject
+            assertEquals("req-2", body["request_id"]!!.jsonPrimitive.content)
+            assertFalse(body.containsKey("expected_revision"))
+            assertFalse(body.containsKey("expected_generation"))
         }
 
     @Test
@@ -254,12 +293,36 @@ class HermesGatewayApiTest {
                     method = m
                 }
 
-            val response = api(engine).deleteSession("session_1")
+            val response =
+                api(engine).deleteSession(
+                    "session_1",
+                    SessionFence(requestId = "req-9", revision = 4, generation = 2),
+                    profile = "default",
+                )
 
-            assertEquals("/api/sessions/session_1", pathAndQuery)
+            val query = pathAndQuery!!.substringAfter('?')
+            assertTrue(pathAndQuery!!.startsWith("/api/sessions/session_1?"), pathAndQuery!!)
             assertEquals("DELETE", method)
+            assertTrue("profile=default" in query, query)
+            assertTrue("request_id=req-9" in query, query)
+            assertTrue("expected_revision=4" in query, query)
+            assertTrue("expected_generation=2" in query, query)
             assertTrue(response.isSuccessful)
             assertEquals(Unit, response.body())
+        }
+
+    @Test
+    fun pruneSessions_sendsTheGatewayFieldNameOlderThanDays() =
+        runTest {
+            var sent: String? = null
+            val engine = jsonResponder("""{"deleted":3}""") { _, _, b -> sent = b }
+
+            api(engine).pruneSessions(PruneRequest(olderThanDays = 30, profile = "default"))
+
+            val body = HermesJson.instance.parseToJsonElement(sent!!).jsonObject
+            assertEquals(30, body["older_than_days"]!!.jsonPrimitive.int)
+            assertEquals("default", body["profile"]!!.jsonPrimitive.content)
+            assertFalse(body.containsKey("days"))
         }
 
     @Test

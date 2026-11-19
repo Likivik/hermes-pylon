@@ -15,8 +15,8 @@ data class PendingSessionTarget(
     val profileId: String,
 )
 
-fun PendingSessionTarget.idForProfile(activeProfileId: String?): String? =
-    sessionId.takeIf { profileId == activeProfileId }
+fun PendingSessionTarget.idForProfile(selectedProfileId: String?): String? =
+    sessionId.takeIf { profileId == selectedProfileId }
 
 /**
  * Central navigation controller with deduplication guard.
