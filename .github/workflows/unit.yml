@@ -102,6 +102,12 @@ jobs:
           python3 scripts/check_route_scope.py
           cd scripts && python3 -m unittest test_check_route_scope
 
+      - name: Icon subset guard
+        run: |
+          # An icon literal outside the subset font pulls a 10.7 MB download for one glyph.
+          python3 scripts/check_icon_literals.py
+          python3 scripts/check_icon_literals.py --self-test
+
       # The shared data/logic layer: ChatViewModel reducers, rail grouping + order
       # persistence, rename fast-path. JUnit + Robolectric, ~7 min.
       - name: Run unit tests (debug)

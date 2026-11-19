@@ -9,12 +9,17 @@ coordinate-driven interaction (see "Probe matrix").
 
 ## Findings
 
-### C1 — There is no empty state at all (product gap, P2)
-A fresh conversation draws an empty transcript area; `grep` finds no empty branch in
-`ChatScreen.kt`. The broken-image glyph in the headless screenshot is an **unverified artifact**
-(likely a missing emoji font in the headless stack) — not the defect. The defect is that the
-product offers nothing on an empty screen. Acceptance: the empty screen states its intent in
-text and exposes it as a heading to assistive tech.
+### C1 — The empty state pulled an 11 MB font for one glyph (payload, P2) — FIXED
+Third and final correction: an `EmptyState` does exist (`"Ready to chat"`), and the torn glyph in
+the screenshot was a Material Symbols glyph, not an image. The real defect: `EmptyState` defaulted
+to `icon = "inbox"`, `inbox` was **not** in the 108-name subset font, so the fallback fetched
+`material_symbols_outlined.ttf` — **10.7 MB** — for the first empty screen of a session.
+Fixed by adding `Inbox` to `HermesIcon` (subset now 109 names, 209,748 bytes) and guarding every
+icon literal with `scripts/check_icon_literals.py`. Measured after: full-font requests **0**,
+fonts loaded = `onest_variable 61 KB + subset 91 KB`.
+Closed 2026-11-20: the user confirmed on the phone that the empty screen renders its icon and text.
+The missing title/subtitle in the headless a11y tree and the box glyph were headless artifacts, so
+no rendering bug exists here — the defect was the 10.7 MB fetch, and that is fixed.
 
 ### C2 — The a11y tree exists but has no keyboard access (accessibility, P1)
 Measured in the live page inside the shadow root: `#cmp_a11y_root` holds **35 role nodes, 34
