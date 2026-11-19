@@ -3473,7 +3473,71 @@ class ChatViewModelTest {
 
             assertEquals(listOf("cached history"), recreated.uiState.value.messages.map { it.content })
             assertFalse(recreated.uiState.value.isLoading)
-            assertTrue(recreated.uiState.value.errorMessage?.contains("Failed to load messages") == true)
+            // Retargeted 2026-11-19: a failed refresh with content on screen is no longer an error
+            // banner. The transcript stays usable and is marked out of date instead, so the user is
+            // never made to choose between "blank" and "wrong".
+            assertNull(recreated.uiState.value.errorMessage)
+            assertNotNull(recreated.uiState.value.staleSince)
+        }
+
+    @Test
+    fun retryHistoryClearsTheStaleMarkerWhenTheRefreshSucceeds() =
+        runTest {
+            fakeRepo.dao.addMessageDirect(cachedEntity("retry-session", "cached history"))
+            coEvery { mockApi.getSessionMessages(any(), any(), any(), true, any()) } throws
+                java.io.IOException("offline")
+
+            val viewModel = createViewModel()
+            viewModel.switchSession("retry-session")
+            advanceUntilIdle()
+            assertNotNull(viewModel.uiState.value.staleSince)
+
+            coEvery { mockApi.getSessionMessages(any(), any(), any(), true, any()) } returns serverMessages("fresh")
+            viewModel.retryHistory()
+            advanceUntilIdle()
+
+            assertNull(viewModel.uiState.value.staleSince)
+            assertTrue(viewModel.uiState.value.messages.any { it.content == "fresh" })
+        }
+
+    /**
+     * A -> B -> A with the first refresh still in flight.
+     *
+     * The first load is held, two more switches happen, then the held response arrives. It is the
+     * exact shape the "answers cross" case describes: same session, so a session fence alone would
+     * let it through — the monotonic owner counter is what has to reject it.
+     */
+    @Test
+    fun lateRefreshForTheSameSessionCannotOverwriteANewerOne() =
+        runTest {
+            val releaseFirst = CompletableDeferred<Unit>()
+            var calls = 0
+            coEvery { mockApi.getSessionMessages(any(), any(), any(), true, any()) } coAnswers {
+                calls += 1
+                if (calls == 1) {
+                    withContext(NonCancellable) { releaseFirst.await() }
+                    serverMessages("first")
+                } else {
+                    serverMessages("second")
+                }
+            }
+            val viewModel = createViewModel()
+
+            viewModel.switchSession("session-a")
+            runCurrent()
+            viewModel.switchSession("session-b")
+            advanceUntilIdle()
+            viewModel.switchSession("session-a")
+            advanceUntilIdle()
+            assertTrue(viewModel.uiState.value.messages.any { it.content == "second" })
+
+            releaseFirst.complete(Unit)
+            advanceUntilIdle()
+
+            assertFalse(
+                "a response from an older generation overwrote a newer one",
+                viewModel.uiState.value.messages.any { it.content == "first" },
+            )
         }
 
     @Test

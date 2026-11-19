@@ -584,6 +584,32 @@ fun ChatScreen(
                             }
                         }
                     }
+                    // A failed refresh keeps the transcript and says so. Never blank, never silent.
+                    state.staleSince?.let {
+                        Surface(
+                            modifier = Modifier.align(Alignment.TopCenter).padding(top = Spacing.xs),
+                            shape = RoundedCornerShape(50),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
+                            tonalElevation = 1.dp,
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(start = 12.dp, end = 4.dp),
+                            ) {
+                                Text(
+                                    text = "Out of date",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                TextButton(onClick = { viewModel.retryHistory() }) {
+                                    Text(
+                                        text = "Retry",
+                                        style = MaterialTheme.typography.labelSmall,
+                                    )
+                                }
+                            }
+                        }
+                    }
                     ChatMessageList(
                         messages = state.messages,
                         streamingMessage = streamingState.streamingMessage,
