@@ -115,6 +115,13 @@ data class ChatUiState(
      * there is already a transcript to show.
      */
     val hasConnectedOnce: Boolean = false,
+    /**
+     * Set when an authoritative transcript refresh failed while content was already on screen.
+     *
+     * The content stays — a cached transcript is better than a blank screen — but the user is told
+     * it may be out of date and offered a retry. Null means "what you see is what the server said".
+     */
+    val staleSince: Long? = null,
 ) {
     /** Convenience — derived from [connectionStatus]. */
     val isConnected: Boolean get() = connectionStatus == ConnectionStatus.CONNECTED

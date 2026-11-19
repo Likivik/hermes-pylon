@@ -2019,6 +2019,9 @@ class ChatViewModel(
      */
     private val transcriptCache = LinkedHashMap<String, List<ChatMessage>>()
 
+    /** Wall-clock milliseconds, for "how long has this been out of date". */
+    private fun nowMs(): Long = nowMillis()
+
     private fun transcriptKey(sessionId: String): String = (selectedProfileNow() ?: "default") + "|" + sessionId
 
     private fun cacheTranscript(
@@ -3070,7 +3073,7 @@ class ChatViewModel(
                                 if (!isHistoryRefreshCurrent(fence, owner)) return@update state
                                 val hasResumeHistory = state.messages.any { it.id.startsWith("resume-$sessionId-") }
                                 if (chatMessages.isEmpty() && hasResumeHistory) {
-                                    state.copy(isLoading = false, isLoadingOlder = false)
+                                    state.copy(isLoading = false, isLoadingOlder = false, staleSince = null)
                                 } else {
                                     val authoritativeIds = chatMessages.mapTo(mutableSetOf()) { it.id }
                                     val newerMessages =
@@ -3093,6 +3096,8 @@ class ChatViewModel(
                                         isLoading = false,
                                         hasOlderMessages = hasOlder,
                                         isLoadingOlder = false,
+                                        // The server just spoke: whatever was stale is now current.
+                                        staleSince = null,
                                     )
                                 }
                             }
@@ -3106,11 +3111,23 @@ class ChatViewModel(
                         is NetworkResult.Failure -> {
                             _uiState.update {
                                 if (!isHistoryRefreshCurrent(fence, owner)) return@update it
-                                it.copy(
-                                    isLoading = false,
-                                    isLoadingOlder = false,
-                                    errorMessage = "Failed to load messages: ${result.error.message}",
-                                )
+                                // Two different situations, two different messages: with content
+                                // on screen a failed refresh means "this may be out of date", not
+                                // "loading failed" — the transcript is still usable.
+                                if (it.messages.isEmpty()) {
+                                    it.copy(
+                                        isLoading = false,
+                                        isLoadingOlder = false,
+                                        errorMessage = "Failed to load messages: ${result.error.message}",
+                                    )
+                                } else {
+                                    it.copy(
+                                        isLoading = false,
+                                        isLoadingOlder = false,
+                                        errorMessage = null,
+                                        staleSince = it.staleSince ?: nowMs(),
+                                    )
+                                }
                             }
                         }
                     }
@@ -3118,6 +3135,19 @@ class ChatViewModel(
                     if (activeHistoryRefreshOwner == owner) historyRefreshJob = null
                 }
             }
+    }
+
+    /**
+     * Re-run the authoritative load for the open session.
+     *
+     * This is the only control behind the "out of date" chip: a failed refresh never blanks the
+     * transcript, so the user needs a way to ask again without switching sessions.
+     */
+    fun retryHistory() {
+        val state = _uiState.value
+        val sessionId = state.currentSessionId ?: return
+        if (state.isLoading) return
+        loadSessionMessages(sessionId)
     }
 
     fun loadOlderMessages() {
