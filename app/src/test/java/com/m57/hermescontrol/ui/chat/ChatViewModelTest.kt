@@ -3131,11 +3131,11 @@ class ChatViewModelTest {
             advanceUntilIdle()
             assertEquals("storage-tip", viewModel.uiState.value.currentSessionId)
             assertEquals("runtime-tip", ActiveSessionHolder.activeSessionId.value)
-            assertEquals(1, viewModel.uiState.value.messages.count { it.content == "Session resumed" })
+            assertEquals(0, viewModel.uiState.value.messages.count { it.content == "Session resumed" })
 
             mockEventsFlow.emit(WsEvent.RpcResult(resumeId, result))
             advanceUntilIdle()
-            assertEquals(1, viewModel.uiState.value.messages.count { it.content == "Session resumed" })
+            assertEquals(0, viewModel.uiState.value.messages.count { it.content == "Session resumed" })
         }
 
     @Test

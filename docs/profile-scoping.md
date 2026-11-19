@@ -146,3 +146,14 @@ Classification is measured, not asserted: the generator reads each handler's own
 and looks for the profile in its signature, in a `destructive_profile(...)` call, or in an attribute read
 off the request model. A fixed character window was tried first and misclassified routes in both
 directions — borrowing a neighbour's call and cutting off long handlers.
+
+## Client-side state that must be keyed by profile
+
+A session id, a draft, a "last opened" pointer — anything that names data inside a profile — is only
+meaningful in that profile. Key it by profile or drop it on a switch:
+
+- `last_session_<profile>` — the remembered chat session. The legacy global `last_session` key is not
+  migrated: it cannot be attributed to a profile, and guessing would open the wrong transcript.
+- the open conversation is dropped on a profile change (generation bumped, pending resume/create
+  cancelled, streaming reset), then the new profile's own remembered session is resumed, or the pane
+  stays empty with the rail as the way in.
