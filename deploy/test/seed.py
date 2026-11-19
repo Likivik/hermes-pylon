@@ -15,12 +15,16 @@ import base64
 import http.cookiejar
 import json
 import os
+import shlex
+import subprocess
 import sys
 import urllib.error
 import urllib.parse
 import urllib.request
 
 BASE = os.environ.get("PYLON_TEST_BASE", "http://127.0.0.1:19119").rstrip("/")
+# Needed only by `sessions`: turns are run inside the pod, through the gateway itself.
+POD = os.environ.get("PYLON_TEST_POD", "")
 TOKEN = os.environ.get("PYLON_TEST_TOKEN", "")
 TIMEOUT = 15
 
@@ -149,12 +153,61 @@ def seed_profiles() -> int:
     return len(profiles)
 
 
+def seed_sessions() -> int:
+    """Two chat sessions with real message shapes, created by running real turns.
+
+    Idempotent by a marker file inside the pod: the ids of the sessions this function created
+    are recorded, and a run is a no-op while both still exist. Turns go through the gateway with
+    the scripted provider, so the message shapes are the gateway's, not ours.
+    """
+    if not POD:
+        raise SystemExit("seed sessions needs PYLON_TEST_POD=<pod name>")
+    state_path = "/opt/data/pylon_seed_sessions.json"
+    recorded: list[str] = []
+    out = subprocess.run(["podman", "exec", f"{POD}-gateway", "cat", state_path], capture_output=True, text=True)
+    if out.returncode == 0 and out.stdout.strip():
+        try:
+            recorded = json.loads(out.stdout)
+        except json.JSONDecodeError:
+            recorded = []
+    alive = [sid for sid in recorded if call("GET", f"api/sessions/{sid}")[0] == 200]
+    if len(alive) == 2:
+        print(f"sessions already seeded: {alive[0][:8]}, {alive[1][:8]}", flush=True)
+        return 2
+
+    prompts = ["Pylon fixture: markdown", "Pylon fixture: long tool"]
+    for prompt in prompts:
+        result = subprocess.run(
+            ["podman", "exec", f"{POD}-gateway", "sh", "-c", f"timeout 240 hermes -z {shlex.quote(prompt)}"],
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        if result.returncode != 0:
+            raise SystemExit(f"turn failed for {prompt!r}: {result.stderr[-400:]}")
+
+    status, body = call("GET", "api/sessions?profile=default&limit=2")
+    if status != 200 or not isinstance(body, dict):
+        raise SystemExit(f"cannot list sessions after seeding: {status}")
+    ids = [row["id"] for row in body.get("sessions", [])][:2]
+    if len(ids) != 2:
+        raise SystemExit(f"expected 2 sessions after seeding, saw {len(ids)}")
+    subprocess.run(
+        ["podman", "exec", "-i", f"{POD}-gateway", "sh", "-c", f"cat > {state_path}"],
+        input=json.dumps(ids),
+        text=True,
+        check=True,
+    )
+    return len(ids)
+
+
 SEEDS = {
     "files": seed_files,
     "env": seed_env,
     "cron": seed_cron,
     "webhooks": seed_webhooks,
     "profiles": seed_profiles,
+    "sessions": seed_sessions,
 }
 
 

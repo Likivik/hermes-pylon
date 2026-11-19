@@ -134,6 +134,32 @@ configure() {
     say "model routed to the stub"
 }
 
+provider_up() {
+    local src="$REPO/deploy/test/fake_llm_provider.py"
+    local scripts="$REPO/deploy/test/chat_scripts.py"
+    [ -f "$src" ] || { say "missing vendored provider: $src" >&2; return 1; }
+    [ -f "$scripts" ] || { say "missing chat scripts: $scripts" >&2; return 1; }
+    # The stub answers one canned line and no tool calls. The scripted provider replaces it on
+    # the same port, so the gateway config (`custom:stub` -> 127.0.0.1:19200) never changes.
+    podman stop "${POD}-stub" >/dev/null 2>&1 || true
+    podman rm -f "${POD}-stub" >/dev/null 2>&1 || true
+    podman rm -f "${POD}-provider" >/dev/null 2>&1 || true
+    podman run -d --pod "$POD" --name "${POD}-provider" \
+        -v "$src:/opt/fake_llm_provider.py:ro" \
+        -v "$scripts:/opt/chat_scripts.py:ro" \
+        "$IMAGE" python3 /opt/chat_scripts.py markdown 19200 >/dev/null
+    local code=""
+    for _ in $(seq 1 20); do
+        code=$(podman exec "${POD}-gateway" sh -c \
+            'curl -s -m 2 -o /dev/null -w "%{http_code}" -X POST http://127.0.0.1:19200/v1/chat/completions -H "content-type: application/json" -d "{\"model\":\"stub\",\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}]}"' 2>/dev/null) || true
+        [ "$code" = "200" ] && { say "scripted provider up on :19200 (script: markdown)"; return 0; }
+        sleep 0.5
+    done
+    say "scripted provider did not answer on :19200 (last: ${code:-none})" >&2
+    podman logs --tail 20 "${POD}-provider" 2>&1 | tail -5 >&2 || true
+    return 1
+}
+
 down() {
     podman pod stop "$POD" >/dev/null 2>&1 || true
     podman pod rm -f "$POD" >/dev/null 2>&1 || true
@@ -145,7 +171,8 @@ status() {
 }
 
 case "${1:-}" in
-    up) up; configure; dashboard_up ;;
+    up) up; configure; provider_up ; dashboard_up ;;
+    provider) provider_up ;;
     down) down ;;
     wipe) down; podman volume rm -f "$VOL" >/dev/null 2>&1 || true; say "volume $VOL deleted" ;;
     status) status ;;
