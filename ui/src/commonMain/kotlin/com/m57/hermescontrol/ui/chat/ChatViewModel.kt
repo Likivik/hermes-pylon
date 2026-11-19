@@ -85,6 +85,9 @@ import kotlin.concurrent.Volatile
 private const val TAG = "ChatViewModel"
 private const val MESSAGE_PAGE_SIZE = 150
 
+/** How many recent transcripts stay in memory for instant switches. */
+private const val TRANSCRIPT_CACHE_LIMIT = 8
+
 /**
  * How long an unacknowledged `session.create` waits before it is retried.
  *
@@ -171,6 +174,8 @@ class ChatViewModel(
     private val profileProvider: ProfileProvider = ProfileProvider { null },
     /** Profile changes to follow; empty in tests, the client's selection flow in production. */
     private val profileChanges: Flow<String?> = emptyFlow(),
+    /** The selection, synchronously, for per-profile storage keys. */
+    private val selectedProfileNow: () -> String? = { ApiClient.selectedProfileId },
     private val selectedGatewayId: () -> String = {
         AppEnvironment.current.auth.getSelectedProfileId() ?: AuthDefaults.PROFILE_ID
     },
@@ -331,6 +336,18 @@ class ChatViewModel(
             }
         }
         viewModelScope.launch(io) {
+            _uiState.collect { state ->
+                state.currentSessionId?.let { id -> cacheTranscript(id, state.messages) }
+            }
+        }
+        viewModelScope.launch(io) {
+            wsClient.connectionStatus.collect { status ->
+                if (status == ConnectionStatus.CONNECTED) {
+                    _uiState.update { it.copy(hasConnectedOnce = true) }
+                }
+            }
+        }
+        viewModelScope.launch(io) {
             profileChanges.collect {
                 // The socket is scoped at handshake: re-open it so chat continues in the
                 // profile the user selected instead of the previous one. Only when a socket
@@ -339,10 +356,14 @@ class ChatViewModel(
                     wsClient.disconnect()
                     wsClient.connect()
                 }
+                resetConversationForProfileChange()
                 _uiState.update { state ->
                     state.copy(sessions = emptyList(), railStatus = RailLoadStatus.Loading)
                 }
                 requestRailRefresh(force = true)
+                // The new profile has its own history; resume its last session if it has one.
+                // With none, the pane stays empty and the rail is the way in.
+                lastSession()?.let { remembered -> switchSession(remembered) }
             }
         }
 
@@ -1033,12 +1054,9 @@ class ChatViewModel(
                 if (!renameOnly) {
                     // Mirror the active runtime session id app-wide (issue #532).
                     ActiveSessionHolder.set(runtimeSessionId ?: sessionId, sessionId)
-                    // Seed the resume notice BEFORE hydrateResumeMessages. When the
-                    // ack's payload replaces the transcript (a cross-session
-                    // resume) the notice goes with it: the payload is the
-                    // authoritative history. When the ack carries no payload the
-                    // notice stands — one entry, and only one, per valid ack.
-                    addSystemMessage("Session resumed")
+                    // No "Session resumed" notice: a resume ack is protocol plumbing, and
+                    // printing it made every rail click look like an event. The rail highlight
+                    // and the title already say which conversation is open.
                 }
                 if (sessionId != null && !renameOnly) {
                     hydrateResumeMessages(
@@ -1979,10 +1997,86 @@ class ChatViewModel(
     // ── Likivik patch: remember the last-open session so a fresh app launch
     // resumes it instead of blindly creating a new one each time. ──
     private fun persistLastSession(id: String) {
-        preferences.putString("last_session", id)
+        preferences.putString(lastSessionKey(), id)
     }
 
-    private fun lastSession(): String? = preferences.getString("last_session")?.takeIf { it.isNotBlank() }
+    /**
+     * Keyed by profile: a session id from one profile is meaningless in another, and a single
+     * global key made the chat resume the previous profile's conversation after a switch.
+     * The legacy key is deliberately not migrated — it cannot be attributed to a profile.
+     */
+    private fun lastSessionKey(): String = SessionPreferenceKeys.lastSession(selectedProfileNow())
+
+    private fun lastSession(): String? = preferences.getString(lastSessionKey())?.takeIf { it.isNotBlank() }
+
+    /**
+     * Recently seen transcripts, keyed by profile *and* session.
+     *
+     * Web has no Room, so without this a switch is a guaranteed blank while the network answers.
+     * Bounded and insertion-ordered: the oldest entry goes first. It is a cache, never a source
+     * of truth — the authoritative load still converges the view, and a stale entry is replaced
+     * as soon as the gateway answers.
+     */
+    private val transcriptCache = LinkedHashMap<String, List<ChatMessage>>()
+
+    private fun transcriptKey(sessionId: String): String = (selectedProfileNow() ?: "default") + "|" + sessionId
+
+    private fun cacheTranscript(
+        sessionId: String,
+        messages: List<ChatMessage>,
+    ) {
+        if (messages.isEmpty()) return
+        val key = transcriptKey(sessionId)
+        transcriptCache.remove(key)
+        transcriptCache[key] = messages
+        while (transcriptCache.size > TRANSCRIPT_CACHE_LIMIT) {
+            val oldest = transcriptCache.keys.firstOrNull() ?: break
+            transcriptCache.remove(oldest)
+        }
+    }
+
+    private fun cachedTranscript(sessionId: String): List<ChatMessage> =
+        transcriptCache[transcriptKey(sessionId)].orEmpty()
+
+    /**
+     * Drop the open conversation when the profile changes.
+     *
+     * Mirrors `switchSession`'s invalidation so late answers for the old profile's session are
+     * inert, then leaves the pane empty or on the new profile's own last session.
+     */
+    private fun resetConversationForProfileChange() {
+        clearPrivilegedControls()
+        invalidateHistoryRefresh()
+        _uiState.value.currentSessionId?.let(repo::invalidateReplacementWrites)
+        conversationGeneration++
+        invalidateResumeRequests()
+        sessionCreateCounter++
+        sessionCreateJob?.cancel()
+        sessionCreateJob = null
+        runtimeSessionId = null
+        loadedMessageOffset = 0
+        latestPaging = false
+        streamingController.resetStreaming()
+        _streamingState.update { StreamingState() }
+        ActiveSessionHolder.set(null, null)
+        _uiState.update {
+            it.copy(
+                currentSessionId = null,
+                isSessionReady = false,
+                isLoading = false,
+                isLoadingOlder = false,
+                hasOlderMessages = false,
+                messages = emptyList(),
+                subagentIndicators = emptyList(),
+                todos = emptyList(),
+                chatTitle = "Hermes",
+                isAgentTyping = false,
+                currentSessionModel = null,
+                contextUsage = null,
+                pendingPrefillText = null,
+            )
+        }
+    }
 
     // ── Likivik patch: per-session rail customization (icon emoji only; the
     // name shown equals the real session title, renamed via session.title) ──
@@ -2821,10 +2915,10 @@ class ChatViewModel(
                 isLoadingOlder = false,
                 hasOlderMessages = false,
                 currentSessionId = sessionId,
-                // A switch owns a fresh transcript: clear the previous session's
-                // messages here. `loadCachedMessages(sessionId)` below repaints
-                // from Room immediately, so the wipe is not a blank flash.
-                messages = emptyList(),
+                // Paint from the transcript cache when we have it: on web there is no Room, so
+                // blanking here made every switch a visible flash. The authoritative load still
+                // converges the view; a cache miss legitimately starts empty.
+                messages = cachedTranscript(sessionId),
                 subagentIndicators = emptyList(),
                 todos = emptyList(),
                 chatTitle = title,

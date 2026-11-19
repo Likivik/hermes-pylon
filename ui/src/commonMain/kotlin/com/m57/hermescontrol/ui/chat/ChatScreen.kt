@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Snackbar
@@ -610,8 +611,20 @@ fun ChatScreen(
                         onImageClick = { viewingImage = it },
                     )
 
-                    // Loading overlay
-                    ChatLoadingOverlay(isLoading = state.isLoading)
+                    // The blocking overlay means "not connected yet". A history load on a live
+                    // socket is not a connection problem: it gets a hairline bar instead of a
+                    // full-screen card, so switching sessions no longer blanks the screen.
+                    ChatLoadingOverlay(isLoading = !state.isConnected && !state.hasConnectedOnce)
+                    if (state.isLoading && state.isConnected) {
+                        LinearProgressIndicator(
+                            modifier =
+                                Modifier
+                                    .align(Alignment.TopCenter)
+                                    .fillMaxWidth()
+                                    .height(2.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
 
                     // Scroll-to-bottom FAB (issue #682): shows while follow is
                     // paused and renders the unseen-message badge.

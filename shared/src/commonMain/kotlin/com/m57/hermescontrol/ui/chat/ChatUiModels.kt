@@ -107,6 +107,14 @@ data class ChatUiState(
     val todos: List<TodoItem> = emptyList(),
     /** One-shot composer restoration produced by a successful `/undo`. */
     val pendingPrefillText: String? = null,
+    /**
+     * Latched once the socket has been up.
+     *
+     * The "Connecting to Hermes…" overlay is for the first connection, not for every moment the
+     * status blips: a reconnecting socket during a session switch must not blank the screen when
+     * there is already a transcript to show.
+     */
+    val hasConnectedOnce: Boolean = false,
 ) {
     /** Convenience — derived from [connectionStatus]. */
     val isConnected: Boolean get() = connectionStatus == ConnectionStatus.CONNECTED
