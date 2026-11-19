@@ -5,6 +5,7 @@ package com.m57.hermescontrol.ui.files
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -72,6 +73,7 @@ import com.m57.hermescontrol.generated.resources.files_metadata_size_and_time
 import com.m57.hermescontrol.generated.resources.files_new_folder_label
 import com.m57.hermescontrol.generated.resources.files_new_folder_placeholder
 import com.m57.hermescontrol.generated.resources.files_root_label
+import com.m57.hermescontrol.generated.resources.files_scope_note
 import com.m57.hermescontrol.generated.resources.screen_files
 import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.EmptyState
@@ -312,7 +314,17 @@ fun FilesScreen(
     }
 
     HermesScaffold(
-        title = { Text(stringResource(Res.string.screen_files)) },
+        title = {
+            Column {
+                Text(stringResource(Res.string.screen_files))
+                // Files is the gateway process's own home: a profile switch cannot move it.
+                Text(
+                    text = stringResource(Res.string.files_scope_note),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
         navigationIcon = onOpenDrawer?.let { NavIcon.Menu(it) },
         isRefreshing = state.isLoading,
         onRefresh = actions::refresh,

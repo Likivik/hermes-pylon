@@ -274,7 +274,7 @@ class HermesGatewayApiTest {
                 api.bulkDeleteSessions(
                     BulkDeleteRequest(
                         ids = listOf("session_1"),
-                        delete_all = false,
+                        deleteAll = false,
                     ),
                 )
 

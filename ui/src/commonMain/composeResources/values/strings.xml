@@ -623,7 +623,7 @@
 
     <!-- Profiles Screen -->
     <string name="profiles_empty_title">No profiles available</string>
-    <string name="profiles_empty_desc">Connection profiles from Hermes will appear here.</string>
+    <string name="profiles_empty_desc">Profiles from this Hermes gateway will appear here.</string>
     <string name="profiles_label_model">Model: %1$s</string>
     <string name="profiles_label_provider">Provider: %1$s</string>
     <string name="profiles_label_skills">%1$d skills</string>
@@ -1079,4 +1079,8 @@
     <string name="subagent_status_completed">Completed</string>
     <string name="subagent_status_cancelled">Cancelled</string>
     <string name="subagent_status_failed">Failed</string>
+    <!-- Profile switching: the app browses the selected profile; the gateway process may serve another. -->
+    <string name="profiles_pending_note">Browsing %1$s — the gateway still serves %2$s</string>
+    <!-- Files is the gateway process's own home; a profile switch cannot move it. -->
+    <string name="files_scope_note">This folder belongs to the gateway process, not to a profile.</string>
 </resources>

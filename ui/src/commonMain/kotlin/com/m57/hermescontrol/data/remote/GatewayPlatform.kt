@@ -46,7 +46,10 @@ internal expect object GatewayPlatform {
  * credential-boundary interceptors and debug-only
  * HTTP logging. Desktop/wasm return a plain Ktor client.
  */
-internal expect fun createGatewayHttpClient(auth: GatewayClientAuth): HttpClient
+internal expect fun createGatewayHttpClient(
+    auth: GatewayClientAuth,
+    profile: String? = null,
+): HttpClient
 
 /**
  * The one bearer-header rule, shared so no target can get it wrong.

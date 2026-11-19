@@ -24,7 +24,10 @@ internal actual object GatewayPlatform {
  * `HttpSend` interceptors, so no OkHttpClient is built here and OkHttp no
  * longer owns the gateway connection pool or its cookies.
  */
-internal actual fun createGatewayHttpClient(auth: GatewayClientAuth): HttpClient =
+internal actual fun createGatewayHttpClient(
+    auth: GatewayClientAuth,
+    profile: String?,
+): HttpClient =
     when (auth) {
         GatewayClientAuth.SessionCredentials -> createGatewayTransportClient(GatewayClientKind.Session)
         is GatewayClientAuth.FixedBearer ->

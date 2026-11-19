@@ -74,6 +74,7 @@ import com.m57.hermescontrol.data.model.RawConfigResponse
 import com.m57.hermescontrol.data.model.RecentUnlock
 import com.m57.hermescontrol.data.model.SaveSkillContentRequest
 import com.m57.hermescontrol.data.model.ScanStatus
+import com.m57.hermescontrol.data.model.SessionFence
 import com.m57.hermescontrol.data.model.SessionInfo
 import com.m57.hermescontrol.data.model.SessionLatestDescendantResponse
 import com.m57.hermescontrol.data.model.SessionListResponse
@@ -227,19 +228,56 @@ class HermesGatewayApi(
 
     suspend fun getSessionStats(): GatewayResponse<SessionStatsResponse> = get("api/sessions/stats")
 
+    /**
+     * Rename or flag a session.
+     *
+     * PATCH, not PUT `/rename`: the gateway exposes one mutation route per session
+     * (`web_routers/sessions.py:933`) and it requires the fence carried in [body].
+     */
     suspend fun renameSession(
         sessionId: String,
         body: SessionRenameRequest,
     ): GatewayResponse<Unit> =
         empty(
-            client.put(url("${sessionPath(sessionId)}/rename")) {
+            client.patch(url(sessionPath(sessionId))) {
                 contentType(ContentType.Application.Json)
                 setBody(body)
             },
         )
 
-    suspend fun deleteSession(sessionId: String): GatewayResponse<Unit> =
-        empty(client.delete(url(sessionPath(sessionId))))
+    /**
+     * Delete one session. The fence travels as query parameters on this route
+     * (`web_routers/sessions.py:853`); without it the gateway answers 409.
+     */
+    suspend fun deleteSession(
+        sessionId: String,
+        fence: SessionFence,
+        profile: String? = null,
+    ): GatewayResponse<Unit> =
+        empty(
+            client.delete(
+                url(
+                    queryPath(
+                        sessionPath(sessionId),
+                        "profile" to profile,
+                        "request_id" to fence.requestId,
+                        "expected_revision" to fence.revision?.toString(),
+                        "expected_generation" to fence.generation?.toString(),
+                    ),
+                ),
+            ),
+        )
+
+    /**
+     * The profile this gateway process serves: `current` when the gateway reports it,
+     * `active` otherwise. Mutations must name it — an omitted profile on a
+     * multi-profile host is a 400, not a default.
+     */
+    suspend fun activeProfileName(): String? {
+        val response = getActiveProfile()
+        val body = response.body() ?: return null
+        return body.current ?: body.active
+    }
 
     suspend fun pruneSessions(body: PruneRequest): GatewayResponse<Unit> =
         empty(

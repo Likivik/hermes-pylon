@@ -53,6 +53,7 @@ import com.m57.hermescontrol.generated.resources.chat_privileged_not_acknowledge
 import com.m57.hermescontrol.ui.chat.rail.RailLoadStatus
 import com.m57.hermescontrol.ui.chat.rail.railLoadStatusOf
 import com.m57.hermescontrol.ui.common.StringResolver
+import com.m57.hermescontrol.ui.profiles.ProfileProvider
 import com.m57.hermescontrol.ui.sessions.AUTOMATION_SOURCE
 import com.m57.hermescontrol.util.HermesLog
 import com.m57.hermescontrol.util.isRunningUnderTest
@@ -61,6 +62,7 @@ import com.m57.hermescontrol.util.synchronizedOn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -68,6 +70,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -164,6 +167,10 @@ class ChatViewModel(
      * retry path explicitly, so existing suites keep their previous timing.
      */
     private val sessionCreateRetryDelayMs: Long? = null,
+    /** Resolves the profile to scope to; production passes the client, tests pass a constant. */
+    private val profileProvider: ProfileProvider = ProfileProvider { null },
+    /** Profile changes to follow; empty in tests, the client's selection flow in production. */
+    private val profileChanges: Flow<String?> = emptyFlow(),
     private val selectedGatewayId: () -> String = {
         AppEnvironment.current.auth.getSelectedProfileId() ?: AuthDefaults.PROFILE_ID
     },
@@ -299,10 +306,46 @@ class ChatViewModel(
                 .drop(1)
                 .distinctUntilChanged()
                 .collect {
+                    // A profile name is per gateway: carrying it across a connection switch
+                    // would scope every request to a profile the new gateway may not have.
+                    ApiClient.clearSelectedProfile()
+                    ApiClient.currentProfileName()
                     _uiState.update { it.copy(sessions = emptyList(), railStatus = RailLoadStatus.Loading) }
                     requestRailRefresh(force = true)
                 }
         }
+        viewModelScope.launch(io) {
+            // Learn the serving profile once, then scope every request to it. The client
+            // rebuilds on change, so the rail can never mix two profiles' rows.
+            if (ApiClient.selectedProfileId == null) {
+                val resolved =
+                    try {
+                        profileProvider.current()
+                    } catch (e: Exception) {
+                        // A screen must survive an unreachable gateway: no profile is a
+                        // degraded scope, not a crash.
+                        HermesLog.e("ChatVM", "Profile resolution failed", e)
+                        null
+                    }
+                resolved?.let(ApiClient::setSelectedProfile)
+            }
+        }
+        viewModelScope.launch(io) {
+            profileChanges.collect {
+                // The socket is scoped at handshake: re-open it so chat continues in the
+                // profile the user selected instead of the previous one. Only when a socket
+                // is already up — otherwise cold start would flap for nothing.
+                if (wsClient.connectionStatus.value == ConnectionStatus.CONNECTED) {
+                    wsClient.disconnect()
+                    wsClient.connect()
+                }
+                _uiState.update { state ->
+                    state.copy(sessions = emptyList(), railStatus = RailLoadStatus.Loading)
+                }
+                requestRailRefresh(force = true)
+            }
+        }
+
         refreshSettings()
 
         viewModelScope.launch {

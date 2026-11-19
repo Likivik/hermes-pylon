@@ -1,0 +1,2002 @@
+{
+ "gateway": "/nix/store/fky5w32h62yh44g32rj10908xnw9y890-hermes-agent-0.23.1-patched/hermes_cli",
+ "routes": [
+  {
+   "method": "GET",
+   "path": "/api/actions/{name}/status",
+   "scope": "none",
+   "file": "actions.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/analytics/models",
+   "scope": "query",
+   "file": "analytics.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/analytics/usage",
+   "scope": "query",
+   "file": "analytics.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/audio/elevenlabs/voices",
+   "scope": "query",
+   "file": "audio.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/audio/speak",
+   "scope": "query",
+   "file": "audio.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/audio/stt-lease",
+   "scope": "query",
+   "file": "audio.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/audio/transcribe",
+   "scope": "query",
+   "file": "audio.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/audio/tts-lease",
+   "scope": "query",
+   "file": "audio.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/audio/voice-config",
+   "scope": "query",
+   "file": "audio.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/audio/voice-live/session",
+   "scope": "query",
+   "file": "audio.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/audio/voice-live/status",
+   "scope": "query",
+   "file": "audio.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/chat/file-upload",
+   "scope": "query",
+   "file": "uploads.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/chat/image-upload",
+   "scope": "query",
+   "file": "files.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/chat/workspaces",
+   "scope": "query",
+   "file": "chat_workspaces.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/config",
+   "scope": "query",
+   "file": "config_env.py"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/config",
+   "scope": "query",
+   "file": "config_env.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/config/defaults",
+   "scope": "none",
+   "file": "config_env.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/config/raw",
+   "scope": "query",
+   "file": "analytics.py"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/config/raw",
+   "scope": "query",
+   "file": "analytics.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/config/schema",
+   "scope": "query",
+   "file": "config_env.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/credentials/pool",
+   "scope": "query",
+   "file": "ops.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/credentials/pool",
+   "scope": "query",
+   "file": "ops.py"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/credentials/pool/{provider}/{index}",
+   "scope": "query",
+   "file": "ops.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/cron/blueprints",
+   "scope": "query",
+   "file": "cron.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/cron/blueprints/instantiate",
+   "scope": "query",
+   "file": "cron.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/cron/delivery-targets",
+   "scope": "query",
+   "file": "cron.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/cron/fire",
+   "scope": "none",
+   "file": "cron.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/cron/jobs",
+   "scope": "query",
+   "file": "cron.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/cron/jobs",
+   "scope": "query",
+   "file": "cron.py"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/cron/jobs/{job_id}",
+   "scope": "query",
+   "file": "cron.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/cron/jobs/{job_id}",
+   "scope": "query",
+   "file": "cron.py"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/cron/jobs/{job_id}",
+   "scope": "query",
+   "file": "cron.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/cron/jobs/{job_id}/cancel",
+   "scope": "query",
+   "file": "cron.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/cron/jobs/{job_id}/pause",
+   "scope": "query",
+   "file": "cron.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/cron/jobs/{job_id}/resume",
+   "scope": "query",
+   "file": "cron.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/cron/jobs/{job_id}/runs",
+   "scope": "query",
+   "file": "cron.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/cron/jobs/{job_id}/trigger",
+   "scope": "query",
+   "file": "cron.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/curator",
+   "scope": "query",
+   "file": "status.py"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/curator/paused",
+   "scope": "query",
+   "file": "status.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/curator/run",
+   "scope": "query",
+   "file": "status.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/dashboard/agent-plugins/activate",
+   "scope": "none",
+   "file": "dashboard_ui.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/dashboard/agent-plugins/install",
+   "scope": "none",
+   "file": "dashboard_ui.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/dashboard/agent-plugins/update-all",
+   "scope": "none",
+   "file": "dashboard_ui.py"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/dashboard/agent-plugins/{name:path}",
+   "scope": "none",
+   "file": "dashboard_ui.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/dashboard/agent-plugins/{name:path}/disable",
+   "scope": "none",
+   "file": "dashboard_ui.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/dashboard/agent-plugins/{name:path}/enable",
+   "scope": "none",
+   "file": "dashboard_ui.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/dashboard/agent-plugins/{name:path}/update",
+   "scope": "none",
+   "file": "dashboard_ui.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/dashboard/font",
+   "scope": "query",
+   "file": "dashboard_ui.py"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/dashboard/font",
+   "scope": "query",
+   "file": "dashboard_ui.py"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/dashboard/plugin-providers",
+   "scope": "query",
+   "file": "dashboard_ui.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/dashboard/plugins",
+   "scope": "query",
+   "file": "dashboard_ui.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/dashboard/plugins/auto-update",
+   "scope": "none",
+   "file": "dashboard_ui.py"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/dashboard/plugins/auto-update",
+   "scope": "none",
+   "file": "dashboard_ui.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/dashboard/plugins/catalog",
+   "scope": "none",
+   "file": "dashboard_ui.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/dashboard/plugins/hub",
+   "scope": "query",
+   "file": "dashboard_ui.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/dashboard/plugins/rescan",
+   "scope": "query",
+   "file": "dashboard_ui.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/dashboard/plugins/{name:path}/visibility",
+   "scope": "query",
+   "file": "dashboard_ui.py"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/dashboard/theme",
+   "scope": "query",
+   "file": "dashboard_ui.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/dashboard/themes",
+   "scope": "query",
+   "file": "dashboard_ui.py"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/delegation/backend",
+   "scope": "query",
+   "file": "delegation.py"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/delegation/backends/model_map",
+   "scope": "query",
+   "file": "delegation.py"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/delegation/backends/profile_routes",
+   "scope": "query",
+   "file": "delegation.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/delegation/routing",
+   "scope": "query",
+   "file": "delegation.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/desktop-plugins/list",
+   "scope": "none",
+   "file": "desktop_plugins.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/desktop-plugins/read",
+   "scope": "none",
+   "file": "desktop_plugins.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/desktop-plugins/reconcile",
+   "scope": "none",
+   "file": "desktop_plugins.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/desktop-plugins/root",
+   "scope": "none",
+   "file": "desktop_plugins.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/egress/status",
+   "scope": "query",
+   "file": "config_env.py"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/env",
+   "scope": "query",
+   "file": "config_env.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/env",
+   "scope": "query",
+   "file": "config_env.py"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/env",
+   "scope": "query",
+   "file": "config_env.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/env/reveal",
+   "scope": "query",
+   "file": "config_env.py"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/files",
+   "scope": "none",
+   "file": "files.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/files",
+   "scope": "none",
+   "file": "files.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/files/download",
+   "scope": "none",
+   "file": "files.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/files/mkdir",
+   "scope": "none",
+   "file": "files.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/files/read",
+   "scope": "none",
+   "file": "files.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/files/stream",
+   "scope": "query",
+   "file": "files.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/files/upload",
+   "scope": "none",
+   "file": "files.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/files/upload-stream",
+   "scope": "none",
+   "file": "files.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/fs/default-cwd",
+   "scope": "query",
+   "file": "files.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/fs/download",
+   "scope": "query",
+   "file": "files.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/fs/git-root",
+   "scope": "query",
+   "file": "files.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/fs/list",
+   "scope": "query",
+   "file": "files.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/fs/read-data-url",
+   "scope": "query",
+   "file": "files.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/fs/read-text",
+   "scope": "query",
+   "file": "files.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/fs/write-text",
+   "scope": "query",
+   "file": "files.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/gateway-connections",
+   "scope": "none",
+   "file": "gateway_connections.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/gateway-connections",
+   "scope": "none",
+   "file": "gateway_connections.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/gateway-connections/last-used",
+   "scope": "none",
+   "file": "gateway_connections.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/gateway-connections/launch-mode",
+   "scope": "none",
+   "file": "gateway_connections.py"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/gateway-connections/{connection_id}",
+   "scope": "none",
+   "file": "gateway_connections.py"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/gateway-connections/{connection_id}/oauth",
+   "scope": "none",
+   "file": "gateway_connections_reach.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/gateway-connections/{connection_id}/oauth",
+   "scope": "none",
+   "file": "gateway_connections_reach.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/gateway-connections/{connection_id}/oauth/complete",
+   "scope": "none",
+   "file": "gateway_connections_reach.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/gateway-connections/{connection_id}/oauth/start",
+   "scope": "none",
+   "file": "gateway_connections_reach.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/gateway-connections/{connection_id}/primary",
+   "scope": "none",
+   "file": "gateway_connections.py"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/gateway-connections/{connection_id}/ssh",
+   "scope": "none",
+   "file": "gateway_connections_reach.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/gateway-connections/{connection_id}/ssh",
+   "scope": "none",
+   "file": "gateway_connections_reach.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/gateway-connections/{connection_id}/ssh",
+   "scope": "none",
+   "file": "gateway_connections_reach.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/gateway-connections/{connection_id}/test",
+   "scope": "none",
+   "file": "gateway_connections.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/gateway/drain",
+   "scope": "none",
+   "file": "actions.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/gateway/migrate",
+   "scope": "none",
+   "file": "actions.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/gateway/migrate/plan",
+   "scope": "none",
+   "file": "actions.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/gateway/restart",
+   "scope": "query",
+   "file": "actions.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/gateway/start",
+   "scope": "query",
+   "file": "ops.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/gateway/stop",
+   "scope": "query",
+   "file": "ops.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/git/base-branches",
+   "scope": "none",
+   "file": "git.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/git/branch/switch",
+   "scope": "none",
+   "file": "git.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/git/branches",
+   "scope": "none",
+   "file": "git.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/git/file-diff",
+   "scope": "none",
+   "file": "git.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/git/gh-auth",
+   "scope": "none",
+   "file": "git.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/git/review/commit",
+   "scope": "none",
+   "file": "git.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/git/review/commit-context",
+   "scope": "none",
+   "file": "git.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/git/review/create-pr",
+   "scope": "none",
+   "file": "git.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/git/review/diff",
+   "scope": "none",
+   "file": "git.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/git/review/list",
+   "scope": "none",
+   "file": "git.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/git/review/pr-list",
+   "scope": "none",
+   "file": "git.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/git/review/push",
+   "scope": "none",
+   "file": "git.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/git/review/rev-parse",
+   "scope": "none",
+   "file": "git.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/git/review/revert",
+   "scope": "none",
+   "file": "git.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/git/review/ship-info",
+   "scope": "none",
+   "file": "git.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/git/review/stage",
+   "scope": "none",
+   "file": "git.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/git/review/unstage",
+   "scope": "none",
+   "file": "git.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/git/status",
+   "scope": "none",
+   "file": "git.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/git/worktree/add",
+   "scope": "none",
+   "file": "git.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/git/worktree/remove",
+   "scope": "none",
+   "file": "git.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/git/worktrees",
+   "scope": "none",
+   "file": "git.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/health",
+   "scope": "none",
+   "file": "status.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/health/idle",
+   "scope": "none",
+   "file": "status.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/health/retirement",
+   "scope": "none",
+   "file": "status.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/hermes/update",
+   "scope": "none",
+   "file": "actions.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/hermes/update/check",
+   "scope": "query",
+   "file": "actions.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/hermes/update/receipt",
+   "scope": "none",
+   "file": "actions.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/host/identity",
+   "scope": "none",
+   "file": "status.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/learning/graph",
+   "scope": "query",
+   "file": "status.py"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/learning/node",
+   "scope": "query",
+   "file": "status.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/learning/node",
+   "scope": "query",
+   "file": "status.py"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/learning/node",
+   "scope": "query",
+   "file": "status.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/local-models/activate",
+   "scope": "query",
+   "file": "local_models.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/local-models/catalog",
+   "scope": "none",
+   "file": "local_models.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/local-models/download",
+   "scope": "none",
+   "file": "local_models.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/local-models/download-browsed",
+   "scope": "none",
+   "file": "local_models.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/local-models/download/pause",
+   "scope": "none",
+   "file": "local_models.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/local-models/download/resume",
+   "scope": "none",
+   "file": "local_models.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/local-models/eject",
+   "scope": "none",
+   "file": "local_models.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/local-models/hardware",
+   "scope": "none",
+   "file": "local_models.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/local-models/jobs",
+   "scope": "none",
+   "file": "local_models.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/local-models/jobs/{job_id}",
+   "scope": "none",
+   "file": "local_models.py"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/local-models/models/{model_id}",
+   "scope": "none",
+   "file": "local_models.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/local-models/quickstart",
+   "scope": "query",
+   "file": "local_models.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/local-models/runtime/install",
+   "scope": "query",
+   "file": "local_models.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/local-models/search",
+   "scope": "none",
+   "file": "local_models.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/local-models/search/files",
+   "scope": "none",
+   "file": "local_models.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/local-models/server",
+   "scope": "none",
+   "file": "local_models.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/local-models/sideload",
+   "scope": "none",
+   "file": "local_models.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/local-models/status",
+   "scope": "none",
+   "file": "local_models.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/logs",
+   "scope": "query",
+   "file": "status.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/mcp/catalog",
+   "scope": "query",
+   "file": "mcp.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/mcp/catalog/install",
+   "scope": "query",
+   "file": "mcp.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/mcp/oauth/callback/{server_name:path}",
+   "scope": "none",
+   "file": "mcp.py"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/mcp/oauth/flows/{flow_id}",
+   "scope": "none",
+   "file": "mcp.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/mcp/oauth/flows/{flow_id}",
+   "scope": "none",
+   "file": "mcp.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/mcp/servers",
+   "scope": "query",
+   "file": "mcp.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/mcp/servers",
+   "scope": "query",
+   "file": "mcp.py"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/mcp/servers",
+   "scope": "query",
+   "file": "mcp.py"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/mcp/servers/{name}",
+   "scope": "query",
+   "file": "mcp.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/mcp/servers/{name}/auth",
+   "scope": "query",
+   "file": "mcp.py"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/mcp/servers/{name}/enabled",
+   "scope": "query",
+   "file": "mcp.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/mcp/servers/{name}/test",
+   "scope": "query",
+   "file": "mcp.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/media",
+   "scope": "none",
+   "file": "files.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/media/proxy",
+   "scope": "none",
+   "file": "files.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/memory",
+   "scope": "query",
+   "file": "ops.py"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/memory/provider",
+   "scope": "query",
+   "file": "ops.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/memory/providers/{name}/config",
+   "scope": "query",
+   "file": "memory_providers.py"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/memory/providers/{name}/config",
+   "scope": "query",
+   "file": "memory_providers.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/memory/providers/{name}/setup",
+   "scope": "query",
+   "file": "memory_providers.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/memory/reset",
+   "scope": "query",
+   "file": "ops.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/messaging/platforms",
+   "scope": "query",
+   "file": "messaging.py"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/messaging/platforms/{platform_id}",
+   "scope": "query",
+   "file": "messaging.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/messaging/platforms/{platform_id}/test",
+   "scope": "query",
+   "file": "messaging.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/messaging/relay",
+   "scope": "none",
+   "file": "messaging_relay.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/messaging/relay/link/{code}",
+   "scope": "none",
+   "file": "messaging_relay.py"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/messaging/relay/{platform}/accounts/{platform_user_id}",
+   "scope": "none",
+   "file": "messaging_relay.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/messaging/relay/{platform}/link",
+   "scope": "none",
+   "file": "messaging_relay.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/messaging/telegram/onboarding/start",
+   "scope": "none",
+   "file": "messaging.py"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/messaging/telegram/onboarding/{pairing_id}",
+   "scope": "none",
+   "file": "messaging.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/messaging/telegram/onboarding/{pairing_id}",
+   "scope": "none",
+   "file": "messaging.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/messaging/telegram/onboarding/{pairing_id}/apply",
+   "scope": "query",
+   "file": "messaging.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/messaging/whatsapp/onboarding/start",
+   "scope": "query",
+   "file": "messaging.py"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/messaging/whatsapp/onboarding/{pairing_id}",
+   "scope": "none",
+   "file": "messaging.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/messaging/whatsapp/onboarding/{pairing_id}",
+   "scope": "none",
+   "file": "messaging.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/messaging/whatsapp/onboarding/{pairing_id}/apply",
+   "scope": "query",
+   "file": "messaging.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/model/auxiliary",
+   "scope": "query",
+   "file": "models.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/model/info",
+   "scope": "query",
+   "file": "models.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/model/moa",
+   "scope": "query",
+   "file": "models.py"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/model/moa",
+   "scope": "query",
+   "file": "models.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/model/options",
+   "scope": "query",
+   "file": "models.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/model/recommended-default",
+   "scope": "query",
+   "file": "models.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/model/set",
+   "scope": "query",
+   "file": "models.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/ops/backup",
+   "scope": "query",
+   "file": "ops.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/ops/backup/download",
+   "scope": "query",
+   "file": "ops.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/ops/checkpoints",
+   "scope": "query",
+   "file": "ops.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/ops/checkpoints/prune",
+   "scope": "query",
+   "file": "ops.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/ops/config-migrate",
+   "scope": "query",
+   "file": "status.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/ops/debug-share",
+   "scope": "query",
+   "file": "status.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/ops/doctor",
+   "scope": "query",
+   "file": "ops.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/ops/dump",
+   "scope": "query",
+   "file": "status.py"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/ops/hooks",
+   "scope": "query",
+   "file": "ops.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/ops/hooks",
+   "scope": "query",
+   "file": "ops.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/ops/hooks",
+   "scope": "query",
+   "file": "ops.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/ops/import",
+   "scope": "query",
+   "file": "ops.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/ops/import-upload",
+   "scope": "query",
+   "file": "ops.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/ops/prompt-size",
+   "scope": "query",
+   "file": "status.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/ops/security-audit",
+   "scope": "query",
+   "file": "ops.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/pairing",
+   "scope": "query",
+   "file": "ops.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/pairing/approve",
+   "scope": "body",
+   "file": "ops.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/pairing/clear-pending",
+   "scope": "query",
+   "file": "ops.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/pairing/revoke",
+   "scope": "body",
+   "file": "ops.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/plugins/hermes-achievements/achievements",
+   "scope": "query",
+   "file": "plugins",
+   "note": "plugin-owned; scoped like core routes (verified: unknown profile -> 404)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/plugins/hermes-achievements/recent-unlocks",
+   "scope": "query",
+   "file": "plugins",
+   "note": "plugin-owned; scoped like core routes (verified: unknown profile -> 404)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/plugins/hermes-achievements/rescan",
+   "scope": "query",
+   "file": "plugins",
+   "note": "plugin-owned; scoped like core routes (verified: unknown profile -> 404)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/plugins/hermes-achievements/reset-state",
+   "scope": "query",
+   "file": "plugins",
+   "note": "plugin-owned; scoped like core routes (verified: unknown profile -> 404)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/plugins/hermes-achievements/scan-status",
+   "scope": "query",
+   "file": "plugins",
+   "note": "plugin-owned; scoped like core routes (verified: unknown profile -> 404)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/plugins/kanban/board",
+   "scope": "query",
+   "file": "plugins",
+   "note": "plugin-owned; scoped like core routes (verified: unknown profile -> 404)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/plugins/kanban/boards",
+   "scope": "query",
+   "file": "plugins",
+   "note": "plugin-owned; scoped like core routes (verified: unknown profile -> 404)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/plugins/kanban/boards",
+   "scope": "query",
+   "file": "plugins",
+   "note": "plugin-owned; scoped like core routes (verified: unknown profile -> 404)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/plugins/kanban/boards/{slug}/switch",
+   "scope": "query",
+   "file": "plugins",
+   "note": "plugin-owned; scoped like core routes (verified: unknown profile -> 404)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/plugins/kanban/tasks",
+   "scope": "query",
+   "file": "plugins",
+   "note": "plugin-owned; scoped like core routes (verified: unknown profile -> 404)"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/plugins/kanban/tasks/{task_id}",
+   "scope": "query",
+   "file": "plugins",
+   "note": "plugin-owned; scoped like core routes (verified: unknown profile -> 404)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/portal",
+   "scope": "query",
+   "file": "status.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/profiles",
+   "scope": "none",
+   "file": "profiles.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/profiles",
+   "scope": "none",
+   "file": "profiles.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/profiles/active",
+   "scope": "none",
+   "file": "profiles.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/profiles/active",
+   "scope": "none",
+   "file": "profiles.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/profiles/import",
+   "scope": "none",
+   "file": "profiles.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/profiles/projects/tree",
+   "scope": "query",
+   "file": "profiles.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/profiles/sessions",
+   "scope": "query",
+   "file": "profiles.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/profiles/sessions/pull-requests",
+   "scope": "query",
+   "file": "profiles.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/profiles/sessions/sidebar",
+   "scope": "query",
+   "file": "profiles.py"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/profiles/{name}",
+   "scope": "none",
+   "file": "profiles.py"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/profiles/{name}",
+   "scope": "none",
+   "file": "profiles.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/profiles/{name}/describe-auto",
+   "scope": "none",
+   "file": "profiles.py"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/profiles/{name}/description",
+   "scope": "none",
+   "file": "profiles.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/profiles/{name}/desktop-overlay",
+   "scope": "none",
+   "file": "profiles.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/profiles/{name}/export",
+   "scope": "none",
+   "file": "profiles.py"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/profiles/{name}/model",
+   "scope": "none",
+   "file": "profiles.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/profiles/{name}/open-terminal",
+   "scope": "none",
+   "file": "profiles.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/profiles/{name}/setup-command",
+   "scope": "none",
+   "file": "profiles.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/profiles/{name}/soul",
+   "scope": "none",
+   "file": "profiles.py"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/profiles/{name}/soul",
+   "scope": "none",
+   "file": "profiles.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/providers/custom-endpoints",
+   "scope": "query",
+   "file": "config_env.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/providers/custom-endpoints",
+   "scope": "query",
+   "file": "config_env.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/providers/custom-endpoints/validate",
+   "scope": "none",
+   "file": "config_env.py"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/providers/custom-endpoints/{endpoint_id}",
+   "scope": "query",
+   "file": "config_env.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/providers/custom-endpoints/{endpoint_id}/activate",
+   "scope": "query",
+   "file": "config_env.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/providers/oauth",
+   "scope": "query",
+   "file": "oauth.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/providers/oauth/nous/handoff",
+   "scope": "query",
+   "file": "oauth.py"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/providers/oauth/sessions/{session_id}",
+   "scope": "query",
+   "file": "oauth.py"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/providers/oauth/{provider_id}",
+   "scope": "query",
+   "file": "oauth.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/providers/oauth/{provider_id}/poll/{session_id}",
+   "scope": "query",
+   "file": "oauth.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/providers/oauth/{provider_id}/start",
+   "scope": "query",
+   "file": "oauth.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/providers/oauth/{provider_id}/submit",
+   "scope": "query",
+   "file": "oauth.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/providers/validate",
+   "scope": "none",
+   "file": "config_env.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/sessions",
+   "scope": "query",
+   "file": "sessions.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/sessions/bulk-delete",
+   "scope": "body",
+   "file": "sessions.py"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/sessions/empty",
+   "scope": "query",
+   "file": "sessions.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/sessions/empty/count",
+   "scope": "query",
+   "file": "sessions.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/sessions/import",
+   "scope": "body",
+   "file": "sessions.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/sessions/owner-backfill",
+   "scope": "body",
+   "file": "sessions.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/sessions/prune",
+   "scope": "body",
+   "file": "sessions.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/sessions/search",
+   "scope": "query",
+   "file": "sessions.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/sessions/stats",
+   "scope": "query",
+   "file": "sessions.py"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/sessions/{session_id}",
+   "scope": "query",
+   "file": "sessions.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/sessions/{session_id}",
+   "scope": "query",
+   "file": "sessions.py"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/sessions/{session_id}",
+   "scope": "body",
+   "file": "sessions.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/sessions/{session_id}/export",
+   "scope": "query",
+   "file": "sessions.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/sessions/{session_id}/latest-descendant",
+   "scope": "query",
+   "file": "sessions.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/sessions/{session_id}/messages",
+   "scope": "query",
+   "file": "sessions.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/sessions/{session_id}/messages/around",
+   "scope": "query",
+   "file": "sessions.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/sessions/{session_id}/mutation-snapshot",
+   "scope": "query",
+   "file": "sessions.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/sessions/{session_id}/timeline",
+   "scope": "query",
+   "file": "sessions.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/shared-metrics/consent",
+   "scope": "query",
+   "file": "shared_metrics.py"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/shared-metrics/consent",
+   "scope": "query",
+   "file": "shared_metrics.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/skills",
+   "scope": "query",
+   "file": "skills.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/skills",
+   "scope": "query",
+   "file": "skills.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/skills/content",
+   "scope": "query",
+   "file": "skills.py"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/skills/content",
+   "scope": "query",
+   "file": "skills.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/skills/hub/install",
+   "scope": "query",
+   "file": "skills.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/skills/hub/official",
+   "scope": "query",
+   "file": "skills.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/skills/hub/preview",
+   "scope": "query",
+   "file": "skills.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/skills/hub/scan",
+   "scope": "query",
+   "file": "skills.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/skills/hub/search",
+   "scope": "query",
+   "file": "skills.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/skills/hub/sources",
+   "scope": "query",
+   "file": "skills.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/skills/hub/uninstall",
+   "scope": "query",
+   "file": "skills.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/skills/hub/update",
+   "scope": "query",
+   "file": "skills.py"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/skills/lock",
+   "scope": "query",
+   "file": "skills.py"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/skills/toggle",
+   "scope": "query",
+   "file": "skills.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/ssh/ownership",
+   "scope": "none",
+   "file": "status.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/status",
+   "scope": "query",
+   "file": "status.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/system/stats",
+   "scope": "none",
+   "file": "status.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/tools/computer-use/permissions/grant",
+   "scope": "query",
+   "file": "tools.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/tools/computer-use/status",
+   "scope": "query",
+   "file": "tools.py"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/tools/terminal/backend",
+   "scope": "query",
+   "file": "tools.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/tools/terminal/backends",
+   "scope": "query",
+   "file": "tools.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/tools/toolsets",
+   "scope": "query",
+   "file": "tools.py"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/tools/toolsets/{name}",
+   "scope": "query",
+   "file": "tools.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/tools/toolsets/{name}/config",
+   "scope": "query",
+   "file": "tools.py"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/tools/toolsets/{name}/env",
+   "scope": "query",
+   "file": "tools.py"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/tools/toolsets/{name}/model",
+   "scope": "query",
+   "file": "tools.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/tools/toolsets/{name}/models",
+   "scope": "query",
+   "file": "tools.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/tools/toolsets/{name}/post-setup",
+   "scope": "query",
+   "file": "tools.py"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/tools/toolsets/{name}/provider",
+   "scope": "query",
+   "file": "tools.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/ui-preferences",
+   "scope": "none",
+   "file": "ui_preferences.py"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/ui-preferences",
+   "scope": "none",
+   "file": "ui_preferences.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/webapp-access/restart",
+   "scope": "query",
+   "file": "webapp_access.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/webapp-access/start",
+   "scope": "query",
+   "file": "webapp_access.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/webapp-access/status",
+   "scope": "query",
+   "file": "webapp_access.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/webapp-access/stop",
+   "scope": "query",
+   "file": "webapp_access.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/webapp/socket-ticket",
+   "scope": "query",
+   "file": "webapp.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/webapp/window-ticket",
+   "scope": "none",
+   "file": "webapp.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/webhooks",
+   "scope": "query",
+   "file": "ops.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/webhooks",
+   "scope": "query",
+   "file": "ops.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/webhooks/enable",
+   "scope": "query",
+   "file": "ops.py"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/webhooks/{name}",
+   "scope": "query",
+   "file": "ops.py"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/webhooks/{name}/enabled",
+   "scope": "query",
+   "file": "ops.py"
+  },
+  {
+   "method": "GET",
+   "path": "/dashboard-plugins/@{profile}/{plugin_name}/{file_path:path}",
+   "scope": "query",
+   "file": "dashboard_ui.py"
+  },
+  {
+   "method": "GET",
+   "path": "/dashboard-plugins/{plugin_name}/{file_path:path}",
+   "scope": "query",
+   "file": "dashboard_ui.py"
+  },
+  {
+   "method": "GET",
+   "path": "/webapp/launch",
+   "scope": "none",
+   "file": "webapp.py"
+  },
+  {
+   "method": "GET",
+   "path": "/webapp/window",
+   "scope": "none",
+   "file": "webapp.py"
+  },
+  {
+   "method": "POST",
+   "path": "/webapp/window-session",
+   "scope": "none",
+   "file": "webapp.py"
+  }
+ ]
+}
