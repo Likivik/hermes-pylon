@@ -1079,29 +1079,19 @@ class ChatViewModel(
                     _uiState.update {
                         it.copy(
                             transcript =
-                                it.transcript.copy(
-                                    isLoading = false,
-                                    currentSessionId = sessionId,
-                                    // `switchSession()` cleared the previous session's
-                                    isSessionReady = runtimeSessionId != null,
-                                    // reading. Hydrate only from this resume response.
+                                it.transcript.withResumedSession(
+                                    sessionId = sessionId,
+                                    // `switchSession()` cleared the previous session's reading;
+                                    // hydrate only from this resume response.
+                                    runtimeReady = runtimeSessionId != null,
                                     contextUsage = parseContextUsage(usage, previous = null),
                                 ),
                             composer =
-                                it.composer.copy(
-                                    currentSessionModel =
-                                        if (model != null && provider != null) {
-                                            "$provider/$model"
-                                        } else {
-                                            model ?: it.currentSessionModel
-                                        },
-                                    reasoningLevel =
-                                        if (reasoningEffort.isNullOrEmpty()) {
-                                            null
-                                        } else {
-                                            reasoningEffort
-                                        },
-                                    terminalBackend = terminalBackend?.trim()?.takeIf { it.isNotEmpty() },
+                                it.composer.withResumedModel(
+                                    provider = provider,
+                                    model = model,
+                                    reasoningLevel = reasoningEffort,
+                                    terminalBackend = terminalBackend,
                                 ),
                         )
                     }
