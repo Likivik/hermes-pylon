@@ -3198,9 +3198,9 @@ class ChatViewModel(
         historyRefreshJob?.cancel()
         retireCacheLoad()
         val baselineMessageIds = _uiState.value.messages.mapTo(mutableSetOf()) { it.id }
-        _uiState.update {
-            it.copy(
-                transcript = it.transcript.copy(isLoading = true, errorMessage = null),
+        _uiState.update { state ->
+            state.copy(
+                transcript = TranscriptReducer.reduce(state.transcript, TranscriptIntent.LoadStarted),
             )
         }
         loadCachedMessages(sessionId)
@@ -3269,44 +3269,22 @@ class ChatViewModel(
                             _uiState.update { state ->
                                 if (!isHistoryRefreshCurrent(fence, owner)) return@update state
                                 val hasResumeHistory = state.messages.any { it.id.startsWith("resume-$sessionId-") }
-                                if (chatMessages.isEmpty() && hasResumeHistory) {
-                                    state.copy(
-                                        transcript =
-                                            state.transcript.copy(
-                                                isLoading = false,
-                                                isLoadingOlder = false,
-                                                staleSince = null,
+                                state.copy(
+                                    transcript =
+                                        TranscriptReducer.reduce(
+                                            state.transcript,
+                                            TranscriptIntent.HistoryLoaded(
+                                                authoritative = chatMessages,
+                                                baselineIds = baselineMessageIds,
+                                                cachedIds = cachedMessageIds,
+                                                hasResumeHistory = hasResumeHistory,
+                                                useLatestPaging = useLatestPaging,
+                                                returned = result.data.pagination?.returned ?: chatMessages.size,
+                                                offset = offset,
+                                                pageSize = MESSAGE_PAGE_SIZE,
                                             ),
-                                    )
-                                } else {
-                                    val authoritativeIds = chatMessages.mapTo(mutableSetOf()) { it.id }
-                                    val newerMessages =
-                                        state.messages.filter { message ->
-                                            message.id !in baselineMessageIds &&
-                                                message.id !in cachedMessageIds &&
-                                                message.id !in authoritativeIds
-                                        }
-                                    val refreshedMessages = chatMessages + newerMessages
-                                    val hasOlder =
-                                        if (useLatestPaging) {
-                                            val returned = result.data.pagination?.returned ?: chatMessages.size
-                                            returned >= MESSAGE_PAGE_SIZE && chatMessages.isNotEmpty()
-                                        } else {
-                                            offset > 0 && chatMessages.isNotEmpty()
-                                        }
-                                    state.copy(
-                                        transcript =
-                                            state.transcript.copy(
-                                                messages = refreshedMessages,
-                                                todos = restoredTodos(state.todos, refreshedMessages),
-                                                isLoading = false,
-                                                hasOlderMessages = hasOlder,
-                                                // The server just spoke: whatever was stale is now current.
-                                                isLoadingOlder = false,
-                                                staleSince = null,
-                                            ),
-                                    )
-                                }
+                                        ),
+                                )
                             }
                             if (isHistoryRefreshCurrent(fence, owner)) {
                                 val hasRestHistory =
@@ -3316,31 +3294,18 @@ class ChatViewModel(
                         }
 
                         is NetworkResult.Failure -> {
-                            _uiState.update {
-                                if (!isHistoryRefreshCurrent(fence, owner)) return@update it
-                                // Two different situations, two different messages: with content
-                                // on screen a failed refresh means "this may be out of date", not
-                                // "loading failed" — the transcript is still usable.
-                                if (it.messages.isEmpty()) {
-                                    it.copy(
-                                        transcript =
-                                            it.transcript.copy(
-                                                isLoading = false,
-                                                isLoadingOlder = false,
-                                                errorMessage = "Failed to load messages: ${result.error.message}",
+                            _uiState.update { state ->
+                                if (!isHistoryRefreshCurrent(fence, owner)) return@update state
+                                state.copy(
+                                    transcript =
+                                        TranscriptReducer.reduce(
+                                            state.transcript,
+                                            TranscriptIntent.HistoryFailed(
+                                                reason = result.error.message,
+                                                nowMs = nowMs(),
                                             ),
-                                    )
-                                } else {
-                                    it.copy(
-                                        transcript =
-                                            it.transcript.copy(
-                                                isLoading = false,
-                                                isLoadingOlder = false,
-                                                errorMessage = null,
-                                                staleSince = it.staleSince ?: nowMs(),
-                                            ),
-                                    )
-                                }
+                                        ),
+                                )
                             }
                         }
                     }
@@ -4954,9 +4919,9 @@ class ChatViewModel(
     fun reconnect() {
         retireSync()
         AuthSessionState.markAuthenticated()
-        _uiState.update {
-            it.copy(
-                transcript = it.transcript.copy(isLoading = true, errorMessage = null),
+        _uiState.update { state ->
+            state.copy(
+                transcript = TranscriptReducer.reduce(state.transcript, TranscriptIntent.LoadStarted),
             )
         }
         viewModelScope.launch(io) {
