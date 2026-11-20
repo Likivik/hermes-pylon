@@ -53,6 +53,24 @@ sealed interface TranscriptIntent {
         val reason: String,
         val nowMs: Long,
     ) : TranscriptIntent
+
+    /** A request for an older page began. */
+    data object OlderLoadStarted : TranscriptIntent
+
+    /**
+     * An older page arrived and passed every fence: prepend it, drop ids that are already on screen.
+     *
+     * @param older the page, oldest-first as the server returned it
+     * @param limit the page size requested, used to decide whether another page may exist
+     * @param effectiveOffset the offset the server actually applied
+     */
+    data class OlderLoaded(
+        val older: List<ChatMessage>,
+        val useLatestPaging: Boolean,
+        val returned: Int,
+        val effectiveOffset: Int,
+        val limit: Int,
+    ) : TranscriptIntent
 }
 
 object TranscriptReducer {
@@ -67,6 +85,11 @@ object TranscriptReducer {
             is TranscriptIntent.HistoryLoaded -> reduceLoaded(state, intent)
 
             is TranscriptIntent.HistoryFailed -> reduceFailed(state, intent)
+
+            TranscriptIntent.OlderLoadStarted ->
+                state.copy(isLoadingOlder = true)
+
+            is TranscriptIntent.OlderLoaded -> reduceOlderLoaded(state, intent)
         }
 
     private fun reduceLoaded(
@@ -104,6 +127,25 @@ object TranscriptReducer {
             // The server just spoke: whatever was stale is now current.
             isLoadingOlder = false,
             staleSince = null,
+        )
+    }
+
+    private fun reduceOlderLoaded(
+        state: TranscriptState,
+        intent: TranscriptIntent.OlderLoaded,
+    ): TranscriptState {
+        // Prepend, then dedupe by id: a page boundary can repeat a message that is already on screen.
+        val merged = (intent.older + state.messages).distinctBy { it.id }
+        val hasOlder =
+            if (intent.useLatestPaging) {
+                intent.returned >= intent.limit && intent.older.isNotEmpty()
+            } else {
+                intent.effectiveOffset > 0 && intent.older.isNotEmpty()
+            }
+        return state.copy(
+            messages = merged,
+            todos = hydrateTodosFromMessages(merged).ifEmpty { state.todos },
+            hasOlderMessages = hasOlder,
         )
     }
 
