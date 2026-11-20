@@ -121,4 +121,88 @@ class SessionInstallTest {
         assertNotNull(after.currentSessionModel)
         assertEquals("anthropic/claude", after.currentSessionModel)
     }
+
+    @Test
+    fun aResumeInstallsTheSessionAndStopsLoading() {
+        val before = TranscriptState(currentSessionId = "old", isLoading = true, isSessionReady = false)
+
+        val after =
+            before.withResumedSession(
+                sessionId = "resumed",
+                runtimeReady = true,
+                contextUsage = null,
+            )
+
+        assertEquals("resumed", after.currentSessionId)
+        assertTrue(after.isSessionReady)
+        assertTrue(!after.isLoading)
+        assertNull(after.contextUsage)
+    }
+
+    @Test
+    fun aResumeTakesTheRuntimeReadyFlagFromTheAck() {
+        val after =
+            TranscriptState(isSessionReady = true).withResumedSession(
+                sessionId = "s",
+                runtimeReady = false,
+                contextUsage = null,
+            )
+
+        // The ack carried no runtime id, so the session is not ready to send into.
+        assertTrue(!after.isSessionReady)
+    }
+
+    @Test
+    fun aResumeQualifiesANewModel() {
+        val after =
+            ComposerState(currentSessionModel = "anthropic/old").withResumedModel(
+                provider = "openai",
+                model = "gpt-5",
+                reasoningLevel = null,
+                terminalBackend = null,
+            )
+
+        assertEquals("openai/gpt-5", after.currentSessionModel)
+    }
+
+    @Test
+    fun aResumeDoesNotDoubleAnAlreadyQualifiedModel() {
+        // This branch used to concatenate provider + model unconditionally.
+        val after =
+            ComposerState().withResumedModel(
+                provider = "openai",
+                model = "openai/gpt-5",
+                reasoningLevel = null,
+                terminalBackend = null,
+            )
+
+        assertEquals("openai/gpt-5", after.currentSessionModel)
+    }
+
+    @Test
+    fun aResumeWithNoModelReportedKeepsTheCurrentLabel() {
+        val after =
+            ComposerState(currentSessionModel = "openai/gpt-5").withResumedModel(
+                provider = null,
+                model = null,
+                reasoningLevel = null,
+                terminalBackend = null,
+            )
+
+        assertEquals("openai/gpt-5", after.currentSessionModel)
+    }
+
+    @Test
+    fun aResumeWithBlankReasoningClearsThePreviousEffort() {
+        val after =
+            ComposerState(reasoningLevel = "high", terminalBackend = "local").withResumedModel(
+                provider = null,
+                model = null,
+                reasoningLevel = "",
+                terminalBackend = "  ",
+            )
+
+        assertNull(after.reasoningLevel)
+        assertNull(after.terminalBackend)
+    }
 }
