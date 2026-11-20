@@ -1195,40 +1195,12 @@ class ChatViewModel(
         }
     }
 
-    @Suppress("UNCHECKED_CAST")
     private fun handleDispatchResult(result: Any?) {
-        val map = result as? Map<*, *> ?: return
-        val type = map["type"] as? String ?: return
-        when (type) {
-            "send" -> {
-                val message = map["message"] as? String ?: ""
-                submitPrompt(message)
-            }
-
-            "exec" -> {
-                val output = map["output"] as? String ?: map["message"] as? String ?: ""
-                addAssistantMessage(output)
-            }
-
-            "skill" -> {
-                val message = map["message"] as? String ?: ""
-                submitPrompt(message)
-            }
-
-            "plugin" -> {
-                val output = map["output"] as? String ?: ""
-                addAssistantMessage(output)
-            }
-
-            "alias" -> {
-                val target = map["target"] as? String ?: return
-                handleSlashCommand(target)
-            }
-
-            else -> {
-                val output = map["output"] as? String ?: map.toString()
-                addAssistantMessage(output)
-            }
+        when (val outcome = classifyDispatchResult(result)) {
+            null -> return
+            is DispatchOutcome.SendPrompt -> submitPrompt(outcome.message)
+            is DispatchOutcome.ShowOutput -> addAssistantMessage(outcome.output)
+            is DispatchOutcome.FollowAlias -> handleSlashCommand(outcome.target)
         }
     }
 
