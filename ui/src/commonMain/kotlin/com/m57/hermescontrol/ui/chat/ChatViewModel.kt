@@ -4104,7 +4104,11 @@ class ChatViewModel(
             if (_uiState.compareAndSet(
                     current,
                     current.copy(
-                        overlays = current.overlays.copy(clarifyRequest = replacement),
+                        overlays =
+                            OverlaysReducer.reduce(
+                                current.overlays,
+                                OverlaysIntent.ClarifyReplaced(expected = expected, replacement = replacement),
+                            ),
                     ),
                 )
             ) {
