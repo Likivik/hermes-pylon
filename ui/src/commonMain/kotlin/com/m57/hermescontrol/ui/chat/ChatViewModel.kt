@@ -3341,9 +3341,9 @@ class ChatViewModel(
         val fence = captureHistoryLoadFence(sessionId) ?: return
         val owner = ++olderLoadCounter
         activeOlderLoadOwner = owner
-        _uiState.update {
-            it.copy(
-                transcript = it.transcript.copy(isLoadingOlder = true),
+        _uiState.update { state ->
+            state.copy(
+                transcript = TranscriptReducer.reduce(state.transcript, TranscriptIntent.OlderLoadStarted),
             )
         }
         olderLoadJob =
@@ -3381,20 +3381,17 @@ class ChatViewModel(
                     _uiState.update { current ->
                         if (!isOlderLoadCurrent(fence, owner)) return@update current
                         loadedMessageOffset = effectiveOffset
-                        val mergedMessages = (older + current.messages).distinctBy { it.id }
-                        val hasOlder =
-                            if (useLatestPaging) {
-                                val returned = result.data.pagination?.returned ?: older.size
-                                returned >= limit && older.isNotEmpty()
-                            } else {
-                                effectiveOffset > 0 && older.isNotEmpty()
-                            }
                         current.copy(
                             transcript =
-                                current.transcript.copy(
-                                    messages = mergedMessages,
-                                    todos = restoredTodos(current.todos, mergedMessages),
-                                    hasOlderMessages = hasOlder,
+                                TranscriptReducer.reduce(
+                                    current.transcript,
+                                    TranscriptIntent.OlderLoaded(
+                                        older = older,
+                                        useLatestPaging = useLatestPaging,
+                                        returned = result.data.pagination?.returned ?: older.size,
+                                        effectiveOffset = effectiveOffset,
+                                        limit = limit,
+                                    ),
                                 ),
                         )
                     }

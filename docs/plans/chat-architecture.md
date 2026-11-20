@@ -60,23 +60,35 @@ dropping stale ones — the fence and owner-counter work already in place. No re
 `ApiClient.` appears in no file under `ui/chat/`; 169 tests pass unchanged; the test file compiles
 without static mocking of `ApiClient` or `HermesWsClient`.
 
-## Step 1 — State split (no behaviour change)
+## Step 1 — State split (no behaviour change) — DONE 2026-11-20 (#223)
 
-`ChatUiState`'s 56 fields become four sub-states, composed into the same public `ChatUiState`:
+`ChatUiState`'s 56 fields become **five** sub-states, composed into the same public `ChatUiState`.
+Five, not four: the session rail was split out (decision 2026-11-20) because its fetch lifecycle and
+failure mode are independent of the conversation, and folding it into transcript would rebuild the
+coupling this step removes.
 
 - `TranscriptState` — messages, paging offsets, generations, `staleSince`, cache ownership.
 - `ComposerState` — draft, attachments, prefill, model selection, slash state.
 - `ConnectionState` — status, `hasConnectedOnce`, profile binding, reconnect bookkeeping.
-- `OverlayState` — approval, clarify, dialogs, search, toasts.
+- `RailState` — session rows, refresh flag, load status, picker visibility.
+- `OverlaysState` — approval, clarify, dialogs, search, model picker, transient errors.
 
-Fields that only make sense together move together, and each sub-state gets a constructor-time
-invariant where one is expressible (e.g. `staleSince != null` requires non-empty messages).
+Fields that only make sense together move together.
 
-**Acceptance:** 169 tests pass with **no assertion changes**; `ChatUiState` keeps its public field
-names via delegated properties so nothing downstream changes; every sub-state has at least one test
-of its invariant; `compileTestKotlinWasmJs` green.
+**Result, measured:** 206 tests pass with **no assertion changes**. 33 `ChatUiState(...)`
+*constructions* had to name their group. `ChatUiState` keeps every public field name as a getter, so
+all reads compile unchanged; writes now name the owner (`copy(transcript = transcript.copy(…))`), 186
+of them.
 
-## Step 2 — Reducers, transcript first
+**Deferred:** constructor-time invariants (e.g. `staleSince != null` requires non-empty messages).
+Adding a `require()` before the transitions that produce those states are enumerated would turn
+currently-tolerated states into crashes; the reducers in Step 2 are where each transition becomes a
+closed list, and the invariants follow from them.
+
+## Step 2 — Reducers, transcript first — IN PROGRESS
+
+Landed 2026-11-20 (#224): `TranscriptReducer` with `LoadStarted`, `HistoryLoaded`, `HistoryFailed`,
+12 pure tests. Landing next: `OlderLoadStarted`, `OlderLoaded`.
 
 - `TranscriptReducer.reduce(state: TranscriptState, intent: TranscriptIntent): TranscriptState` — pure.
 - The existing load/append/merge/stale transitions are re-expressed as intents and the ViewModel

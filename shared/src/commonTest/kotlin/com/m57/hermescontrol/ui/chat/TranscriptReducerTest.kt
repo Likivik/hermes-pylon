@@ -212,4 +212,66 @@ class TranscriptReducerTest {
         assertNull(after.staleSince)
         assertFalse(after.isLoading)
     }
+
+    @Test
+    fun olderLoadStartedSetsTheOlderFlag() {
+        val after = TranscriptReducer.reduce(TranscriptState(), TranscriptIntent.OlderLoadStarted)
+
+        assertTrue(after.isLoadingOlder)
+    }
+
+    @Test
+    fun anOlderPageIsPrependedToTheTranscript() {
+        val before = TranscriptState(messages = listOf(message("new")))
+
+        val after =
+            TranscriptReducer.reduce(
+                before,
+                TranscriptIntent.OlderLoaded(
+                    older = listOf(message("old")),
+                    useLatestPaging = true,
+                    returned = 1,
+                    effectiveOffset = 0,
+                    limit = 150,
+                ),
+            )
+
+        assertEquals(listOf("old", "new"), after.messages.map { it.id })
+    }
+
+    @Test
+    fun aMessageRepeatedAcrossAPageBoundaryAppearsOnce() {
+        val before = TranscriptState(messages = listOf(message("shared"), message("new")))
+
+        val after =
+            TranscriptReducer.reduce(
+                before,
+                TranscriptIntent.OlderLoaded(
+                    older = listOf(message("old"), message("shared")),
+                    useLatestPaging = true,
+                    returned = 2,
+                    effectiveOffset = 0,
+                    limit = 150,
+                ),
+            )
+
+        assertEquals(listOf("old", "shared", "new"), after.messages.map { it.id })
+    }
+
+    @Test
+    fun aShortOlderPageEndsThePaging() {
+        val after =
+            TranscriptReducer.reduce(
+                TranscriptState(messages = listOf(message("new"))),
+                TranscriptIntent.OlderLoaded(
+                    older = listOf(message("old")),
+                    useLatestPaging = true,
+                    returned = 149,
+                    effectiveOffset = 0,
+                    limit = 150,
+                ),
+            )
+
+        assertFalse(after.hasOlderMessages)
+    }
 }
