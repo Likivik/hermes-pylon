@@ -11,120 +11,99 @@ import com.m57.hermescontrol.ui.chat.rail.RailLoadStatus
 import com.m57.hermescontrol.ui.common.SecureGatewayMediaRequest
 import com.m57.hermescontrol.util.nowMillis
 
-/** Chat UI state and prompt models, shared across platforms.
+//
+// Extracted from ChatViewModel.kt (which stays in :app — it is an
+// AndroidViewModel and owns the live connection/session machinery). These are
+// plain data classes, so the console client can render the same prompt and
+// session state without the Android ViewModel.
+
+/**
+ * The chat screen's whole state, composed of five lifecycle-owned groups.
  *
- * Extracted from ChatViewModel.kt (which stays in :app — it is an
- * AndroidViewModel and owns the live connection/session machinery). These are
- * plain data classes, so the console client can render the same prompt and
- * session state without the Android ViewModel.
+ * **Reads are unchanged.** Every field below is a getter over its group, so `state.messages`,
+ * `state.isConnected` and the rest still work at every call site, including tests.
+ *
+ * **Writes moved.** A getter cannot participate in a data-class `copy`, so a mutation now says which
+ * group it belongs to: `copy(transcript = transcript.copy(
+ transcript = transcript.transcript.copy(messages = …),
+ ))`. That is the point of the
+ * split — the compiler asks the author to name the owner of the change.
  */
 data class ChatUiState(
-    val messages: List<ChatMessage> = emptyList(),
-    val currentSessionId: String? = null,
-    val isSessionReady: Boolean = false,
-    val sessions: List<SessionUi> = emptyList(),
-    val railRefreshing: Boolean = false,
-    /**
-     * Rows plus the reason there are none. The rail renders [RailLoadStatus.Unavailable]
-     * as a retry affordance instead of vanishing, so a failed fetch can never be
-     * mistaken for "you have no chats".
-     */
-    val railStatus: RailLoadStatus = RailLoadStatus.Loading,
-    val chatTitle: String = "Hermes",
-    val connectionStatus: ConnectionStatus = ConnectionStatus.DISCONNECTED,
-    val statusPill: String? = null,
-    val isAgentTyping: Boolean = false,
-    val isThinking: Boolean = false,
-    val thinkingText: String = "",
-    val isLoading: Boolean = false,
-    val isLoadingOlder: Boolean = false,
-    val hasOlderMessages: Boolean = false,
-    /** Standalone streaming message — rendered after the main list. */
-    val streamingMessage: ChatMessage? = null,
-    val errorMessage: String? = null,
-    // Background job completion toast (issue #527) — non-blocking snackbar
-    val backgroundCompleteMessage: String? = null,
-    // Attachment open failure — surfaced as a non-blocking snackbar (issue #724)
-    val openError: String? = null,
-    val openingAttachmentPath: String? = null,
-    val mediaPlayerRequest: SecureGatewayMediaRequest? = null,
-    val clarifyRequest: ClarifyUi? = null,
-    // Sudo / secret prompts — surfaced as dialogs (issue #524)
-    val sudoPrompt: SudoPromptUi? = null,
-    val secretPrompt: SecretPromptUi? = null,
-    val vaultPrompt: VaultPromptUi? = null,
-    val showSessionPicker: Boolean = false,
-    // Search state
-    val isSearchActive: Boolean = false,
-    val searchQuery: String = "",
-    val searchMatchIndices: List<Int> = emptyList(),
-    val currentSearchMatchIndex: Int = -1,
-    // Cached settings
-    val typingEffectEnabled: Boolean = true,
-    val typingEffectDelayMs: Int = 30,
-    // Commands catalog
-    val commandCatalog: CommandCatalog = CommandCatalog(),
-    val slashUsageCounts: Map<String, Int> = emptyMap(),
-    val openHistoryRequested: Boolean = false,
-    // In-session model picker (issue #589) — surfaced when the user types /model
-    // or taps the composer model chip. Mirror of the global model screen's
-    // picker, but the selection hot-swaps the CURRENT session via config.set.
-    val showModelPicker: Boolean = false,
-    val modelPickerProviders: List<ModelProvider> = emptyList(),
-    val modelPickerPinned: List<PinnedModel> = emptyList(),
-    val modelPickerLoading: Boolean = false,
-    val modelInventoryResolved: Boolean = false,
-    // Current session's active provider/model label, used by the composer
-    // model chip and picker title.
-    val currentSessionModel: String? = null,
-    val modelSwitchConfirmation: ModelSwitchConfirmation? = null,
-    // Reasoning effort level for the current session
-    val reasoningLevel: String? = null,
-    val terminalBackend: String? = null,
-    // Attachment state
-    val pendingAttachments: List<Attachment> = emptyList(),
-    // Reaction animation — set when a reaction WS event arrives, auto-clears
-    val reactionKind: String? = null,
-    /** Monotonic trigger ID so consecutive same-kind reactions re-animate. */
-    val reactionTriggerId: Long = 0L,
-    /** Subagent delegation indicators (issue #538) — transient UI state. */
-    val subagentIndicators: List<SubagentIndicator> = emptyList(),
-    /**
-     * Context-window meter state. Fed by the gateway `usage` block on
-     * `session.info` / `message.complete`; null until the session reports one.
-     */
-    val contextUsage: ContextUsage? = null,
-    /**
-     * Denominator fallback from `GET /api/model/info`, used only while the
-     * session has not yet reported a live `context_max` over the WebSocket.
-     */
-    val modelContextLength: Long? = null,
-    /** Provider-qualified model identity associated with [modelContextLength]. */
-    val modelContextLengthModel: String? = null,
-    /** Whether the tappable context breakdown sheet is open. */
-    val showContextDetail: Boolean = false,
-    /** Agent todo / plan items (issue #736). */
-    val todos: List<TodoItem> = emptyList(),
-    /** One-shot composer restoration produced by a successful `/undo`. */
-    val pendingPrefillText: String? = null,
-    /**
-     * Latched once the socket has been up.
-     *
-     * The "Connecting to Hermes…" overlay is for the first connection, not for every moment the
-     * status blips: a reconnecting socket during a session switch must not blank the screen when
-     * there is already a transcript to show.
-     */
-    val hasConnectedOnce: Boolean = false,
-    /**
-     * Set when an authoritative transcript refresh failed while content was already on screen.
-     *
-     * The content stays — a cached transcript is better than a blank screen — but the user is told
-     * it may be out of date and offered a retry. Null means "what you see is what the server said".
-     */
-    val staleSince: Long? = null,
+    val transcript: TranscriptState = TranscriptState(),
+    val rail: RailState = RailState(),
+    val composer: ComposerState = ComposerState(),
+    val connection: ConnectionState = ConnectionState(),
+    val overlays: OverlaysState = OverlaysState(),
 ) {
+    // Transcript
+    val messages: List<ChatMessage> get() = transcript.messages
+    val currentSessionId: String? get() = transcript.currentSessionId
+    val isSessionReady: Boolean get() = transcript.isSessionReady
+    val chatTitle: String get() = transcript.chatTitle
+    val isAgentTyping: Boolean get() = transcript.isAgentTyping
+    val isThinking: Boolean get() = transcript.isThinking
+    val thinkingText: String get() = transcript.thinkingText
+    val isLoading: Boolean get() = transcript.isLoading
+    val isLoadingOlder: Boolean get() = transcript.isLoadingOlder
+    val hasOlderMessages: Boolean get() = transcript.hasOlderMessages
+    val streamingMessage: ChatMessage? get() = transcript.streamingMessage
+    val errorMessage: String? get() = transcript.errorMessage
+    val staleSince: Long? get() = transcript.staleSince
+    val reactionKind: String? get() = transcript.reactionKind
+    val reactionTriggerId: Long get() = transcript.reactionTriggerId
+    val subagentIndicators: List<SubagentIndicator> get() = transcript.subagentIndicators
+    val contextUsage: ContextUsage? get() = transcript.contextUsage
+    val todos: List<TodoItem> get() = transcript.todos
+
+    // Rail
+    val sessions: List<SessionUi> get() = rail.sessions
+    val railRefreshing: Boolean get() = rail.railRefreshing
+    val railStatus: RailLoadStatus get() = rail.railStatus
+    val showSessionPicker: Boolean get() = rail.showSessionPicker
+
+    // Composer
+    val pendingAttachments: List<Attachment> get() = composer.pendingAttachments
+    val pendingPrefillText: String? get() = composer.pendingPrefillText
+    val commandCatalog: CommandCatalog get() = composer.commandCatalog
+    val slashUsageCounts: Map<String, Int> get() = composer.slashUsageCounts
+    val openHistoryRequested: Boolean get() = composer.openHistoryRequested
+    val reasoningLevel: String? get() = composer.reasoningLevel
+    val currentSessionModel: String? get() = composer.currentSessionModel
+    val terminalBackend: String? get() = composer.terminalBackend
+    val modelContextLength: Long? get() = composer.modelContextLength
+    val modelContextLengthModel: String? get() = composer.modelContextLengthModel
+    val typingEffectEnabled: Boolean get() = composer.typingEffectEnabled
+    val typingEffectDelayMs: Int get() = composer.typingEffectDelayMs
+
+    // Connection
+    val connectionStatus: ConnectionStatus get() = connection.connectionStatus
+    val statusPill: String? get() = connection.statusPill
+    val hasConnectedOnce: Boolean get() = connection.hasConnectedOnce
+
+    // Overlays
+    val backgroundCompleteMessage: String? get() = overlays.backgroundCompleteMessage
+    val openError: String? get() = overlays.openError
+    val openingAttachmentPath: String? get() = overlays.openingAttachmentPath
+    val mediaPlayerRequest: SecureGatewayMediaRequest? get() = overlays.mediaPlayerRequest
+    val clarifyRequest: ClarifyUi? get() = overlays.clarifyRequest
+    val sudoPrompt: SudoPromptUi? get() = overlays.sudoPrompt
+    val secretPrompt: SecretPromptUi? get() = overlays.secretPrompt
+    val vaultPrompt: VaultPromptUi? get() = overlays.vaultPrompt
+    val isSearchActive: Boolean get() = overlays.isSearchActive
+    val searchQuery: String get() = overlays.searchQuery
+    val searchMatchIndices: List<Int> get() = overlays.searchMatchIndices
+    val currentSearchMatchIndex: Int get() = overlays.currentSearchMatchIndex
+    val showModelPicker: Boolean get() = overlays.showModelPicker
+    val modelPickerProviders: List<ModelProvider> get() = overlays.modelPickerProviders
+    val modelPickerPinned: List<PinnedModel> get() = overlays.modelPickerPinned
+    val modelPickerLoading: Boolean get() = overlays.modelPickerLoading
+    val modelInventoryResolved: Boolean get() = overlays.modelInventoryResolved
+    val modelSwitchConfirmation: ModelSwitchConfirmation? get() = overlays.modelSwitchConfirmation
+    val showContextDetail: Boolean get() = overlays.showContextDetail
+
     /** Convenience — derived from [connectionStatus]. */
-    val isConnected: Boolean get() = connectionStatus == ConnectionStatus.CONNECTED
+    val isConnected: Boolean get() = connection.connectionStatus == ConnectionStatus.CONNECTED
 }
 
 data class SessionUi(

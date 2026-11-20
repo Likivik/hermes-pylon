@@ -39,22 +39,35 @@ class ChatAttachmentsDelegate(
             val seenUris = state.pendingAttachments.mapTo(mutableSetOf(), Attachment::uri)
             val remainingCapacity = (MAX_PENDING_ATTACHMENTS - state.pendingAttachments.size).coerceAtLeast(0)
             val additions = attachments.filter { seenUris.add(it.uri) }.take(remainingCapacity)
-            if (additions.isEmpty()) state else state.copy(pendingAttachments = state.pendingAttachments + additions)
+            if (additions.isEmpty()) {
+                state
+            } else {
+                state.copy(
+                    composer = state.composer.copy(pendingAttachments = state.pendingAttachments + additions),
+                )
+            }
         }
     }
 
     fun removeAttachment(index: Int) {
         uiState.update { state ->
             state.copy(
-                pendingAttachments =
-                    state.pendingAttachments.toMutableList().apply {
-                        if (index in indices) removeAt(index)
-                    },
+                composer =
+                    state.composer.copy(
+                        pendingAttachments =
+                            state.pendingAttachments.toMutableList().apply {
+                                if (index in indices) removeAt(index)
+                            },
+                    ),
             )
         }
     }
 
     fun clearAttachments() {
-        uiState.update { it.copy(pendingAttachments = emptyList()) }
+        uiState.update {
+            it.copy(
+                composer = it.composer.copy(pendingAttachments = emptyList()),
+            )
+        }
     }
 }

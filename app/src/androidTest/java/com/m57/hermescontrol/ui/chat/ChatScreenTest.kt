@@ -68,8 +68,8 @@ class ChatScreenTest {
         // so the interactive controls are active.
         val uiState =
             ChatUiState(
-                connectionStatus = ConnectionStatus.CONNECTED,
-                isSessionReady = true,
+                transcript = TranscriptState(isSessionReady = true),
+                connection = ConnectionState(connectionStatus = ConnectionStatus.CONNECTED),
             )
         val mockViewModel = mockk<ChatViewModel>(relaxed = true)
         every { mockViewModel.uiState } returns MutableStateFlow(uiState).asStateFlow()
@@ -103,16 +103,19 @@ class ChatScreenTest {
     fun attachmentOnlyInput_showsSendButton_andSubmitsThroughParent() {
         val uiState =
             ChatUiState(
-                connectionStatus = ConnectionStatus.CONNECTED,
-                isSessionReady = true,
-                pendingAttachments =
-                    listOf(
-                        Attachment(
-                            uri = "content://test/photo.jpg",
-                            name = "photo.jpg",
-                            mimeType = "image/jpeg",
-                        ),
+                transcript = TranscriptState(isSessionReady = true),
+                composer =
+                    ComposerState(
+                        pendingAttachments =
+                            listOf(
+                                Attachment(
+                                    uri = "content://test/photo.jpg",
+                                    name = "photo.jpg",
+                                    mimeType = "image/jpeg",
+                                ),
+                            ),
                     ),
+                connection = ConnectionState(connectionStatus = ConnectionStatus.CONNECTED),
             )
         val mockViewModel = mockk<ChatViewModel>(relaxed = true)
         every { mockViewModel.uiState } returns MutableStateFlow(uiState).asStateFlow()
@@ -139,8 +142,8 @@ class ChatScreenTest {
     fun newSession_keepsDraftUntilSessionCreateCompletes() {
         val uiState =
             ChatUiState(
-                connectionStatus = ConnectionStatus.CONNECTED,
-                isSessionReady = false,
+                transcript = TranscriptState(isSessionReady = false),
+                connection = ConnectionState(connectionStatus = ConnectionStatus.CONNECTED),
             )
         val mockViewModel = mockk<ChatViewModel>(relaxed = true)
         every { mockViewModel.uiState } returns MutableStateFlow(uiState).asStateFlow()
@@ -169,22 +172,25 @@ class ChatScreenTest {
     fun taggedAndSyntheticRowsRenderAsTimelineEventsNeverUserBubbles() {
         val uiState =
             ChatUiState(
-                connectionStatus = ConnectionStatus.CONNECTED,
-                isSessionReady = true,
-                messages =
-                    listOf(
-                        ChatMessage(
-                            role = MessageRole.USER,
-                            content = "backend marker",
-                            displayKind = "future_kind",
-                        ),
-                        ChatMessage(
-                            role = MessageRole.USER,
-                            content =
-                                "You've reached the maximum number of tool-calling iterations allowed. " +
-                                    "Please provide a final response.",
-                        ),
+                transcript =
+                    TranscriptState(
+                        isSessionReady = true,
+                        messages =
+                            listOf(
+                                ChatMessage(
+                                    role = MessageRole.USER,
+                                    content = "backend marker",
+                                    displayKind = "future_kind",
+                                ),
+                                ChatMessage(
+                                    role = MessageRole.USER,
+                                    content =
+                                        "You've reached the maximum number of tool-calling iterations allowed. " +
+                                            "Please provide a final response.",
+                                ),
+                            ),
                     ),
+                connection = ConnectionState(connectionStatus = ConnectionStatus.CONNECTED),
             )
         val mockViewModel = mockk<ChatViewModel>(relaxed = true)
         every { mockViewModel.uiState } returns MutableStateFlow(uiState).asStateFlow()
@@ -207,9 +213,12 @@ class ChatScreenTest {
     fun genuineUserRowStillRendersAsUserBubble() {
         val uiState =
             ChatUiState(
-                connectionStatus = ConnectionStatus.CONNECTED,
-                isSessionReady = true,
-                messages = listOf(ChatMessage(role = MessageRole.USER, content = "hello")),
+                transcript =
+                    TranscriptState(
+                        isSessionReady = true,
+                        messages = listOf(ChatMessage(role = MessageRole.USER, content = "hello")),
+                    ),
+                connection = ConnectionState(connectionStatus = ConnectionStatus.CONNECTED),
             )
         val mockViewModel = mockk<ChatViewModel>(relaxed = true)
         every { mockViewModel.uiState } returns MutableStateFlow(uiState).asStateFlow()
@@ -234,26 +243,29 @@ class ChatScreenTest {
         val state =
             MutableStateFlow(
                 ChatUiState(
-                    connectionStatus = ConnectionStatus.CONNECTED,
-                    isSessionReady = true,
-                    messages =
-                        listOf(
-                            ChatMessage(
-                                role = MessageRole.ASSISTANT,
-                                content = "files",
-                                attachments =
-                                    listOf(
-                                        Attachment(path, "report.pdf", "application/pdf", gatewayPath = path),
-                                        Attachment(
-                                            "/gateway/other.txt",
-                                            "other.txt",
-                                            "text/plain",
-                                            gatewayPath = "/gateway/other.txt",
-                                        ),
+                    transcript =
+                        TranscriptState(
+                            isSessionReady = true,
+                            messages =
+                                listOf(
+                                    ChatMessage(
+                                        role = MessageRole.ASSISTANT,
+                                        content = "files",
+                                        attachments =
+                                            listOf(
+                                                Attachment(path, "report.pdf", "application/pdf", gatewayPath = path),
+                                                Attachment(
+                                                    "/gateway/other.txt",
+                                                    "other.txt",
+                                                    "text/plain",
+                                                    gatewayPath = "/gateway/other.txt",
+                                                ),
+                                            ),
                                     ),
-                            ),
+                                ),
                         ),
-                    openingAttachmentPath = path,
+                    connection = ConnectionState(connectionStatus = ConnectionStatus.CONNECTED),
+                    overlays = OverlaysState(openingAttachmentPath = path),
                 ),
             )
         val mockViewModel = mockk<ChatViewModel>(relaxed = true)
@@ -271,7 +283,10 @@ class ChatScreenTest {
 
         composeTestRule.onNodeWithTag("attachment_opening_$path").assertIsDisplayed()
         composeTestRule.onNodeWithTag("attachment_opening_/gateway/other.txt").assertDoesNotExist()
-        state.value = state.value.copy(openingAttachmentPath = null)
+        state.value =
+            state.value.copy(
+                overlays = state.value.overlays.copy(openingAttachmentPath = null),
+            )
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("attachment_opening_$path").assertDoesNotExist()
     }
@@ -280,10 +295,13 @@ class ChatScreenTest {
     fun fallbackOnlyContextMeter_opensOccupancyExplanation() {
         val uiState =
             ChatUiState(
-                connectionStatus = ConnectionStatus.CONNECTED,
-                currentSessionModel = "openai-codex/gpt-5.6-sol",
-                modelContextLength = 272_000L,
-                modelContextLengthModel = "openai-codex/gpt-5.6-sol",
+                composer =
+                    ComposerState(
+                        currentSessionModel = "openai-codex/gpt-5.6-sol",
+                        modelContextLength = 272_000L,
+                        modelContextLengthModel = "openai-codex/gpt-5.6-sol",
+                    ),
+                connection = ConnectionState(connectionStatus = ConnectionStatus.CONNECTED),
             )
         val mockViewModel = mockk<ChatViewModel>(relaxed = true)
         every { mockViewModel.uiState } returns MutableStateFlow(uiState).asStateFlow()
@@ -391,11 +409,17 @@ class ChatScreenTest {
         val input = composeTestRule.onNodeWithTag("vault_secret_input")
         input.performTextInput("retained")
 
-        state.value = state.value.copy(vaultPrompt = first.copy(prompt = "duplicate update"))
+        state.value =
+            state.value.copy(
+                overlays = state.value.overlays.copy(vaultPrompt = first.copy(prompt = "duplicate update")),
+            )
         composeTestRule.waitForIdle()
         input.assert(rawInputEquals("retained"))
 
-        state.value = state.value.copy(vaultPrompt = vaultPrompt("vault.code", "request-2"))
+        state.value =
+            state.value.copy(
+                overlays = state.value.overlays.copy(vaultPrompt = vaultPrompt("vault.code", "request-2")),
+            )
         composeTestRule.waitForIdle()
         input.assert(rawInputEquals(""))
     }
@@ -403,7 +427,13 @@ class ChatScreenTest {
     @Test
     fun sudoAndSecret_parentRouteMaskedConfirmAndCancel() {
         val binding = privilegedBinding("sudo-1")
-        val state = promptState().also { it.value = it.value.copy(sudoPrompt = SudoPromptUi(binding)) }
+        val state =
+            promptState().also {
+                it.value =
+                    it.value.copy(
+                        overlays = it.value.overlays.copy(sudoPrompt = SudoPromptUi(binding)),
+                    )
+            }
         val viewModel = promptViewModel(state)
         composeTestRule.setContent { ChatScreen(sessionId = "session", viewModel = viewModel) }
         val sudoInput = composeTestRule.onNodeWithTag("sudo_password_input")
@@ -414,7 +444,14 @@ class ChatScreenTest {
         composeTestRule.onNodeWithTag("sudo_cancel_button").performClick()
         verify { viewModel.cancelSudo() }
 
-        state.value = state.value.copy(sudoPrompt = null, secretPrompt = SecretPromptUi(privilegedBinding("secret-1")))
+        state.value =
+            state.value.copy(
+                overlays =
+                    state.value.overlays.copy(
+                        sudoPrompt = null,
+                        secretPrompt = SecretPromptUi(privilegedBinding("secret-1")),
+                    ),
+            )
         composeTestRule.waitForIdle()
         val secretInput = composeTestRule.onNodeWithTag("secret_value_input")
         secretInput.performTextInput("api-token")
@@ -428,10 +465,9 @@ class ChatScreenTest {
     private fun promptState(prompt: VaultPromptUi? = null) =
         MutableStateFlow(
             ChatUiState(
-                connectionStatus = ConnectionStatus.CONNECTED,
-                isSessionReady = true,
-                currentSessionId = "session",
-                vaultPrompt = prompt,
+                transcript = TranscriptState(isSessionReady = true, currentSessionId = "session"),
+                connection = ConnectionState(connectionStatus = ConnectionStatus.CONNECTED),
+                overlays = OverlaysState(vaultPrompt = prompt),
             ),
         )
 
