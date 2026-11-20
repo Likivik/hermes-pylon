@@ -49,3 +49,43 @@ fun ComposerState.withSessionModel(
         reasoningLevel = reasoningLevel?.takeIf { it.isNotEmpty() },
         terminalBackend = terminalBackend?.takeIf { it.isNotEmpty() },
     )
+
+/**
+ * A resume ack installs the session the user asked for: not loading, ready when the gateway supplied a
+ * runtime id, and the gauge taken from the snapshot — never from the session being left behind.
+ */
+fun TranscriptState.withResumedSession(
+    sessionId: String?,
+    runtimeReady: Boolean,
+    contextUsage: ContextUsage?,
+): TranscriptState =
+    copy(
+        isLoading = false,
+        currentSessionId = sessionId,
+        isSessionReady = runtimeReady,
+        contextUsage = contextUsage,
+    )
+
+/**
+ * A resume ack reports the session's model, reasoning effort and terminal backend.
+ *
+ * The label goes through [qualifyModelLabel] like every other surface: this branch used to build
+ * `"$provider/$model"` unconditionally, which doubled an already-qualified model.
+ */
+fun ComposerState.withResumedModel(
+    provider: String?,
+    model: String?,
+    reasoningLevel: String?,
+    terminalBackend: String?,
+): ComposerState =
+    copy(
+        currentSessionModel =
+            if (model != null && provider != null) {
+                qualifyModelLabel(provider, model)
+            } else {
+                model ?: currentSessionModel
+            },
+        // Blank reasoning is "not reported"; a resume must not keep the previous session's effort.
+        reasoningLevel = reasoningLevel?.takeIf { it.isNotEmpty() },
+        terminalBackend = terminalBackend?.trim()?.takeIf { it.isNotEmpty() },
+    )
