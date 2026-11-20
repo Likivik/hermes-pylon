@@ -48,7 +48,7 @@ class TodoParentPreservationTest {
 
     @Test
     fun `tool completion preserves hierarchy through persisted message history`() {
-        val state = ChatUiState(currentSessionId = "session")
+        val state = ChatUiState(transcript = TranscriptState(currentSessionId = "session"))
         val started =
             ChatWsEventReducer.reduce(
                 state,
@@ -80,7 +80,7 @@ class TodoParentPreservationTest {
     fun `tool start args retain parents and hydrate without live todo events`() {
         val result =
             ChatWsEventReducer.reduce(
-                ChatUiState(currentSessionId = "session"),
+                ChatUiState(transcript = TranscriptState(currentSessionId = "session")),
                 StreamingState(),
                 WsEvent.ToolStart(
                     "todo",
