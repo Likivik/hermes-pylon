@@ -101,19 +101,18 @@ object ChatWsEventReducer {
             is WsEvent.ClarifyExpire ->
                 ReducerResult(
                     state =
-                        if (state.clarifyRequest?.let { clarify ->
-                                clarify.clarifyId == event.clarifyId &&
-                                    clarify.sessionId == event.sessionId &&
-                                    clarify.sourceProfileId == event.sourceProfileId &&
-                                    clarify.connectionGeneration == event.connectionGeneration
-                            } == true
-                        ) {
-                            state.copy(
-                                overlays = state.overlays.copy(clarifyRequest = null),
-                            )
-                        } else {
-                            state
-                        },
+                        state.copy(
+                            overlays =
+                                OverlaysReducer.reduce(
+                                    state.overlays,
+                                    OverlaysIntent.ClarifyExpired(
+                                        clarifyId = event.clarifyId,
+                                        sessionId = event.sessionId,
+                                        sourceProfileId = event.sourceProfileId,
+                                        connectionGeneration = event.connectionGeneration,
+                                    ),
+                                ),
+                        ),
                     streamingState = streamingState,
                 )
 
@@ -329,7 +328,7 @@ object ChatWsEventReducer {
             state =
                 state.copy(
                     transcript = state.transcript.copy(messages = state.messages + msg, isAgentTyping = false),
-                    overlays = state.overlays.copy(clarifyRequest = null),
+                    overlays = OverlaysReducer.reduce(state.overlays, OverlaysIntent.ClarifyCleared),
                 ),
             effects = effects,
         )

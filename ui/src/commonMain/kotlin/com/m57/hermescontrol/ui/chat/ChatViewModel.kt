@@ -4055,29 +4055,26 @@ class ChatViewModel(
                 ) { normalized.getValue(it.qid) }
             val userMessage = ChatMessage(role = MessageRole.USER, content = displayAnswer)
             _uiState.update { current ->
-                if (current.clarifyRequest == expected) {
-                    current.copy(
-                        transcript =
-                            current.transcript.copy(
-                                messages = current.messages + userMessage,
-                                isAgentTyping = remaining.isEmpty(),
+                current.copy(
+                    transcript =
+                        current.transcript.copy(
+                            messages = current.messages + userMessage,
+                            isAgentTyping = remaining.isEmpty(),
+                        ),
+                    overlays =
+                        OverlaysReducer.reduce(
+                            current.overlays,
+                            OverlaysIntent.ClarifyReplaced(
+                                expected = expected,
+                                replacement =
+                                    if (remaining.isEmpty()) {
+                                        null
+                                    } else {
+                                        expected.withRemainingQuestions(remaining)
+                                    },
                             ),
-                        overlays =
-                            current.overlays.copy(
-                                clarifyRequest = expected.withRemainingQuestions(remaining),
-                            ),
-                    ).let { updated ->
-                        if (remaining.isEmpty()) {
-                            updated.copy(
-                                overlays = updated.overlays.copy(clarifyRequest = null),
-                            )
-                        } else {
-                            updated
-                        }
-                    }
-                } else {
-                    current
-                }
+                        ),
+                )
             }
             if (_uiState.value.messages.any { it.id == userMessage.id }) {
                 repo.persistMessage(userMessage, sessionId, acceptedRevision)
@@ -4104,7 +4101,11 @@ class ChatViewModel(
             if (_uiState.compareAndSet(
                     current,
                     current.copy(
-                        overlays = current.overlays.copy(clarifyRequest = replacement),
+                        overlays =
+                            OverlaysReducer.reduce(
+                                current.overlays,
+                                OverlaysIntent.ClarifyReplaced(expected = expected, replacement = replacement),
+                            ),
                     ),
                 )
             ) {
@@ -4312,18 +4313,18 @@ class ChatViewModel(
                 }
             "clarify" ->
                 _uiState.update { state ->
-                    val binding = state.clarifyRequest?.serverRequestBinding
-                    if (binding?.requestId == event.id &&
-                        binding.runtimeSessionId == event.sessionId &&
-                        binding.profileId == event.sourceProfileId &&
-                        binding.connectionGeneration == event.connectionGeneration
-                    ) {
-                        state.copy(
-                            overlays = state.overlays.copy(clarifyRequest = null),
-                        )
-                    } else {
-                        state
-                    }
+                    state.copy(
+                        overlays =
+                            OverlaysReducer.reduce(
+                                state.overlays,
+                                OverlaysIntent.ClarifyCancelled(
+                                    requestId = event.id,
+                                    sessionId = event.sessionId,
+                                    sourceProfileId = event.sourceProfileId,
+                                    connectionGeneration = event.connectionGeneration,
+                                ),
+                            ),
+                    )
                 }
             "vault.code", "vault.unlock_prompt", "vault.save_login" ->
                 _uiState.update { state ->
