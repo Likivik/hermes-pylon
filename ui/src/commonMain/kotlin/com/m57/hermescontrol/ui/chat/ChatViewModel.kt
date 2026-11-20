@@ -85,9 +85,6 @@ import kotlin.concurrent.Volatile
 private const val TAG = "ChatViewModel"
 private const val MESSAGE_PAGE_SIZE = 150
 
-/** How many recent transcripts stay in memory for instant switches. */
-private const val TRANSCRIPT_CACHE_LIMIT = 8
-
 /**
  * How long an unacknowledged `session.create` waits before it is retried.
  *
@@ -231,15 +228,10 @@ class ChatViewModel(
     private var reactionClearJob: Job? = null
 
     /**
-     * Local expiry timers for live approval cards. Request ids can be reused,
-     * so timer ownership includes the message and complete transport binding.
+     * Expiry timers for live approval cards. Keyed by message and complete transport binding,
+     * because request ids can be reused; see [ApprovalExpiryScheduler].
      */
-    private data class ApprovalTimerKey(
-        val messageId: String,
-        val binding: PrivilegedRequestBinding,
-    )
-
-    private val approvalExpiryJobs = mutableMapOf<ApprovalTimerKey, Job>()
+    private val approvalExpiry = ApprovalExpiryScheduler(viewModelScope)
 
     private val wsClient = HermesWsClient
 
@@ -337,7 +329,7 @@ class ChatViewModel(
         }
         viewModelScope.launch(io) {
             _uiState.collect { state ->
-                state.currentSessionId?.let { id -> cacheTranscript(id, state.messages) }
+                state.currentSessionId?.let { id -> transcriptCache.put(selectedProfileNow(), id, state.messages) }
             }
         }
         viewModelScope.launch(io) {
@@ -2009,37 +2001,11 @@ class ChatViewModel(
 
     private fun lastSession(): String? = preferences.getString(lastSessionKey())?.takeIf { it.isNotBlank() }
 
-    /**
-     * Recently seen transcripts, keyed by profile *and* session.
-     *
-     * Web has no Room, so without this a switch is a guaranteed blank while the network answers.
-     * Bounded and insertion-ordered: the oldest entry goes first. It is a cache, never a source
-     * of truth — the authoritative load still converges the view, and a stale entry is replaced
-     * as soon as the gateway answers.
-     */
-    private val transcriptCache = LinkedHashMap<String, List<ChatMessage>>()
+    /** Bounded, profile-keyed transcript cache. Owns its own keying and eviction (see the class). */
+    private val transcriptCache = TranscriptCache()
 
     /** Wall-clock milliseconds, for "how long has this been out of date". */
     private fun nowMs(): Long = nowMillis()
-
-    private fun transcriptKey(sessionId: String): String = (selectedProfileNow() ?: "default") + "|" + sessionId
-
-    private fun cacheTranscript(
-        sessionId: String,
-        messages: List<ChatMessage>,
-    ) {
-        if (messages.isEmpty()) return
-        val key = transcriptKey(sessionId)
-        transcriptCache.remove(key)
-        transcriptCache[key] = messages
-        while (transcriptCache.size > TRANSCRIPT_CACHE_LIMIT) {
-            val oldest = transcriptCache.keys.firstOrNull() ?: break
-            transcriptCache.remove(oldest)
-        }
-    }
-
-    private fun cachedTranscript(sessionId: String): List<ChatMessage> =
-        transcriptCache[transcriptKey(sessionId)].orEmpty()
 
     /**
      * Drop the open conversation when the profile changes.
@@ -2921,7 +2887,7 @@ class ChatViewModel(
                 // Paint from the transcript cache when we have it: on web there is no Room, so
                 // blanking here made every switch a visible flash. The authoritative load still
                 // converges the view; a cache miss legitimately starts empty.
-                messages = cachedTranscript(sessionId),
+                messages = transcriptCache.get(selectedProfileNow(), sessionId),
                 subagentIndicators = emptyList(),
                 todos = emptyList(),
                 chatTitle = title,
@@ -3845,9 +3811,6 @@ class ChatViewModel(
         }
     }
 
-    private fun ClarifyUi.wireQuestionId(question: ClarifyQuestionUi): String? =
-        if (questions.isNotEmpty()) question.qid else questionId
-
     private fun clarifyRequestIsCurrent(
         expected: ClarifyUi,
         sessionId: String,
@@ -3867,13 +3830,6 @@ class ChatViewModel(
             if (_uiState.compareAndSet(current, current.copy(clarifyRequest = replacement))) return true
         }
     }
-
-    private fun ClarifyUi.withRemainingQuestions(remaining: List<ClarifyQuestionUi>): ClarifyUi? =
-        when {
-            remaining.isEmpty() -> null
-            questions.isEmpty() -> this
-            else -> copy(questions = remaining)
-        }
 
     fun clearError() {
         _uiState.update { it.copy(errorMessage = null) }
@@ -4102,8 +4058,7 @@ class ChatViewModel(
             binding.connectionGeneration == event.connectionGeneration
 
     private fun clearPrivilegedControls() {
-        approvalExpiryJobs.values.forEach(Job::cancel)
-        approvalExpiryJobs.clear()
+        approvalExpiry.cancelAll()
         _uiState.update { state ->
             state.copy(
                 messages = state.messages.map { message -> message.copy(approvalInfo = null) },
@@ -4165,15 +4120,7 @@ class ChatViewModel(
         binding: PrivilegedRequestBinding,
         timeoutSeconds: Double,
     ) {
-        val key = ApprovalTimerKey(messageId, binding)
-        val job =
-            viewModelScope.launch {
-                delay((timeoutSeconds * 1_000.0).toLong().coerceAtLeast(1L))
-                // Conditional remove: only drop the entry if it is still this attempt's job.
-                if (approvalExpiryJobs[key] === coroutineContext[Job]) approvalExpiryJobs.remove(key)
-                clearApprovalControls(messageId, binding)
-            }
-        approvalExpiryJobs.put(key, job)?.cancel()
+        approvalExpiry.schedule(messageId, binding, timeoutSeconds) { id, owner -> clearApprovalControls(id, owner) }
     }
 
     /** Approve exactly once. Session-wide and permanent allows are not offered. */
@@ -4240,7 +4187,7 @@ class ChatViewModel(
                     )
                 }
             if (accepted) {
-                approvalExpiryJobs.remove(ApprovalTimerKey(messageId, binding))?.cancel()
+                approvalExpiry.cancel(messageId, binding)
                 clearApprovalControls(messageId, binding)
             } else {
                 restoreApprovalControls(messageId, binding, failureMessage)
