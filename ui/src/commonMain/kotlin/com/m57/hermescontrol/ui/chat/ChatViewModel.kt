@@ -692,11 +692,7 @@ class ChatViewModel(
                                 state.composer.copy(
                                     currentSessionModel =
                                         if (model.isNotEmpty()) {
-                                            if (provider.isEmpty() || model.startsWith("$provider/")) {
-                                                model
-                                            } else {
-                                                "$provider/$model"
-                                            }
+                                            qualifyModelLabel(provider, model)
                                         } else {
                                             state.currentSessionModel
                                         },
@@ -993,11 +989,7 @@ class ChatViewModel(
                             it.composer.copy(
                                 currentSessionModel =
                                     model.takeIf { it.isNotEmpty() }?.let { resolvedModel ->
-                                        if (provider.isEmpty() || resolvedModel.startsWith("$provider/")) {
-                                            resolvedModel
-                                        } else {
-                                            "$provider/$resolvedModel"
-                                        }
+                                        qualifyModelLabel(provider, resolvedModel)
                                     },
                                 reasoningLevel =
                                     reasoningEffort?.takeIf {
