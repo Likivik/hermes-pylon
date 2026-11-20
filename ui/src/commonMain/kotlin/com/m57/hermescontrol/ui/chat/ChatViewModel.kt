@@ -228,15 +228,10 @@ class ChatViewModel(
     private var reactionClearJob: Job? = null
 
     /**
-     * Local expiry timers for live approval cards. Request ids can be reused,
-     * so timer ownership includes the message and complete transport binding.
+     * Expiry timers for live approval cards. Keyed by message and complete transport binding,
+     * because request ids can be reused; see [ApprovalExpiryScheduler].
      */
-    private data class ApprovalTimerKey(
-        val messageId: String,
-        val binding: PrivilegedRequestBinding,
-    )
-
-    private val approvalExpiryJobs = mutableMapOf<ApprovalTimerKey, Job>()
+    private val approvalExpiry = ApprovalExpiryScheduler(viewModelScope)
 
     private val wsClient = HermesWsClient
 
@@ -4073,8 +4068,7 @@ class ChatViewModel(
             binding.connectionGeneration == event.connectionGeneration
 
     private fun clearPrivilegedControls() {
-        approvalExpiryJobs.values.forEach(Job::cancel)
-        approvalExpiryJobs.clear()
+        approvalExpiry.cancelAll()
         _uiState.update { state ->
             state.copy(
                 messages = state.messages.map { message -> message.copy(approvalInfo = null) },
@@ -4136,15 +4130,7 @@ class ChatViewModel(
         binding: PrivilegedRequestBinding,
         timeoutSeconds: Double,
     ) {
-        val key = ApprovalTimerKey(messageId, binding)
-        val job =
-            viewModelScope.launch {
-                delay((timeoutSeconds * 1_000.0).toLong().coerceAtLeast(1L))
-                // Conditional remove: only drop the entry if it is still this attempt's job.
-                if (approvalExpiryJobs[key] === coroutineContext[Job]) approvalExpiryJobs.remove(key)
-                clearApprovalControls(messageId, binding)
-            }
-        approvalExpiryJobs.put(key, job)?.cancel()
+        approvalExpiry.schedule(messageId, binding, timeoutSeconds) { id, owner -> clearApprovalControls(id, owner) }
     }
 
     /** Approve exactly once. Session-wide and permanent allows are not offered. */
@@ -4211,7 +4197,7 @@ class ChatViewModel(
                     )
                 }
             if (accepted) {
-                approvalExpiryJobs.remove(ApprovalTimerKey(messageId, binding))?.cancel()
+                approvalExpiry.cancel(messageId, binding)
                 clearApprovalControls(messageId, binding)
             } else {
                 restoreApprovalControls(messageId, binding, failureMessage)
