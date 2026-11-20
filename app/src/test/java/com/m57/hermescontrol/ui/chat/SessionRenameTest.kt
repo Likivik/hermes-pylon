@@ -7,7 +7,6 @@ import android.util.Log
 import androidx.lifecycle.viewModelScope
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.local.HermesDatabase
-import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.GatewayResponse
 import com.m57.hermescontrol.data.session.ActiveSessionHolder
 import com.m57.hermescontrol.data.ws.ConnectionStatus
@@ -17,7 +16,9 @@ import com.m57.hermescontrol.data.ws.WsEvent
 import com.m57.hermescontrol.data.ws.WsMethods
 import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.chat_model_switch_failed
+import com.m57.hermescontrol.ui.chat.fakes.FakeChatApi
 import com.m57.hermescontrol.ui.chat.fakes.FakeChatPersistenceRepository
+import com.m57.hermescontrol.ui.chat.fakes.FakeChatTransport
 import com.m57.hermescontrol.ui.chat.fakes.FakeSlashUsageStore
 import com.m57.hermescontrol.ui.chat.fakes.testChatEnvironment
 import com.m57.hermescontrol.ui.common.FakeStringResolver
@@ -27,13 +28,10 @@ import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.mockkStatic
 import io.mockk.unmockkAll
-import io.mockk.verify
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -65,16 +63,13 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class SessionRenameTest {
     private val testDispatcher = StandardTestDispatcher()
-    private val mockEventsFlow = MutableSharedFlow<WsEvent>(extraBufferCapacity = 64)
-    private val mockConnectionStatus = MutableStateFlow(ConnectionStatus.DISCONNECTED)
     private lateinit var app: Application
     private lateinit var resolver: FakeStringResolver
+    private val fakeTransport = FakeChatTransport()
+    private lateinit var fakeApi: FakeChatApi
     private lateinit var fakeRepo: FakeChatPersistenceRepository
     private lateinit var fakeSlashUsageStore: FakeSlashUsageStore
     private lateinit var mockApi: com.m57.hermescontrol.data.remote.HermesGatewayApi
-
-    /** Counter used to generate unique WS request IDs (mirrors the client). */
-    private var reqCount = 0
 
     /** Request id of the most recent session.resume send. */
     private var resumeRequestId = ""
@@ -83,7 +78,6 @@ class SessionRenameTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         val testMainDispatcher = Dispatchers.Main
-        reqCount = 0
         resumeRequestId = ""
 
         mockkStatic(Log::class)
@@ -98,8 +92,6 @@ class SessionRenameTest {
 
         mockkObject(AuthManager)
         every { AuthManager.getPinnedModels() } returns emptyList()
-        mockkObject(HermesWsClient)
-        mockkObject(ApiClient)
         mockkObject(HermesDatabase)
 
         app = mockk(relaxed = true)
@@ -109,43 +101,24 @@ class SessionRenameTest {
         fakeSlashUsageStore = FakeSlashUsageStore()
         every { AuthManager.getSelectedProfileId() } returns "profile-a"
 
-        mockConnectionStatus.value = ConnectionStatus.DISCONNECTED
+        fakeTransport.status.value = ConnectionStatus.DISCONNECTED
 
         every { AuthManager.getToken() } returns "test-token"
         every { AuthManager.isTypingEffectEnabled() } returns true
         every { AuthManager.getTypingEffectDelayMs() } returns 30
         every { AuthManager.isAutoReconnect() } returns false
-        every { HermesWsClient.events } returns mockEventsFlow
-        every { HermesWsClient.connectionStatus } returns mockConnectionStatus
-        every { HermesWsClient.connect() } answers {
-            mockConnectionStatus.value = ConnectionStatus.CONNECTING
+        fakeTransport.status.value = ConnectionStatus.DISCONNECTED
+        fakeTransport.onRequest = { method, _, _ ->
+            if (method == WsMethods.CONFIG_SET) {
+                CompletableDeferred<Any?>(mapOf("ok" to true))
+            } else {
+                CompletableDeferred(Unit)
+            }
         }
-        every { HermesWsClient.disconnect() } returns Unit
 
-        // Default send stub: unique ids + onSent callback.
-        every { HermesWsClient.send(any(), any(), any()) } answers {
-            reqCount++
-            val id = "req-id-$reqCount"
-            arg<((String) -> Unit)?>(2)?.invoke(id)
-            id
-        }
-        every { HermesWsClient.sendMessage(any(), any(), any(), any()) } answers {
-            reqCount++
-            val id = "req-msg-$reqCount"
-            arg<((String) -> Unit)?>(2)?.invoke(id)
-            id
-        }
-        every { HermesWsClient.sendRedirect(any(), any(), any()) } answers {
-            reqCount++
-            val id = "req-redirect-$reqCount"
-            arg<((String) -> Unit)?>(2)?.invoke(id)
-            id
-        }
-        every { HermesWsClient.request(WsMethods.CONFIG_SET, any(), any()) } returns
-            CompletableDeferred<Any?>(mapOf("ok" to true))
-
+        fakeApi = FakeChatApi()
         mockApi = mockk(relaxed = true)
-        every { ApiClient.hermesApi } returns mockApi
+        fakeApi.hermesApi = mockApi
         coEvery { mockApi.getModelInfo() } returns
             GatewayResponse.success(
                 com.m57.hermescontrol.data.model.ModelInfoResponse(
@@ -193,6 +166,8 @@ class SessionRenameTest {
             fakeSlashUsageStore,
             testDispatcher,
             io = testDispatcher,
+            wsClient = fakeTransport,
+            api = fakeApi,
         ).also { createdViewModels += it }
 
     /**
@@ -204,16 +179,16 @@ class SessionRenameTest {
         val viewModel = createViewModel()
         advanceUntilIdle()
 
-        mockConnectionStatus.value = ConnectionStatus.CONNECTED
-        mockEventsFlow.emit(WsEvent.GatewayReady(null))
+        fakeTransport.status.value = ConnectionStatus.CONNECTED
+        fakeTransport.eventFlow.emit(WsEvent.GatewayReady(null))
         advanceUntilIdle()
 
         viewModel.createNewSession()
         advanceUntilIdle()
 
-        // The create is the last send, so reqCount points at it.
-        val createId = "req-id-$reqCount"
-        mockEventsFlow.emit(
+        // The create is the last send, so the fake's counter points at it.
+        val createId = "req-id-${fakeTransport.sendCount}"
+        fakeTransport.eventFlow.emit(
             WsEvent.RpcResult(createId, mapOf("session_id" to "session-123")),
         )
         advanceUntilIdle()
@@ -226,13 +201,38 @@ class SessionRenameTest {
 
     /** Capture the id of the next session.resume send so the ack can match it. */
     private fun captureResumeRequestId() {
-        every { HermesWsClient.send(WsMethods.SESSION_RESUME, any(), any()) } answers {
-            reqCount++
-            val id = "req-resume-$reqCount"
-            resumeRequestId = id
-            arg<((String) -> Unit)?>(2)?.invoke(id)
+        fakeTransport.onSend = { method, _ ->
+            val id = fakeTransport.nextSendId()
+            if (method == WsMethods.SESSION_RESUME) resumeRequestId = id
             id
         }
+    }
+
+    private fun verifySent(
+        method: String,
+        params: Map<String, Any>,
+    ) {
+        assertTrue(
+            "expected $method$params; sent=${fakeTransport.sends}",
+            fakeTransport.sends.any { it.method == method && it.params == params },
+        )
+    }
+
+    private fun verifyNotSent(
+        method: String,
+        params: Map<String, Any>,
+    ) {
+        assertTrue(
+            "did not expect $method$params; sent=${fakeTransport.sends}",
+            fakeTransport.sends.none { it.method == method && it.params == params },
+        )
+    }
+
+    private fun verifyNothingSent(method: String) {
+        assertTrue(
+            "did not expect any $method; sent=${fakeTransport.sends}",
+            fakeTransport.sends.none { it.method == method },
+        )
     }
 
     // ── Tests ────────────────────────────────────────────────────────────────
@@ -247,17 +247,11 @@ class SessionRenameTest {
             advanceUntilIdle()
 
             // 1. Resume carries the queued rename.
-            verify {
-                HermesWsClient.send(
-                    WsMethods.SESSION_RESUME,
-                    mapOf("session_id" to "stored-bg", "omit_messages" to true),
-                    any(),
-                )
-            }
+            verifySent(WsMethods.SESSION_RESUME, mapOf("session_id" to "stored-bg", "omit_messages" to true))
 
             // 2. Ack reports both ids: session_id = the live runtime sid,
             //    session_key = the STORED id.
-            mockEventsFlow.emit(
+            fakeTransport.eventFlow.emit(
                 WsEvent.RpcResult(
                     resumeRequestId,
                     mapOf(
@@ -273,22 +267,10 @@ class SessionRenameTest {
             // 3. Title addressed by the RUNTIME sid — session.title is a
             //    session-scoped RPC resolved against the gateway's live
             //    `_sessions` map, so only the runtime sid can match.
-            verify {
-                HermesWsClient.send(
-                    WsMethods.SESSION_TITLE,
-                    mapOf("session_id" to "runtime-8hex", "title" to "New Test Name"),
-                    any(),
-                )
-            }
+            verifySent(WsMethods.SESSION_TITLE, mapOf("session_id" to "runtime-8hex", "title" to "New Test Name"))
             // …and never by the stored id (that 4001s "session not found";
             // addressing the title with it was the rename bug).
-            verify(exactly = 0) {
-                HermesWsClient.send(
-                    WsMethods.SESSION_TITLE,
-                    mapOf("session_id" to "stored-bg", "title" to "New Test Name"),
-                    any(),
-                )
-            }
+            verifyNotSent(WsMethods.SESSION_TITLE, mapOf("session_id" to "stored-bg", "title" to "New Test Name"))
             // (The optimistic rail title is not asserted here: the fake session
             // list is empty, so renameSession has no row to update. The RPC
             // addressing above is the contract under test.)
@@ -304,14 +286,12 @@ class SessionRenameTest {
             advanceUntilIdle()
 
             // Ack carries NO session_id / session_key (nothing addressable).
-            mockEventsFlow.emit(WsEvent.RpcResult(resumeRequestId, emptyMap<String, Any?>()))
+            fakeTransport.eventFlow.emit(WsEvent.RpcResult(resumeRequestId, emptyMap<String, Any?>()))
             advanceUntilIdle()
 
             // No title: the cached runtime id belongs to the CURRENT session
             // ("session-123"), so falling back to it would rename the wrong one.
-            verify(exactly = 0) {
-                HermesWsClient.send(WsMethods.SESSION_TITLE, any(), any())
-            }
+            verifyNothingSent(WsMethods.SESSION_TITLE)
         }
 
     @Test
@@ -325,15 +305,9 @@ class SessionRenameTest {
 
             // Even the CURRENT session resumes first — the gateway may have
             // reaped its detached runtime, and a bare session.title would 4001.
-            verify {
-                HermesWsClient.send(
-                    WsMethods.SESSION_RESUME,
-                    mapOf("session_id" to "session-123", "omit_messages" to true),
-                    any(),
-                )
-            }
+            verifySent(WsMethods.SESSION_RESUME, mapOf("session_id" to "session-123", "omit_messages" to true))
 
-            mockEventsFlow.emit(
+            fakeTransport.eventFlow.emit(
                 WsEvent.RpcResult(
                     resumeRequestId,
                     mapOf(
@@ -347,20 +321,8 @@ class SessionRenameTest {
             advanceUntilIdle()
 
             // Addressed by the ack's runtime sid, not the stored id.
-            verify {
-                HermesWsClient.send(
-                    WsMethods.SESSION_TITLE,
-                    mapOf("session_id" to "runtime-live-8hex", "title" to "Live Rename"),
-                    any(),
-                )
-            }
-            verify(exactly = 0) {
-                HermesWsClient.send(
-                    WsMethods.SESSION_TITLE,
-                    mapOf("session_id" to "session-123", "title" to "Live Rename"),
-                    any(),
-                )
-            }
+            verifySent(WsMethods.SESSION_TITLE, mapOf("session_id" to "runtime-live-8hex", "title" to "Live Rename"))
+            verifyNotSent(WsMethods.SESSION_TITLE, mapOf("session_id" to "session-123", "title" to "Live Rename"))
         }
 
     @Test
@@ -375,16 +337,10 @@ class SessionRenameTest {
             // Gateway fast-path payload for an already-live session: reports
             // nothing, so neither session_id nor session_key is present. This
             // used to silently drop the rename altogether.
-            mockEventsFlow.emit(WsEvent.RpcResult(resumeRequestId, emptyMap<String, Any?>()))
+            fakeTransport.eventFlow.emit(WsEvent.RpcResult(resumeRequestId, emptyMap<String, Any?>()))
             advanceUntilIdle()
 
-            verify {
-                HermesWsClient.send(
-                    WsMethods.SESSION_TITLE,
-                    mapOf("session_id" to "session-123", "title" to "Live Rename"),
-                    any(),
-                )
-            }
+            verifySent(WsMethods.SESSION_TITLE, mapOf("session_id" to "session-123", "title" to "Live Rename"))
         }
 
     @Test
@@ -396,7 +352,7 @@ class SessionRenameTest {
             viewModel.renameSession("stored-dead", "Never Persists", null)
             advanceUntilIdle()
 
-            mockEventsFlow.emit(
+            fakeTransport.eventFlow.emit(
                 WsEvent.RpcError(
                     resumeRequestId,
                     JsonRpcError(
@@ -408,9 +364,7 @@ class SessionRenameTest {
             advanceUntilIdle()
 
             // No title may be sent after a failed resume…
-            verify(exactly = 0) {
-                HermesWsClient.send(WsMethods.SESSION_TITLE, any(), any())
-            }
+            verifyNothingSent(WsMethods.SESSION_TITLE)
             // …and the failure is surfaced, not silently dropped.
             assertTrue(
                 "expected the resume failure in errorMessage, got " +
@@ -428,7 +382,7 @@ class SessionRenameTest {
             viewModel.renameSession("stored-bg", "New Test Name", null)
             advanceUntilIdle()
 
-            mockEventsFlow.emit(
+            fakeTransport.eventFlow.emit(
                 WsEvent.RpcResult(
                     resumeRequestId,
                     mapOf(
@@ -453,24 +407,13 @@ class SessionRenameTest {
     fun deleteSession_sendsTheStoredIdTheRailHolds() =
         runTest {
             val viewModel = createViewModelWithSession()
-            every {
-                HermesWsClient.send(WsMethods.SESSION_DELETE, any(), any())
-            } answers {
-                arg<((String) -> Unit)?>(2)?.invoke("del-1")
-                "del-1"
-            }
+            fakeTransport.onSend = { _, _ -> "del-1" }
 
             viewModel.deleteRailSession("stored-bg")
             advanceUntilIdle()
 
-            verify {
-                HermesWsClient.send(
-                    WsMethods.SESSION_DELETE,
-                    mapOf("session_id" to "stored-bg"),
-                    any(),
-                )
-            }
-            mockEventsFlow.emit(WsEvent.RpcResult("del-1", mapOf("deleted" to "stored-bg")))
+            verifySent(WsMethods.SESSION_DELETE, mapOf("session_id" to "stored-bg"))
+            fakeTransport.eventFlow.emit(WsEvent.RpcResult("del-1", mapOf("deleted" to "stored-bg")))
             advanceUntilIdle()
             assertNull(viewModel.uiState.value.errorMessage)
         }
@@ -480,32 +423,20 @@ class SessionRenameTest {
         runTest {
             val viewModel = createViewModelWithSession()
             var deleteCount = 0
-            every {
-                HermesWsClient.send(WsMethods.SESSION_DELETE, any(), any())
-            } answers {
-                deleteCount++
-                val id = "del-$deleteCount"
-                arg<((String) -> Unit)?>(2)?.invoke(id)
-                id
-            }
-            every {
-                HermesWsClient.send(WsMethods.SESSION_RESUME, any(), any())
-            } answers {
-                arg<((String) -> Unit)?>(2)?.invoke("res-1")
-                "res-1"
-            }
-            every {
-                HermesWsClient.send(WsMethods.SESSION_CLOSE, any(), any())
-            } answers {
-                arg<((String) -> Unit)?>(2)?.invoke("cls-1")
-                "cls-1"
+            fakeTransport.onSend = { method, _ ->
+                when (method) {
+                    WsMethods.SESSION_DELETE -> "del-${++deleteCount}"
+                    WsMethods.SESSION_RESUME -> "res-1"
+                    WsMethods.SESSION_CLOSE -> "cls-1"
+                    else -> fakeTransport.nextSendId()
+                }
             }
 
             viewModel.deleteRailSession("stored-bg")
             advanceUntilIdle()
 
             // The gateway refuses: the target's runtime is still live.
-            mockEventsFlow.emit(
+            fakeTransport.eventFlow.emit(
                 WsEvent.RpcError(
                     "del-1",
                     JsonRpcError(code = 4023, message = "cannot delete an active session"),
@@ -514,38 +445,26 @@ class SessionRenameTest {
             advanceUntilIdle()
 
             // 1. Resume the STORED id purely to learn its runtime sid.
-            verify {
-                HermesWsClient.send(
-                    WsMethods.SESSION_RESUME,
-                    mapOf("session_id" to "stored-bg", "omit_messages" to true),
-                    any(),
-                )
-            }
-            mockEventsFlow.emit(
+            verifySent(WsMethods.SESSION_RESUME, mapOf("session_id" to "stored-bg", "omit_messages" to true))
+            fakeTransport.eventFlow.emit(
                 WsEvent.RpcResult("res-1", mapOf("session_id" to "runtime-a1b2")),
             )
             advanceUntilIdle()
 
             // 2. Close that runtime — session.close resolves an exact live
             //    runtime sid (`_pop_session_by_id` pops the `_sessions` key).
-            verify {
-                HermesWsClient.send(
-                    WsMethods.SESSION_CLOSE,
-                    mapOf("session_id" to "runtime-a1b2"),
-                    any(),
-                )
-            }
-            mockEventsFlow.emit(WsEvent.RpcResult("cls-1", mapOf("closed" to true)))
+            verifySent(WsMethods.SESSION_CLOSE, mapOf("session_id" to "runtime-a1b2"))
+            fakeTransport.eventFlow.emit(WsEvent.RpcResult("cls-1", mapOf("closed" to true)))
             advanceUntilIdle()
 
             // 3. Retry the stored delete (two sends total, not a loop).
-            verify(exactly = 2) {
-                HermesWsClient.send(
-                    WsMethods.SESSION_DELETE,
-                    mapOf("session_id" to "stored-bg"),
-                    any(),
-                )
-            }
+            assertEquals(
+                2,
+                fakeTransport.sends.count {
+                    it.method == WsMethods.SESSION_DELETE &&
+                        it.params == mapOf("session_id" to "stored-bg")
+                },
+            )
             assertNull(viewModel.uiState.value.errorMessage)
         }
 
@@ -554,47 +473,36 @@ class SessionRenameTest {
         runTest {
             val viewModel = createViewModelWithSession()
             var deleteCount = 0
-            every {
-                HermesWsClient.send(WsMethods.SESSION_DELETE, any(), any())
-            } answers {
-                deleteCount++
-                val id = "del-$deleteCount"
-                arg<((String) -> Unit)?>(2)?.invoke(id)
-                id
-            }
-            every {
-                HermesWsClient.send(WsMethods.SESSION_RESUME, any(), any())
-            } answers {
-                arg<((String) -> Unit)?>(2)?.invoke("res-1")
-                "res-1"
-            }
-            every {
-                HermesWsClient.send(WsMethods.SESSION_CLOSE, any(), any())
-            } answers {
-                arg<((String) -> Unit)?>(2)?.invoke("cls-1")
-                "cls-1"
+            fakeTransport.onSend = { method, _ ->
+                when (method) {
+                    WsMethods.SESSION_DELETE -> "del-${++deleteCount}"
+                    WsMethods.SESSION_RESUME -> "res-1"
+                    WsMethods.SESSION_CLOSE -> "cls-1"
+                    else -> fakeTransport.nextSendId()
+                }
             }
 
             viewModel.deleteRailSession("stored-bg")
             advanceUntilIdle()
-            mockEventsFlow.emit(
+            fakeTransport.eventFlow.emit(
                 WsEvent.RpcError("del-1", JsonRpcError(4023, "cannot delete an active session")),
             )
             advanceUntilIdle()
-            mockEventsFlow.emit(WsEvent.RpcResult("res-1", mapOf("session_id" to "runtime-a1b2")))
+            fakeTransport.eventFlow.emit(WsEvent.RpcResult("res-1", mapOf("session_id" to "runtime-a1b2")))
             advanceUntilIdle()
-            mockEventsFlow.emit(WsEvent.RpcResult("cls-1", mapOf("closed" to true)))
+            fakeTransport.eventFlow.emit(WsEvent.RpcResult("cls-1", mapOf("closed" to true)))
             advanceUntilIdle()
 
             // The retry is refused too — surface it and give up (no third send).
-            mockEventsFlow.emit(
+            fakeTransport.eventFlow.emit(
                 WsEvent.RpcError("del-2", JsonRpcError(4023, "cannot delete an active session")),
             )
             advanceUntilIdle()
 
-            verify(exactly = 2) {
-                HermesWsClient.send(WsMethods.SESSION_DELETE, any(), any())
-            }
+            assertEquals(
+                2,
+                fakeTransport.sends.count { it.method == WsMethods.SESSION_DELETE },
+            )
             assertTrue(
                 "expected a delete failure message, got " +
                     viewModel.uiState.value.errorMessage,
