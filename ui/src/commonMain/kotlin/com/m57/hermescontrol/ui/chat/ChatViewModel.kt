@@ -85,9 +85,6 @@ import kotlin.concurrent.Volatile
 private const val TAG = "ChatViewModel"
 private const val MESSAGE_PAGE_SIZE = 150
 
-/** How many recent transcripts stay in memory for instant switches. */
-private const val TRANSCRIPT_CACHE_LIMIT = 8
-
 /**
  * How long an unacknowledged `session.create` waits before it is retried.
  *
@@ -337,7 +334,7 @@ class ChatViewModel(
         }
         viewModelScope.launch(io) {
             _uiState.collect { state ->
-                state.currentSessionId?.let { id -> cacheTranscript(id, state.messages) }
+                state.currentSessionId?.let { id -> transcriptCache.put(selectedProfileNow(), id, state.messages) }
             }
         }
         viewModelScope.launch(io) {
@@ -2009,37 +2006,11 @@ class ChatViewModel(
 
     private fun lastSession(): String? = preferences.getString(lastSessionKey())?.takeIf { it.isNotBlank() }
 
-    /**
-     * Recently seen transcripts, keyed by profile *and* session.
-     *
-     * Web has no Room, so without this a switch is a guaranteed blank while the network answers.
-     * Bounded and insertion-ordered: the oldest entry goes first. It is a cache, never a source
-     * of truth — the authoritative load still converges the view, and a stale entry is replaced
-     * as soon as the gateway answers.
-     */
-    private val transcriptCache = LinkedHashMap<String, List<ChatMessage>>()
+    /** Bounded, profile-keyed transcript cache. Owns its own keying and eviction (see the class). */
+    private val transcriptCache = TranscriptCache()
 
     /** Wall-clock milliseconds, for "how long has this been out of date". */
     private fun nowMs(): Long = nowMillis()
-
-    private fun transcriptKey(sessionId: String): String = (selectedProfileNow() ?: "default") + "|" + sessionId
-
-    private fun cacheTranscript(
-        sessionId: String,
-        messages: List<ChatMessage>,
-    ) {
-        if (messages.isEmpty()) return
-        val key = transcriptKey(sessionId)
-        transcriptCache.remove(key)
-        transcriptCache[key] = messages
-        while (transcriptCache.size > TRANSCRIPT_CACHE_LIMIT) {
-            val oldest = transcriptCache.keys.firstOrNull() ?: break
-            transcriptCache.remove(oldest)
-        }
-    }
-
-    private fun cachedTranscript(sessionId: String): List<ChatMessage> =
-        transcriptCache[transcriptKey(sessionId)].orEmpty()
 
     /**
      * Drop the open conversation when the profile changes.
@@ -2921,7 +2892,7 @@ class ChatViewModel(
                 // Paint from the transcript cache when we have it: on web there is no Room, so
                 // blanking here made every switch a visible flash. The authoritative load still
                 // converges the view; a cache miss legitimately starts empty.
-                messages = cachedTranscript(sessionId),
+                messages = transcriptCache.get(selectedProfileNow(), sessionId),
                 subagentIndicators = emptyList(),
                 todos = emptyList(),
                 chatTitle = title,
