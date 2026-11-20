@@ -6,12 +6,13 @@ import android.app.Application
 import androidx.lifecycle.viewModelScope
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.local.HermesDatabase
-import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.ws.ConnectionStatus
 import com.m57.hermescontrol.data.ws.HermesWsClient
 import com.m57.hermescontrol.data.ws.WsEvent
 import com.m57.hermescontrol.data.ws.WsMethods
+import com.m57.hermescontrol.ui.chat.fakes.FakeChatApi
 import com.m57.hermescontrol.ui.chat.fakes.FakeChatPersistenceRepository
+import com.m57.hermescontrol.ui.chat.fakes.FakeChatTransport
 import com.m57.hermescontrol.ui.chat.fakes.FakeSlashUsageStore
 import com.m57.hermescontrol.ui.chat.fakes.testChatEnvironment
 import com.m57.hermescontrol.ui.common.FakeStringResolver
@@ -19,14 +20,11 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.mockkStatic
-import io.mockk.slot
 import io.mockk.unmockkAll
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -53,13 +51,12 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class SlashCommandDispatchRpcTest {
     private val testDispatcher = StandardTestDispatcher()
-    private val mockEventsFlow = MutableSharedFlow<WsEvent>(extraBufferCapacity = 64)
-    private val mockConnectionStatus = MutableStateFlow(ConnectionStatus.DISCONNECTED)
+    private val fakeTransport = FakeChatTransport()
+    private val fakeApi = FakeChatApi()
     private lateinit var app: Application
     private lateinit var resolver: FakeStringResolver
     private lateinit var fakeRepo: FakeChatPersistenceRepository
     private lateinit var fakeSlashUsageStore: FakeSlashUsageStore
-    private var reqCount = 0
 
     /**
      * Every ViewModel built by this class, so `tearDown` can cancel its
@@ -73,7 +70,6 @@ class SlashCommandDispatchRpcTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         val testMainDispatcher = Dispatchers.Main
-        reqCount = 0
 
         mockkStatic(android.util.Log::class)
         every { android.util.Log.d(any(), any()) } returns 0
@@ -87,8 +83,6 @@ class SlashCommandDispatchRpcTest {
         every { Dispatchers.Main } returns testMainDispatcher
 
         mockkObject(AuthManager)
-        mockkObject(HermesWsClient)
-        mockkObject(ApiClient)
         mockkObject(HermesDatabase)
 
         app = mockk(relaxed = true)
@@ -96,34 +90,15 @@ class SlashCommandDispatchRpcTest {
         fakeRepo = FakeChatPersistenceRepository()
         fakeSlashUsageStore = FakeSlashUsageStore()
 
-        mockConnectionStatus.value = ConnectionStatus.DISCONNECTED
+        fakeTransport.status.value = ConnectionStatus.DISCONNECTED
 
         every { AuthManager.getToken() } returns "test-token"
         every { AuthManager.getSelectedProfileId() } returns "profile-test"
         every { AuthManager.isTypingEffectEnabled() } returns true
         every { AuthManager.getTypingEffectDelayMs() } returns 30
         every { AuthManager.isAutoReconnect() } returns false
-        every { HermesWsClient.events } returns mockEventsFlow
-        every { HermesWsClient.connectionStatus } returns mockConnectionStatus
-        every { HermesWsClient.connectionBinding("profile-test") } returns mockk()
-        every { HermesWsClient.isConnectionBindingCurrent(any()) } returns true
-        every { HermesWsClient.connect() } answers {
-            mockConnectionStatus.value = ConnectionStatus.CONNECTING
-        }
-        every { HermesWsClient.disconnect() } returns Unit
-
-        every { HermesWsClient.send(any(), any(), any()) } answers {
-            reqCount++
-            val id = "req-id-$reqCount"
-            arg<((String) -> Unit)?>(2)?.invoke(id)
-            id
-        }
-        every { HermesWsClient.sendMessage(any(), any(), any(), any()) } answers {
-            reqCount++
-            val id = "req-msg-$reqCount"
-            arg<((String) -> Unit)?>(2)?.invoke(id)
-            id
-        }
+        fakeTransport.status.value = ConnectionStatus.DISCONNECTED
+        fakeTransport.bindingIsCurrent = true
     }
 
     @After
@@ -145,11 +120,13 @@ class SlashCommandDispatchRpcTest {
                 fakeRepo,
                 fakeSlashUsageStore,
                 testDispatcher,
+                wsClient = fakeTransport,
+                api = fakeApi,
             )
         createdViewModels += vm
         advanceUntilIdle()
-        mockConnectionStatus.value = ConnectionStatus.CONNECTED
-        mockEventsFlow.emit(WsEvent.GatewayReady(null))
+        fakeTransport.status.value = ConnectionStatus.CONNECTED
+        fakeTransport.eventFlow.emit(WsEvent.GatewayReady(null))
         advanceUntilIdle()
         // Auto-create on launch is disabled (Likivik): the ViewModel no longer
         // fires session.create on GatewayReady, so the test must request the
@@ -157,8 +134,8 @@ class SlashCommandDispatchRpcTest {
         // answer the create that was actually sent (the last send wins).
         vm.createNewSession()
         advanceUntilIdle()
-        val createId = "req-id-$reqCount"
-        mockEventsFlow.emit(WsEvent.RpcResult(createId, mapOf("session_id" to "session-xyz")))
+        val createId = "req-id-${fakeTransport.sendCount}"
+        fakeTransport.eventFlow.emit(WsEvent.RpcResult(createId, mapOf("session_id" to "session-xyz")))
         advanceUntilIdle()
         check(vm.uiState.value.currentSessionId == "session-xyz") {
             "createViewModelWithSession: session was not installed"
@@ -171,23 +148,13 @@ class SlashCommandDispatchRpcTest {
         runTest {
             val (vm, sessionId) = createViewModelWithSession()
 
-            val methodSlot = slot<String>()
-            val paramsSlot = slot<Map<String, Any>>()
-            var captured = false
-            every {
-                HermesWsClient.request(capture(methodSlot), capture(paramsSlot), any())
-            } answers {
-                captured = true
-                CompletableDeferred<Any?>(Unit)
-            }
-
             // /help is NOT client-special-cased -> RpcDispatch
             vm.sendMessage("/help")
             advanceUntilIdle()
 
-            assertTrue("expected a COMMAND_DISPATCH request", captured)
-            assertEquals(WsMethods.COMMAND_DISPATCH, methodSlot.captured)
-            val params = paramsSlot.captured
+            assertTrue("expected a COMMAND_DISPATCH request", fakeTransport.requests.isNotEmpty())
+            assertEquals(WsMethods.COMMAND_DISPATCH, fakeTransport.requests.last().method)
+            val params = fakeTransport.requests.last().params
             assertEquals("help", params["name"])
             assertEquals("", params["arg"])
             assertEquals(sessionId, params["session_id"])
@@ -198,33 +165,13 @@ class SlashCommandDispatchRpcTest {
         runTest {
             val (vm, sessionId) = createViewModelWithSession()
 
-            val sentSession = slot<String>()
-            val sentText = slot<String>()
-            val sentQueued = slot<Boolean>()
-            val rpcMethods = mutableListOf<String>()
-            every {
-                HermesWsClient.request(capture(rpcMethods), any(), any())
-            } answers {
-                CompletableDeferred<Any?>(Unit)
-            }
-            every {
-                HermesWsClient.sendMessage(
-                    capture(sentSession),
-                    capture(sentText),
-                    any(),
-                    capture(sentQueued),
-                )
-            } answers {
-                "queued-msg-1"
-            }
-
             vm.sendMessage("/queue do the thing")
             advanceUntilIdle()
 
-            assertTrue(WsMethods.COMMAND_DISPATCH !in rpcMethods)
-            assertEquals(sessionId, sentSession.captured)
-            assertEquals("do the thing", sentText.captured)
-            assertEquals(true, sentQueued.captured)
+            assertTrue(fakeTransport.requests.none { it.method == WsMethods.COMMAND_DISPATCH })
+            assertEquals(sessionId, fakeTransport.sentMessages.last().sessionId)
+            assertEquals("do the thing", fakeTransport.sentMessages.last().text)
+            assertEquals(true, fakeTransport.sentMessages.last().queued)
             val userBubble =
                 vm.uiState.value.messages.lastOrNull {
                     it.role == MessageRole.USER
@@ -236,18 +183,10 @@ class SlashCommandDispatchRpcTest {
     fun `bare queue shows usage without sending`() =
         runTest {
             val (vm, _) = createViewModelWithSession()
-            var sendCalls = 0
-            every {
-                HermesWsClient.sendMessage(any(), any(), any(), any())
-            } answers {
-                sendCalls++
-                "queued-msg-1"
-            }
-
             vm.sendMessage("/queue")
             advanceUntilIdle()
 
-            assertEquals(0, sendCalls)
+            assertEquals(0, fakeTransport.sentMessages.size)
             assertEquals(
                 "usage: /queue <prompt>",
                 vm.uiState.value.messages.lastOrNull()?.content,
@@ -259,9 +198,7 @@ class SlashCommandDispatchRpcTest {
         runTest {
             val (vm, _) = createViewModelWithSession()
 
-            every {
-                HermesWsClient.request(any(), any(), any())
-            } answers {
+            fakeTransport.onRequest = { method, _, _ ->
                 val d = CompletableDeferred<Any?>()
                 d.completeExceptionally(
                     // A real, actionable error (not the "not a command" 4018
@@ -283,12 +220,7 @@ class SlashCommandDispatchRpcTest {
         runTest {
             val (vm, sessionId) = createViewModelWithSession()
 
-            val methodSlot = slot<String>()
-            val paramsSlot = slot<Map<String, Any>>()
-            every {
-                HermesWsClient.request(capture(methodSlot), capture(paramsSlot), any())
-            } answers {
-                val m = methodSlot.captured
+            fakeTransport.onRequest = { m, _, _ ->
                 val d = CompletableDeferred<Any?>()
                 if (m == WsMethods.COMMAND_DISPATCH) {
                     // Backend rejects /status with the registry-miss 4018 (issue #576).
@@ -309,8 +241,8 @@ class SlashCommandDispatchRpcTest {
 
             // The fallback must have hit slash.exec with the full command string.
             // (methodSlot/paramsSlot hold the LAST call = slash.exec.)
-            assertEquals(WsMethods.SLASH_EXEC, methodSlot.captured)
-            val params = paramsSlot.captured
+            assertEquals(WsMethods.SLASH_EXEC, fakeTransport.requests.last().method)
+            val params = fakeTransport.requests.last().params
             assertEquals("/status", params["command"])
             assertEquals(sessionId, params["session_id"])
 
@@ -324,11 +256,7 @@ class SlashCommandDispatchRpcTest {
         runTest {
             val (vm, _) = createViewModelWithSession()
 
-            var rpcCalls = 0
-            every {
-                HermesWsClient.request(any(), any(), any())
-            } answers {
-                rpcCalls++
+            fakeTransport.onRequest = { method, _, _ ->
                 CompletableDeferred<Any?>(Unit)
             }
 
@@ -342,7 +270,7 @@ class SlashCommandDispatchRpcTest {
                 "expected a 'not supported on mobile' message, got: ${last?.content}",
                 last?.content?.contains("not supported on mobile") == true,
             )
-            assertEquals("no RPC should fire for a blocklisted command", 0, rpcCalls)
+            assertEquals("no RPC should fire for a blocklisted command", 0, fakeTransport.requests.size)
         }
 
     @Test
@@ -350,10 +278,8 @@ class SlashCommandDispatchRpcTest {
         runTest {
             val (vm, _) = createViewModelWithSession()
 
-            every {
-                HermesWsClient.request(any(), any(), any())
-            } answers {
-                val m = arg<String>(0)
+            fakeTransport.onRequest = { method, _, _ ->
+                val m = method
                 val d = CompletableDeferred<Any?>()
                 if (m == WsMethods.COMMAND_DISPATCH) {
                     // Registry miss -> triggers the slash.exec fallback.
@@ -384,10 +310,8 @@ class SlashCommandDispatchRpcTest {
         runTest {
             val (vm, _) = createViewModelWithSession()
 
-            every {
-                HermesWsClient.request(any(), any(), any())
-            } answers {
-                val m = arg<String>(0)
+            fakeTransport.onRequest = { method, _, _ ->
+                val m = method
                 val d = CompletableDeferred<Any?>()
                 if (m == WsMethods.COMMAND_DISPATCH) {
                     d.completeExceptionally(
@@ -418,22 +342,14 @@ class SlashCommandDispatchRpcTest {
         runTest {
             val (vm, sessionId) = createViewModelWithSession()
 
-            val methodSlot = slot<String>()
-            val paramsSlot = slot<Map<String, Any>>()
-            every {
-                HermesWsClient.request(capture(methodSlot), capture(paramsSlot), any())
-            } answers {
-                CompletableDeferred<Any?>(Unit)
-            }
-
             // /init generates-or-updates AGENTS.md (backend command.dispatch
             // name=="init" branch, hermes-agent tui_gateway/server.py ~L15451).
             // NOT client-special-cased -> RpcDispatch.
             vm.sendMessage("/init")
             advanceUntilIdle()
 
-            assertEquals(WsMethods.COMMAND_DISPATCH, methodSlot.captured)
-            val params = paramsSlot.captured
+            assertEquals(WsMethods.COMMAND_DISPATCH, fakeTransport.requests.last().method)
+            val params = fakeTransport.requests.last().params
             assertEquals("init", params["name"])
             assertEquals("", params["arg"])
             assertEquals(sessionId, params["session_id"])
@@ -444,19 +360,11 @@ class SlashCommandDispatchRpcTest {
         runTest {
             val (vm, sessionId) = createViewModelWithSession()
 
-            val methodSlot = slot<String>()
-            val paramsSlot = slot<Map<String, Any>>()
-            every {
-                HermesWsClient.request(capture(methodSlot), capture(paramsSlot), any())
-            } answers {
-                CompletableDeferred<Any?>(Unit)
-            }
-
             vm.sendMessage("/init extra context here")
             advanceUntilIdle()
 
-            assertEquals(WsMethods.COMMAND_DISPATCH, methodSlot.captured)
-            val params = paramsSlot.captured
+            assertEquals(WsMethods.COMMAND_DISPATCH, fakeTransport.requests.last().method)
+            val params = fakeTransport.requests.last().params
             assertEquals("init", params["name"])
             assertEquals("extra context here", params["arg"])
             assertEquals(sessionId, params["session_id"])
@@ -467,22 +375,14 @@ class SlashCommandDispatchRpcTest {
         runTest {
             val (vm, sessionId) = createViewModelWithSession()
 
-            val methodSlot = slot<String>()
-            val paramsSlot = slot<Map<String, Any>>()
-            every {
-                HermesWsClient.request(capture(methodSlot), capture(paramsSlot), any())
-            } answers {
-                CompletableDeferred<Any?>(Unit)
-            }
-
             // /focus is the display-only focus view (backend command.dispatch
             // name=="focus" branch, hermes-agent tui_gateway/server.py ~L15522).
             // NOT client-special-cased -> RpcDispatch.
             vm.sendMessage("/focus")
             advanceUntilIdle()
 
-            assertEquals(WsMethods.COMMAND_DISPATCH, methodSlot.captured)
-            val params = paramsSlot.captured
+            assertEquals(WsMethods.COMMAND_DISPATCH, fakeTransport.requests.last().method)
+            val params = fakeTransport.requests.last().params
             assertEquals("focus", params["name"])
             assertEquals("", params["arg"])
             assertEquals(sessionId, params["session_id"])
@@ -493,19 +393,11 @@ class SlashCommandDispatchRpcTest {
         runTest {
             val (vm, sessionId) = createViewModelWithSession()
 
-            val methodSlot = slot<String>()
-            val paramsSlot = slot<Map<String, Any>>()
-            every {
-                HermesWsClient.request(capture(methodSlot), capture(paramsSlot), any())
-            } answers {
-                CompletableDeferred<Any?>(Unit)
-            }
-
             vm.sendMessage("/focus on")
             advanceUntilIdle()
 
-            assertEquals(WsMethods.COMMAND_DISPATCH, methodSlot.captured)
-            val params = paramsSlot.captured
+            assertEquals(WsMethods.COMMAND_DISPATCH, fakeTransport.requests.last().method)
+            val params = fakeTransport.requests.last().params
             assertEquals("focus", params["name"])
             assertEquals("on", params["arg"])
             assertEquals(sessionId, params["session_id"])
@@ -516,14 +408,9 @@ class SlashCommandDispatchRpcTest {
         runTest {
             val (vm, _) = createViewModelWithSession()
 
-            val methodSlot = slot<String>()
-            val paramsSlot = slot<Map<String, Any>>()
-            val sentText = slot<String>()
-            every {
-                HermesWsClient.request(capture(methodSlot), capture(paramsSlot), any())
-            } answers {
+            fakeTransport.onRequest = { method, _, _ ->
                 val d = CompletableDeferred<Any?>()
-                if (methodSlot.captured == WsMethods.COMMAND_DISPATCH) {
+                if (method == WsMethods.COMMAND_DISPATCH) {
                     // Backend /init returns type:"send" with the AGENTS.md prompt.
                     d.complete(mapOf("type" to "send", "message" to "Scan this repo and write AGENTS.md"))
                 } else {
@@ -532,24 +419,11 @@ class SlashCommandDispatchRpcTest {
                 d
             }
             // submitPrompt() forwards the returned prompt via wsClient.sendMessage.
-            every {
-                HermesWsClient.sendMessage(
-                    any(),
-                    capture(sentText),
-                    any(),
-                    any(),
-                )
-            } answers {
-                val id = "send-msg-1"
-                arg<((String) -> Unit)?>(2)?.invoke(id)
-                id
-            }
-
             vm.sendMessage("/init")
             advanceUntilIdle()
 
             // type:"send" must be forwarded to the agent as a normal prompt turn.
-            assertEquals("Scan this repo and write AGENTS.md", sentText.captured)
+            assertEquals("Scan this repo and write AGENTS.md", fakeTransport.sentMessages.last().text)
         }
 
     @Test
@@ -557,10 +431,8 @@ class SlashCommandDispatchRpcTest {
         runTest {
             val (vm, _) = createViewModelWithSession()
 
-            every {
-                HermesWsClient.request(any(), any(), any())
-            } answers {
-                val m = arg<String>(0)
+            fakeTransport.onRequest = { method, _, _ ->
+                val m = method
                 val d = CompletableDeferred<Any?>()
                 if (m == WsMethods.COMMAND_DISPATCH) {
                     // Backend /focus returns type:"exec" with a notice line.
