@@ -928,17 +928,8 @@ class ChatViewModel(
                 runtimeSessionId = runtimeId
                 _uiState.update {
                     it.copy(
-                        transcript =
-                            it.transcript.copy(
-                                currentSessionId = storageId,
-                                isSessionReady = true,
-                                isLoading = false,
-                                messages = emptyList(),
-                                subagentIndicators = emptyList(),
-                                todos = emptyList(),
-                                chatTitle = "Hermes",
-                            ),
-                        composer = it.composer.copy(currentSessionModel = null, terminalBackend = null),
+                        transcript = it.transcript.withInstalledSession(storageId = storageId),
+                        composer = it.composer.withNoSessionModel(),
                         overlays = it.overlays.copy(modelSwitchConfirmation = null),
                     )
                 }
@@ -969,33 +960,23 @@ class ChatViewModel(
                 _uiState.update {
                     it.copy(
                         transcript =
-                            it.transcript.copy(
-                                currentSessionId = newId,
-                                isSessionReady = true,
-                                isLoading = false,
-                                messages = emptyList(),
-                                subagentIndicators = emptyList(),
-                                todos = emptyList(),
-                                chatTitle =
-                                    (resultMap["title"] as? String)?.takeIf {
-                                            t ->
-                                        t.isNotBlank()
+                            it.transcript.withInstalledSession(
+                                storageId = newId,
+                                title =
+                                    (resultMap["title"] as? String)?.takeIf { title ->
+                                        title.isNotBlank()
                                     } ?: "Hermes",
                                 // Never use the parent snapshot as the previous value:
                                 // the branch response carries child-scoped info.
                                 contextUsage = parseContextUsage(usage, previous = null),
+                                replaceContextUsage = true,
                             ),
                         composer =
-                            it.composer.copy(
-                                currentSessionModel =
-                                    model.takeIf { it.isNotEmpty() }?.let { resolvedModel ->
-                                        qualifyModelLabel(provider, resolvedModel)
-                                    },
-                                reasoningLevel =
-                                    reasoningEffort?.takeIf {
-                                        it.isNotEmpty()
-                                    },
-                                terminalBackend = terminalBackend?.takeIf { it.isNotEmpty() },
+                            it.composer.withSessionModel(
+                                provider = provider,
+                                model = model,
+                                reasoningLevel = reasoningEffort,
+                                terminalBackend = terminalBackend,
                             ),
                     )
                 }
