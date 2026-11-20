@@ -16,7 +16,6 @@ import com.m57.hermescontrol.data.model.ModelProvider
 import com.m57.hermescontrol.data.model.PinnedModel
 import com.m57.hermescontrol.data.model.SessionInfo
 import com.m57.hermescontrol.data.model.SessionMessage
-import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.AuthPayloads
 import com.m57.hermescontrol.data.remote.HermesJson
 import com.m57.hermescontrol.data.remote.NetworkError
@@ -172,7 +171,7 @@ class ChatViewModel(
     /** Profile changes to follow; empty in tests, the client's selection flow in production. */
     private val profileChanges: Flow<String?> = emptyFlow(),
     /** The selection, synchronously, for per-profile storage keys. */
-    private val selectedProfileNow: () -> String? = { ApiClient.selectedProfileId },
+    private val selectedProfileNow: () -> String? = { DefaultChatApi.selectedProfileId },
     private val selectedGatewayId: () -> String = {
         AppEnvironment.current.auth.getSelectedProfileId() ?: AuthDefaults.PROFILE_ID
     },
@@ -181,6 +180,10 @@ class ChatViewModel(
     private val attachmentOpener: AttachmentOpener = environment.attachmentOpener,
     /** IO dispatcher for background work; injectable so tests can drive it deterministically. */
     private val io: kotlinx.coroutines.CoroutineDispatcher = com.m57.hermescontrol.util.ioDispatcher,
+    /** The websocket seam. Production is the singleton; tests pass a fake. */
+    private val wsClient: ChatTransport = DefaultChatTransport,
+    /** The HTTP seam, same rule. */
+    private val api: ChatApi = DefaultChatApi,
 ) : ViewModel() {
     // ── Internal state ───────────────────────────────────────────────────
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -232,8 +235,6 @@ class ChatViewModel(
      * because request ids can be reused; see [ApprovalExpiryScheduler].
      */
     private val approvalExpiry = ApprovalExpiryScheduler(viewModelScope)
-
-    private val wsClient = HermesWsClient
 
     // ── Session persistence ──────────────────────────────────────────────
     private val repo: ChatPersistenceRepository = repo
@@ -305,8 +306,8 @@ class ChatViewModel(
                 .collect {
                     // A profile name is per gateway: carrying it across a connection switch
                     // would scope every request to a profile the new gateway may not have.
-                    ApiClient.clearSelectedProfile()
-                    ApiClient.currentProfileName()
+                    api.clearSelectedProfile()
+                    api.currentProfileName()
                     _uiState.update { it.copy(sessions = emptyList(), railStatus = RailLoadStatus.Loading) }
                     requestRailRefresh(force = true)
                 }
@@ -314,7 +315,7 @@ class ChatViewModel(
         viewModelScope.launch(io) {
             // Learn the serving profile once, then scope every request to it. The client
             // rebuilds on change, so the rail can never mix two profiles' rows.
-            if (ApiClient.selectedProfileId == null) {
+            if (api.selectedProfileId == null) {
                 val resolved =
                     try {
                         profileProvider.current()
@@ -324,7 +325,7 @@ class ChatViewModel(
                         HermesLog.e("ChatVM", "Profile resolution failed", e)
                         null
                     }
-                resolved?.let(ApiClient::setSelectedProfile)
+                resolved?.let(api::setSelectedProfile)
             }
         }
         viewModelScope.launch(io) {
@@ -2436,7 +2437,7 @@ class ChatViewModel(
         while (pages < RAIL_MAX_PAGES) {
             val result =
                 safeApiCall {
-                    ApiClient.hermesApi.getSessions(
+                    api.hermesApi.getSessions(
                         limit = RAIL_PAGE_SIZE,
                         offset = offset,
                         order = "recent",
@@ -2515,7 +2516,7 @@ class ChatViewModel(
      */
     private fun fetchModelContextLength() {
         viewModelScope.launch(io) {
-            when (val result = safeApiCall { ApiClient.hermesApi.getModelInfo() }) {
+            when (val result = safeApiCall { api.hermesApi.getModelInfo() }) {
                 is NetworkResult.Success -> {
                     val length =
                         result.data.effectiveContextLength
@@ -2594,7 +2595,7 @@ class ChatViewModel(
         viewModelScope.launch(io) {
             val result =
                 safeApiCall {
-                    ApiClient.hermesApi.getModelOptions(refresh = false)
+                    api.hermesApi.getModelOptions(refresh = false)
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -2642,7 +2643,7 @@ class ChatViewModel(
         viewModelScope.launch(io) {
             val result =
                 safeApiCall {
-                    ApiClient.hermesApi.getModelOptions(refresh = true)
+                    api.hermesApi.getModelOptions(refresh = true)
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -3325,7 +3326,7 @@ class ChatViewModel(
             withContext(io) {
                 // One precise row, not a 500-row listing: the route caps `limit` at 100,
                 // so the old `getSessions(limit = 500)` here could never succeed.
-                safeApiCall { ApiClient.hermesApi.getSession(sessionId) }
+                safeApiCall { api.hermesApi.getSession(sessionId) }
             }
         if (result is NetworkResult.Success) {
             if (!isHistoryRefreshCurrent(fence, owner)) return null
@@ -3353,7 +3354,7 @@ class ChatViewModel(
         order: String? = null,
     ) = withContext(io) {
         safeApiCall {
-            ApiClient.hermesApi.getSessionMessages(
+            api.hermesApi.getSessionMessages(
                 sessionId = sessionId,
                 limit = limit,
                 offset = offset,
@@ -4579,7 +4580,7 @@ class ChatViewModel(
             val jsonBody = AuthPayloads.passwordLogin(username, password)
 
             try {
-                val status = ApiClient.postJson(path = "auth/password-login", jsonBody = jsonBody)
+                val status = api.postJson(path = "auth/password-login", jsonBody = jsonBody)
                 if (status !in 200..299) {
                     val msg =
                         when (status) {
