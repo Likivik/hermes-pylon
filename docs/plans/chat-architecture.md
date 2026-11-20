@@ -85,10 +85,12 @@ Adding a `require()` before the transitions that produce those states are enumer
 currently-tolerated states into crashes; the reducers in Step 2 are where each transition becomes a
 closed list, and the invariants follow from them.
 
-## Step 2 — Reducers, transcript first — IN PROGRESS
+## Step 2 — Reducers, transcript first — DONE 2026-11-20 (#224, #225, #227)
 
-Landed 2026-11-20 (#224): `TranscriptReducer` with `LoadStarted`, `HistoryLoaded`, `HistoryFailed`,
-12 pure tests. Landing next: `OlderLoadStarted`, `OlderLoaded`.
+Landed 2026-11-20: `TranscriptReducer` with `LoadStarted`, `HistoryLoaded`, `HistoryFailed` (#224);
+`OlderLoadStarted`/`OlderLoaded` (#225); clarify-overlay transitions through their own reducer (#227).
+16 reducer tests. `ChatRouterCharacterizationTest` (#229) pins the router's three core guarantees so the
+Step 3 moves below are gated by a test written against `main`.
 
 - `TranscriptReducer.reduce(state: TranscriptState, intent: TranscriptIntent): TranscriptState` — pure.
 - The existing load/append/merge/stale transitions are re-expressed as intents and the ViewModel
@@ -100,10 +102,32 @@ perform today is expressible as an intent; reducer tests cover late-response dro
 and clearing; the 169 tests still pass unchanged; the ViewModel has no transcript-state mutation
 outside the reducer.
 
-## Step 3 — Retire the ViewModel, area by area
+## Step 3 — Retire the ViewModel, area by area — IN PROGRESS
 
-Composer, connection and overlays follow the same pattern. The ViewModel ends as a dispatcher:
-intents in, state out, effects delegated.
+Started 2026-11-20. Each PR moves a *rule* out of `handleRpcResult` into `:shared` as a pure function
+with tests, leaving the effects (fences, holders, persistence, job cancellation) in the ViewModel.
+
+Landed:
+
+- **3a (#231)** — `withInstalledSession`, `withNoSessionModel`, `withSessionModel`: session create and
+  branch. Surfaced an undocumented difference: a branch replaces `contextUsage` even with `null`, a
+  create leaves it alone.
+- **3b (#233)** — `withResumedSession`, `withResumedModel`: the resume ack. Found the third
+  model-label implementation and fixed a real bug — resume built `"$provider/$model"` unconditionally,
+  so a pre-qualified model became `openai/openai/gpt-5`.
+- **3c (#235)** — `classifyDispatchResult` / `DispatchOutcome`: `command.dispatch` as data. Documented
+  the asymmetry that `exec` falls back to `message` and `plugin` does not.
+
+`handleRpcResult`: 322 → ~230 lines.
+
+What remains in it, and why it is not a rule to extract: `SESSION_LIST` (4 lines), `SESSION_CLOSE` (7),
+`SESSION_INTERRUPT` (11), `COMMANDS_CATALOG` (12), `APPROVAL_RESPOND` (20) are thin delegations to
+existing functions — `requestRailRefresh`, `submitPrompt`, `streamingController.reset`, and so on.
+Extracting the delegation would add indirection without a testable rule. Step 3 continues when those
+*functions* move, not when their call sites are wrapped.
+
+Next candidates, in order of payoff: the send pipeline (~250 lines, no tests today), then
+`handleWsEvent` (342 lines) behind the harness.
 
 **Acceptance:** `ChatViewModel.kt` under 600 lines; no `_uiState.update` in it; the 60 public
 commands are either intent constructors or thin wrappers; each retired area has reducer tests equal
