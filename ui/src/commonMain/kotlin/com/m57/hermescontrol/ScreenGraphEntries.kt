@@ -49,7 +49,7 @@ import com.m57.hermescontrol.ui.profiles.ProfilesScreen as ProfilesScreenContent
 import com.m57.hermescontrol.ui.providers.ProvidersRoute as ProvidersScreenContent
 import com.m57.hermescontrol.ui.sessions.SessionsScreen as HistoryScreenContent
 import com.m57.hermescontrol.ui.settings.SettingsScreen as SettingsScreenContent
-import com.m57.hermescontrol.ui.skills.SkillsScreen as SkillsScreenContent
+import com.m57.hermescontrol.ui.skills.SkillsRoute as SkillsScreenContent
 import com.m57.hermescontrol.ui.system.SystemScreen as SystemScreenContent
 import com.m57.hermescontrol.ui.toolsets.ToolsetsScreen as ToolsetsScreenContent
 import com.m57.hermescontrol.ui.webhooks.WebhooksRoute as WebhooksRouteContent
