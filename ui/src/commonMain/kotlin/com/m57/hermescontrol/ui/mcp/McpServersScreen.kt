@@ -1,7 +1,7 @@
 package com.m57.hermescontrol.ui.mcp
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,7 +31,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SecondaryTabRow
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
@@ -44,6 +43,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -105,6 +106,7 @@ import com.m57.hermescontrol.theme.Spacing
 import com.m57.hermescontrol.ui.common.DetailDialog
 import com.m57.hermescontrol.ui.common.EmptyState
 import com.m57.hermescontrol.ui.common.ErrorState
+import com.m57.hermescontrol.ui.common.HermesListItem
 import com.m57.hermescontrol.ui.common.HermesScaffold
 import com.m57.hermescontrol.ui.common.NavIcon
 import com.m57.hermescontrol.ui.common.SearchBar
@@ -121,13 +123,170 @@ import com.m57.hermescontrol.ui.icons.HermesSymbol
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
+/**
+ * Everything the MCP screen can ask for, as an interface.
+ *
+ * Twenty-eight individual lambdas is unreadable, and taking the ViewModel directly makes the
+ * screen untestable. The route implements this over the ViewModel; goldens implement it with
+ * no-ops.
+ */
+interface McpActions {
+    fun loadServers()
+
+    fun testAllServers()
+
+    fun toggleServer(server: McpServer)
+
+    fun testServer(name: String)
+
+    fun deleteServer(name: String)
+
+    fun toggleAddForm()
+
+    fun setAddMode(mode: AddServerMode)
+
+    fun updateAddServerName(v: String)
+
+    fun updateAddServerUrl(v: String)
+
+    fun updateAddServerCommand(v: String)
+
+    fun updateAddServerArgs(v: String)
+
+    fun updateAddServerAuth(v: String)
+
+    fun updateAddServerBearerToken(v: String)
+
+    fun submitAddServer()
+
+    fun startEditingEnv(server: McpServer)
+
+    fun stopEditingEnv()
+
+    fun updateEnvKey(v: String)
+
+    fun updateEnvValue(v: String)
+
+    fun addEnvVar(serverName: String)
+
+    fun removeEnvVar(
+        serverName: String,
+        key: String,
+    )
+
+    fun loadCatalog()
+
+    fun updateCatalogQuery(v: String)
+
+    fun installCatalogEntry(entry: McpCatalogEntry)
+
+    fun updateCatalogEnvVar(
+        key: String,
+        value: String,
+    )
+
+    fun startMcpOAuthFlow(
+        server: McpServer,
+        onOpenBrowser: (String) -> Boolean,
+    )
+
+    fun retryMcpOAuthBrowser(onOpenBrowser: (String) -> Boolean)
+
+    fun dismissOAuthFlow()
+
+    fun clearToast()
+}
+
 @Composable
-fun McpServersScreen(
+fun McpServersRoute(
     modifier: Modifier = Modifier,
     onOpenDrawer: (() -> Unit)? = null,
     viewModel: McpServersViewModel = viewModel { McpServersViewModel() },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    McpServersScreen(
+        state = state,
+        actions =
+            object : McpActions {
+                override fun loadServers() = viewModel.loadServers()
+
+                override fun testAllServers() = viewModel.testAllServers()
+
+                override fun toggleServer(server: McpServer) = viewModel.toggleServer(server)
+
+                override fun testServer(name: String) = viewModel.testServer(name)
+
+                override fun deleteServer(name: String) = viewModel.deleteServer(name)
+
+                override fun toggleAddForm() = viewModel.toggleAddForm()
+
+                override fun setAddMode(mode: AddServerMode) = viewModel.setAddMode(mode)
+
+                override fun updateAddServerName(v: String) = viewModel.updateAddServerName(v)
+
+                override fun updateAddServerUrl(v: String) = viewModel.updateAddServerUrl(v)
+
+                override fun updateAddServerCommand(v: String) = viewModel.updateAddServerCommand(v)
+
+                override fun updateAddServerArgs(v: String) = viewModel.updateAddServerArgs(v)
+
+                override fun updateAddServerAuth(v: String) = viewModel.updateAddServerAuth(v)
+
+                override fun updateAddServerBearerToken(v: String) = viewModel.updateAddServerBearerToken(v)
+
+                override fun submitAddServer() = viewModel.submitAddServer()
+
+                override fun startEditingEnv(server: McpServer) = viewModel.startEditingEnv(server)
+
+                override fun stopEditingEnv() = viewModel.stopEditingEnv()
+
+                override fun updateEnvKey(v: String) = viewModel.updateEnvKey(v)
+
+                override fun updateEnvValue(v: String) = viewModel.updateEnvValue(v)
+
+                override fun addEnvVar(serverName: String) = viewModel.addEnvVar(serverName)
+
+                override fun removeEnvVar(
+                    serverName: String,
+                    key: String,
+                ) = viewModel.removeEnvVar(serverName, key)
+
+                override fun loadCatalog() = viewModel.loadCatalog()
+
+                override fun updateCatalogQuery(v: String) = viewModel.updateCatalogQuery(v)
+
+                override fun installCatalogEntry(entry: McpCatalogEntry) = viewModel.installCatalogEntry(entry)
+
+                override fun updateCatalogEnvVar(
+                    key: String,
+                    value: String,
+                ) = viewModel.updateCatalogEnvVar(key, value)
+
+                override fun startMcpOAuthFlow(
+                    server: McpServer,
+                    onOpenBrowser: (String) -> Boolean,
+                ) = viewModel.startMcpOAuthFlow(server, onOpenBrowser)
+
+                override fun retryMcpOAuthBrowser(onOpenBrowser: (String) -> Boolean) =
+                    viewModel.retryMcpOAuthBrowser(onOpenBrowser)
+
+                override fun dismissOAuthFlow() = viewModel.dismissOAuthFlow()
+
+                override fun clearToast() = viewModel.clearToast()
+            },
+        modifier = modifier,
+        onOpenDrawer = onOpenDrawer,
+    )
+}
+
+@Composable
+fun McpServersScreen(
+    state: McpServersUiState,
+    actions: McpActions,
+    modifier: Modifier = Modifier,
+    onOpenDrawer: (() -> Unit)? = null,
+) {
     val spacing = LocalSpacing.current
     val launcher = rememberExternalUrlLauncher()
     var query by remember { mutableStateOf("") }
@@ -155,17 +314,17 @@ fun McpServersScreen(
             }
         }
 
-    LaunchedEffect(Unit) { viewModel.loadServers() }
-    ToastEffect(toastMessage = state.toastMessage, onClearToast = viewModel::clearToast)
+    LaunchedEffect(Unit) { actions.loadServers() }
+    ToastEffect(toastMessage = state.toastMessage, onClearToast = actions::clearToast)
 
     HermesScaffold(
         title = { Text(stringResource(Res.string.screen_mcp_servers)) },
         navigationIcon = onOpenDrawer?.let { NavIcon.Menu(it) },
         isRefreshing = state.isLoading,
-        onRefresh = { viewModel.loadServers() },
+        onRefresh = { actions.loadServers() },
         actions = {
             IconButton(
-                onClick = viewModel::testAllServers,
+                onClick = actions::testAllServers,
                 enabled = !state.isTestingAll && state.servers.any { it.enabled },
             ) {
                 if (state.isTestingAll) {
@@ -187,7 +346,7 @@ fun McpServersScreen(
             state.errorMessage != null -> {
                 ErrorState(
                     message = state.errorMessage ?: "",
-                    onRetry = { viewModel.loadServers() },
+                    onRetry = { actions.loadServers() },
                     modifier = Modifier.padding(paddingValues),
                 )
             }
@@ -200,7 +359,7 @@ fun McpServersScreen(
                 ) {
                     // ── 1. Add server ────────────────────────────────────
                     item(key = "add-header") {
-                        AddServerSection(state, viewModel, spacing)
+                        AddServerSection(state, actions, spacing)
                     }
 
                     // ── 2. Search ────────────────────────────────────────
@@ -219,7 +378,7 @@ fun McpServersScreen(
                                 title = stringResource(Res.string.mcp_servers_empty_title),
                                 subtitle = stringResource(Res.string.mcp_servers_empty_desc),
                                 actionLabel = stringResource(Res.string.empty_action_add_server),
-                                onAction = { viewModel.toggleAddForm() },
+                                onAction = { actions.toggleAddForm() },
                             )
                         }
                     } else if (filteredServers.isEmpty()) {
@@ -237,7 +396,7 @@ fun McpServersScreen(
                         ServerCard(
                             server = server,
                             state = state,
-                            viewModel = viewModel,
+                            actions = actions,
                             spacing = spacing,
                             onClick = { showDetail = server },
                             onOpenBrowser = { url -> openOAuthAuthorization(launcher, url) },
@@ -248,7 +407,7 @@ fun McpServersScreen(
                     item(key = "catalog-header") {
                         CatalogSection(
                             state = state,
-                            viewModel = viewModel,
+                            actions = actions,
                             spacing = spacing,
                             filteredCatalog = filteredCatalog,
                         )
@@ -268,11 +427,11 @@ fun McpServersScreen(
 
     state.activeOAuthFlow?.let { flow ->
         androidx.compose.material3.AlertDialog(
-            onDismissRequest = { viewModel.dismissOAuthFlow() },
+            onDismissRequest = { actions.dismissOAuthFlow() },
             confirmButton = {
                 Button(
                     onClick = {
-                        viewModel.retryMcpOAuthBrowser { url ->
+                        actions.retryMcpOAuthBrowser { url ->
                             openOAuthAuthorization(launcher, url)
                         }
                     },
@@ -281,7 +440,7 @@ fun McpServersScreen(
                 }
             },
             dismissButton = {
-                OutlinedButton(onClick = { viewModel.dismissOAuthFlow() }) {
+                OutlinedButton(onClick = { actions.dismissOAuthFlow() }) {
                     Text(stringResource(Res.string.action_cancel))
                 }
             },
@@ -324,13 +483,13 @@ private fun openOAuthAuthorization(
 @Composable
 private fun AddServerSection(
     state: McpServersUiState,
-    viewModel: McpServersViewModel,
+    actions: McpActions,
     spacing: com.m57.hermescontrol.theme.Spacing,
 ) {
     SectionHeader(
         title = stringResource(Res.string.mcp_servers_add_server),
         trailing = {
-            TextButton(onClick = { viewModel.toggleAddForm() }) {
+            TextButton(onClick = { actions.toggleAddForm() }) {
                 Text(if (state.showAddForm) "Hide" else "New")
             }
         },
@@ -345,12 +504,12 @@ private fun AddServerSection(
                 SecondaryTabRow(selectedTabIndex = if (state.addMode == AddServerMode.HTTP) 0 else 1) {
                     Tab(
                         selected = state.addMode == AddServerMode.HTTP,
-                        onClick = { viewModel.setAddMode(AddServerMode.HTTP) },
+                        onClick = { actions.setAddMode(AddServerMode.HTTP) },
                         text = { Text(stringResource(Res.string.mcp_servers_add_http)) },
                     )
                     Tab(
                         selected = state.addMode == AddServerMode.Stdio,
-                        onClick = { viewModel.setAddMode(AddServerMode.Stdio) },
+                        onClick = { actions.setAddMode(AddServerMode.Stdio) },
                         text = { Text(stringResource(Res.string.mcp_servers_add_stdio)) },
                     )
                 }
@@ -359,7 +518,7 @@ private fun AddServerSection(
 
                 OutlinedTextField(
                     value = state.addServerName,
-                    onValueChange = viewModel::updateAddServerName,
+                    onValueChange = actions::updateAddServerName,
                     label = { Text(stringResource(Res.string.mcp_servers_field_name)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
@@ -369,7 +528,7 @@ private fun AddServerSection(
                 if (state.addMode == AddServerMode.HTTP) {
                     OutlinedTextField(
                         value = state.addServerUrl,
-                        onValueChange = viewModel::updateAddServerUrl,
+                        onValueChange = actions::updateAddServerUrl,
                         label = { Text(stringResource(Res.string.mcp_servers_field_url)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
@@ -389,17 +548,17 @@ private fun AddServerSection(
                     ) {
                         FilterChip(
                             selected = state.addServerAuth == "none",
-                            onClick = { viewModel.updateAddServerAuth("none") },
+                            onClick = { actions.updateAddServerAuth("none") },
                             label = { Text(stringResource(Res.string.mcp_servers_auth_none)) },
                         )
                         FilterChip(
                             selected = state.addServerAuth == "header",
-                            onClick = { viewModel.updateAddServerAuth("header") },
+                            onClick = { actions.updateAddServerAuth("header") },
                             label = { Text(stringResource(Res.string.mcp_servers_auth_header)) },
                         )
                         FilterChip(
                             selected = state.addServerAuth == "oauth",
-                            onClick = { viewModel.updateAddServerAuth("oauth") },
+                            onClick = { actions.updateAddServerAuth("oauth") },
                             label = { Text(stringResource(Res.string.mcp_servers_auth_oauth)) },
                         )
                     }
@@ -407,7 +566,7 @@ private fun AddServerSection(
                         Spacer(modifier = Modifier.height(spacing.sm))
                         OutlinedTextField(
                             value = state.addServerBearerToken,
-                            onValueChange = viewModel::updateAddServerBearerToken,
+                            onValueChange = actions::updateAddServerBearerToken,
                             label = { Text(stringResource(Res.string.mcp_servers_field_bearer_token)) },
                             singleLine = true,
                             visualTransformation = remember { PasswordVisualTransformation() },
@@ -417,7 +576,7 @@ private fun AddServerSection(
                 } else {
                     OutlinedTextField(
                         value = state.addServerCommand,
-                        onValueChange = viewModel::updateAddServerCommand,
+                        onValueChange = actions::updateAddServerCommand,
                         label = { Text(stringResource(Res.string.mcp_servers_field_command)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
@@ -425,7 +584,7 @@ private fun AddServerSection(
                     Spacer(modifier = Modifier.height(spacing.sm))
                     OutlinedTextField(
                         value = state.addServerArgs,
-                        onValueChange = viewModel::updateAddServerArgs,
+                        onValueChange = actions::updateAddServerArgs,
                         label = { Text(stringResource(Res.string.mcp_servers_field_args)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
@@ -434,7 +593,7 @@ private fun AddServerSection(
 
                 Spacer(modifier = Modifier.height(spacing.md))
                 Button(
-                    onClick = { viewModel.submitAddServer() },
+                    onClick = { actions.submitAddServer() },
                     enabled = !state.addingServer,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -451,11 +610,37 @@ private fun AddServerSection(
     }
 }
 
+/** A 40 dp tile: filled when the server is enabled, muted when it is not. */
+@Composable
+private fun McpServerTile(enabled: Boolean) {
+    Box(
+        modifier =
+            Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(
+                    if (enabled) {
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerHigh
+                    },
+                ),
+        contentAlignment = Alignment.Center,
+    ) {
+        HermesSymbol(
+            icon = HermesIcon.CloudDownload,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(22.dp),
+        )
+    }
+}
+
 @Composable
 private fun ServerCard(
     server: McpServer,
     state: McpServersUiState,
-    viewModel: McpServersViewModel,
+    actions: McpActions,
     spacing: com.m57.hermescontrol.theme.Spacing,
     onClick: () -> Unit,
     onOpenBrowser: (String) -> Boolean,
@@ -465,54 +650,33 @@ private fun ServerCard(
     val testResult = state.serverTestResults[server.name]
     val healthStatus = McpHealthStatus.resolve(isTesting, testResult, server.status, server.error)
 
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        colors =
-            CardDefaults.cardColors(
-                containerColor =
-                    if (server.enabled) {
-                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
-                    } else {
-                        MaterialTheme.colorScheme.surfaceVariant
-                    },
-            ),
-    ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(spacing.md)) {
-            // Header row: name + status + toggle
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = server.name.replaceFirstChar { it.uppercase() },
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Spacer(modifier = Modifier.width(spacing.sm))
-                        when (healthStatus) {
-                            McpHealthStatus.HEALTHY ->
-                                HealthBadge(
-                                    Res.string.mcp_servers_status_healthy,
-                                    StatusBadgeType.SUCCESS,
-                                )
-                            McpHealthStatus.AUTH_REQUIRED ->
-                                HealthBadge(Res.string.mcp_servers_status_needs_auth, StatusBadgeType.WARNING)
-                            McpHealthStatus.ERROR ->
-                                HealthBadge(
-                                    Res.string.mcp_servers_status_error,
-                                    StatusBadgeType.ERROR,
-                                )
-                            McpHealthStatus.TESTING ->
-                                HealthBadge(
-                                    Res.string.mcp_servers_status_testing,
-                                    StatusBadgeType.INFO,
-                                )
-                            McpHealthStatus.UNKNOWN -> ServerStatusBadge(server.status)
-                        }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        HermesListItem(
+            onClick = onClick,
+            leading = { McpServerTile(enabled = server.enabled) },
+            headline = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = server.name.replaceFirstChar { it.uppercase() },
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(modifier = Modifier.width(spacing.sm))
+                    when (healthStatus) {
+                        McpHealthStatus.HEALTHY ->
+                            HealthBadge(Res.string.mcp_servers_status_healthy, StatusBadgeType.SUCCESS)
+                        McpHealthStatus.AUTH_REQUIRED ->
+                            HealthBadge(Res.string.mcp_servers_status_needs_auth, StatusBadgeType.WARNING)
+                        McpHealthStatus.ERROR ->
+                            HealthBadge(Res.string.mcp_servers_status_error, StatusBadgeType.ERROR)
+                        McpHealthStatus.TESTING ->
+                            HealthBadge(Res.string.mcp_servers_status_testing, StatusBadgeType.INFO)
+                        McpHealthStatus.UNKNOWN -> ServerStatusBadge(server.status)
                     }
+                }
+            },
+            supporting = {
+                Column {
                     Text(
                         text = stringResource(Res.string.mcp_servers_label_transport, server.transport ?: "stdio"),
                         style = MaterialTheme.typography.bodySmall,
@@ -521,37 +685,28 @@ private fun ServerCard(
                     val toolInfos = testResult?.tools
                     val toolCount = toolInfos?.size ?: server.tools?.size
                     if (toolCount != null && toolCount > 0) {
-                        val estimate = toolInfos?.let(McpTokenEstimator::estimateTokens)
                         Spacer(modifier = Modifier.height(spacing.xs))
-                        Surface(
-                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
-                            shape = RoundedCornerShape(6.dp),
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                HermesSymbol(
-                                    icon = HermesIcon.Build,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(12.dp),
-                                )
-                                Spacer(modifier = Modifier.width(spacing.xs))
-                                Text(
-                                    text = McpTokenEstimator.formatTokenOverhead(toolCount, estimate),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Medium,
-                                )
-                            }
-                        }
+                        Text(
+                            text =
+                                McpTokenEstimator.formatTokenOverhead(
+                                    toolCount,
+                                    toolInfos?.let(McpTokenEstimator::estimateTokens),
+                                ),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
+            },
+            trailing = {
                 Switch(
                     checked = server.enabled,
-                    onCheckedChange = { viewModel.toggleServer(server) },
+                    onCheckedChange = { actions.toggleServer(server) },
                 )
-            }
-
+            },
+            containerColor = Color.Transparent,
+        )
+        Column(modifier = Modifier.fillMaxWidth().padding(start = spacing.md, end = spacing.md, bottom = spacing.md)) {
             // URL or Command
             val serverUrl = server.url
             if (serverUrl != null) {
@@ -588,7 +743,7 @@ private fun ServerCard(
 
             if (server.auth == "oauth") {
                 FilledTonalButton(
-                    onClick = { viewModel.startMcpOAuthFlow(server, onOpenBrowser) },
+                    onClick = { actions.startMcpOAuthFlow(server, onOpenBrowser) },
                     modifier = Modifier.fillMaxWidth(),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
                 ) {
@@ -605,7 +760,7 @@ private fun ServerCard(
                 horizontalArrangement = Arrangement.spacedBy(spacing.sm),
             ) {
                 FilledTonalButton(
-                    onClick = { viewModel.testServer(server.name) },
+                    onClick = { actions.testServer(server.name) },
                     enabled = !isTesting,
                     modifier = Modifier.weight(1f),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
@@ -624,7 +779,7 @@ private fun ServerCard(
                         Text(stringResource(Res.string.mcp_servers_action_test), maxLines = 1)
                     }
                 }
-                IconButton(onClick = { viewModel.deleteServer(server.name) }) {
+                IconButton(onClick = { actions.deleteServer(server.name) }) {
                     HermesSymbol(
                         icon = HermesIcon.Delete,
                         contentDescription = stringResource(Res.string.action_delete),
@@ -643,7 +798,7 @@ private fun ServerCard(
             }
 
             AnimatedVisibility(visible = showEnv) {
-                EnvVarSection(server = server, state = state, viewModel = viewModel, spacing = spacing)
+                EnvVarSection(server = server, state = state, actions = actions, spacing = spacing)
             }
         }
     }
@@ -653,7 +808,7 @@ private fun ServerCard(
 private fun EnvVarSection(
     server: McpServer,
     state: McpServersUiState,
-    viewModel: McpServersViewModel,
+    actions: McpActions,
     spacing: com.m57.hermescontrol.theme.Spacing,
 ) {
     val isEditing = state.editingEnvFor == server.name
@@ -680,7 +835,7 @@ private fun EnvVarSection(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                IconButton(onClick = { viewModel.removeEnvVar(server.name, key) }) {
+                IconButton(onClick = { actions.removeEnvVar(server.name, key) }) {
                     HermesSymbol(
                         icon = HermesIcon.Close,
                         contentDescription = "Remove",
@@ -700,14 +855,14 @@ private fun EnvVarSection(
         ) {
             OutlinedTextField(
                 value = state.envKeyInput,
-                onValueChange = viewModel::updateEnvKey,
+                onValueChange = actions::updateEnvKey,
                 label = { Text(stringResource(Res.string.mcp_servers_env_key)) },
                 singleLine = true,
                 modifier = Modifier.weight(1f),
             )
             OutlinedTextField(
                 value = state.envValueInput,
-                onValueChange = viewModel::updateEnvValue,
+                onValueChange = actions::updateEnvValue,
                 label = { Text(stringResource(Res.string.mcp_servers_env_value)) },
                 singleLine = true,
                 modifier = Modifier.weight(1f),
@@ -718,15 +873,15 @@ private fun EnvVarSection(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(spacing.sm),
         ) {
-            Button(onClick = { viewModel.addEnvVar(server.name) }) {
+            Button(onClick = { actions.addEnvVar(server.name) }) {
                 Text(stringResource(Res.string.mcp_servers_env_add))
             }
-            OutlinedButton(onClick = { viewModel.stopEditingEnv() }) {
+            OutlinedButton(onClick = { actions.stopEditingEnv() }) {
                 Text(stringResource(Res.string.action_cancel))
             }
         }
     } else {
-        TextButton(onClick = { viewModel.startEditingEnv(server) }) {
+        TextButton(onClick = { actions.startEditingEnv(server) }) {
             HermesSymbol(icon = HermesIcon.Add, contentDescription = null, modifier = Modifier.size(14.dp))
             Spacer(modifier = Modifier.width(spacing.xs))
             Text(stringResource(Res.string.mcp_servers_env_add))
@@ -760,7 +915,7 @@ private fun HealthBadge(
 @Composable
 private fun CatalogSection(
     state: McpServersUiState,
-    viewModel: McpServersViewModel,
+    actions: McpActions,
     spacing: com.m57.hermescontrol.theme.Spacing,
     filteredCatalog: List<McpCatalogEntry>,
 ) {
@@ -772,7 +927,7 @@ private fun CatalogSection(
             TextButton(onClick = {
                 catalogExpanded.value = !catalogExpanded.value
                 if (catalogExpanded.value && state.catalogEntries.isEmpty() && !state.catalogLoading) {
-                    viewModel.loadCatalog()
+                    actions.loadCatalog()
                 }
             }) {
                 Text(if (catalogExpanded.value) "Hide" else "Browse")
@@ -785,7 +940,7 @@ private fun CatalogSection(
             // Search
             OutlinedTextField(
                 value = state.catalogQuery,
-                onValueChange = viewModel::updateCatalogQuery,
+                onValueChange = actions::updateCatalogQuery,
                 label = { Text(stringResource(Res.string.mcp_servers_catalog_search)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth().padding(bottom = spacing.sm),
@@ -804,7 +959,7 @@ private fun CatalogSection(
                 state.catalogError != null -> {
                     ErrorState(
                         message = state.catalogError,
-                        onRetry = { viewModel.loadCatalog() },
+                        onRetry = { actions.loadCatalog() },
                     )
                 }
 
@@ -822,7 +977,7 @@ private fun CatalogSection(
                         CatalogEntryCard(
                             entry = entry,
                             state = state,
-                            viewModel = viewModel,
+                            actions = actions,
                             spacing = spacing,
                         )
                         Spacer(modifier = Modifier.height(spacing.sm))
@@ -837,7 +992,7 @@ private fun CatalogSection(
 private fun CatalogEntryCard(
     entry: McpCatalogEntry,
     state: McpServersUiState,
-    viewModel: McpServersViewModel,
+    actions: McpActions,
     spacing: com.m57.hermescontrol.theme.Spacing,
 ) {
     var showInstallForm by remember { mutableStateOf(false) }
@@ -872,7 +1027,7 @@ private fun CatalogEntryCard(
                         if (entry.env?.isNotEmpty() == true) {
                             showInstallForm = !showInstallForm
                         } else {
-                            viewModel.installCatalogEntry(entry)
+                            actions.installCatalogEntry(entry)
                         }
                     },
                     enabled = !isInstalling,
@@ -912,7 +1067,7 @@ private fun CatalogEntryCard(
                                 val currentValue = state.catalogInstallEnv[envVar.key] ?: ""
                                 OutlinedTextField(
                                     value = currentValue,
-                                    onValueChange = { viewModel.updateCatalogEnvVar(envVar.key, it) },
+                                    onValueChange = { actions.updateCatalogEnvVar(envVar.key, it) },
                                     label = { Text(label) },
                                     placeholder = envVar.description?.let { { Text(it) } },
                                     singleLine = true,
@@ -923,7 +1078,7 @@ private fun CatalogEntryCard(
                         }
                     }
                     Button(
-                        onClick = { viewModel.installCatalogEntry(entry) },
+                        onClick = { actions.installCatalogEntry(entry) },
                         enabled = !isInstalling,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
