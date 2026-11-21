@@ -47,12 +47,26 @@ Why this first: 631 lines are read by every future change, and the harness alrea
 
 Gate: 169 + harness 3 + send net 9 + ktlint + compile.
 
-## Batch 2 — the three missing reducers
+## Batch 2 — gateway requests leave the file (revised after measuring)
 
-Composer (12 fields), connection (3), overlays (18). Each transition becomes a pure
-`reduce(state, intent)` in `:shared` with tests; the ViewModel calls it instead of editing fields inline.
+The plan said "composer, connection, overlays reducers". Measured before building: connection is
+**3 fields and 5 setters**, so a reducer there is ceremony — the same indirection-without-a-rule that
+this plan already rejects for the five thin `handleRpcResult` branches.
 
-Gate: the same suites plus the new reducer tests.
+Replaced with an area that is genuinely large and has a hard boundary: the flows where the *gateway*
+asks the *user* for something.
+
+Moved to `ChatServerRequests.kt`: `handleServerRequest` (152), `handleServerRequestCancelled` (74),
+`handleApprovalRequest`, `handleSudoRequest`, `handleSecretRequest`, `clearPrivilegedControls`,
+`expiryMatches`. **`ChatViewModel.kt`: 4,491 → 4,172.**
+
+Why this area matters more than a reducer: a dropped approval or secret event does not produce a stale
+pixel, it hangs an agent thread.
+
+### Where the reducers went
+
+Composer and overlays are still the honest target for real rules, and they are **Batch 3** now. They were
+not ceremony — the plan was just wrong about connection.
 
 ## Batch 3 — pipeline call sites onto intents
 
