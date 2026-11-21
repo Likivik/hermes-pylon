@@ -1329,24 +1329,40 @@ class ChatViewModel(
      */
     fun sendMessage(text: String): Boolean {
         val state = _uiState.value
-        if (!state.isSessionReady) return false
-        if (text.isBlank() && state.pendingAttachments.isEmpty()) return false
-        val storageSessionId = state.currentSessionId ?: return false
-        val agentSessionId = runtimeSessionId ?: return false
         val dispatchGeneration = conversationGeneration
-        val dispatchConnection = wsClient.connectionBinding(selectedGatewayId()) ?: return false
+        val boundConnection = wsClient.connectionBinding(selectedGatewayId())
 
-        val trimmed = text.trim()
-        if (trimmed.startsWith("/", ignoreCase = true)) {
-            // Issue #589: a bare "/model" (no argument) opens the picker instead
-            // of requiring the user to hand-type the provider/model.
-            if (isModelPickerCommand(trimmed)) {
+        // Admission and routing are decided by a pure rule (SendPlan.kt); everything below is effect.
+        when (
+            val start =
+                planSend(
+                    text = text,
+                    hasAttachments = state.pendingAttachments.isNotEmpty(),
+                    sessionReady = state.isSessionReady,
+                    hasStorageSessionId = state.currentSessionId != null,
+                    hasRuntimeSessionId = runtimeSessionId != null,
+                    hasConnection = boundConnection != null,
+                )
+        ) {
+            SendStart.Refused -> return false
+            SendStart.OpenModelPicker -> {
+                // Issue #589: a bare "/model" opens the picker instead of requiring
+                // the user to hand-type the provider/model.
                 openModelPicker()
                 return true
             }
-            handleSlashCommand(trimmed)
-            return true
+
+            is SendStart.DispatchCommand -> {
+                handleSlashCommand(start.command)
+                return true
+            }
+
+            SendStart.Prepare -> Unit
         }
+
+        val storageSessionId = state.currentSessionId ?: return false
+        val agentSessionId = runtimeSessionId ?: return false
+        val dispatchConnection = boundConnection ?: return false
 
         // Snapshot + clear attachments so the input bar empties immediately
         val attachments = _uiState.value.pendingAttachments.toList()
@@ -1462,7 +1478,9 @@ class ChatViewModel(
             // the normal path. A backend that cannot redirect answers 4010;
             // handleRpcError re-sends the text as a normal prompt so the
             // typed message is never silently lost.
-            if (wasStreaming && attachments.isEmpty()) {
+            if (chooseDelivery(wasStreaming = wasStreaming, hasAttachments = attachments.isNotEmpty()) ==
+                Delivery.Redirect
+            ) {
                 wsClient.sendRedirectForConnection(
                     binding = dispatchConnection,
                     sessionId = agentSessionId,
@@ -2679,23 +2697,8 @@ class ChatViewModel(
 
     // ── In-session model picker (issue #589) ─────────────────────────────
 
-    /**
-     * Whether [command] should open the in-session model picker instead of being
-     * dispatched as a normal slash command. True for a bare `/model` (with no
-     * trailing model argument) — the picker supplies the argument interactively.
-     * A fully-typed `/model provider/model` is forwarded straight to the backend.
-     */
-    private fun isModelPickerCommand(command: String): Boolean {
-        val trimmed = command.trim()
-        if (!trimmed.startsWith("/", ignoreCase = true)) return false
-        val body = trimmed.removePrefix("/").trimStart()
-        // Must be exactly "model" with no argument (or just whitespace).
-        return body.equals("model", ignoreCase = true) ||
-            (
-                body.startsWith("model ", ignoreCase = true) &&
-                    body.substringAfter("model").trim().isEmpty()
-            )
-    }
+    // The "/model" rule itself lives in SendPlan.kt as `isBareModelCommand`, so it can be
+    // tested without a ViewModel; this section only holds the picker's cache.
 
     /** Preload model options so the picker opens instantly (no spinner on /model). */
     private fun preloadModelOptions() {
