@@ -235,10 +235,7 @@ fun SearchBar(
             modifier
                 .fillMaxWidth()
                 .height(40.dp)
-                .background(
-                    color = MaterialTheme.colorScheme.surfaceContainer,
-                    shape = MaterialTheme.shapes.medium,
-                ).border(
+                .border(
                     width = 1.dp,
                     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
                     shape = MaterialTheme.shapes.medium,
