@@ -48,6 +48,14 @@ class FakeChatTransport : ChatTransport {
     /** Every `sendMessage` call in order. */
     val sentMessages = mutableListOf<SentMessage>()
 
+    /**
+     * Every `sendRedirectForConnection` call in order.
+     *
+     * Separate from [sentMessages] because redirect and submit record identically there, and the send
+     * pipeline's whole point is to choose between them.
+     */
+    val redirects = mutableListOf<SentMessage>()
+
     /** Every `request` call in order: method, params, timeout. */
     val requests = mutableListOf<RequestCall>()
 
@@ -166,7 +174,7 @@ class FakeChatTransport : ChatTransport {
         text: String,
         onSent: ((String) -> Unit)?,
     ): Boolean {
-        sentMessages += SentMessage(sessionId, text, queued = false)
+        redirects += SentMessage(sessionId, text, queued = false)
         onSent?.invoke(nextMessageId())
         return true
     }
