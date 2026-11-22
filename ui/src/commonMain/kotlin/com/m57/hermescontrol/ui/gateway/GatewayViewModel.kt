@@ -106,6 +106,8 @@ class GatewayViewModel(
     ) {
         if (_uiState.value.isActionRunning) return
         val requestedProfileId = profileId
+        // The singleton, not `source`, for the same reason as SessionsViewModel: the result is discarded when the
+        // client has been rebuilt since the request started, and only `!==` can tell.
         val requestedApi = ApiClient.hermesApi
         val generation = ++actionGeneration
         _uiState.update { it.copy(isActionRunning = true) }

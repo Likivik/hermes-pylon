@@ -353,6 +353,9 @@ class SessionsViewModel(
     fun setSearchQuery(query: String) {
         val generation = ++searchGeneration
         val section = _uiState.value.section
+        // Deliberately the singleton, not `source`: this read exists to notice that the client was rebuilt (endpoint
+        // or profile changed) while the request was in flight, and `!==` is the only way to see that. An interface
+        // cannot express object identity, so this file is the one place the global is still the right answer.
         val api = ApiClient.hermesApi
         val profileId = authStore.getSelectedProfileId()
         val connectionChanged = searchApi !== api || searchProfileId != profileId

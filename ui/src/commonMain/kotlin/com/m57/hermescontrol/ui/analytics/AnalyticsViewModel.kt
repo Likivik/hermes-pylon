@@ -8,6 +8,8 @@ import com.m57.hermescontrol.data.model.ModelsAnalyticsResponse
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.data.remote.source.AnalyticsSource
+import com.m57.hermescontrol.data.remote.source.AnalyticsSourceOf
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,11 +45,10 @@ data class AnalyticsUiState(
 
 class AnalyticsViewModel(
     private val cacheStore: AnalyticsCacheStore,
+    private val source: AnalyticsSource = AnalyticsSourceOf(ApiClient.hermesApi),
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(AnalyticsUiState())
     val uiState: StateFlow<AnalyticsUiState> = _uiState.asStateFlow()
-
-    private val api get() = ApiClient.hermesApi
 
     private var loadJob: Job? = null
 
@@ -113,7 +114,7 @@ class AnalyticsViewModel(
                 // usage call is what's slow on a cold backend, so we must not let it
                 // block the models/totals render.
                 val modelsDeferred =
-                    async { safeApiCall<ModelsAnalyticsResponse> { api.getModelsAnalytics(days, profile) } }
+                    async { safeApiCall<ModelsAnalyticsResponse> { source.getModelsAnalytics(days, profile) } }
 
                 // Surface models immediately when it arrives (before usage finishes).
                 val modelsResult = modelsDeferred.await()
@@ -137,7 +138,7 @@ class AnalyticsViewModel(
 
                 // Now the slow usage call.
                 val usageDeferred =
-                    async { safeApiCall<AnalyticsResponse> { api.getAnalytics(days, profile) } }
+                    async { safeApiCall<AnalyticsResponse> { source.getAnalytics(days, profile) } }
                 val usageResult = usageDeferred.await()
                 val usage = (usageResult as? NetworkResult.Success)?.data ?: _uiState.value.usage
 
@@ -202,9 +203,9 @@ class AnalyticsViewModel(
             if (cache.containsKey(otherDays)) return@forEach
             viewModelScope.launch {
                 val usageDeferred =
-                    async { safeApiCall<AnalyticsResponse> { api.getAnalytics(otherDays, profile) } }
+                    async { safeApiCall<AnalyticsResponse> { source.getAnalytics(otherDays, profile) } }
                 val modelsDeferred =
-                    async { safeApiCall<ModelsAnalyticsResponse> { api.getModelsAnalytics(otherDays, profile) } }
+                    async { safeApiCall<ModelsAnalyticsResponse> { source.getModelsAnalytics(otherDays, profile) } }
                 val usageResult = (usageDeferred.await() as? NetworkResult.Success)?.data
                 val modelsResult = (modelsDeferred.await() as? NetworkResult.Success)?.data
                 if (usageResult != null) {
