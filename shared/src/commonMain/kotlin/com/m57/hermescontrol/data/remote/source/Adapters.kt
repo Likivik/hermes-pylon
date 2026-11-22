@@ -1,5 +1,6 @@
 package com.m57.hermescontrol.data.remote.source
 
+import com.m57.hermescontrol.data.model.AchievementsResponse
 import com.m57.hermescontrol.data.model.ActionResponse
 import com.m57.hermescontrol.data.model.ActionStatusResponse
 import com.m57.hermescontrol.data.model.ActiveProfileResponse
@@ -65,6 +66,7 @@ import com.m57.hermescontrol.data.model.ProfileSoulResponse
 import com.m57.hermescontrol.data.model.ProfilesResponse
 import com.m57.hermescontrol.data.model.PruneRequest
 import com.m57.hermescontrol.data.model.RawConfigResponse
+import com.m57.hermescontrol.data.model.RecentUnlock
 import com.m57.hermescontrol.data.model.SaveSkillContentRequest
 import com.m57.hermescontrol.data.model.SessionListResponse
 import com.m57.hermescontrol.data.model.SessionStatsResponse
@@ -576,4 +578,14 @@ class LogsSourceOf(private val api: HermesGatewayApi) : LogsSource {
         level: String,
         component: String,
     ): GatewayResponse<LogResponse> = api.getLogs(file, lines, level, component)
+}
+
+class AchievementsSourceOf(private val api: HermesGatewayApi) : AchievementsSource {
+    override suspend fun getAchievements(): GatewayResponse<AchievementsResponse> = api.getAchievements()
+
+    override suspend fun getRecentUnlocks(): GatewayResponse<List<RecentUnlock>> = api.getRecentUnlocks()
+
+    override suspend fun rescanAchievements(): GatewayResponse<AchievementsResponse> = api.rescanAchievements()
+
+    override suspend fun resetAchievementState(): GatewayResponse<Unit> = api.resetAchievementState()
 }

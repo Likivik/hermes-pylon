@@ -7,6 +7,8 @@ import com.m57.hermescontrol.data.local.authStore
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.data.remote.source.AnalyticsSource
+import com.m57.hermescontrol.data.remote.source.AnalyticsSourceOf
 import com.m57.hermescontrol.util.ioDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -29,7 +31,10 @@ import kotlinx.coroutines.launch
 object AnalyticsPreloader {
     private val scope = CoroutineScope(SupervisorJob() + ioDispatcher)
 
-    fun preload(context: Context) {
+    fun preload(
+        context: Context,
+        source: AnalyticsSource = AnalyticsSourceOf(ApiClient.hermesApi),
+    ) {
         if (authStore.getToken().isNullOrBlank()) return
         val store = AndroidAnalyticsCacheStore(context)
         val daysOptions = listOf(7, 30, 90)
@@ -39,11 +44,11 @@ object AnalyticsPreloader {
                 if (store.load(days, null) != null) continue
                 val usage =
                     safeApiCall<com.m57.hermescontrol.data.model.AnalyticsResponse> {
-                        ApiClient.hermesApi.getAnalytics(days, null)
+                        source.getAnalytics(days, null)
                     }
                 val models =
                     safeApiCall<com.m57.hermescontrol.data.model.ModelsAnalyticsResponse> {
-                        ApiClient.hermesApi.getModelsAnalytics(days, null)
+                        source.getModelsAnalytics(days, null)
                     }
                 val usageData = (usage as? NetworkResult.Success)?.data ?: continue
                 val modelsData = (models as? NetworkResult.Success)?.data
