@@ -1037,39 +1037,6 @@ class HermesGatewayApi(
     /** For POSTs with no request body that still decode a response. */
     private suspend inline fun <reified T> postAndDecode(path: String): GatewayResponse<T> =
         decode(client.post(url(path)))
-
-    private fun queryPath(
-        path: String,
-        vararg params: Pair<String, String?>,
-    ): String {
-        val query =
-            params.mapNotNull { (name, value) -> value?.let { "$name=${encodeQueryValue(it)}" } }
-        return if (query.isEmpty()) path else "$path?" + query.joinToString("&")
-    }
-
-    /**
-     * Percent-encode a query value the way OkHttp did: space becomes `%20`, not
-     * `+`. Kept local so the encoding cannot drift with a Ktor helper's defaults.
-     */
-    private fun encodeQueryValue(value: String): String {
-        val sb = StringBuilder(value.length)
-        for (ch in value) {
-            val unreserved = (ch.isLetterOrDigit() && ch.code < 128) || ch in "-._~"
-            if (unreserved) {
-                sb.append(ch)
-            } else {
-                for (byte in ch.toString().encodeToByteArray()) {
-                    val b = byte.toInt() and 0xFF
-                    sb.append('%').append(HEX_DIGITS[b shr 4]).append(HEX_DIGITS[b and 0xF])
-                }
-            }
-        }
-        return sb.toString()
-    }
-
-    private companion object {
-        const val HEX_DIGITS = "0123456789ABCDEF"
-    }
 }
 
 /**
