@@ -333,11 +333,7 @@ class ChatViewModel(
         viewModelScope.launch(io) {
             wsClient.connectionStatus.collect { status ->
                 if (status == ConnectionStatus.CONNECTED) {
-                    uiStateMutable.update {
-                        it.copy(
-                            connection = it.connection.copy(hasConnectedOnce = true),
-                        )
-                    }
+                    uiStateMutable.update { it.copy(connection = it.connection.afterFirstConnected()) }
                 }
             }
         }
@@ -369,7 +365,7 @@ class ChatViewModel(
             slashUsageProfileIds.flatMapLatest(slashUsageStore::counts).collect { counts ->
                 uiStateMutable.update {
                     it.copy(
-                        composer = it.composer.copy(slashUsageCounts = counts),
+                        composer = it.composer.afterSlashUsageCounts(counts),
                     )
                 }
             }
@@ -963,7 +959,7 @@ class ChatViewModel(
             is SlashResult.OpenHistory -> {
                 uiStateMutable.update {
                     it.copy(
-                        composer = it.composer.copy(openHistoryRequested = true),
+                        composer = it.composer.afterOpenHistoryRequest(true),
                     )
                 }
                 recordAcceptedSlash(command)
@@ -1282,7 +1278,7 @@ class ChatViewModel(
                         hasOlderMessages = false,
                         isLoadingOlder = false,
                     ),
-                composer = state.composer.copy(pendingPrefillText = prefill.takeIf { it.isNotBlank() }),
+                composer = state.composer.afterPendingPrefill(prefill),
             )
         }
     }
@@ -1314,7 +1310,7 @@ class ChatViewModel(
     fun consumePendingPrefill() {
         uiStateMutable.update {
             it.copy(
-                composer = it.composer.copy(pendingPrefillText = null),
+                composer = it.composer.afterPendingPrefill(null),
             )
         }
     }
@@ -1614,7 +1610,7 @@ class ChatViewModel(
                         isAgentTyping = false,
                         contextUsage = null,
                     ),
-                composer = it.composer.copy(currentSessionModel = null, pendingPrefillText = null),
+                composer = it.composer.afterProfileChange(),
             )
         }
     }
@@ -2057,11 +2053,7 @@ class ChatViewModel(
                     if (length != null && length > 0L) {
                         uiStateMutable.update {
                             it.copy(
-                                composer =
-                                    it.composer.copy(
-                                        modelContextLength = length,
-                                        modelContextLengthModel = result.data.qualifiedModel,
-                                    ),
+                                composer = it.composer.afterModelContextLength(length, result.data.qualifiedModel),
                             )
                         }
                     }
@@ -2076,7 +2068,7 @@ class ChatViewModel(
     fun openContextDetail() {
         uiStateMutable.update {
             it.copy(
-                overlays = it.overlays.copy(showContextDetail = true),
+                overlays = it.overlays.afterContextDetailOpened(),
             )
         }
     }
@@ -2085,7 +2077,7 @@ class ChatViewModel(
     fun closeContextDetail() {
         uiStateMutable.update {
             it.copy(
-                overlays = it.overlays.copy(showContextDetail = false),
+                overlays = it.overlays.afterContextDetailClosed(),
             )
         }
     }
@@ -2099,9 +2091,9 @@ class ChatViewModel(
         uiStateMutable.update { state ->
             state.copy(
                 composer =
-                    state.composer.copy(
-                        typingEffectEnabled = authStore.isTypingEffectEnabled(),
-                        typingEffectDelayMs = authStore.getTypingEffectDelayMs(),
+                    state.composer.afterTypingSettings(
+                        authStore.isTypingEffectEnabled(),
+                        authStore.getTypingEffectDelayMs(),
                     ),
             )
         }
@@ -2147,7 +2139,7 @@ class ChatViewModel(
                 is NetworkResult.Failure -> {
                     uiStateMutable.update {
                         it.copy(
-                            overlays = it.overlays.copy(modelInventoryResolved = true),
+                            overlays = it.overlays.afterModelInventoryResolved(),
                         )
                     }
                 }
@@ -2183,7 +2175,7 @@ class ChatViewModel(
     fun refreshModelOptions() {
         uiStateMutable.update {
             it.copy(
-                overlays = it.overlays.copy(modelPickerLoading = true),
+                overlays = it.overlays.afterModelRefreshStarted(),
             )
         }
         viewModelScope.launch(io) {
@@ -2224,7 +2216,7 @@ class ChatViewModel(
     fun closeModelPicker() {
         uiStateMutable.update {
             it.copy(
-                overlays = it.overlays.copy(showModelPicker = false, modelPickerLoading = false),
+                overlays = it.overlays.afterModelPickerClosed(),
             )
         }
     }
@@ -2243,7 +2235,7 @@ class ChatViewModel(
         authStore.savePinnedModels(currentPinned)
         uiStateMutable.update {
             it.copy(
-                overlays = it.overlays.copy(modelPickerPinned = currentPinned),
+                overlays = it.overlays.afterPinnedModelsChanged(currentPinned),
             )
         }
     }
@@ -2255,7 +2247,7 @@ class ChatViewModel(
     ) {
         uiStateMutable.update {
             it.copy(
-                overlays = it.overlays.copy(showModelPicker = false, modelPickerLoading = false),
+                overlays = it.overlays.afterModelPickerClosed(),
             )
         }
         applySessionModel(
@@ -2276,7 +2268,7 @@ class ChatViewModel(
                 uiStateMutable.update {
                     it.copy(
                         transcript = it.transcript.copy(errorMessage = msg),
-                        overlays = it.overlays.copy(modelSwitchConfirmation = null),
+                        overlays = it.overlays.afterModelSwitchConfirmationDismissed(),
                     )
                 }
             }
@@ -2284,7 +2276,7 @@ class ChatViewModel(
         }
         uiStateMutable.update {
             it.copy(
-                overlays = it.overlays.copy(modelSwitchConfirmation = null),
+                overlays = it.overlays.afterModelSwitchConfirmationDismissed(),
             )
         }
         applySessionModel(
@@ -2297,7 +2289,7 @@ class ChatViewModel(
     fun cancelModelSwitchConfirmation() {
         uiStateMutable.update {
             it.copy(
-                overlays = it.overlays.copy(modelSwitchConfirmation = null),
+                overlays = it.overlays.afterModelSwitchConfirmationDismissed(),
             )
         }
     }
@@ -2373,8 +2365,8 @@ class ChatViewModel(
                     if (runtimeSessionId != sessionId) return@update it
                     it.copy(
                         transcript = it.transcript.copy(contextUsage = it.contextUsage?.copy(maxTokens = null)),
-                        composer = it.composer.copy(currentSessionModel = confirmedLabel ?: it.currentSessionModel),
-                        overlays = it.overlays.copy(modelSwitchConfirmation = null),
+                        composer = it.composer.afterSessionModel(confirmedLabel),
+                        overlays = it.overlays.afterModelSwitchConfirmationDismissed(),
                     )
                 }
                 if (recordUsage) recordAcceptedSlash("/model")
@@ -2384,7 +2376,7 @@ class ChatViewModel(
                     if (runtimeSessionId != sessionId) return@update it
                     it.copy(
                         transcript = it.transcript.copy(errorMessage = msg),
-                        overlays = it.overlays.copy(modelSwitchConfirmation = null),
+                        overlays = it.overlays.afterModelSwitchConfirmationDismissed(),
                     )
                 }
             }
@@ -2401,7 +2393,7 @@ class ChatViewModel(
     fun consumeOpenHistoryRequest() {
         uiStateMutable.update {
             it.copy(
-                composer = it.composer.copy(openHistoryRequested = false),
+                composer = it.composer.afterOpenHistoryRequest(false),
             )
         }
     }
@@ -2418,7 +2410,7 @@ class ChatViewModel(
     fun setReasoningLevel(level: String?) {
         uiStateMutable.update {
             it.copy(
-                composer = it.composer.copy(reasoningLevel = level),
+                composer = it.composer.afterReasoningLevel(level),
             )
         }
         val sessionId = runtimeSessionId ?: return
@@ -2765,7 +2757,7 @@ class ChatViewModel(
                 attachmentOpener.open(attachment) { path ->
                     uiStateMutable.update {
                         it.copy(
-                            overlays = it.overlays.copy(openingAttachmentPath = path),
+                            overlays = it.overlays.afterAttachmentOpening(path),
                         )
                     }
                 }
@@ -2773,7 +2765,7 @@ class ChatViewModel(
                 is AttachmentOpenOutcome.PlayMedia ->
                     uiStateMutable.update {
                         it.copy(
-                            overlays = it.overlays.copy(mediaPlayerRequest = outcome.request),
+                            overlays = it.overlays.afterMediaPlayerRequested(outcome.request),
                         )
                     }
 
@@ -2806,7 +2798,7 @@ class ChatViewModel(
         val message = resolver.get(key, *args)
         uiStateMutable.update {
             it.copy(
-                overlays = it.overlays.copy(openError = message),
+                overlays = it.overlays.afterOpenErrorShown(message),
             )
         }
     }
@@ -2814,7 +2806,7 @@ class ChatViewModel(
     fun clearOpenError() {
         uiStateMutable.update {
             it.copy(
-                overlays = it.overlays.copy(openError = null),
+                overlays = it.overlays.afterOpenErrorCleared(),
             )
         }
     }
@@ -2822,7 +2814,7 @@ class ChatViewModel(
     fun closeMediaPlayer() {
         uiStateMutable.update {
             it.copy(
-                overlays = it.overlays.copy(mediaPlayerRequest = null),
+                overlays = it.overlays.afterMediaPlayerClosed(),
             )
         }
     }
@@ -3042,7 +3034,7 @@ class ChatViewModel(
     fun clearBackgroundComplete() {
         uiStateMutable.update {
             it.copy(
-                overlays = it.overlays.copy(backgroundCompleteMessage = null),
+                overlays = it.overlays.afterBackgroundCompleteCleared(),
             )
         }
     }
@@ -3305,7 +3297,7 @@ class ChatViewModel(
             if (uiStateMutable.compareAndSet(
                     state,
                     state.copy(
-                        overlays = state.overlays.copy(vaultPrompt = claimed),
+                        overlays = state.overlays.afterVaultPromptClaimed(expected),
                     ),
                 )
             ) {
@@ -3319,12 +3311,12 @@ class ChatViewModel(
                     state
                 } else if (accepted) {
                     state.copy(
-                        overlays = state.overlays.copy(vaultPrompt = null),
+                        overlays = state.overlays.afterVaultPromptAnswered(claimed),
                     )
                 } else {
                     state.copy(
                         transcript = state.transcript.copy(errorMessage = privilegedFailureMessage()),
-                        overlays = state.overlays.copy(vaultPrompt = claimed.copy(isSubmitting = false)),
+                        overlays = state.overlays.afterVaultPromptReleased(claimed),
                     )
                 }
             }
@@ -3355,7 +3347,7 @@ class ChatViewModel(
                 uiStateMutable.update {
                     if (it.sudoPrompt == claimed) {
                         it.copy(
-                            overlays = it.overlays.copy(sudoPrompt = null),
+                            overlays = it.overlays.afterSudoPromptAnswered(claimed),
                         )
                     } else {
                         it
@@ -3366,7 +3358,7 @@ class ChatViewModel(
                     if (it.sudoPrompt == claimed) {
                         it.copy(
                             transcript = it.transcript.copy(errorMessage = privilegedFailureMessage()),
-                            overlays = it.overlays.copy(sudoPrompt = claimed.copy(isSubmitting = false)),
+                            overlays = it.overlays.afterSudoPromptReleased(claimed),
                         )
                     } else {
                         it
@@ -3384,7 +3376,7 @@ class ChatViewModel(
             if (uiStateMutable.compareAndSet(
                     state,
                     state.copy(
-                        overlays = state.overlays.copy(sudoPrompt = claimed),
+                        overlays = state.overlays.afterSudoPromptClaimed(expected),
                     ),
                 )
             ) {
@@ -3417,7 +3409,7 @@ class ChatViewModel(
                 uiStateMutable.update {
                     if (it.secretPrompt == claimed) {
                         it.copy(
-                            overlays = it.overlays.copy(secretPrompt = null),
+                            overlays = it.overlays.afterSecretPromptAnswered(claimed),
                         )
                     } else {
                         it
@@ -3428,7 +3420,7 @@ class ChatViewModel(
                     if (it.secretPrompt == claimed) {
                         it.copy(
                             transcript = it.transcript.copy(errorMessage = privilegedFailureMessage()),
-                            overlays = it.overlays.copy(secretPrompt = claimed.copy(isSubmitting = false)),
+                            overlays = it.overlays.afterSecretPromptReleased(claimed),
                         )
                     } else {
                         it
@@ -3446,7 +3438,7 @@ class ChatViewModel(
             if (uiStateMutable.compareAndSet(
                     state,
                     state.copy(
-                        overlays = state.overlays.copy(secretPrompt = claimed),
+                        overlays = state.overlays.afterSecretPromptClaimed(expected),
                     ),
                 )
             ) {
@@ -3559,20 +3551,12 @@ class ChatViewModel(
         // chat via tail-follow scrolling. These are surfaced as a transient
         // status pill instead and never enter the message list.
         if (transient) {
-            uiStateMutable.update {
-                it.copy(
-                    connection = it.connection.copy(statusPill = text),
-                )
-            }
+            uiStateMutable.update { it.copy(connection = it.connection.afterStatusPill(text)) }
             statusPillJob?.cancel()
             statusPillJob =
                 viewModelScope.launch {
                     kotlinx.coroutines.delay(2500)
-                    uiStateMutable.update {
-                        it.copy(
-                            connection = it.connection.copy(statusPill = null),
-                        )
-                    }
+                    uiStateMutable.update { it.copy(connection = it.connection.afterStatusPillCleared()) }
                 }
             return
         }
