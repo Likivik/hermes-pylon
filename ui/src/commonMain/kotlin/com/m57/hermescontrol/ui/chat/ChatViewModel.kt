@@ -14,11 +14,9 @@ import com.m57.hermescontrol.data.model.Attachment
 import com.m57.hermescontrol.data.model.AttachmentSource
 import com.m57.hermescontrol.data.model.ModelProvider
 import com.m57.hermescontrol.data.model.PinnedModel
-import com.m57.hermescontrol.data.model.SessionInfo
 import com.m57.hermescontrol.data.model.SessionMessage
 import com.m57.hermescontrol.data.remote.AuthPayloads
 import com.m57.hermescontrol.data.remote.HermesJson
-import com.m57.hermescontrol.data.remote.NetworkError
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.attachmentReader
 import com.m57.hermescontrol.data.remote.mediaStore
@@ -1947,12 +1945,6 @@ class ChatViewModel(
     // keeps a slow response from painting over a newer list, and a failure keeps the
     // last-good rows instead of blanking the rail.
 
-    private var railSeq = 0L
-    private var railInFlight = false
-    private var railPendingForce = false
-    private var railFailures = 0
-    private var railNextAllowedAt = 0L
-
     fun loadSessions() {
         // The RPC round-trip stays as the *trigger* — the rest of the app still expects
         // this handshake — but its rows are ignored: the rail's rows come from REST,
@@ -1984,111 +1976,72 @@ class ChatViewModel(
     /** Foreground re-entry: refresh quietly — the user did not ask for a spinner. */
     fun onAppForegrounded() = requestRailRefresh(force = true)
 
-    internal fun requestRailRefresh(force: Boolean) {
-        if (railInFlight) {
-            // A forced refresh that arrives mid-flight must still happen: dropping it
-            // would keep the pull-to-refresh spinner on until the next signal. Coalesce
-            // it into one follow-up instead of queueing a burst.
-            if (force) railPendingForce = true
-            return
-        }
-        val now = nowMillis()
-        if (!force && now < railNextAllowedAt) return
-        railInFlight = true
-        val token = ++railSeq
-        viewModelScope.launch(io) {
-            try {
-                fetchRail(token)
-            } finally {
-                railInFlight = false
-                if (railPendingForce) {
-                    railPendingForce = false
-                    requestRailRefresh(force = true)
-                }
-            }
-        }
-    }
-
-    private suspend fun fetchRail(token: Long) {
-        val started = nowMillis()
-        val rows = ArrayList<SessionInfo>()
-        var offset = 0
-        var pages = 0
-        var failure: NetworkError? = null
-        // No `profile` parameter, ever. Profile identity is gateway-owned: the
-        // route resolves a client-supplied id against its profile registry and
-        // answers 404 for an id it does not know (that is what blanked the rail —
-        // the app's selected-profile id is client state, not a server fact). With
-        // the parameter omitted the route reads "this process's own state.db",
-        // the same rows the dashboard shows. Real multi-profile scoping must use
-        // an id the server itself handed out, not auth state.
-        // Page rather than trust one call: the route caps `limit` at 100, and quietly
-        // showing 100 of 400 sessions would be a regression against the RPC's 200.
-        while (pages < RAIL_MAX_PAGES) {
-            val result =
+    private val chatRail: ChatRail by lazy {
+        ChatRail(
+            io = io,
+            now = { nowMillis() },
+            launch = { block -> viewModelScope.launch(io) { block() } },
+            fetchPage = { offset, limit ->
                 safeApiCall {
                     api.hermesApi.getSessions(
-                        limit = RAIL_PAGE_SIZE,
+                        limit = limit,
                         offset = offset,
                         order = "recent",
                         excludeSources = AUTOMATION_SOURCE,
                     )
                 }
-            when (result) {
-                is NetworkResult.Success -> {
-                    val page = result.data.sessions.orEmpty()
-                    pages++
-                    rows += page
-                    offset += page.size
-                    if (page.size < RAIL_PAGE_SIZE || rows.size >= result.data.total) break
-                }
-                is NetworkResult.Failure -> {
-                    failure = result.error
-                    break
-                }
-            }
-        }
-        if (failure != null) {
-            railFailures++
-            val backoff = railBackoffMs(railFailures)
-            railNextAllowedAt = nowMillis() + backoff
-            // Keep the last-good rows and record *why* they are missing: the rail
-            // renders the reason as a retry affordance instead of vanishing.
-            val status = railLoadStatusOf(uiStateMutable.value.sessions.size, failure)
-            HermesLog.w(
-                "ChatVM",
-                "rail refresh failed ($failure); keeping ${uiStateMutable.value.sessions.size} rows, " +
-                    "status=$status, next attempt in ${backoff / 1000}s",
-            )
-            uiStateMutable.update {
-                it.copy(
-                    rail = it.rail.copy(railRefreshing = false, railStatus = status),
-                )
-            }
-            return
-        }
-        if (token != railSeq) return
-        val sessions = railSessionsOf(rows)
-        if (rows.size != sessions.size) {
-            HermesLog.i("ChatVM", "rail hid ${rows.size - sessions.size} automation sessions")
-        }
-        HermesLog.i(
-            "ChatVM",
-            "rail refreshed: ${sessions.size} sessions in $pages page(s), ${nowMillis() - started}ms",
+            },
+            selectSessions = ::railSessionsOf,
+            backoffMs = ::railBackoffMs,
+            write = ::applyRailUpdate,
+            pageSize = RAIL_PAGE_SIZE,
+            maxPages = RAIL_MAX_PAGES,
+            minIntervalMs = RAIL_MIN_INTERVAL_MS,
         )
-        railFailures = 0
-        railNextAllowedAt = nowMillis() + RAIL_MIN_INTERVAL_MS
-        uiStateMutable.update { state ->
-            val newTitle = sessions.find { s -> s.id == state.currentSessionId }?.title
-            state.copy(
-                transcript = state.transcript.copy(chatTitle = newTitle ?: state.chatTitle),
-                rail =
-                    state.rail.copy(
-                        sessions = sessions,
-                        railRefreshing = false,
-                        railStatus = railLoadStatusOf(sessions.size, null),
-                    ),
-            )
+    }
+
+    internal fun requestRailRefresh(force: Boolean) {
+        chatRail.request(force)
+    }
+
+    private fun applyRailUpdate(update: ChatRailUpdate) {
+        when (update) {
+            is ChatRailUpdate.Loaded -> {
+                if (update.rows != update.sessions.size) {
+                    HermesLog.i("ChatVM", "rail hid ${update.rows - update.sessions.size} automation sessions")
+                }
+                HermesLog.i(
+                    "ChatVM",
+                    "rail refreshed: ${update.sessions.size} sessions in ${update.pages} page(s), ${update.elapsedMs}ms",
+                )
+                uiStateMutable.update { state ->
+                    val newTitle = update.sessions.find { s -> s.id == state.currentSessionId }?.title
+                    state.copy(
+                        transcript = state.transcript.copy(chatTitle = newTitle ?: state.chatTitle),
+                        rail =
+                            state.rail.copy(
+                                sessions = update.sessions,
+                                railRefreshing = false,
+                                railStatus = railLoadStatusOf(update.sessions.size, null),
+                            ),
+                    )
+                }
+            }
+
+            is ChatRailUpdate.Failed -> {
+                val rows = uiStateMutable.value.sessions.size
+                val status = railLoadStatusOf(rows, update.error)
+                // Keep the last-good rows and record *why* they are missing: the rail renders the reason
+                // as a retry affordance instead of vanishing.
+                HermesLog.w(
+                    "ChatVM",
+                    "rail refresh failed (${update.error}); keeping $rows rows, " +
+                        "status=$status, next attempt in ${update.backoffMs / 1000}s",
+                )
+                uiStateMutable.update {
+                    it.copy(rail = it.rail.copy(railRefreshing = false, railStatus = status))
+                }
+            }
         }
     }
 
