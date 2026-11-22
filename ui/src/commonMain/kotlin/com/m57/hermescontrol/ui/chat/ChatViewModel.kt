@@ -2473,36 +2473,13 @@ class ChatViewModel(
         loadedMessageOffset = 0
         latestPaging = false
         streamingController.resetStreaming()
-        uiStateMutable.update {
-            val title = it.sessions.find { s -> s.id == sessionId }?.title ?: "Hermes"
-            it.copy(
-                transcript =
-                    it.transcript.copy(
-                        isLoading = false,
-                        isSessionReady = false,
-                        isLoadingOlder = false,
-                        hasOlderMessages = false,
-                        // Paint from the transcript cache when we have it: on web there is no Room, so
-                        currentSessionId = sessionId,
-                        // blanking here made every switch a visible flash. The authoritative load still
-                        // converges the view; a cache miss legitimately starts empty.
-                        messages = transcriptCache.get(selectedProfileNow(), sessionId),
-                        subagentIndicators = emptyList(),
-                        todos = emptyList(),
-                        chatTitle = title,
-                        isAgentTyping = false, // The gauge is per-session occupancy; carrying the previous
-                        // session's fill into a new one would misreport it until the
-                        // first turn lands.
-                        contextUsage = null,
-                    ),
-                rail = it.rail.copy(showSessionPicker = false),
-                composer =
-                    it.composer.copy(
-                        currentSessionModel = null,
-                        terminalBackend = null,
-                        pendingPrefillText = null,
-                    ),
-                overlays = it.overlays.copy(modelSwitchConfirmation = null, showContextDetail = false),
+        uiStateMutable.update { state ->
+            val title = state.sessions.find { s -> s.id == sessionId }?.title ?: "Hermes"
+            switchedState(
+                state = state,
+                sessionId = sessionId,
+                cachedMessages = transcriptCache.get(selectedProfileNow(), sessionId),
+                title = title,
             )
         }
         // Mirror the active session id app-wide (issue #532).
