@@ -33,6 +33,8 @@ internal sealed interface ChatHistoryUpdate {
     data class SyncMerged(val sessionId: String, val incoming: List<ChatMessage>) : ChatHistoryUpdate
 
     data object SyncFinished : ChatHistoryUpdate
+
+    data class MessageCountKnown(val sessionId: String, val count: Int) : ChatHistoryUpdate
 }
 
 /**
@@ -226,6 +228,31 @@ internal class ChatHistory(
         activeSyncOwner = null
         syncJob = null
         write(ChatHistoryUpdate.SyncFinished)
+    }
+
+    /**
+     * How many messages the session has, preferring a number the client already knows.
+     *
+     * The rail usually knows the count, so most calls cost nothing. When it does not, one precise
+     * `getSession` is asked — not a session listing, whose `limit` the route caps at 100. When even that
+     * fails, the transcript's own size is the honest fallback: it is what the user can actually see.
+     */
+    suspend fun serverMessageCount(
+        sessionId: String,
+        knownCount: Int?,
+        transcriptSize: Int,
+        isCurrent: () -> Boolean,
+        fetchCount: suspend (String) -> Int?,
+    ): Int? {
+        if (!isCurrent()) return null
+        if (knownCount != null) return knownCount.takeIf { isCurrent() }
+        val fetched = fetchCount(sessionId)
+        if (fetched != null) {
+            if (!isCurrent()) return null
+            write(ChatHistoryUpdate.MessageCountKnown(sessionId, fetched))
+            return fetched.takeIf { isCurrent() }
+        }
+        return transcriptSize.takeIf { isCurrent() }
     }
 
     private fun isOlderCurrent(
