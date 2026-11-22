@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.m57.hermescontrol.AppEnvironment
 import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.gateway.GatewaySessions
+import com.m57.hermescontrol.data.remote.gateway.SessionsGateway
 import com.m57.hermescontrol.data.remote.safeApiCall
 import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.ui.common.safeLaunchLoad
@@ -40,6 +42,7 @@ data class LogsUiState(
 
 class LogsViewModel(
     private val ioDispatcher: CoroutineDispatcher = AppEnvironment.current.io,
+    private val gateway: SessionsGateway = GatewaySessions(ApiClient.hermesApi),
 ) :
     ViewModel(),
         ToastHost {
@@ -57,7 +60,7 @@ class LogsViewModel(
                 ioDispatcher = ioDispatcher,
                 apiCall = {
                     safeApiCall {
-                        ApiClient.hermesApi.getLogs(
+                        gateway.getLogs(
                             file = filters.file,
                             lines = filters.lines,
                             level = filters.level,
@@ -130,7 +133,7 @@ class LogsViewModel(
                     for (file in files) {
                         val result =
                             safeApiCall {
-                                ApiClient.hermesApi.uploadManagedFileStream(
+                                gateway.uploadManagedFileStream(
                                     path = "logs/${'$'}{file.name}",
                                     overwrite = true,
                                     fileName = file.name,
