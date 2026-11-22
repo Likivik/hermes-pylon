@@ -185,6 +185,9 @@ class ChatViewModel(
     /** The HTTP seam, same rule. */
     private val api: ChatApi = DefaultChatApi,
 ) : ViewModel() {
+    /** Batch 3 seam: the history reads, out of this class. */
+    private val historyLoader = ChatHistoryLoader(api, io)
+
     // ── Internal state ───────────────────────────────────────────────────
     internal val uiStateMutable = MutableStateFlow(ChatUiState())
 
@@ -2866,11 +2869,9 @@ class ChatViewModel(
                 ?.messageCount
         if (known != null) return known.takeIf { isHistoryRefreshCurrent(fence, owner) }
         val result =
-            withContext(io) {
-                // One precise row, not a 500-row listing: the route caps `limit` at 100,
-                // so the old `getSessions(limit = 500)` here could never succeed.
-                safeApiCall { api.hermesApi.getSession(sessionId) }
-            }
+            // One precise row, not a 500-row listing: the route caps `limit` at 100,
+            // so the old `getSessions(limit = 500)` here could never succeed.
+            withContext(io) { safeApiCall { api.hermesApi.getSession(sessionId) } }
         if (result is NetworkResult.Success) {
             if (!isHistoryRefreshCurrent(fence, owner)) return null
             val count = result.data.message_count
@@ -2898,17 +2899,7 @@ class ChatViewModel(
         offset: Int,
         limit: Int,
         order: String? = null,
-    ) = withContext(io) {
-        safeApiCall {
-            api.hermesApi.getSessionMessages(
-                sessionId = sessionId,
-                limit = limit,
-                offset = offset,
-                includeCompacted = true,
-                order = order,
-            )
-        }
-    }
+    ) = historyLoader.page(sessionId, offset, limit, order)
 
     private fun mapServerMessages(
         sessionId: String,
