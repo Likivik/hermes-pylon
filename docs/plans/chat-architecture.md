@@ -75,6 +75,28 @@ transition code that Batch 2 replaced.
 
 Gate: the same suites.
 
+## What Batch 3 actually taught (2026-11-22)
+
+Three attempts to move `requestRailRefresh` + `fetchRail` into `ChatRail.kt` as extensions, three
+reverts. All three failed the same way, and the failures are the useful part:
+
+1. **A function already marked `internal` keeps its `internal`, so the rewrite to
+   `internal fun ChatViewModel.x(...)` never fires** — the function lands in the new file with no
+   receiver, and every reference to `this` inside it breaks.
+2. **Constructor properties are not widened by a 4-space regex.** `private val api: ChatApi` lives in the
+   class header; moving code that calls `api` silently requires editing the header by hand.
+3. **Functions that own mutable counters cannot be cut out at all.** The rail holds `railSeq`,
+   `railInFlight`, `railNextAllowedAt`, `railFailures`; history holds refresh generations, owner tokens
+   and job handles. Each extraction cut declarations that sit *between* the moved functions, which is how
+   one attempt produced a duplicate `fetchRail` and 1,200 cascading errors.
+
+Batches 1 and 2 worked because routers and gateway handlers mostly *read* state, and the few members they
+wrote were simple flags. An area that *owns* state needs a class with explicit inputs and a callback for
+its writes — the shape `ChatHistoryLoader` already has, which is why that one compiled first time.
+
+**Rule for Batch 4 and onward:** extensions for readers, classes for owners. Do not reach for a script
+when the area has counters.
+
 ## Rules that still hold
 
 - No test assertion changes unless the assertion *is* the bug, and each one is named in the PR body.
