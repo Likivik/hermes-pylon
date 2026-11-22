@@ -1666,8 +1666,11 @@ class ChatViewModel(
     ) {
         saveRailMeta(sessionId, icon)
         // Icon-only edit (empty title = keep current): no server round-trip.
-        val title = newTitle.trim().takeIf { it.isNotEmpty() }
-        if (title == null) return
+        val title =
+            when (val plan = planRename(newTitle)) {
+                RenamePlan.IconOnly -> return
+                is RenamePlan.Title -> plan.title
+            }
         // ALWAYS resume first — single deterministic path. The gateway reaps
         // detached runtimes (WS grace reaper), so a session the app still
         // considers "live" (cached runtime id) can already be reaped
