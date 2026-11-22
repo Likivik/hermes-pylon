@@ -211,10 +211,7 @@ class ChatViewModel(
 
     private var conversationGeneration = 0L
     private val historyLoadJobs = mutableSetOf<Job>()
-    private var historyRefreshCounter = 0L
 
-    @Volatile private var activeHistoryRefreshOwner: Long? = null
-    private var historyRefreshJob: Job? = null
     private var cacheLoadCounter = 0L
 
     @Volatile private var activeCacheLoadOwner: Long? = null
@@ -1076,6 +1073,54 @@ class ChatViewModel(
                     )
                 }
 
+            ChatHistoryUpdate.LoadStarted ->
+                uiStateMutable.update { state ->
+                    state.copy(
+                        transcript = TranscriptReducer.reduce(state.transcript, TranscriptIntent.LoadStarted),
+                    )
+                }
+
+            is ChatHistoryUpdate.LoadSucceeded -> {
+                val cachedIds = activeCacheMessageIds
+                retireCacheLoad()
+                latestPaging = update.useLatestPaging
+                uiStateMutable.update { state ->
+                    val hasResumeHistory = state.messages.any { it.id.startsWith("resume-${update.sessionId}-") }
+                    state.copy(
+                        transcript =
+                            TranscriptReducer.reduce(
+                                state.transcript,
+                                TranscriptIntent.HistoryLoaded(
+                                    authoritative = update.messages,
+                                    baselineIds = update.baselineIds,
+                                    cachedIds = cachedIds,
+                                    hasResumeHistory = hasResumeHistory,
+                                    useLatestPaging = update.useLatestPaging,
+                                    returned = update.returned,
+                                    offset = update.offset,
+                                    pageSize = MESSAGE_PAGE_SIZE,
+                                ),
+                            ),
+                    )
+                }
+                val hasRestHistory =
+                    uiStateMutable.value.messages.any { serverMessageIndex(it.id, update.sessionId) != null }
+                if (update.messages.isNotEmpty() && hasRestHistory) loadedMessageOffset = update.offset
+            }
+
+            is ChatHistoryUpdate.LoadFailed ->
+                uiStateMutable.update { state ->
+                    state.copy(
+                        transcript =
+                            TranscriptReducer.reduce(
+                                state.transcript,
+                                TranscriptIntent.HistoryFailed(reason = update.reason, nowMs = nowMs()),
+                            ),
+                    )
+                }
+
+            ChatHistoryUpdate.LoadFinished -> Unit
+
             ChatHistoryUpdate.SyncStarted -> Unit
 
             is ChatHistoryUpdate.SyncMerged ->
@@ -1128,18 +1173,8 @@ class ChatViewModel(
 
     private fun isHistoryLoadFenceCurrent(fence: HistoryLoadFence): Boolean = fence.isCurrent()
 
-    private fun isHistoryRefreshCurrent(
-        fence: HistoryLoadFence,
-        owner: Long,
-    ): Boolean = activeHistoryRefreshOwner == owner && isHistoryLoadFenceCurrent(fence)
-
     private fun invalidateHistoryRefresh() {
-        retireSync()
-        retireCacheLoad()
-        activeHistoryRefreshOwner = null
-        historyRefreshCounter++
-        historyRefreshJob?.cancel()
-        historyRefreshJob = null
+        chatHistory.retireRefresh()
     }
 
     private fun retireCacheLoad() {
@@ -2577,134 +2612,29 @@ class ChatViewModel(
     }
 
     internal fun loadSessionMessages(sessionId: String) {
-        // A full refresh supersedes any incremental sync. Retire it before the
-        // repository FIFO barrier and refresh-fence capture so a sync already
-        // queued for persistence cannot become authoritative afterward.
-        retireSync()
-        retireOlderLoad()
-        val owner = ++historyRefreshCounter
-        activeHistoryRefreshOwner = owner
-        historyRefreshJob?.cancel()
+        val baselineIds = uiStateMutable.value.messages.mapTo(mutableSetOf()) { it.id }
         retireCacheLoad()
-        val baselineMessageIds = uiStateMutable.value.messages.mapTo(mutableSetOf()) { it.id }
-        uiStateMutable.update { state ->
-            state.copy(
-                transcript = TranscriptReducer.reduce(state.transcript, TranscriptIntent.LoadStarted),
-            )
-        }
         loadCachedMessages(sessionId)
-        historyRefreshJob =
-            launchHistoryLoad {
-                try {
-                    withContext(io) {
-                        repo.awaitSessionOperations(sessionId)
-                    }
-                    if (activeHistoryRefreshOwner != owner) return@launchHistoryLoad
-                    val fence = captureHistoryLoadFence(sessionId) ?: return@launchHistoryLoad
-                    if (!isHistoryRefreshCurrent(fence, owner)) return@launchHistoryLoad
-                    val latestResult =
-                        fetchMessagePage(
-                            sessionId,
-                            offset = 0,
-                            limit = MESSAGE_PAGE_SIZE,
-                            order = "latest",
-                        )
-                    if (!isHistoryRefreshCurrent(fence, owner)) return@launchHistoryLoad
-                    val probeOrder = (latestResult as? NetworkResult.Success)?.data?.pagination?.order
-                    val messageCount =
-                        if (probeOrder != "latest") {
-                            fetchServerMessageCount(sessionId, fence, owner) ?: return@launchHistoryLoad
-                        } else {
-                            null
+        chatHistory.refresh(
+            sessionId = sessionId,
+            baselineIds = baselineIds,
+            pageSize = MESSAGE_PAGE_SIZE,
+            awaitSessionOperations = { id -> repo.awaitSessionOperations(id) },
+            countProvider = {
+                chatHistory.serverMessageCount(
+                    sessionId = sessionId,
+                    knownCount = uiStateMutable.value.sessions.find { it.id == sessionId }?.messageCount,
+                    transcriptSize = uiStateMutable.value.messages.size,
+                    isCurrent = { true },
+                    fetchCount = {
+                        when (val r = withContext(io) { safeApiCall { api.hermesApi.getSession(sessionId) } }) {
+                            is NetworkResult.Success -> r.data.message_count
+                            is NetworkResult.Failure -> null
                         }
-                    if (!isHistoryRefreshCurrent(fence, owner)) return@launchHistoryLoad
-                    val firstPage =
-                        planFirstLoad(
-                            probeSucceeded = latestResult is NetworkResult.Success,
-                            probeOrder = probeOrder,
-                            messageCount = messageCount,
-                            pageSize = MESSAGE_PAGE_SIZE,
-                        ) ?: return@launchHistoryLoad
-                    val useLatestPaging = firstPage.useLatestPaging
-                    val requestedOffset = firstPage.offset
-                    val result =
-                        when {
-                            useLatestPaging -> latestResult
-                            latestResult is NetworkResult.Failure -> latestResult
-                            else -> fetchMessagePage(sessionId, requestedOffset, MESSAGE_PAGE_SIZE)
-                        }
-                    if (!isHistoryRefreshCurrent(fence, owner)) return@launchHistoryLoad
-                    latestPaging = useLatestPaging
-                    when (result) {
-                        is NetworkResult.Success -> {
-                            val offset = result.data.pagination?.offset ?: requestedOffset
-                            val chatMessages =
-                                mapServerMessages(
-                                    sessionId,
-                                    result.data.messages.orEmpty(),
-                                    offset,
-                                    useLatestPaging,
-                                )
-                            val persisted =
-                                withContext(io) {
-                                    repo.persistMessagesIfCurrent(
-                                        chatMessages,
-                                        sessionId,
-                                        fence.transcriptRevision,
-                                    ) {
-                                        isHistoryRefreshCurrent(fence, owner)
-                                    }
-                                }
-                            if (!persisted || !isHistoryRefreshCurrent(fence, owner)) return@launchHistoryLoad
-                            val cachedMessageIds = activeCacheMessageIds
-                            retireCacheLoad()
-                            uiStateMutable.update { state ->
-                                if (!isHistoryRefreshCurrent(fence, owner)) return@update state
-                                val hasResumeHistory = state.messages.any { it.id.startsWith("resume-$sessionId-") }
-                                state.copy(
-                                    transcript =
-                                        TranscriptReducer.reduce(
-                                            state.transcript,
-                                            TranscriptIntent.HistoryLoaded(
-                                                authoritative = chatMessages,
-                                                baselineIds = baselineMessageIds,
-                                                cachedIds = cachedMessageIds,
-                                                hasResumeHistory = hasResumeHistory,
-                                                useLatestPaging = useLatestPaging,
-                                                returned = result.data.pagination?.returned ?: chatMessages.size,
-                                                offset = offset,
-                                                pageSize = MESSAGE_PAGE_SIZE,
-                                            ),
-                                        ),
-                                )
-                            }
-                            if (isHistoryRefreshCurrent(fence, owner)) {
-                                val hasRestHistory =
-                                    uiStateMutable.value.messages.any { serverMessageIndex(it.id, sessionId) != null }
-                                if (chatMessages.isNotEmpty() && hasRestHistory) loadedMessageOffset = offset
-                            }
-                        }
-
-                        is NetworkResult.Failure -> {
-                            uiStateMutable.update { state ->
-                                if (!isHistoryRefreshCurrent(fence, owner)) return@update state
-                                state.copy(
-                                    transcript =
-                                        TranscriptReducer.reduce(
-                                            state.transcript,
-                                            TranscriptIntent.HistoryFailed(
-                                                reason = result.error.message,
-                                                nowMs = nowMs(),
-                                            ),
-                                        ),
-                                )
-                            }
-                        }
-                    }
-                } finally {
-                    if (activeHistoryRefreshOwner == owner) historyRefreshJob = null
-                }
-            }
+                    },
+                )
+            },
+        )
     }
 
     /**
@@ -2761,24 +2691,6 @@ class ChatViewModel(
         currentTodos: List<TodoItem>,
         messages: List<ChatMessage>,
     ): List<TodoItem> = hydrateTodosFromMessages(messages).ifEmpty { currentTodos }
-
-    private suspend fun fetchServerMessageCount(
-        sessionId: String,
-        fence: HistoryLoadFence,
-        owner: Long,
-    ): Int? =
-        chatHistory.serverMessageCount(
-            sessionId = sessionId,
-            knownCount = uiStateMutable.value.sessions.find { it.id == sessionId }?.messageCount,
-            transcriptSize = uiStateMutable.value.messages.size,
-            isCurrent = { isHistoryRefreshCurrent(fence, owner) },
-            fetchCount = {
-                when (val result = withContext(io) { safeApiCall { api.hermesApi.getSession(sessionId) } }) {
-                    is NetworkResult.Success -> result.data.message_count
-                    is NetworkResult.Failure -> null
-                }
-            },
-        )
 
     private suspend fun fetchMessagePage(
         sessionId: String,
