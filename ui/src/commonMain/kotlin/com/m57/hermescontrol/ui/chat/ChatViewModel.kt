@@ -2597,25 +2597,28 @@ class ChatViewModel(
                             order = "latest",
                         )
                     if (!isHistoryRefreshCurrent(fence, owner)) return@launchHistoryLoad
-                    val useLatestPaging: Boolean
-                    val (result, requestedOffset) =
-                        if (
-                            latestResult is NetworkResult.Success &&
-                            latestResult.data.pagination?.order == "latest"
-                        ) {
-                            useLatestPaging = true
-                            latestResult to 0
-                        } else if (latestResult is NetworkResult.Success) {
-                            useLatestPaging = false
-                            val messageCount =
-                                fetchServerMessageCount(sessionId, fence, owner)
-                                    ?: return@launchHistoryLoad
-                            val offset = (messageCount - MESSAGE_PAGE_SIZE).coerceAtLeast(0)
-                            if (!isHistoryRefreshCurrent(fence, owner)) return@launchHistoryLoad
-                            fetchMessagePage(sessionId, offset, MESSAGE_PAGE_SIZE) to offset
+                    val probeOrder = (latestResult as? NetworkResult.Success)?.data?.pagination?.order
+                    val messageCount =
+                        if (probeOrder != "latest") {
+                            fetchServerMessageCount(sessionId, fence, owner) ?: return@launchHistoryLoad
                         } else {
-                            useLatestPaging = false
-                            latestResult to 0
+                            null
+                        }
+                    if (!isHistoryRefreshCurrent(fence, owner)) return@launchHistoryLoad
+                    val firstPage =
+                        planFirstLoad(
+                            probeSucceeded = latestResult is NetworkResult.Success,
+                            probeOrder = probeOrder,
+                            messageCount = messageCount,
+                            pageSize = MESSAGE_PAGE_SIZE,
+                        ) ?: return@launchHistoryLoad
+                    val useLatestPaging = firstPage.useLatestPaging
+                    val requestedOffset = firstPage.offset
+                    val result =
+                        when {
+                            useLatestPaging -> latestResult
+                            latestResult is NetworkResult.Failure -> latestResult
+                            else -> fetchMessagePage(sessionId, requestedOffset, MESSAGE_PAGE_SIZE)
                         }
                     if (!isHistoryRefreshCurrent(fence, owner)) return@launchHistoryLoad
                     latestPaging = useLatestPaging
