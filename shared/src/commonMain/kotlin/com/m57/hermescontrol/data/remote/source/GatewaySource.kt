@@ -10,5 +10,11 @@ import com.m57.hermescontrol.data.remote.GatewayResponse
  * 150. `GatewaySourceOf` is the production adapter; tests pass their own implementation.
  */
 interface GatewaySource {
+    suspend fun startGateway(): GatewayResponse<Unit>
+
+    suspend fun stopGateway(): GatewayResponse<Unit>
+
+    suspend fun restartGateway(): GatewayResponse<Unit>
+
     suspend fun getStatus(): GatewayResponse<StatusResponse>
 }

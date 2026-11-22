@@ -3,9 +3,9 @@ package com.m57.hermescontrol.ui.sessions
 import com.m57.hermescontrol.data.model.SessionInfo
 import com.m57.hermescontrol.data.model.SessionTreeItem
 import com.m57.hermescontrol.data.model.flattenSessionTree
-import com.m57.hermescontrol.data.remote.HermesGatewayApi
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.data.remote.source.SessionsSource
 
 /**
  * Where pinned session ids are persisted.
@@ -58,16 +58,16 @@ fun buildSessionSections(
 }
 
 suspend fun hydratePinnedSessions(
-    api: HermesGatewayApi,
+    source: SessionsSource,
     pinIds: List<String>,
 ): List<SessionInfo> =
     pinIds.mapNotNull { pinId ->
         val resolvedSessionId =
-            when (val result = safeApiCall { api.getSessionLatestDescendant(pinId) }) {
+            when (val result = safeApiCall { source.getSessionLatestDescendant(pinId) }) {
                 is NetworkResult.Success -> result.data.session_id.takeIf(String::isNotBlank) ?: pinId
                 is NetworkResult.Failure -> pinId
             }
-        when (val result = safeApiCall { api.getSession(resolvedSessionId) }) {
+        when (val result = safeApiCall { source.getSession(resolvedSessionId) }) {
             is NetworkResult.Success -> {
                 val session = result.data
                 if (session.matchesPin(pinId)) {

@@ -121,12 +121,23 @@ object ApiClient {
         )
     }
 
+    /**
+     * How many times the gateway client has been built in this process.
+     *
+     * A request captures this number and compares it on return: if it changed, the client was rebuilt (endpoint or
+     * profile changed) while the request was in flight, and the answer belongs to the old one. A number survives an
+     * interface boundary; object identity does not, which is why fences used to reach for the singleton itself.
+     */
+    var generation: Long = 0L
+        private set
+
     private fun buildGateway(): Gateway {
         val endpoint = GatewayPlatform.endpoint()
         val profile = selectedProfileId
         // The profile rides in the client, not in each call: one place appends it,
         // so "forgot the parameter" is not a failure mode.
         val client = createGatewayHttpClient(GatewayClientAuth.SessionCredentials, profile)
+        generation++
         return Gateway(client, HermesGatewayApi(client, endpoint.baseUrl))
     }
 }

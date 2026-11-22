@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.m57.hermescontrol.AppEnvironment
 import com.m57.hermescontrol.data.model.StatusResponse
 import com.m57.hermescontrol.data.remote.ApiClient
-import com.m57.hermescontrol.data.remote.HermesGatewayApi
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
 import com.m57.hermescontrol.data.remote.source.GatewaySource
@@ -89,31 +88,36 @@ class GatewayViewModel(
     }
 
     fun startGateway() {
-        runGatewayAction("start") { api -> safeApiCall { api.startGateway() } }
+        runGatewayAction("start") { gateway -> safeApiCall { gateway.startGateway() } }
     }
 
     fun stopGateway() {
-        runGatewayAction("stop") { api -> safeApiCall { api.stopGateway() } }
+        runGatewayAction("stop") { gateway -> safeApiCall { gateway.stopGateway() } }
     }
 
     fun restartGateway() {
-        runGatewayAction("restart") { api -> safeApiCall { api.restartGateway() } }
+        runGatewayAction("restart") { gateway -> safeApiCall { gateway.restartGateway() } }
     }
 
     private fun runGatewayAction(
         actionName: String,
-        apiCall: suspend (HermesGatewayApi) -> NetworkResult<Unit>,
+        apiCall: suspend (GatewaySource) -> NetworkResult<Unit>,
     ) {
         if (_uiState.value.isActionRunning) return
         val requestedProfileId = profileId
-        // The singleton, not `source`, for the same reason as SessionsViewModel: the result is discarded when the
-        // client has been rebuilt since the request started, and only `!==` can tell.
-        val requestedApi = ApiClient.hermesApi
+        // Re-read per action: a profile or endpoint change rebuilds the client, and this action must travel the
+        // current one. The generation number is the fence — the object itself is not compared.
+        val startedAt = ApiClient.generation
+        val gateway = GatewaySourceOf(ApiClient.hermesApi)
         val generation = ++actionGeneration
         _uiState.update { it.copy(isActionRunning = true) }
         viewModelScope.launch {
-            val result = withContext(ioDispatcher) { apiCall(requestedApi) }
-            if (profileId != requestedProfileId || generation != actionGeneration) return@launch
+            val result = withContext(ioDispatcher) { apiCall(gateway) }
+            val stale =
+                profileId != requestedProfileId ||
+                    generation != actionGeneration ||
+                    startedAt != ApiClient.generation
+            if (stale) return@launch
             when (result) {
                 is NetworkResult.Success -> {
                     _uiState.update {
