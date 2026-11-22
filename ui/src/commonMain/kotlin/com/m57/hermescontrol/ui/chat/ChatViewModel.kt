@@ -1861,28 +1861,7 @@ class ChatViewModel(
         loadedMessageOffset = 0
         latestPaging = false
         ActiveSessionHolder.set(null)
-        uiStateMutable.update {
-            it.copy(
-                transcript =
-                    it.transcript.copy(
-                        isLoading = setLoading,
-                        currentSessionId = null,
-                        isSessionReady = false,
-                        messages = emptyList(),
-                        subagentIndicators = emptyList(),
-                        todos = emptyList(),
-                        chatTitle = "Hermes",
-                        contextUsage = null,
-                    ),
-                composer =
-                    it.composer.copy(
-                        currentSessionModel = null,
-                        terminalBackend = null,
-                        pendingPrefillText = null,
-                    ),
-                overlays = it.overlays.copy(showContextDetail = false),
-            )
-        }
+        uiStateMutable.update { it.afterNewSession(setLoading) }
         streamingStateMutable.update { StreamingState() }
         streamingController.resetStreaming()
         sendSessionCreate(generation = generation, attempt = 1, onDispatched = onDispatched)
