@@ -510,4 +510,171 @@ class ChatHistoryTest {
 
             assertNull(count, "a count with no current load behind it would be used for the wrong page")
         }
+
+    @Test
+    fun aRefreshWritesStartedThenLoadedThenFinished() =
+        runTest {
+            val updates = mutableListOf<ChatHistoryUpdate>()
+            val history = history(updates, StandardTestDispatcher(testScheduler), this)
+
+            history.refresh(
+                sessionId = "s-1",
+                baselineIds = setOf("a"),
+                pageSize = 150,
+                awaitSessionOperations = {},
+                countProvider = { 500 },
+            )
+            advanceUntilIdle()
+
+            assertEquals(ChatHistoryUpdate.LoadStarted, updates.first())
+            val loaded = updates.filterIsInstance<ChatHistoryUpdate.LoadSucceeded>().single()
+            assertEquals("s-1", loaded.sessionId)
+            assertEquals(setOf("a"), loaded.baselineIds)
+            assertEquals(ChatHistoryUpdate.LoadFinished, updates.last())
+        }
+
+    @Test
+    fun aGatewayWithLatestOrderingFetchesOnlyOnce() =
+        runTest {
+            val orders = mutableListOf<String?>()
+            var countProviderCalls = 0
+            val updates = mutableListOf<ChatHistoryUpdate>()
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val history =
+                history(
+                    updates,
+                    dispatcher,
+                    this,
+                    fetcher = { _, _, _, order ->
+                        orders += order
+                        NetworkResult.Success(
+                            SessionMessagesResponse(
+                                messages = emptyList(),
+                                pagination = SessionMessagePagination(offset = 0, order = "latest", returned = 0),
+                            ),
+                        )
+                    },
+                )
+
+            history.refresh(
+                sessionId = "s-1",
+                baselineIds = emptySet(),
+                pageSize = 150,
+                awaitSessionOperations = {},
+                countProvider = {
+                    countProviderCalls += 1
+                    500
+                },
+            )
+            advanceUntilIdle()
+
+            assertEquals(listOf<String?>("latest"), orders)
+            assertEquals(0, countProviderCalls, "latest ordering means the count is never needed")
+            assertTrue(updates.filterIsInstance<ChatHistoryUpdate.LoadSucceeded>().single().useLatestPaging)
+        }
+
+    @Test
+    fun aGatewayWithoutLatestOrderingAsksForTheTailWindow() =
+        runTest {
+            val requests = mutableListOf<Pair<Int, String?>>()
+            val updates = mutableListOf<ChatHistoryUpdate>()
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val history =
+                history(
+                    updates,
+                    dispatcher,
+                    this,
+                    fetcher = { _, offset, _, order ->
+                        requests += offset to order
+                        NetworkResult.Success(
+                            SessionMessagesResponse(
+                                messages = listOf(SessionMessage(id = 1, role = "user", content = "x")),
+                                // A gateway without latest support ignores the order and echoes none back.
+                                pagination = SessionMessagePagination(offset = offset, order = null, returned = 1),
+                            ),
+                        )
+                    },
+                )
+
+            history.refresh(
+                sessionId = "s-1",
+                baselineIds = emptySet(),
+                pageSize = 150,
+                awaitSessionOperations = {},
+                countProvider = { 500 },
+            )
+            advanceUntilIdle()
+
+            assertEquals(0 to "latest", requests.first(), "the probe always asks for latest first")
+            assertEquals(350 to null, requests.last(), "then the real page is the window ending at the newest message")
+            assertEquals(350, updates.filterIsInstance<ChatHistoryUpdate.LoadSucceeded>().single().offset)
+        }
+
+    @Test
+    fun anUnknownCountAbortsTheRefreshWithoutAWrite() =
+        runTest {
+            val updates = mutableListOf<ChatHistoryUpdate>()
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val history =
+                history(
+                    updates,
+                    dispatcher,
+                    this,
+                    fetcher = { _, _, _, _ ->
+                        NetworkResult.Success(
+                            SessionMessagesResponse(
+                                messages = emptyList(),
+                                pagination = SessionMessagePagination(offset = 0, order = null, returned = 0),
+                            ),
+                        )
+                    },
+                )
+
+            history.refresh(
+                sessionId = "s-1",
+                baselineIds = emptySet(),
+                pageSize = 150,
+                awaitSessionOperations = {},
+                countProvider = { null },
+            )
+            advanceUntilIdle()
+
+            assertTrue(updates.none { it is ChatHistoryUpdate.LoadSucceeded })
+            assertEquals(ChatHistoryUpdate.LoadFinished, updates.last())
+        }
+
+    @Test
+    fun aFailedProbeReportsAFailure() =
+        runTest {
+            val updates = mutableListOf<ChatHistoryUpdate>()
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val history =
+                ChatHistory(
+                    io = dispatcher,
+                    launch = { block -> launch { block() } },
+                    fetchPage = {
+                            _,
+                            _,
+                            _,
+                            _,
+                        ->
+                        NetworkResult.Failure(NetworkError.Unknown("boom", RuntimeException("boom")))
+                    },
+                    mapMessages = { _, _, _, _ -> emptyList() },
+                    persist = { _, _, _, _ -> true },
+                    captureFence = { fence() },
+                    write = { updates += it },
+                )
+
+            history.refresh(
+                sessionId = "s-1",
+                baselineIds = emptySet(),
+                pageSize = 150,
+                awaitSessionOperations = {},
+                countProvider = { 500 },
+            )
+            advanceUntilIdle()
+
+            assertEquals("boom", updates.filterIsInstance<ChatHistoryUpdate.LoadFailed>().single().reason)
+        }
 }

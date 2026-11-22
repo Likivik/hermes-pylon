@@ -35,6 +35,21 @@ internal sealed interface ChatHistoryUpdate {
     data object SyncFinished : ChatHistoryUpdate
 
     data class MessageCountKnown(val sessionId: String, val count: Int) : ChatHistoryUpdate
+
+    data object LoadStarted : ChatHistoryUpdate
+
+    data class LoadSucceeded(
+        val sessionId: String,
+        val messages: List<ChatMessage>,
+        val offset: Int,
+        val useLatestPaging: Boolean,
+        val returned: Int,
+        val baselineIds: Set<String>,
+    ) : ChatHistoryUpdate
+
+    data class LoadFailed(val reason: String) : ChatHistoryUpdate
+
+    data object LoadFinished : ChatHistoryUpdate
 }
 
 /**
@@ -74,6 +89,10 @@ internal class ChatHistory(
     private var olderCounter = 0L
     private var activeOlderOwner: Long? = null
     private var olderJob: Job? = null
+
+    private var refreshCounter = 0L
+    private var activeRefreshOwner: Long? = null
+    private var refreshJob: Job? = null
 
     private var syncCounter = 0L
     private var activeSyncOwner: Long? = null
@@ -216,6 +235,7 @@ internal class ChatHistory(
 
     /** Cancels an in-flight sync, e.g. when the session is replaced under it. */
     fun retireSync() {
+        if (activeSyncOwner == null) return
         activeSyncOwner = null
         syncCounter++
         syncJob?.cancel()
@@ -229,6 +249,120 @@ internal class ChatHistory(
         syncJob = null
         write(ChatHistoryUpdate.SyncFinished)
     }
+
+    /**
+     * The authoritative load for one session: probe the newest page, decide where to start, fetch it.
+     *
+     * A refresh supersedes any incremental sync or older-page load, so those are retired first — before the
+     * persistence barrier and the fence capture — otherwise a queued write could become authoritative after
+     * it.
+     */
+    fun refresh(
+        sessionId: String,
+        baselineIds: Set<String>,
+        pageSize: Int,
+        awaitSessionOperations: suspend (String) -> Unit,
+        countProvider: suspend () -> Int?,
+    ) {
+        retireSync()
+        retireOlder()
+        val owner = ++refreshCounter
+        activeRefreshOwner = owner
+        refreshJob?.cancel()
+        write(ChatHistoryUpdate.LoadStarted)
+
+        refreshJob =
+            launch {
+                try {
+                    withContext(io) { awaitSessionOperations(sessionId) }
+                    if (activeRefreshOwner != owner) return@launch
+                    val fence = captureFence(sessionId) ?: return@launch
+                    if (!isRefreshCurrent(fence, owner)) return@launch
+
+                    val probe = fetchPage(sessionId, 0, pageSize, "latest")
+                    if (!isRefreshCurrent(fence, owner)) return@launch
+                    val probeOrder = (probe as? NetworkResult.Success)?.data?.pagination?.order
+                    val messageCount =
+                        if (probeOrder != "latest") {
+                            countProvider() ?: return@launch
+                        } else {
+                            null
+                        }
+                    if (!isRefreshCurrent(fence, owner)) return@launch
+
+                    val plan =
+                        planFirstLoad(
+                            probeSucceeded = probe is NetworkResult.Success,
+                            probeOrder = probeOrder,
+                            messageCount = messageCount,
+                            pageSize = pageSize,
+                        ) ?: return@launch
+
+                    val result =
+                        when {
+                            plan.useLatestPaging -> probe
+                            probe is NetworkResult.Failure -> probe
+                            else -> fetchPage(sessionId, plan.offset, pageSize, null)
+                        }
+                    if (!isRefreshCurrent(fence, owner)) return@launch
+
+                    when (result) {
+                        is NetworkResult.Success -> {
+                            val offset = result.data.pagination?.offset ?: plan.offset
+                            val mapped =
+                                mapMessages(
+                                    sessionId,
+                                    result.data.messages.orEmpty(),
+                                    offset,
+                                    plan.useLatestPaging,
+                                )
+                            val persisted =
+                                withContext(io) {
+                                    persist(mapped, sessionId, fence.transcriptRevision) {
+                                        isRefreshCurrent(fence, owner)
+                                    }
+                                }
+                            if (!persisted || !isRefreshCurrent(fence, owner)) return@launch
+                            write(
+                                ChatHistoryUpdate.LoadSucceeded(
+                                    sessionId = sessionId,
+                                    messages = mapped,
+                                    offset = offset,
+                                    useLatestPaging = plan.useLatestPaging,
+                                    returned = result.data.pagination?.returned ?: mapped.size,
+                                    baselineIds = baselineIds,
+                                ),
+                            )
+                        }
+
+                        is NetworkResult.Failure -> write(ChatHistoryUpdate.LoadFailed(result.error.message))
+                    }
+                } finally {
+                    releaseRefresh(owner)
+                }
+            }
+    }
+
+    /** Cancels the in-flight refresh, e.g. when the session is switched under it. */
+    fun retireRefresh() {
+        activeRefreshOwner = null
+        refreshCounter++
+        refreshJob?.cancel()
+        refreshJob = null
+        write(ChatHistoryUpdate.LoadFinished)
+    }
+
+    private fun releaseRefresh(owner: Long) {
+        if (activeRefreshOwner != owner) return
+        activeRefreshOwner = null
+        refreshJob = null
+        write(ChatHistoryUpdate.LoadFinished)
+    }
+
+    private fun isRefreshCurrent(
+        fence: HistoryLoadFence,
+        owner: Long,
+    ): Boolean = activeRefreshOwner == owner && fence.isCurrent()
 
     /**
      * How many messages the session has, preferring a number the client already knows.
