@@ -2653,11 +2653,17 @@ class ChatViewModel(
         val sessionId = state.currentSessionId ?: return
         if (!state.hasOlderMessages || state.isLoadingOlder) return
         if (!latestPaging && loadedMessageOffset <= 0) return
-        val oldOffset = loadedMessageOffset
-        val newOffset =
-            if (latestPaging) oldOffset + MESSAGE_PAGE_SIZE else (oldOffset - MESSAGE_PAGE_SIZE).coerceAtLeast(0)
-        val limit = if (latestPaging) MESSAGE_PAGE_SIZE else oldOffset - newOffset
-        val useLatestPaging = latestPaging
+        val page =
+            planOlderLoad(
+                hasOlderMessages = state.hasOlderMessages,
+                isLoadingOlder = state.isLoadingOlder,
+                latestPaging = latestPaging,
+                loadedOffset = loadedMessageOffset,
+                pageSize = MESSAGE_PAGE_SIZE,
+            ) ?: return
+        val newOffset = page.offset
+        val limit = page.limit
+        val useLatestPaging = page.useLatestPaging
         val fence = captureHistoryLoadFence(sessionId) ?: return
         val owner = ++olderLoadCounter
         activeOlderLoadOwner = owner
@@ -2753,21 +2759,19 @@ class ChatViewModel(
     fun syncCurrentSession() {
         val state = uiStateMutable.value
         val sessionId = state.currentSessionId ?: return
-        if (isSyncingMessages || state.isLoading || state.isLoadingOlder || state.isAgentTyping ||
-            streamingStateMutable.value.streamingMessage != null
-        ) {
-            return
-        }
-        val nextOffset =
-            if (latestPaging) {
-                0
-            } else {
-                state.messages
-                    .mapNotNull { serverMessageIndex(it.id, sessionId) }
-                    .maxOrNull()
-                    ?.plus(1)
-                    ?: loadedMessageOffset
-            }
+        val request =
+            planSync(
+                isSyncing = isSyncingMessages,
+                isLoading = state.isLoading,
+                isLoadingOlder = state.isLoadingOlder,
+                isAgentTyping = state.isAgentTyping,
+                isStreaming = streamingStateMutable.value.streamingMessage != null,
+                latestPaging = latestPaging,
+                serverIndexes = state.messages.mapNotNull { serverMessageIndex(it.id, sessionId) },
+                loadedOffset = loadedMessageOffset,
+                pageSize = MESSAGE_PAGE_SIZE,
+            ) ?: return
+        val nextOffset = request.offset
         val fence = captureHistoryLoadFence(sessionId) ?: return
         val owner = ++syncCounter
         activeSyncOwner = owner
