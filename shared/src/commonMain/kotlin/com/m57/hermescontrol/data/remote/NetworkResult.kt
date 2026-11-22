@@ -95,6 +95,13 @@ fun jitteredBackoff(baseMs: Long): Long {
     return baseMs + jitter
 }
 
+/**
+ * The outcome of an attempt, after policy.
+ *
+ * `GatewayResponse` says what the server answered; this says what should happen next: success, a typed failure,
+ * whether another attempt is worth making, and whether the session is gone. Keeping the two apart is what lets
+ * retry and auth-expiry be tested without a network — do not collapse them into one type.
+ */
 suspend inline fun <reified T> safeApiCall(
     retries: Int = 2,
     reportAuthExpiry: Boolean = true,

@@ -198,15 +198,14 @@ class FakeChatApi(
 
     var clearedProfile = false
 
-    var onPostJson: suspend (path: String, jsonBody: String) -> Int = { _, _ -> 200 }
+    var onLogin: suspend (jsonBody: String) -> Int = { 200 }
 
     override suspend fun currentProfileName(): String? = selectedProfileId
 
-    override suspend fun postJson(
-        path: String,
+    override suspend fun loginWithPassword(
         jsonBody: String,
         timeoutMillis: Long,
-    ): Int = onPostJson(path, jsonBody)
+    ): Int = onLogin(jsonBody)
 
     override fun setSelectedProfile(profile: String?) {
         selectedProfileId = profile

@@ -16,8 +16,7 @@ interface ChatApi {
 
     suspend fun currentProfileName(): String?
 
-    suspend fun postJson(
-        path: String,
+    suspend fun loginWithPassword(
         jsonBody: String,
         timeoutMillis: Long = 10_000,
     ): Int
@@ -35,11 +34,10 @@ object DefaultChatApi : ChatApi {
 
     override suspend fun currentProfileName(): String? = ApiClient.currentProfileName()
 
-    override suspend fun postJson(
-        path: String,
+    override suspend fun loginWithPassword(
         jsonBody: String,
         timeoutMillis: Long,
-    ): Int = ApiClient.postJson(path, jsonBody, timeoutMillis)
+    ): Int = ApiClient.hermesApi.loginWithPassword(jsonBody, timeoutMillis).code
 
     override fun setSelectedProfile(profile: String?) = ApiClient.setSelectedProfile(profile)
 
