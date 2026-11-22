@@ -5399,7 +5399,7 @@ class ChatViewModelTest {
             )
         val after = before.copy(reasoningText = "Restored reasoning")
 
-        assertFalse(viewModel.sameMessages(listOf(before), listOf(after)))
+        assertFalse(sameTranscript(listOf(before), listOf(after)))
     }
 
     @Test
@@ -5408,7 +5408,7 @@ class ChatViewModelTest {
         val before = ChatMessage(role = MessageRole.USER, content = "marker")
         val after = before.copy(displayKind = "internal_notification")
 
-        assertFalse(viewModel.sameMessages(listOf(before), listOf(after)))
+        assertFalse(sameTranscript(listOf(before), listOf(after)))
     }
 
     @Test

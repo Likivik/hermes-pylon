@@ -105,3 +105,28 @@ private fun isAttachmentReferenceLine(line: String): Boolean {
         normalized.startsWith("@file:") ||
         normalized == "[screenshot]"
 }
+
+/**
+ * Whether two transcripts are the same for the purpose of skipping a write.
+ *
+ * This is what stops a sync from replacing the list the user is reading with an identical one, which would
+ * restart list animations and lose scroll anchoring. It has to compare every field a bubble renders, not just
+ * id and text: a tool row that changes from RUNNING to COMPLETED is a different row even when its content is
+ * unchanged, and skipping that write would leave a finished tool spinning.
+ */
+fun sameTranscript(
+    left: List<ChatMessage>,
+    right: List<ChatMessage>,
+): Boolean =
+    left.size == right.size &&
+        left.zip(right).all { (a, b) ->
+            a.id == b.id &&
+                a.role == b.role &&
+                a.content == b.content &&
+                a.reasoningText == b.reasoningText &&
+                a.attachments == b.attachments &&
+                a.toolName == b.toolName &&
+                a.toolCallId == b.toolCallId &&
+                a.toolStatus == b.toolStatus &&
+                a.displayKind == b.displayKind
+        }

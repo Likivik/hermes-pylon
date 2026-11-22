@@ -1131,7 +1131,7 @@ class ChatViewModel(
                                 serverMessageIndex(id, update.sessionId) != null
                             },
                         )
-                    if (sameMessages(current.messages, merged)) {
+                    if (sameTranscript(current.messages, merged)) {
                         current
                     } else {
                         current.copy(
@@ -2849,23 +2849,6 @@ class ChatViewModel(
         id: String,
         sessionId: String,
     ): Int? = id.removePrefix("rest-$sessionId-").takeIf { it != id }?.toIntOrNull()
-
-    fun sameMessages(
-        left: List<ChatMessage>,
-        right: List<ChatMessage>,
-    ): Boolean =
-        left.size == right.size &&
-            left.zip(right).all { (a, b) ->
-                a.id == b.id &&
-                    a.role == b.role &&
-                    a.content == b.content &&
-                    a.reasoningText == b.reasoningText &&
-                    a.attachments == b.attachments &&
-                    a.toolName == b.toolName &&
-                    a.toolCallId == b.toolCallId &&
-                    a.toolStatus == b.toolStatus &&
-                    a.displayKind == b.displayKind
-            }
 
     // ── UI actions ───────────────────────────────────────────────────────
 
