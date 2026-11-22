@@ -12,6 +12,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -420,5 +421,93 @@ class ChatHistoryTest {
             advanceUntilIdle()
 
             assertTrue(updates.none { it is ChatHistoryUpdate.SyncMerged }, "nothing new means nothing to write")
+        }
+
+    @Test
+    fun aKnownCountIsUsedWithoutAskingTheGateway() =
+        runTest {
+            val updates = mutableListOf<ChatHistoryUpdate>()
+            var fetches = 0
+            val history =
+                history(
+                    updates,
+                    StandardTestDispatcher(testScheduler),
+                    this,
+                    fetcher = { _, _, _, _ ->
+                        fetches += 1
+                        NetworkResult.Success(page(0))
+                    },
+                )
+
+            val count =
+                history.serverMessageCount(
+                    sessionId = "s-1",
+                    knownCount = 420,
+                    transcriptSize = 12,
+                    isCurrent = { true },
+                    fetchCount = {
+                        fetches += 1
+                        99
+                    },
+                )
+
+            assertEquals(420, count)
+            assertEquals(0, fetches, "the rail already knows the count; asking again is waste")
+        }
+
+    @Test
+    fun aFetchedCountUpdatesTheRail() =
+        runTest {
+            val updates = mutableListOf<ChatHistoryUpdate>()
+            val history = history(updates, StandardTestDispatcher(testScheduler), this)
+
+            val count =
+                history.serverMessageCount(
+                    sessionId = "s-1",
+                    knownCount = null,
+                    transcriptSize = 12,
+                    isCurrent = { true },
+                    fetchCount = { 420 },
+                )
+
+            assertEquals(420, count)
+            assertEquals(ChatHistoryUpdate.MessageCountKnown("s-1", 420), updates.single())
+        }
+
+    @Test
+    fun anUnknownCountFallsBackToWhatTheUserCanSee() =
+        runTest {
+            val updates = mutableListOf<ChatHistoryUpdate>()
+            val history = history(updates, StandardTestDispatcher(testScheduler), this)
+
+            val count =
+                history.serverMessageCount(
+                    sessionId = "s-1",
+                    knownCount = null,
+                    transcriptSize = 12,
+                    isCurrent = { true },
+                    fetchCount = { null },
+                )
+
+            assertEquals(12, count)
+            assertTrue(updates.isEmpty(), "a fallback is not new information, so nothing is written")
+        }
+
+    @Test
+    fun aStaleOwnerGetsNoCountAtAll() =
+        runTest {
+            val updates = mutableListOf<ChatHistoryUpdate>()
+            val history = history(updates, StandardTestDispatcher(testScheduler), this)
+
+            val count =
+                history.serverMessageCount(
+                    sessionId = "s-1",
+                    knownCount = 420,
+                    transcriptSize = 12,
+                    isCurrent = { false },
+                    fetchCount = { 420 },
+                )
+
+            assertNull(count, "a count with no current load behind it would be used for the wrong page")
         }
 }

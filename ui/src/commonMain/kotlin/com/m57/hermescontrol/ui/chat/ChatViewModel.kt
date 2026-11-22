@@ -1063,6 +1063,19 @@ class ChatViewModel(
                     )
                 }
 
+            is ChatHistoryUpdate.MessageCountKnown ->
+                uiStateMutable.update { current ->
+                    current.copy(
+                        rail =
+                            current.rail.copy(
+                                sessions =
+                                    current.sessions.map {
+                                        if (it.id == update.sessionId) it.copy(messageCount = update.count) else it
+                                    },
+                            ),
+                    )
+                }
+
             ChatHistoryUpdate.SyncStarted -> Unit
 
             is ChatHistoryUpdate.SyncMerged ->
@@ -2753,38 +2766,19 @@ class ChatViewModel(
         sessionId: String,
         fence: HistoryLoadFence,
         owner: Long,
-    ): Int? {
-        if (!isHistoryRefreshCurrent(fence, owner)) return null
-        val known =
-            uiStateMutable.value.sessions
-                .find { it.id == sessionId }
-                ?.messageCount
-        if (known != null) return known.takeIf { isHistoryRefreshCurrent(fence, owner) }
-        val result =
-            // One precise row, not a 500-row listing: the route caps `limit` at 100,
-            // so the old `getSessions(limit = 500)` here could never succeed.
-            withContext(io) { safeApiCall { api.hermesApi.getSession(sessionId) } }
-        if (result is NetworkResult.Success) {
-            if (!isHistoryRefreshCurrent(fence, owner)) return null
-            val count = result.data.message_count
-            if (count != null) {
-                uiStateMutable.update { current ->
-                    if (!isHistoryRefreshCurrent(fence, owner)) return@update current
-                    current.copy(
-                        rail =
-                            current.rail.copy(
-                                sessions =
-                                    current.sessions.map {
-                                        if (it.id == sessionId) it.copy(messageCount = count) else it
-                                    },
-                            ),
-                    )
+    ): Int? =
+        chatHistory.serverMessageCount(
+            sessionId = sessionId,
+            knownCount = uiStateMutable.value.sessions.find { it.id == sessionId }?.messageCount,
+            transcriptSize = uiStateMutable.value.messages.size,
+            isCurrent = { isHistoryRefreshCurrent(fence, owner) },
+            fetchCount = {
+                when (val result = withContext(io) { safeApiCall { api.hermesApi.getSession(sessionId) } }) {
+                    is NetworkResult.Success -> result.data.message_count
+                    is NetworkResult.Failure -> null
                 }
-                return count.takeIf { isHistoryRefreshCurrent(fence, owner) }
-            }
-        }
-        return (uiStateMutable.value.messages.size).takeIf { isHistoryRefreshCurrent(fence, owner) }
-    }
+            },
+        )
 
     private suspend fun fetchMessagePage(
         sessionId: String,
