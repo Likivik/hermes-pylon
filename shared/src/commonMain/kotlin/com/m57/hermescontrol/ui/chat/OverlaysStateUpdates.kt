@@ -245,7 +245,7 @@ fun OverlaysState.afterSearchClosed(): OverlaysState =
  *
  * **Preserved:** every other overlay, including the media player request.
  */
-fun OverlaysState.afterAttachmentOpening(path: String): OverlaysState = copy(openingAttachmentPath = path)
+fun OverlaysState.afterAttachmentOpening(path: String?): OverlaysState = copy(openingAttachmentPath = path)
 
 /**
  * Open the media player for an attachment.
