@@ -17,6 +17,8 @@ import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.data.remote.parseForBuild
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.data.remote.source.SettingsSource
+import com.m57.hermescontrol.data.remote.source.SettingsSourceOf
 import com.m57.hermescontrol.data.theme.ThemePreference
 import com.m57.hermescontrol.data.theme.ThemePreset
 import com.m57.hermescontrol.data.ws.HermesWsClient
@@ -74,6 +76,7 @@ class SettingsViewModel(
     private val connectWebSocket: () -> Unit = {
         HermesWsClient.connect()
     },
+    private val source: SettingsSource = SettingsSourceOf(ApiClient.hermesApi),
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
@@ -476,7 +479,7 @@ class SettingsViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.getStatus() }
+                    safeApiCall { source.getStatus() }
                 }
             when (result) {
                 is NetworkResult.Success -> {

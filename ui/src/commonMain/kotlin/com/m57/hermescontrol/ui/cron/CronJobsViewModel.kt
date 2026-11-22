@@ -9,6 +9,8 @@ import com.m57.hermescontrol.data.model.UpdateCronJobRequest
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.data.remote.source.CronJobsSource
+import com.m57.hermescontrol.data.remote.source.CronJobsSourceOf
 import com.m57.hermescontrol.data.ws.toJsonElement
 import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.ui.common.safeLaunchLoad
@@ -34,6 +36,7 @@ data class CronJobsUiState(
 
 class CronJobsViewModel(
     private val ioDispatcher: kotlinx.coroutines.CoroutineDispatcher = AppEnvironment.current.io,
+    private val source: CronJobsSource = CronJobsSourceOf(ApiClient.hermesApi),
 ) :
     ViewModel(),
         ToastHost {
@@ -47,7 +50,7 @@ class CronJobsViewModel(
             safeLaunchLoad(
                 currentJob = loadJob,
                 ioDispatcher = ioDispatcher,
-                apiCall = { safeApiCall { ApiClient.hermesApi.getCronJobs() } },
+                apiCall = { safeApiCall { source.getCronJobs() } },
                 onStart = { _uiState.update { it.copy(isLoading = true, errorMessage = null) } },
                 onSuccess = { data ->
                     _uiState.update { it.copy(isLoading = false, jobs = data.orEmpty()) }
@@ -76,7 +79,7 @@ class CronJobsViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.pauseCronJob(id) }
+                    safeApiCall { source.pauseCronJob(id) }
                 }
             if (result is NetworkResult.Failure) {
                 revertJobs(originalJobs, "Failed to pause cron job: ${result.error.message}")
@@ -97,7 +100,7 @@ class CronJobsViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.resumeCronJob(id) }
+                    safeApiCall { source.resumeCronJob(id) }
                 }
             if (result is NetworkResult.Failure) {
                 revertJobs(originalJobs, "Failed to resume cron job: ${result.error.message}")
@@ -109,7 +112,7 @@ class CronJobsViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.triggerCronJob(id) }
+                    safeApiCall { source.triggerCronJob(id) }
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -131,7 +134,7 @@ class CronJobsViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.deleteCronJob(id) }
+                    safeApiCall { source.deleteCronJob(id) }
                 }
             if (result is NetworkResult.Failure) {
                 revertJobs(originalJobs, "Failed to delete cron job: ${result.error.message}")
@@ -182,7 +185,7 @@ class CronJobsViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.getCronJob(id) }
+                    safeApiCall { source.getCronJob(id) }
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -272,7 +275,7 @@ class CronJobsViewModel(
                     if (editor.isNew) {
                         val created =
                             safeApiCall {
-                                ApiClient.hermesApi.createCronJob(
+                                source.createCronJob(
                                     CreateCronJobRequest(
                                         name = editor.name,
                                         schedule = editor.schedule,
@@ -295,7 +298,7 @@ class CronJobsViewModel(
                         if (created is NetworkResult.Success && monitorUpdates.isNotEmpty()) {
                             val applied =
                                 safeApiCall {
-                                    ApiClient.hermesApi.updateCronJob(
+                                    source.updateCronJob(
                                         created.data.id,
                                         UpdateCronJobRequest(
                                             updates = monitorUpdates.mapValues { it.value.toJsonElement() },
@@ -327,7 +330,7 @@ class CronJobsViewModel(
                         updates["monitor_script"] = editor.monitor_script.ifBlank { null }
                         updates["monitor_url"] = editor.monitor_url.ifBlank { null }
                         safeApiCall {
-                            ApiClient.hermesApi.updateCronJob(
+                            source.updateCronJob(
                                 editor.jobId ?: "",
                                 UpdateCronJobRequest(updates = updates.mapValues { it.value.toJsonElement() }),
                             )

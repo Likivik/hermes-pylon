@@ -11,6 +11,8 @@ import com.m57.hermescontrol.data.model.ToggleSkillRequest
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.data.remote.source.SkillsSource
+import com.m57.hermescontrol.data.remote.source.SkillsSourceOf
 import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.skills_status_all
 import com.m57.hermescontrol.generated.resources.skills_status_disabled
@@ -82,6 +84,7 @@ data class SkillsUiState(
 
 class SkillsViewModel(
     private val ioDispatcher: CoroutineDispatcher = com.m57.hermescontrol.concurrent.ioDispatcher,
+    private val source: SkillsSource = SkillsSourceOf(ApiClient.hermesApi),
 ) : ViewModel(),
     ToastHost {
     private val _uiState = MutableStateFlow(SkillsUiState())
@@ -95,7 +98,7 @@ class SkillsViewModel(
             safeLaunchLoad(
                 currentJob = loadJob,
                 ioDispatcher = ioDispatcher,
-                apiCall = { safeApiCall { ApiClient.hermesApi.getSkills() } },
+                apiCall = { safeApiCall { source.getSkills() } },
                 onStart = { _uiState.update { it.copy(isLoading = true, errorMessage = null) } },
                 onSuccess = { data ->
                     _uiState.update { it.copy(isLoading = false, skills = data.orEmpty()) }
@@ -140,7 +143,7 @@ class SkillsViewModel(
                 currentJob = searchJob,
                 ioDispatcher = ioDispatcher,
                 apiCall = {
-                    safeApiCall { ApiClient.hermesApi.searchSkillsHub(q = query) }
+                    safeApiCall { source.searchSkillsHub(q = query) }
                 },
                 onStart = { _uiState.update { it.copy(isHubSearching = true) } },
                 onSuccess = { data ->
@@ -187,7 +190,7 @@ class SkillsViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.previewHubSkill(identifier = identifier) }
+                    safeApiCall { source.previewHubSkill(identifier = identifier) }
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -223,7 +226,7 @@ class SkillsViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.installHubSkill(SkillHubInstallRequest(identifier = identifier)) }
+                    safeApiCall { source.installHubSkill(SkillHubInstallRequest(identifier = identifier)) }
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -261,7 +264,7 @@ class SkillsViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.uninstallHubSkill(SkillHubUninstallRequest(name = name)) }
+                    safeApiCall { source.uninstallHubSkill(SkillHubUninstallRequest(name = name)) }
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -316,7 +319,7 @@ class SkillsViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.toggleSkill(ToggleSkillRequest(skill.name, targetEnabled)) }
+                    safeApiCall { source.toggleSkill(ToggleSkillRequest(skill.name, targetEnabled)) }
                 }
             if (result is NetworkResult.Failure) {
                 revertSkillToggle(
@@ -356,7 +359,7 @@ class SkillsViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.getSkillContent(skillName) }
+                    safeApiCall { source.getSkillContent(skillName) }
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -390,7 +393,7 @@ class SkillsViewModel(
             val result =
                 withContext(ioDispatcher) {
                     safeApiCall {
-                        ApiClient.hermesApi.saveSkillContent(
+                        source.saveSkillContent(
                             SaveSkillContentRequest(
                                 name = skillName,
                                 content = content,
@@ -427,7 +430,7 @@ class SkillsViewModel(
             _uiState.update { it.copy(toastMessage = "Updating skills from hub…") }
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.updateSkillsFromHub() }
+                    safeApiCall { source.updateSkillsFromHub() }
                 }
             when (result) {
                 is NetworkResult.Success -> {
