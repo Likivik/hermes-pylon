@@ -8,6 +8,8 @@ import com.m57.hermescontrol.data.model.AddMcpServerRequest
 import com.m57.hermescontrol.data.model.AgentPluginInstallBody
 import com.m57.hermescontrol.data.model.AnalyticsResponse
 import com.m57.hermescontrol.data.model.AuxiliaryModelsResponse
+import com.m57.hermescontrol.data.model.BulkDeleteRequest
+import com.m57.hermescontrol.data.model.BulkDeleteResponse
 import com.m57.hermescontrol.data.model.CheckpointsResponse
 import com.m57.hermescontrol.data.model.ConfigSchemaResponse
 import com.m57.hermescontrol.data.model.ConfigUpdateRequest
@@ -68,7 +70,12 @@ import com.m57.hermescontrol.data.model.PruneRequest
 import com.m57.hermescontrol.data.model.RawConfigResponse
 import com.m57.hermescontrol.data.model.RecentUnlock
 import com.m57.hermescontrol.data.model.SaveSkillContentRequest
+import com.m57.hermescontrol.data.model.SessionFence
+import com.m57.hermescontrol.data.model.SessionInfo
+import com.m57.hermescontrol.data.model.SessionLatestDescendantResponse
 import com.m57.hermescontrol.data.model.SessionListResponse
+import com.m57.hermescontrol.data.model.SessionRenameRequest
+import com.m57.hermescontrol.data.model.SessionSearchResponse
 import com.m57.hermescontrol.data.model.SessionStatsResponse
 import com.m57.hermescontrol.data.model.SetActiveProfileRequest
 import com.m57.hermescontrol.data.model.Skill
@@ -203,6 +210,12 @@ class CronJobsSourceOf(private val api: HermesGatewayApi) : CronJobsSource {
 }
 
 class GatewaySourceOf(private val api: HermesGatewayApi) : GatewaySource {
+    override suspend fun startGateway(): GatewayResponse<Unit> = api.startGateway()
+
+    override suspend fun stopGateway(): GatewayResponse<Unit> = api.stopGateway()
+
+    override suspend fun restartGateway(): GatewayResponse<Unit> = api.restartGateway()
+
     override suspend fun getStatus(): GatewayResponse<StatusResponse> = api.getStatus()
 }
 
@@ -522,6 +535,33 @@ class WebhooksSourceOf(private val api: HermesGatewayApi) : WebhooksSource {
 }
 
 class SessionsSourceOf(private val api: HermesGatewayApi) : SessionsSource {
+    override suspend fun getSessionLatestDescendant(
+        sessionId: String,
+    ): GatewayResponse<SessionLatestDescendantResponse> = api.getSessionLatestDescendant(sessionId)
+
+    override suspend fun getSession(sessionId: String): GatewayResponse<SessionInfo> = api.getSession(sessionId)
+
+    override suspend fun searchSessions(
+        q: String,
+        profile: String?,
+        source: String?,
+        excludeSources: String?,
+    ): GatewayResponse<SessionSearchResponse> = api.searchSessions(q, profile, source, excludeSources)
+
+    override suspend fun renameSession(
+        sessionId: String,
+        body: SessionRenameRequest,
+    ): GatewayResponse<Unit> = api.renameSession(sessionId, body)
+
+    override suspend fun deleteSession(
+        sessionId: String,
+        fence: SessionFence,
+        profile: String?,
+    ): GatewayResponse<Unit> = api.deleteSession(sessionId, fence, profile)
+
+    override suspend fun bulkDeleteSessions(request: BulkDeleteRequest): GatewayResponse<BulkDeleteResponse> =
+        api.bulkDeleteSessions(request)
+
     override suspend fun getSessions(
         limit: Int,
         offset: Int,

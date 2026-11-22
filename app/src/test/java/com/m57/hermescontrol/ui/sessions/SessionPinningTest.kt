@@ -5,6 +5,7 @@ import com.m57.hermescontrol.data.model.SessionLatestDescendantResponse
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.GatewayResponse
 import com.m57.hermescontrol.data.remote.HermesGatewayApi
+import com.m57.hermescontrol.data.remote.source.SessionsSourceOf
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -77,7 +78,7 @@ class SessionPinningTest {
             val pinnedTip = SessionInfo(id = "tip", title = "Pinned")
             coEvery { api.getSession("root") } returns GatewayResponse.success(pinnedTip)
 
-            val hydrated = hydratePinnedSessions(api, listOf("root"))
+            val hydrated = hydratePinnedSessions(SessionsSourceOf(api), listOf("root"))
 
             assertEquals(listOf("tip"), hydrated.map { it.id })
             assertEquals("root", hydrated.single()._lineage_root_id)
@@ -91,7 +92,7 @@ class SessionPinningTest {
             coEvery { api.getSession("tip") } returns
                 GatewayResponse.success(SessionInfo(id = "tip", title = "Live tip"))
 
-            val hydrated = hydratePinnedSessions(api, listOf("root"))
+            val hydrated = hydratePinnedSessions(SessionsSourceOf(api), listOf("root"))
 
             assertEquals(listOf("tip"), hydrated.map { it.id })
             assertEquals("root", hydrated.single()._lineage_root_id)
