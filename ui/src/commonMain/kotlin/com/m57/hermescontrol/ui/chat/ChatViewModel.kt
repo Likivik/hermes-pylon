@@ -224,10 +224,7 @@ class ChatViewModel(
     @Volatile private var activeCacheLoadOwner: Long? = null
     private var cacheLoadJob: Job? = null
     private var activeCacheMessageIds: Set<String> = emptySet()
-    private var olderLoadCounter = 0L
 
-    @Volatile private var activeOlderLoadOwner: Long? = null
-    private var olderLoadJob: Job? = null
     val streamingState: StateFlow<StreamingState> = streamingStateMutable.asStateFlow()
 
     /** Tracks the auto-clear coroutine for reaction animations. */
@@ -1004,15 +1001,6 @@ class ChatViewModel(
         val persistenceGeneration: Long,
     )
 
-    private data class HistoryLoadFence(
-        val storageSessionId: String,
-        val runtimeSessionId: String?,
-        val profileId: String,
-        val connectionBinding: ConnectionBinding,
-        val generation: Long,
-        val transcriptRevision: Long,
-    )
-
     private data class CacheLoadFence(
         val storageSessionId: String,
         val runtimeSessionId: String?,
@@ -1038,26 +1026,71 @@ class ChatViewModel(
             fence.storageSessionId == uiStateMutable.value.currentSessionId &&
             fence.runtimeSessionId == runtimeSessionId
 
-    private fun captureHistoryLoadFence(sessionId: String): HistoryLoadFence? {
-        val profileId = selectedGatewayId()
-        val connectionBinding = wsClient.connectionBinding(profileId) ?: return null
-        return HistoryLoadFence(
-            storageSessionId = sessionId,
-            runtimeSessionId = runtimeSessionId,
-            profileId = profileId,
-            connectionBinding = connectionBinding,
-            generation = conversationGeneration,
-            transcriptRevision = repo.replacementGeneration(sessionId),
+    private val chatHistory: ChatHistory by lazy {
+        ChatHistory(
+            io = io,
+            launch = ::launchHistoryLoad,
+            fetchPage = { sessionId, offset, limit, order -> fetchMessagePage(sessionId, offset, limit, order) },
+            mapMessages = { sessionId, raw, offset, latest -> mapServerMessages(sessionId, raw, offset, latest) },
+            persist = { messages, sessionId, revision, stillCurrent ->
+                repo.persistMessagesIfCurrent(messages, sessionId, revision, stillCurrent)
+            },
+            captureFence = ::captureHistoryLoadFence,
+            write = ::applyHistoryUpdate,
         )
     }
 
-    private fun isHistoryLoadFenceCurrent(fence: HistoryLoadFence): Boolean =
-        fence.generation == conversationGeneration &&
-            fence.profileId == selectedGatewayId() &&
-            fence.storageSessionId == uiStateMutable.value.currentSessionId &&
-            fence.runtimeSessionId == runtimeSessionId &&
-            fence.transcriptRevision == repo.replacementGeneration(fence.storageSessionId) &&
-            wsClient.isConnectionBindingCurrent(fence.connectionBinding)
+    private fun applyHistoryUpdate(update: ChatHistoryUpdate) {
+        when (update) {
+            ChatHistoryUpdate.OlderStarted ->
+                uiStateMutable.update { state ->
+                    state.copy(
+                        transcript = TranscriptReducer.reduce(state.transcript, TranscriptIntent.OlderLoadStarted),
+                    )
+                }
+
+            is ChatHistoryUpdate.OlderLoaded ->
+                uiStateMutable.update { current ->
+                    loadedMessageOffset = update.effectiveOffset
+                    current.copy(
+                        transcript =
+                            TranscriptReducer.reduce(
+                                current.transcript,
+                                TranscriptIntent.OlderLoaded(
+                                    older = update.older,
+                                    useLatestPaging = update.useLatestPaging,
+                                    returned = update.returned,
+                                    effectiveOffset = update.effectiveOffset,
+                                    limit = update.limit,
+                                ),
+                            ),
+                    )
+                }
+
+            ChatHistoryUpdate.OlderFinished ->
+                uiStateMutable.update { state ->
+                    state.copy(transcript = state.transcript.copy(isLoadingOlder = false))
+                }
+        }
+    }
+
+    private fun captureHistoryLoadFence(sessionId: String): HistoryLoadFence? {
+        val profileId = selectedGatewayId()
+        val binding = wsClient.connectionBinding(profileId) ?: return null
+        val generation = conversationGeneration
+        val runtime = runtimeSessionId
+        val revision = repo.replacementGeneration(sessionId)
+        return HistoryLoadFence(sessionId = sessionId, transcriptRevision = revision) {
+            generation == conversationGeneration &&
+                profileId == selectedGatewayId() &&
+                sessionId == uiStateMutable.value.currentSessionId &&
+                runtime == runtimeSessionId &&
+                revision == repo.replacementGeneration(sessionId) &&
+                wsClient.isConnectionBindingCurrent(binding)
+        }
+    }
+
+    private fun isHistoryLoadFenceCurrent(fence: HistoryLoadFence): Boolean = fence.isCurrent()
 
     private fun isHistoryRefreshCurrent(
         fence: HistoryLoadFence,
@@ -2651,109 +2684,18 @@ class ChatViewModel(
     fun loadOlderMessages() {
         val state = uiStateMutable.value
         val sessionId = state.currentSessionId ?: return
-        if (!state.hasOlderMessages || state.isLoadingOlder) return
-        if (!latestPaging && loadedMessageOffset <= 0) return
-        val page =
-            planOlderLoad(
-                hasOlderMessages = state.hasOlderMessages,
-                isLoadingOlder = state.isLoadingOlder,
-                latestPaging = latestPaging,
-                loadedOffset = loadedMessageOffset,
-                pageSize = MESSAGE_PAGE_SIZE,
-            ) ?: return
-        val newOffset = page.offset
-        val limit = page.limit
-        val useLatestPaging = page.useLatestPaging
-        val fence = captureHistoryLoadFence(sessionId) ?: return
-        val owner = ++olderLoadCounter
-        activeOlderLoadOwner = owner
-        uiStateMutable.update { state ->
-            state.copy(
-                transcript = TranscriptReducer.reduce(state.transcript, TranscriptIntent.OlderLoadStarted),
-            )
-        }
-        olderLoadJob =
-            launchHistoryLoad {
-                try {
-                    val result =
-                        fetchMessagePage(
-                            sessionId,
-                            newOffset,
-                            limit,
-                            order = if (useLatestPaging) "latest" else null,
-                        )
-                    if (result !is NetworkResult.Success || !isOlderLoadCurrent(fence, owner)) {
-                        return@launchHistoryLoad
-                    }
-                    val effectiveOffset = result.data.pagination?.offset ?: newOffset
-                    val older =
-                        mapServerMessages(
-                            sessionId,
-                            result.data.messages.orEmpty(),
-                            effectiveOffset,
-                            useLatestPaging,
-                        )
-                    val persisted =
-                        withContext(io) {
-                            repo.persistMessagesIfCurrent(
-                                older,
-                                sessionId,
-                                fence.transcriptRevision,
-                            ) {
-                                isOlderLoadCurrent(fence, owner)
-                            }
-                        }
-                    if (!persisted || !isOlderLoadCurrent(fence, owner)) return@launchHistoryLoad
-                    uiStateMutable.update { current ->
-                        if (!isOlderLoadCurrent(fence, owner)) return@update current
-                        loadedMessageOffset = effectiveOffset
-                        current.copy(
-                            transcript =
-                                TranscriptReducer.reduce(
-                                    current.transcript,
-                                    TranscriptIntent.OlderLoaded(
-                                        older = older,
-                                        useLatestPaging = useLatestPaging,
-                                        returned = result.data.pagination?.returned ?: older.size,
-                                        effectiveOffset = effectiveOffset,
-                                        limit = limit,
-                                    ),
-                                ),
-                        )
-                    }
-                } finally {
-                    releaseOlderLoad(owner)
-                }
-            }
+        chatHistory.loadOlder(
+            sessionId = sessionId,
+            hasOlderMessages = state.hasOlderMessages,
+            isLoadingOlder = state.isLoadingOlder,
+            latestPaging = latestPaging,
+            loadedOffset = loadedMessageOffset,
+            pageSize = MESSAGE_PAGE_SIZE,
+        )
     }
-
-    private fun isOlderLoadCurrent(
-        fence: HistoryLoadFence,
-        owner: Long,
-    ): Boolean = activeOlderLoadOwner == owner && isHistoryLoadFenceCurrent(fence)
 
     private fun retireOlderLoad() {
-        val owner = activeOlderLoadOwner ?: return
-        if (activeOlderLoadOwner != owner) return
-        activeOlderLoadOwner = null
-        olderLoadJob?.cancel()
-        olderLoadJob = null
-        uiStateMutable.update {
-            it.copy(
-                transcript = it.transcript.copy(isLoadingOlder = false),
-            )
-        }
-    }
-
-    private fun releaseOlderLoad(owner: Long) {
-        if (activeOlderLoadOwner != owner) return
-        activeOlderLoadOwner = null
-        olderLoadJob = null
-        uiStateMutable.update {
-            it.copy(
-                transcript = it.transcript.copy(isLoadingOlder = false),
-            )
-        }
+        chatHistory.retireOlder()
     }
 
     fun syncCurrentSession() {
