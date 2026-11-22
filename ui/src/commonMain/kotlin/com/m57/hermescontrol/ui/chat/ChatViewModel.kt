@@ -2012,7 +2012,8 @@ class ChatViewModel(
                 }
                 HermesLog.i(
                     "ChatVM",
-                    "rail refreshed: ${update.sessions.size} sessions in ${update.pages} page(s), ${update.elapsedMs}ms",
+                    "rail refreshed: ${update.sessions.size} sessions in " +
+                        "${update.pages} page(s), ${update.elapsedMs}ms",
                 )
                 uiStateMutable.update { state ->
                     val newTitle = update.sessions.find { s -> s.id == state.currentSessionId }?.title
