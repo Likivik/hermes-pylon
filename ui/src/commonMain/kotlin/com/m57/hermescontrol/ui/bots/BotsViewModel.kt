@@ -8,6 +8,8 @@ import com.m57.hermescontrol.data.model.ProfileInfo
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.data.remote.source.BotsSource
+import com.m57.hermescontrol.data.remote.source.BotsSourceOf
 import com.m57.hermescontrol.util.nowMillis
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -69,6 +71,7 @@ class BotsViewModel(
     autoLoad: Boolean = true,
     private val clockSeconds: () -> Long = { AppEnvironment.current.clock.nowMillis() / 1_000L },
     private val selectedConnectionProfileId: () -> String? = { authStore.getSelectedProfileId() },
+    private val source: BotsSource = BotsSourceOf(ApiClient.hermesApi),
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(BotsUiState())
     val uiState: StateFlow<BotsUiState> = _uiState.asStateFlow()
@@ -87,7 +90,7 @@ class BotsViewModel(
             }
         }
         viewModelScope.launch(ioDispatcher) {
-            when (val result = safeApiCall { ApiClient.hermesApi.getProfiles() }) {
+            when (val result = safeApiCall { source.getProfiles() }) {
                 is NetworkResult.Success ->
                     _uiState.update {
                         it.copy(

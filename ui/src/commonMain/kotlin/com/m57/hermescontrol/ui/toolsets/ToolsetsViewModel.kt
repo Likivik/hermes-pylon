@@ -7,6 +7,8 @@ import com.m57.hermescontrol.data.model.ToolsetToggleRequest
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.data.remote.source.ToolsetsSource
+import com.m57.hermescontrol.data.remote.source.ToolsetsSourceOf
 import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.ui.common.safeLaunchLoad
 import com.m57.hermescontrol.util.ioDispatcher
@@ -24,15 +26,17 @@ data class ToolsetsUiState(
     val toastMessage: String? = null,
 )
 
-class ToolsetsViewModel :
+class ToolsetsViewModel(
+    private val source: ToolsetsSource = ToolsetsSourceOf(ApiClient.hermesApi),
+) :
     ViewModel(),
-    ToastHost {
+        ToastHost {
     private val _uiState = MutableStateFlow(ToolsetsUiState())
     val uiState: StateFlow<ToolsetsUiState> = _uiState.asStateFlow()
 
     fun loadToolsets() {
         safeLaunchLoad(
-            apiCall = { safeApiCall { ApiClient.hermesApi.getToolsets() } },
+            apiCall = { safeApiCall { source.getToolsets() } },
             onStart = { _uiState.update { it.copy(isLoading = true, errorMessage = null) } },
             onSuccess = { data ->
                 _uiState.update { it.copy(isLoading = false, toolsets = data.orEmpty()) }
@@ -65,7 +69,7 @@ class ToolsetsViewModel :
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.toggleToolset(toolset.name, ToolsetToggleRequest(targetEnabled)) }
+                    safeApiCall { source.toggleToolset(toolset.name, ToolsetToggleRequest(targetEnabled)) }
                 }
             if (result is NetworkResult.Failure) {
                 revertToggle(toolset.name, originalEnabled, "Failed to toggle toolset: ${result.error.message}")

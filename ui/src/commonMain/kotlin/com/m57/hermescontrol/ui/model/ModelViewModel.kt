@@ -14,6 +14,8 @@ import com.m57.hermescontrol.data.model.UpdateProfileModelRequest
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.data.remote.source.ModelSource
+import com.m57.hermescontrol.data.remote.source.ModelSourceOf
 import com.m57.hermescontrol.ui.common.ToastHost
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.async
@@ -70,6 +72,7 @@ data class ModelUiState(
 
 class ModelViewModel(
     private val ioDispatcher: CoroutineDispatcher = AppEnvironment.current.io,
+    private val source: ModelSource = ModelSourceOf(ApiClient.hermesApi),
 ) :
     ViewModel(),
         ToastHost {
@@ -86,25 +89,25 @@ class ModelViewModel(
             // Phase 1: Launch fast lightweight calls first (profiles, aux, moa)
             val activeProfileDeferred =
                 async(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.getActiveProfile() }
+                    safeApiCall { source.getActiveProfile() }
                 }
             val profilesDeferred =
                 async(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.getProfiles() }
+                    safeApiCall { source.getProfiles() }
                 }
             val auxDeferred =
                 async(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.getAuxiliaryModels() }
+                    safeApiCall { source.getAuxiliaryModels() }
                 }
             val moaDeferred =
                 async(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.getMoaModels() }
+                    safeApiCall { source.getMoaModels() }
                 }
 
             // Phase 2: Launch model options concurrently
             val optionsDeferred =
                 async(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.getModelOptions(refresh = refresh, includeUnconfigured = false) }
+                    safeApiCall { source.getModelOptions(refresh = refresh, includeUnconfigured = false) }
                 }
 
             // Await Phase 1 calls (~40-190ms total) and update UI immediately with available state
@@ -190,15 +193,15 @@ class ModelViewModel(
         viewModelScope.launch {
             val activeProfileDeferred =
                 async(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.getActiveProfile() }
+                    safeApiCall { source.getActiveProfile() }
                 }
             val profilesDeferred =
                 async(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.getProfiles() }
+                    safeApiCall { source.getProfiles() }
                 }
             val auxDeferred =
                 async(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.getAuxiliaryModels() }
+                    safeApiCall { source.getAuxiliaryModels() }
                 }
 
             val activeProfileResult = activeProfileDeferred.await()
@@ -261,7 +264,7 @@ class ModelViewModel(
             val result =
                 withContext(ioDispatcher) {
                     safeApiCall {
-                        ApiClient.hermesApi.setModelAssignment(
+                        source.setModelAssignment(
                             ModelAssignmentRequest(
                                 scope = "main",
                                 provider = provider,
@@ -323,7 +326,7 @@ class ModelViewModel(
             val result =
                 withContext(ioDispatcher) {
                     safeApiCall {
-                        ApiClient.hermesApi.setModelAssignment(
+                        source.setModelAssignment(
                             ModelAssignmentRequest(
                                 confirm_expensive_model = true,
                                 scope = "main",
@@ -399,7 +402,7 @@ class ModelViewModel(
             val result =
                 withContext(ioDispatcher) {
                     safeApiCall {
-                        ApiClient.hermesApi.setModelAssignment(
+                        source.setModelAssignment(
                             ModelAssignmentRequest(
                                 scope = "auxiliary",
                                 task = task,
@@ -439,7 +442,7 @@ class ModelViewModel(
             val result =
                 withContext(ioDispatcher) {
                     safeApiCall {
-                        ApiClient.hermesApi.setModelAssignment(
+                        source.setModelAssignment(
                             ModelAssignmentRequest(
                                 scope = "auxiliary",
                                 task = "__reset__",
@@ -485,7 +488,7 @@ class ModelViewModel(
             val result =
                 withContext(ioDispatcher) {
                     safeApiCall {
-                        ApiClient.hermesApi.saveMoaModels(config)
+                        source.saveMoaModels(config)
                     }
                 }
             when (result) {
@@ -526,7 +529,7 @@ class ModelViewModel(
                 } else {
                     val activeProfileNameResResult =
                         withContext(ioDispatcher) {
-                            safeApiCall { ApiClient.hermesApi.getActiveProfile() }
+                            safeApiCall { source.getActiveProfile() }
                         }
                     when (activeProfileNameResResult) {
                         is NetworkResult.Failure -> {
@@ -546,7 +549,7 @@ class ModelViewModel(
             val updateResResult =
                 withContext(ioDispatcher) {
                     safeApiCall {
-                        ApiClient.hermesApi.updateProfileModel(
+                        source.updateProfileModel(
                             activeProfileName,
                             UpdateProfileModelRequest(providerSlug, modelName),
                         )

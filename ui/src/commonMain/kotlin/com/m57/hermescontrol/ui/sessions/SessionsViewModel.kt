@@ -17,9 +17,9 @@ import com.m57.hermescontrol.data.remote.MutationRefusal
 import com.m57.hermescontrol.data.remote.NetworkError
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.asMutationRefusal
-import com.m57.hermescontrol.data.remote.gateway.GatewaySessions
-import com.m57.hermescontrol.data.remote.gateway.SessionsGateway
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.data.remote.source.SessionsSource
+import com.m57.hermescontrol.data.remote.source.SessionsSourceOf
 import com.m57.hermescontrol.data.ws.ConnectionStatus
 import com.m57.hermescontrol.data.ws.HermesSessionLiveStatusSource
 import com.m57.hermescontrol.data.ws.SessionLiveConnection
@@ -95,7 +95,7 @@ class SessionsViewModel(
             selectedProfileIdsProvider = { authStore.selectedGatewayIdFlow },
             selectedProfileIdProvider = { authStore.getSelectedProfileId() },
         ),
-    private val gateway: SessionsGateway = GatewaySessions(ApiClient.hermesApi),
+    private val source: SessionsSource = SessionsSourceOf(ApiClient.hermesApi),
 ) : ViewModel(), ToastHost {
     private val _uiState =
         MutableStateFlow(
@@ -189,7 +189,7 @@ class SessionsViewModel(
                 ioDispatcher = ioDispatcher,
                 apiCall = {
                     safeApiCall {
-                        gateway.getSessions(
+                        source.getSessions(
                             limit = PAGE_SIZE,
                             offset = 0,
                             order = "recent",
@@ -248,7 +248,7 @@ class SessionsViewModel(
                     safeApiCall {
                         // Paginate strictly on the server window: the offset counts rows the
                         // server returned, never the locally merged or filtered row count.
-                        gateway.getSessions(
+                        source.getSessions(
                             limit = PAGE_SIZE,
                             offset = state.serverOffset,
                             order = "recent",
@@ -452,7 +452,7 @@ class SessionsViewModel(
                 currentJob = statsJob,
                 ioDispatcher = ioDispatcher,
                 apiCall = {
-                    safeApiCall { gateway.getSessionStats() }
+                    safeApiCall { source.getSessionStats() }
                 },
                 onStart = { _uiState.update { it.copy(isLoadingStats = true, statsError = null) } },
                 onSuccess = { data ->
@@ -869,7 +869,7 @@ class SessionsViewModel(
             }
             val result =
                 safeApiCall {
-                    gateway.pruneSessions(
+                    source.pruneSessions(
                         body = PruneRequest(olderThanDays = days, profile = profile),
                     )
                 }

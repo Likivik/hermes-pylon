@@ -8,6 +8,8 @@ import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.HermesGatewayApi
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.data.remote.source.GatewaySource
+import com.m57.hermescontrol.data.remote.source.GatewaySourceOf
 import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.ui.common.reconcilePressureStatus
 import com.m57.hermescontrol.ui.common.safeLaunchLoad
@@ -30,6 +32,7 @@ data class GatewayUiState(
 
 class GatewayViewModel(
     private val ioDispatcher: CoroutineDispatcher = AppEnvironment.current.io,
+    private val source: GatewaySource = GatewaySourceOf(ApiClient.hermesApi),
 ) :
     ViewModel(),
         ToastHost {
@@ -54,7 +57,7 @@ class GatewayViewModel(
         val requestedProfileId = profileId
         safeLaunchLoad(
             ioDispatcher = ioDispatcher,
-            apiCall = { safeApiCall { ApiClient.hermesApi.getStatus() } },
+            apiCall = { safeApiCall { source.getStatus() } },
             onStart = { _uiState.update { it.copy(isLoading = true, errorMessage = null) } },
             onSuccess = { data ->
                 if (profileId == requestedProfileId && generation == statusGeneration) {

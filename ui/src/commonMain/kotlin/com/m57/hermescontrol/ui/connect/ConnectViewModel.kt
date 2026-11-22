@@ -19,6 +19,8 @@ import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.data.remote.parseForBuild
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.data.remote.source.ConnectSource
+import com.m57.hermescontrol.data.remote.source.ConnectSourceOf
 import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.connect_error_401
 import com.m57.hermescontrol.generated.resources.connect_error_403
@@ -69,6 +71,7 @@ data class ConnectUiState(
 class ConnectViewModel(
     private val resolver: StringResolver,
     private val ioDispatcher: CoroutineDispatcher = AppEnvironment.current.io,
+    private val source: ConnectSource = ConnectSourceOf(ApiClient.hermesApi),
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ConnectUiState())
     val uiState: StateFlow<ConnectUiState> = _uiState.asStateFlow()
@@ -168,7 +171,7 @@ class ConnectViewModel(
         val fingerprint = listOf(profile.id, state.baseUrl, state.token, state.authMode)
         viewModelScope.launch {
             val result =
-                withContext(ioDispatcher) { safeApiCall(reportAuthExpiry = false) { ApiClient.hermesApi.getStatus() } }
+                withContext(ioDispatcher) { safeApiCall(reportAuthExpiry = false) { source.getStatus() } }
             val current = _uiState.value
             val currentFingerprint =
                 listOf(current.selectedProfile?.id.orEmpty(), current.baseUrl, current.token, current.authMode)

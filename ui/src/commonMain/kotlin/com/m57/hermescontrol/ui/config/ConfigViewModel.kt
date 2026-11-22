@@ -10,6 +10,8 @@ import com.m57.hermescontrol.data.model.UpdateRawConfigRequest
 import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.data.remote.source.ConfigSource
+import com.m57.hermescontrol.data.remote.source.ConfigSourceOf
 import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.config_load_failed
 import com.m57.hermescontrol.generated.resources.config_load_yaml_failed
@@ -189,9 +191,11 @@ fun structuredRefreshAfterYamlSave(
             )
     }
 
-class ConfigViewModel :
+class ConfigViewModel(
+    private val source: ConfigSource = ConfigSourceOf(ApiClient.hermesApi),
+) :
     ViewModel(),
-    ToastHost {
+        ToastHost {
     private val _uiState = MutableStateFlow(ConfigUiState())
     val uiState: StateFlow<ConfigUiState> = _uiState.asStateFlow()
 
@@ -213,12 +217,12 @@ class ConfigViewModel :
                 _uiState.update { it.copy(isLoading = true, errorMessage = null) }
                 try {
                     coroutineScope {
-                        val configDeferred = async(ioDispatcher) { safeApiCall { ApiClient.hermesApi.getConfig() } }
+                        val configDeferred = async(ioDispatcher) { safeApiCall { source.getConfig() } }
                         val schemaDeferred =
-                            async(ioDispatcher) { safeApiCall { ApiClient.hermesApi.getConfigSchema() } }
+                            async(ioDispatcher) { safeApiCall { source.getConfigSchema() } }
                         val defaultsDeferred =
-                            async(ioDispatcher) { safeApiCall { ApiClient.hermesApi.getConfigDefaults() } }
-                        val rawDeferred = async(ioDispatcher) { safeApiCall { ApiClient.hermesApi.getRawConfig() } }
+                            async(ioDispatcher) { safeApiCall { source.getConfigDefaults() } }
+                        val rawDeferred = async(ioDispatcher) { safeApiCall { source.getRawConfig() } }
 
                         val configResult = configDeferred.await()
                         val schemaResult = schemaDeferred.await()
@@ -390,7 +394,7 @@ class ConfigViewModel :
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.getRawConfig() }
+                    safeApiCall { source.getRawConfig() }
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -461,7 +465,7 @@ class ConfigViewModel :
             val result =
                 withContext(ioDispatcher) {
                     safeApiCall {
-                        ApiClient.hermesApi.updateConfig(
+                        source.updateConfig(
                             ConfigUpdateRequest(config = changeset),
                         )
                     }
@@ -471,7 +475,7 @@ class ConfigViewModel :
                     acknowledgeSubmittedChanges(pendingChanges, submitted)
                     val configResult =
                         withContext(ioDispatcher) {
-                            safeApiCall { ApiClient.hermesApi.getConfig() }
+                            safeApiCall { source.getConfig() }
                         }
                     val refreshed =
                         (configResult as? NetworkResult.Success)?.data?.let {
@@ -525,7 +529,7 @@ class ConfigViewModel :
             val result =
                 withContext(ioDispatcher) {
                     safeApiCall {
-                        ApiClient.hermesApi.updateRawConfig(
+                        source.updateRawConfig(
                             UpdateRawConfigRequest(yaml_text = yamlText),
                         )
                     }
@@ -536,7 +540,7 @@ class ConfigViewModel :
                     pendingChanges.clear()
                     val configResult =
                         withContext(ioDispatcher) {
-                            safeApiCall { ApiClient.hermesApi.getConfig() }
+                            safeApiCall { source.getConfig() }
                         }
                     val current = uiState.value
                     val structuredRefresh =
