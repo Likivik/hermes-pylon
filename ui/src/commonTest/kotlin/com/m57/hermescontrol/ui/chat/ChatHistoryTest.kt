@@ -272,4 +272,153 @@ class ChatHistoryTest {
 
             assertEquals(listOf("latest", null), orders)
         }
+
+    private fun history(
+        updates: MutableList<ChatHistoryUpdate>,
+        dispatcher: kotlinx.coroutines.CoroutineDispatcher,
+        scope: kotlinx.coroutines.CoroutineScope,
+        fetches: () -> Int = { 0 },
+        fetcher: suspend (String, Int, Int, String?) -> NetworkResult<SessionMessagesResponse> = { _, _, _, _ ->
+            NetworkResult.Success(page(offset = 0))
+        },
+        fenceValid: Boolean = true,
+    ) = ChatHistory(
+        io = dispatcher,
+        launch = { block -> scope.launch { block() } },
+        fetchPage = { s, o, l, order -> fetcher(s, o, l, order) },
+        mapMessages = { _, _, _, _ -> listOf(ChatMessage(id = "x", role = MessageRole.USER, content = "x")) },
+        persist = { _, _, _, _ -> true },
+        captureFence = { fence(stillValid = fenceValid) },
+        write = { updates += it },
+    )
+
+    @Test
+    fun aSyncWritesStartedThenMergedThenFinished() =
+        runTest {
+            val updates = mutableListOf<ChatHistoryUpdate>()
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val history = history(updates, dispatcher, this)
+
+            history.sync(
+                sessionId = "s-1",
+                isLoading = false,
+                isLoadingOlder = false,
+                isAgentTyping = false,
+                isStreaming = false,
+                latestPaging = true,
+                serverIndexes = emptyList(),
+                loadedOffset = 0,
+                pageSize = 150,
+            )
+            advanceUntilIdle()
+
+            assertEquals(ChatHistoryUpdate.SyncStarted, updates.first())
+            assertEquals(1, updates.filterIsInstance<ChatHistoryUpdate.SyncMerged>().size)
+            assertEquals(ChatHistoryUpdate.SyncFinished, updates.last())
+        }
+
+    @Test
+    fun aSyncNeverRunsWhileStreamingOrTyping() =
+        runTest {
+            val updates = mutableListOf<ChatHistoryUpdate>()
+            var fetches = 0
+            val history =
+                history(
+                    updates,
+                    StandardTestDispatcher(testScheduler),
+                    this,
+                    fetcher = { _, _, _, _ ->
+                        fetches += 1
+                        NetworkResult.Success(page(0))
+                    },
+                )
+
+            history.sync(
+                "s-1",
+                false,
+                false,
+                isAgentTyping = true,
+                isStreaming = false,
+                latestPaging = true,
+                serverIndexes = emptyList(),
+                loadedOffset = 0,
+                pageSize = 150,
+            )
+            history.sync(
+                "s-1",
+                false,
+                false,
+                isAgentTyping = false,
+                isStreaming = true,
+                latestPaging = true,
+                serverIndexes = emptyList(),
+                loadedOffset = 0,
+                pageSize = 150,
+            )
+            advanceUntilIdle()
+
+            assertEquals(0, fetches, "a sync during typing or streaming would fight the transcript")
+            assertTrue(updates.isEmpty())
+        }
+
+    @Test
+    fun aStaleFenceStopsTheSyncFromMerging() =
+        runTest {
+            val updates = mutableListOf<ChatHistoryUpdate>()
+            val history = history(updates, StandardTestDispatcher(testScheduler), this, fenceValid = false)
+
+            history.sync(
+                "s-1",
+                false,
+                false,
+                false,
+                false,
+                true,
+                serverIndexes = emptyList(),
+                loadedOffset = 0,
+                pageSize = 150,
+            )
+            advanceUntilIdle()
+
+            assertTrue(updates.none { it is ChatHistoryUpdate.SyncMerged })
+        }
+
+    @Test
+    fun anEmptyPageIsNotMerged() =
+        runTest {
+            val updates = mutableListOf<ChatHistoryUpdate>()
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val history =
+                ChatHistory(
+                    io = dispatcher,
+                    launch = { block -> launch { block() } },
+                    fetchPage = {
+                            _,
+                            _,
+                            _,
+                            _,
+                        ->
+                        NetworkResult.Success(SessionMessagesResponse(messages = emptyList()))
+                    },
+                    mapMessages = { _, _, _, _ -> emptyList() },
+                    persist = { _, _, _, _ -> true },
+                    captureFence = { fence() },
+                    write = { updates += it },
+                )
+
+            history.sync(
+                "s-1",
+                false,
+                false,
+                false,
+                false,
+                true,
+                serverIndexes = emptyList(),
+                loadedOffset = 0,
+                pageSize = 150,
+            )
+            advanceUntilIdle()
+
+            assertTrue(updates.none { it is ChatHistoryUpdate.SyncMerged }, "nothing new means nothing to write")
+        }
 }
