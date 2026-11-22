@@ -27,6 +27,12 @@ internal sealed interface ChatHistoryUpdate {
     ) : ChatHistoryUpdate
 
     data object OlderFinished : ChatHistoryUpdate
+
+    data object SyncStarted : ChatHistoryUpdate
+
+    data class SyncMerged(val sessionId: String, val incoming: List<ChatMessage>) : ChatHistoryUpdate
+
+    data object SyncFinished : ChatHistoryUpdate
 }
 
 /**
@@ -67,6 +73,13 @@ internal class ChatHistory(
     private var activeOlderOwner: Long? = null
     private var olderJob: Job? = null
 
+    private var syncCounter = 0L
+    private var activeSyncOwner: Long? = null
+    private var syncJob: Job? = null
+
+    /** True while a sync is in flight; the guard for "do not start another". */
+    val isSyncing: Boolean get() = activeSyncOwner != null
+
     fun loadOlder(
         sessionId: String,
         hasOlderMessages: Boolean,
@@ -99,7 +112,7 @@ internal class ChatHistory(
                             request.limit,
                             if (request.useLatestPaging) "latest" else null,
                         )
-                    if (result !is NetworkResult.Success || !isCurrent(fence, owner)) return@launch
+                    if (result !is NetworkResult.Success || !isOlderCurrent(owner, fence)) return@launch
                     val effectiveOffset = result.data.pagination?.offset ?: request.offset
                     val older =
                         mapMessages(
@@ -110,9 +123,9 @@ internal class ChatHistory(
                         )
                     val persisted =
                         withContext(io) {
-                            persist(older, sessionId, fence.transcriptRevision) { isCurrent(fence, owner) }
+                            persist(older, sessionId, fence.transcriptRevision) { isOlderCurrent(owner, fence) }
                         }
-                    if (!persisted || !isCurrent(fence, owner)) return@launch
+                    if (!persisted || !isOlderCurrent(owner, fence)) return@launch
                     write(
                         ChatHistoryUpdate.OlderLoaded(
                             older = older,
@@ -138,10 +151,92 @@ internal class ChatHistory(
         write(ChatHistoryUpdate.OlderFinished)
     }
 
-    private fun isCurrent(
-        fence: HistoryLoadFence,
+    /** Continues the transcript from where it already is, without touching what the user is reading. */
+    fun sync(
+        sessionId: String,
+        isLoading: Boolean,
+        isLoadingOlder: Boolean,
+        isAgentTyping: Boolean,
+        isStreaming: Boolean,
+        latestPaging: Boolean,
+        serverIndexes: List<Int>,
+        loadedOffset: Int,
+        pageSize: Int,
+    ) {
+        val request =
+            planSync(
+                isSyncing = isSyncing,
+                isLoading = isLoading,
+                isLoadingOlder = isLoadingOlder,
+                isAgentTyping = isAgentTyping,
+                isStreaming = isStreaming,
+                latestPaging = latestPaging,
+                serverIndexes = serverIndexes,
+                loadedOffset = loadedOffset,
+                pageSize = pageSize,
+            ) ?: return
+        val fence = captureFence(sessionId) ?: return
+
+        val owner = ++syncCounter
+        activeSyncOwner = owner
+        write(ChatHistoryUpdate.SyncStarted)
+
+        syncJob =
+            launch {
+                try {
+                    val result =
+                        fetchPage(
+                            sessionId,
+                            request.offset,
+                            request.limit,
+                            if (request.useLatestPaging) "latest" else null,
+                        )
+                    if (result !is NetworkResult.Success || !isSyncCurrent(owner, fence)) return@launch
+                    val incoming =
+                        mapMessages(
+                            sessionId,
+                            result.data.messages.orEmpty(),
+                            request.offset,
+                            request.useLatestPaging,
+                        )
+                    if (incoming.isEmpty() || !isSyncCurrent(owner, fence)) return@launch
+                    val persisted =
+                        withContext(io) {
+                            persist(incoming, sessionId, fence.transcriptRevision) { isSyncCurrent(owner, fence) }
+                        }
+                    if (!persisted || !isSyncCurrent(owner, fence)) return@launch
+                    write(ChatHistoryUpdate.SyncMerged(sessionId, incoming))
+                } finally {
+                    releaseSync(owner)
+                }
+            }
+    }
+
+    /** Cancels an in-flight sync, e.g. when the session is replaced under it. */
+    fun retireSync() {
+        activeSyncOwner = null
+        syncCounter++
+        syncJob?.cancel()
+        syncJob = null
+        write(ChatHistoryUpdate.SyncFinished)
+    }
+
+    private fun releaseSync(owner: Long) {
+        if (activeSyncOwner != owner) return
+        activeSyncOwner = null
+        syncJob = null
+        write(ChatHistoryUpdate.SyncFinished)
+    }
+
+    private fun isOlderCurrent(
         owner: Long,
+        fence: HistoryLoadFence,
     ): Boolean = activeOlderOwner == owner && fence.isCurrent()
+
+    private fun isSyncCurrent(
+        owner: Long,
+        fence: HistoryLoadFence,
+    ): Boolean = activeSyncOwner == owner && fence.isCurrent()
 
     private fun release(owner: Long) {
         if (activeOlderOwner != owner) return
