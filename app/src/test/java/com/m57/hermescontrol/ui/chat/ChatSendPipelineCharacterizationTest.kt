@@ -4,8 +4,10 @@ import android.app.Application
 import androidx.lifecycle.viewModelScope
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.local.HermesDatabase
+import com.m57.hermescontrol.data.remote.installAttachmentReader
 import com.m57.hermescontrol.data.ws.ConnectionStatus
 import com.m57.hermescontrol.data.ws.WsEvent
+import com.m57.hermescontrol.data.ws.WsMethods
 import com.m57.hermescontrol.ui.chat.fakes.FakeChatApi
 import com.m57.hermescontrol.ui.chat.fakes.FakeChatPersistenceRepository
 import com.m57.hermescontrol.ui.chat.fakes.FakeChatTransport
@@ -17,6 +19,7 @@ import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.mockkStatic
 import io.mockk.unmockkAll
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
@@ -84,6 +87,7 @@ class ChatSendPipelineCharacterizationTest {
     fun tearDown() {
         createdViewModels.forEach { it.viewModelScope.cancel() }
         createdViewModels.clear()
+        installAttachmentReader(null)
         Dispatchers.resetMain()
         unmockkAll()
     }
@@ -198,5 +202,61 @@ class ChatSendPipelineCharacterizationTest {
             assertEquals("one redirect", 1, fakeTransport.redirects.size)
             assertEquals("follow-up", fakeTransport.redirects.single().text)
             assertEquals("nothing was submitted", 1, fakeTransport.sentMessages.size)
+        }
+
+    @Test
+    fun `an image is staged before the prompt is submitted`() =
+        runTest {
+            installAttachmentReader { "QUJD" }
+            // Hold the attach open: the prompt must not be submitted while it is in flight.
+            val gate = CompletableDeferred<Any?>()
+            fakeTransport.onRequest = { method, _, _ ->
+                assertEquals(WsMethods.IMAGE_ATTACH_BYTES, method)
+                gate
+            }
+            val vm = viewModelWithSession()
+            vm.addAttachment(uri = "content://pic", name = "pic.png", mimeType = "image/png", size = 4)
+
+            vm.sendMessage("what is this")
+            advanceUntilIdle()
+
+            // Ordering is the point: a fire-and-forget attach raced prompt.submit and the image was
+            // dropped (#526). Nothing may be submitted while the attach is still open.
+            assertTrue("the prompt waits for the attach", fakeTransport.sentMessages.isEmpty())
+
+            gate.complete(mapOf("attached" to true))
+            advanceUntilIdle()
+
+            assertEquals("what is this", fakeTransport.sentMessages.single().text)
+        }
+
+    @Test
+    fun `a file attachment is embedded as a ref ahead of the text`() =
+        runTest {
+            installAttachmentReader { "QUJD" }
+            fakeTransport.onRequest = { _, _, _ ->
+                CompletableDeferred<Any?>(mapOf("ref_text" to "@file:report.pdf"))
+            }
+            val vm = viewModelWithSession()
+            vm.addAttachment(uri = "content://doc", name = "report.pdf", mimeType = "application/pdf", size = 4)
+
+            vm.sendMessage("summarise")
+            advanceUntilIdle()
+
+            assertEquals("@file:report.pdf\n\nsummarise", fakeTransport.sentMessages.single().text)
+        }
+
+    @Test
+    fun `an unreadable attachment is skipped and the text still goes`() =
+        runTest {
+            installAttachmentReader { null }
+            val vm = viewModelWithSession()
+            vm.addAttachment(uri = "content://gone", name = "gone.bin", mimeType = "application/octet-stream", size = 4)
+
+            vm.sendMessage("still here")
+            advanceUntilIdle()
+
+            assertTrue("no attach call for an unreadable file", fakeTransport.requests.isEmpty())
+            assertEquals("still here", fakeTransport.sentMessages.single().text)
         }
 }

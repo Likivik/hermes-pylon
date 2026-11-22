@@ -885,16 +885,20 @@ class ChatViewModel(
     private suspend fun readContentUriBase64(uriString: String): String? = attachmentReader?.readBase64(uriString)
 
     /**
-     * Send a JSON-RPC call and suspend until the response arrives, delegating
-     * the deferred + 120s timeout to [HermesWsClient.request] (issue #526).
+     * Send a JSON-RPC call and suspend until the response arrives, delegating the deferred + 120s
+     * timeout to the injected transport (issue #526).
+     *
+     * This used to call `HermesWsClient.request` directly, which was the last place the ViewModel
+     * touched the singleton: attachment sends could not be driven by a fake, so the ordering that
+     * issues #526 and #710 were about — staging an image *before* `prompt.submit` — had no test.
+     *
      * Throws [HermesWsClient.HermesRpcException] on RPC error, or
-     * [kotlinx.coroutines.TimeoutCancellationException] if the server never
-     * answers within the timeout.
+     * [kotlinx.coroutines.TimeoutCancellationException] if the server never answers in time.
      */
     private suspend fun sendRpcAndAwait(
         method: String,
         params: Map<String, Any>,
-    ): Any? = HermesWsClient.request(method, params).await()
+    ): Any? = wsClient.request(method, params).await()
 
     // ── Attachment management ─────────────────────────────────────────────
 
