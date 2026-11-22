@@ -1,12 +1,6 @@
 package com.m57.hermescontrol.data.remote
 
 import io.ktor.client.HttpClient
-import io.ktor.client.plugins.timeout
-import io.ktor.client.request.request
-import io.ktor.client.request.setBody
-import io.ktor.http.ContentType
-import io.ktor.http.HttpMethod
-import io.ktor.http.contentType
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -125,36 +119,6 @@ object ApiClient {
             createGatewayHttpClient(GatewayClientAuth.FixedBearer(token)),
             endpoint.baseUrl,
         )
-    }
-
-    /**
-     * POSTs a raw JSON body to [path] and returns the HTTP status code.
-     *
-     * This exists for calls that must not go through the typed [HermesGatewayApi]
-     * surface — password login runs before a session exists and needs its own
-     * short timeouts. It travels the session client, so on Android the request
-     * keeps the shared OkHttp stack (cookie jar, TLS pinning, token refresh).
-     */
-    suspend fun postJson(
-        path: String,
-        jsonBody: String,
-        timeoutMillis: Long = 10_000,
-    ): Int {
-        val gateway = current.value
-        // Re-read the endpoint per call: the user can move the session while a
-        // client generation is still alive.
-        val baseUrl = GatewayPlatform.endpoint().baseUrl.toString()
-        val response =
-            gateway.client.request(baseUrl.trimEnd('/') + "/" + path.trimStart('/')) {
-                method = HttpMethod.Post
-                contentType(ContentType.Application.Json)
-                setBody(jsonBody)
-                timeout {
-                    requestTimeoutMillis = timeoutMillis
-                    connectTimeoutMillis = timeoutMillis
-                }
-            }
-        return response.status.value
     }
 
     private fun buildGateway(): Gateway {

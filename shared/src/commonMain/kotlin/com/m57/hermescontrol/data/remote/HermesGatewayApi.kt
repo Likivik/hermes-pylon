@@ -112,6 +112,7 @@ import com.m57.hermescontrol.data.model.WebhooksResponse
 import com.m57.hermescontrol.data.model.WebhooksToggleRequest
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.delete
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
@@ -157,6 +158,35 @@ class HermesGatewayApi(
     private val client: HttpClient,
     private val baseUrl: ServerBaseUrl,
 ) {
+    /**
+     * Password login — the one call the app makes before it has a session.
+     *
+     * Status-only by design: the call site switches on 401 and 403 to explain the failure and never reads a body,
+     * and this route answers errors with FastAPI's `{"detail": ...}` shape, which a typed decode would throw on.
+     *
+     * It is here rather than in `ApiClient` so the base-URL join, the JSON content type and the body handling are
+     * the same code path as every other call. What it adds is the timeout: login is the one place where hanging is
+     * worse than failing, so it carries its own.
+     *
+     * It must never travel through `safeApiCall`: there a 401 means "session expired" and forces a sign-out,
+     * while for login a 401 means "wrong password".
+     */
+    suspend fun loginWithPassword(
+        jsonBody: String,
+        timeoutMillis: Long = 10_000,
+    ): GatewayResponse<Unit> {
+        val response =
+            client.post(url("auth/password-login")) {
+                contentType(ContentType.Application.Json)
+                setBody(jsonBody)
+                timeout {
+                    requestTimeoutMillis = timeoutMillis
+                    connectTimeoutMillis = timeoutMillis
+                }
+            }
+        return empty(response)
+    }
+
     // ── plugins / status ──────────────────────────────────────────────────
     suspend fun getStatus(): GatewayResponse<StatusResponse> = get("api/status")
 
@@ -986,6 +1016,14 @@ class HermesGatewayApi(
      */
     private fun sessionPath(sessionId: String): String = "api/sessions/$sessionId"
 
+    /**
+     * Join a relative route onto the gateway's base URL.
+     *
+     * Not replaced by Ktor's `defaultRequest { url(base) }` on purpose: the client is rebuilt per profile and per
+     * endpoint (`ApiClient.buildGateway`), so the base URL belongs to this instance, not to the shared client
+     * config. Moving it into client construction would leave a stale endpoint behind after the user moves the
+     * session.
+     */
     private fun url(path: String): String = baseUrl.resolve(path).toString()
 
     private suspend inline fun <reified T> get(path: String): GatewayResponse<T> = decode(client.get(url(path)))
@@ -1040,8 +1078,14 @@ class HermesGatewayApi(
 }
 
 /**
- * Ktor-side counterpart of `retrofit2.Response<T>`, shaped to match so migration
- * of call sites is mechanical rather than a rewrite.
+ * What the wire said: status code, decoded body, failure text.
+ *
+ * This is the data layer's result, not a decision. Callers that need retry, backoff or auth-expiry policy go
+ * through `safeApiCall`, which turns this into `NetworkResult`. The two types are not duplicates: one is the
+ * response, the other is the outcome of an attempt.
+ *
+ * Ktor-side counterpart of `retrofit2.Response<T>`, shaped to match so migration of call sites is mechanical
+ * rather than a rewrite.
  */
 class GatewayResponse<out T>(
     val code: Int,

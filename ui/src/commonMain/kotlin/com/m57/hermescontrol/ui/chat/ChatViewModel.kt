@@ -3536,7 +3536,7 @@ class ChatViewModel(
             val jsonBody = AuthPayloads.passwordLogin(username, password)
 
             try {
-                val status = api.postJson(path = "auth/password-login", jsonBody = jsonBody)
+                val status = api.loginWithPassword(jsonBody = jsonBody)
                 if (status !in 200..299) {
                     val msg =
                         when (status) {
