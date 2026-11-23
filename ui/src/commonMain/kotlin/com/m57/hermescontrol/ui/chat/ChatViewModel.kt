@@ -1036,126 +1036,44 @@ class ChatViewModel(
         )
     }
 
+    /**
+     * The transcript slice's state writes, out of this class.
+     *
+     * Every fact the controller needs arrives as a lambda, so it owns nothing it did not create and a test
+     * can drive it with fakes. [ChatViewModel] keeps the fields; the controller keeps the rules.
+     */
+    private val transcriptController by lazy {
+        TranscriptController(
+            updateState = { f -> uiStateMutable.update(f) },
+            setMessageOffset = { loadedMessageOffset = it },
+            setLatestPaging = { latestPaging = it },
+            activeCacheMessageIds = { activeCacheMessageIds },
+            readMessages = { uiStateMutable.value.messages },
+            retireCacheLoad = { retireCacheLoad() },
+            serverMessageIndex = { id, sessionId -> serverMessageIndex(id, sessionId) },
+            restoredTodos = { todos, messages -> restoredTodos(todos, messages) },
+            nowMs = { nowMs() },
+            pageSize = MESSAGE_PAGE_SIZE,
+        )
+    }
+
     private fun applyHistoryUpdate(update: ChatHistoryUpdate) {
-        when (update) {
-            ChatHistoryUpdate.OlderStarted ->
-                uiStateMutable.update { state ->
-                    state.copy(
-                        transcript = TranscriptReducer.reduce(state.transcript, TranscriptIntent.OlderLoadStarted),
-                    )
-                }
-
-            is ChatHistoryUpdate.OlderLoaded ->
-                uiStateMutable.update { current ->
-                    loadedMessageOffset = update.effectiveOffset
-                    current.copy(
-                        transcript =
-                            TranscriptReducer.reduce(
-                                current.transcript,
-                                TranscriptIntent.OlderLoaded(
-                                    older = update.older,
-                                    useLatestPaging = update.useLatestPaging,
-                                    returned = update.returned,
-                                    effectiveOffset = update.effectiveOffset,
-                                    limit = update.limit,
-                                ),
-                            ),
-                    )
-                }
-
-            is ChatHistoryUpdate.MessageCountKnown ->
-                uiStateMutable.update { current ->
-                    current.copy(
-                        rail =
-                            current.rail.copy(
-                                sessions =
-                                    current.sessions.map {
-                                        if (it.id == update.sessionId) it.copy(messageCount = update.count) else it
-                                    },
-                            ),
-                    )
-                }
-
-            ChatHistoryUpdate.LoadStarted ->
-                uiStateMutable.update { state ->
-                    state.copy(
-                        transcript = TranscriptReducer.reduce(state.transcript, TranscriptIntent.LoadStarted),
-                    )
-                }
-
-            is ChatHistoryUpdate.LoadSucceeded -> {
-                val cachedIds = activeCacheMessageIds
-                retireCacheLoad()
-                latestPaging = update.useLatestPaging
-                uiStateMutable.update { state ->
-                    val hasResumeHistory = state.messages.any { it.id.startsWith("resume-${update.sessionId}-") }
-                    state.copy(
-                        transcript =
-                            TranscriptReducer.reduce(
-                                state.transcript,
-                                TranscriptIntent.HistoryLoaded(
-                                    authoritative = update.messages,
-                                    baselineIds = update.baselineIds,
-                                    cachedIds = cachedIds,
-                                    hasResumeHistory = hasResumeHistory,
-                                    useLatestPaging = update.useLatestPaging,
-                                    returned = update.returned,
-                                    offset = update.offset,
-                                    pageSize = MESSAGE_PAGE_SIZE,
-                                ),
-                            ),
-                    )
-                }
-                val hasRestHistory =
-                    uiStateMutable.value.messages.any { serverMessageIndex(it.id, update.sessionId) != null }
-                if (update.messages.isNotEmpty() && hasRestHistory) loadedMessageOffset = update.offset
+        // The rail's message count is not the transcript's slice; this one case stays here.
+        if (update is ChatHistoryUpdate.MessageCountKnown) {
+            uiStateMutable.update { current ->
+                current.copy(
+                    rail =
+                        current.rail.copy(
+                            sessions =
+                                current.sessions.map {
+                                    if (it.id == update.sessionId) it.copy(messageCount = update.count) else it
+                                },
+                        ),
+                )
             }
-
-            is ChatHistoryUpdate.LoadFailed ->
-                uiStateMutable.update { state ->
-                    state.copy(
-                        transcript =
-                            TranscriptReducer.reduce(
-                                state.transcript,
-                                TranscriptIntent.HistoryFailed(reason = update.reason, nowMs = nowMs()),
-                            ),
-                    )
-                }
-
-            ChatHistoryUpdate.LoadFinished -> Unit
-
-            ChatHistoryUpdate.SyncStarted -> Unit
-
-            is ChatHistoryUpdate.SyncMerged ->
-                uiStateMutable.update { current ->
-                    val merged =
-                        mergeSyncedMessages(
-                            current = current.messages,
-                            incoming = update.incoming,
-                            isServerMessage = { id ->
-                                serverMessageIndex(id, update.sessionId) != null
-                            },
-                        )
-                    if (sameTranscript(current.messages, merged)) {
-                        current
-                    } else {
-                        current.copy(
-                            transcript =
-                                current.transcript.copy(
-                                    messages = merged,
-                                    todos = restoredTodos(current.todos, merged),
-                                ),
-                        )
-                    }
-                }
-
-            ChatHistoryUpdate.SyncFinished -> Unit
-
-            ChatHistoryUpdate.OlderFinished ->
-                uiStateMutable.update { state ->
-                    state.copy(transcript = state.transcript.copy(isLoadingOlder = false))
-                }
+            return
         }
+        transcriptController.apply(update)
     }
 
     private fun captureHistoryLoadFence(sessionId: String): HistoryLoadFence? {
