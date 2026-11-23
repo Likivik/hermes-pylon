@@ -9,7 +9,7 @@ import com.m57.hermescontrol.data.remote.HermesApi
  * Same reason as [ChatTransport]: `GatewayConnection` is an `object`, so every test that touches it mocks a
  * static. This names the five members the chat screen uses.
  */
-interface ChatApi {
+interface ChatGateway {
     val hermesApi: HermesApi
 
     val selectedProfileId: String?
@@ -27,7 +27,7 @@ interface ChatApi {
 }
 
 /** Production adapter: the singleton, unchanged. */
-object DefaultChatApi : ChatApi {
+object DefaultChatGateway : ChatGateway {
     override val hermesApi: HermesApi get() = GatewayConnection.hermesApi
 
     override val selectedProfileId: String? get() = GatewayConnection.selectedProfileId
