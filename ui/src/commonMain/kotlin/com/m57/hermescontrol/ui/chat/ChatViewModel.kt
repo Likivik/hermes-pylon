@@ -342,7 +342,7 @@ class ChatViewModel(
         viewModelScope.launch(io) {
             wsClient.connectionStatus.collect { status ->
                 if (status == ConnectionStatus.CONNECTED) {
-                    uiStateMutable.update { it.copy(connection = it.connection.afterFirstConnected()) }
+                    dispatch(ChatIntent.FirstConnected)
                 }
             }
         }
@@ -372,11 +372,7 @@ class ChatViewModel(
 
         viewModelScope.launch {
             slashUsageProfileIds.flatMapLatest(slashUsageStore::counts).collect { counts ->
-                uiStateMutable.update {
-                    it.copy(
-                        composer = it.composer.afterSlashUsageCounts(counts),
-                    )
-                }
+                dispatch(ChatIntent.SlashUsageCountsChanged(counts))
             }
         }
 
@@ -966,11 +962,7 @@ class ChatViewModel(
             }
 
             is SlashResult.OpenHistory -> {
-                uiStateMutable.update {
-                    it.copy(
-                        composer = it.composer.afterOpenHistoryRequest(true),
-                    )
-                }
+                dispatch(ChatIntent.HistorySheetRequested(true))
                 recordAcceptedSlash(command)
             }
 
@@ -1055,6 +1047,17 @@ class ChatViewModel(
             nowMs = { nowMs() },
             pageSize = MESSAGE_PAGE_SIZE,
         )
+    }
+
+    /**
+     * Says something happened. The reducer decides what changes, and produces one whole new state.
+     *
+     * This is the only way state is meant to change. Call sites that update several slices at once still write
+     * their own `copy` — splitting those would emit two states where there was one, so they move only once the
+     * reducer can express the whole update.
+     */
+    private fun dispatch(intent: ChatIntent) {
+        uiStateMutable.update { ChatReducer.reduce(it, intent) }
     }
 
     private fun applyHistoryUpdate(update: ChatHistoryUpdate) {
@@ -1235,11 +1238,7 @@ class ChatViewModel(
     }
 
     fun consumePendingPrefill() {
-        uiStateMutable.update {
-            it.copy(
-                composer = it.composer.afterPendingPrefill(null),
-            )
-        }
+        dispatch(ChatIntent.PrefillRequested(null))
     }
 
     private fun handleQueueCommand(command: String) {
@@ -1978,11 +1977,7 @@ class ChatViewModel(
                         result.data.effectiveContextLength
                             ?: result.data.autoContextLength
                     if (length != null && length > 0L) {
-                        uiStateMutable.update {
-                            it.copy(
-                                composer = it.composer.afterModelContextLength(length, result.data.qualifiedModel),
-                            )
-                        }
+                        dispatch(ChatIntent.ModelContextMeasured(length, result.data.qualifiedModel))
                     }
                 }
 
@@ -2015,15 +2010,7 @@ class ChatViewModel(
     }
 
     fun refreshSettings() {
-        uiStateMutable.update { state ->
-            state.copy(
-                composer =
-                    state.composer.afterTypingSettings(
-                        authStore.isTypingEffectEnabled(),
-                        authStore.getTypingEffectDelayMs(),
-                    ),
-            )
-        }
+        dispatch(ChatIntent.TypingSettingsLoaded(authStore.isTypingEffectEnabled(), authStore.getTypingEffectDelayMs()))
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -2338,11 +2325,7 @@ class ChatViewModel(
     }
 
     fun consumeOpenHistoryRequest() {
-        uiStateMutable.update {
-            it.copy(
-                composer = it.composer.afterOpenHistoryRequest(false),
-            )
-        }
+        dispatch(ChatIntent.HistorySheetRequested(false))
     }
 
     /**
@@ -2355,11 +2338,7 @@ class ChatViewModel(
      * @param level One of "low", "medium", "high", or null for default.
      */
     fun setReasoningLevel(level: String?) {
-        uiStateMutable.update {
-            it.copy(
-                composer = it.composer.afterReasoningLevel(level),
-            )
-        }
+        dispatch(ChatIntent.ReasoningLevelChanged(level))
         val sessionId = runtimeSessionId ?: return
         if (level == null) return // null = model default, no need to send WS
         viewModelScope.launch(io) {
@@ -3498,12 +3477,12 @@ class ChatViewModel(
         // chat via tail-follow scrolling. These are surfaced as a transient
         // status pill instead and never enter the message list.
         if (transient) {
-            uiStateMutable.update { it.copy(connection = it.connection.afterStatusPill(text)) }
+            dispatch(ChatIntent.StatusPillChanged(text))
             statusPillJob?.cancel()
             statusPillJob =
                 viewModelScope.launch {
                     kotlinx.coroutines.delay(2500)
-                    uiStateMutable.update { it.copy(connection = it.connection.afterStatusPillCleared()) }
+                    dispatch(ChatIntent.StatusPillCleared)
                 }
             return
         }
