@@ -143,7 +143,7 @@ import kotlinx.serialization.json.JsonObject
  * because that is what `safeApiCall` and the pinned `HermesApiServiceTest` cases
  * are written against — call sites move without changing.
  *
- * Parities that are easy to get wrong, all asserted in [HermesGatewayApiTest]:
+ * Parities that are easy to get wrong, all asserted in [HermesApiTest]:
  * - request bodies are encoded by [HermesJson], so defaulted fields are omitted:
  *   `BulkDeleteRequest(ids = listOf("session_1"))` encodes to `{"ids":["session_1"]}`.
  * - a malformed body on a 2xx **throws** the bare `SerializationException`, as
@@ -154,7 +154,7 @@ import kotlinx.serialization.json.JsonObject
  *   than the `+` some Ktor helpers emit.
  */
 @Suppress("TooManyFunctions")
-class HermesGatewayApi(
+class HermesApi(
     private val client: HttpClient,
     private val baseUrl: ServerBaseUrl,
 ) {
@@ -164,7 +164,7 @@ class HermesGatewayApi(
      * Status-only by design: the call site switches on 401 and 403 to explain the failure and never reads a body,
      * and this route answers errors with FastAPI's `{"detail": ...}` shape, which a typed decode would throw on.
      *
-     * It is here rather than in `ApiClient` so the base-URL join, the JSON content type and the body handling are
+     * It is here rather than in `GatewayConnection` so the base-URL join, the JSON content type and the body handling are
      * the same code path as every other call. What it adds is the timeout: login is the one place where hanging is
      * worse than failing, so it carries its own.
      *
@@ -1020,7 +1020,7 @@ class HermesGatewayApi(
      * Join a relative route onto the gateway's base URL.
      *
      * Not replaced by Ktor's `defaultRequest { url(base) }` on purpose: the client is rebuilt per profile and per
-     * endpoint (`ApiClient.buildGateway`), so the base URL belongs to this instance, not to the shared client
+     * endpoint (`GatewayConnection.buildGateway`), so the base URL belongs to this instance, not to the shared client
      * config. Moving it into client construction would leave a stale endpoint behind after the user moves the
      * session.
      */

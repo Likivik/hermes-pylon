@@ -17,7 +17,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.m57.hermescontrol.NavigationController
 import com.m57.hermescontrol.data.local.AuthDefaults
 import com.m57.hermescontrol.data.local.authStore
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.ws.ConnectionStatus
 import com.m57.hermescontrol.idForProfile
 import com.m57.hermescontrol.ui.chat.ChatMessage
@@ -65,12 +65,12 @@ fun ChatLifecycleEffects(
         pendingSessionTarget,
         connectionStatus,
         gatewayInstanceId,
-        ApiClient.selectedProfileId,
+        GatewayConnection.selectedProfileId,
     ) {
         // A session target carries the *profile* that owns it; comparing it to the
         // gateway instance id (as this did) could never match on a multi-profile gateway.
         val pendingSessionId =
-            pendingSessionTarget?.idForProfile(ApiClient.selectedProfileId)
+            pendingSessionTarget?.idForProfile(GatewayConnection.selectedProfileId)
         if (
             pendingSessionTarget != null &&
             pendingSessionId == null &&

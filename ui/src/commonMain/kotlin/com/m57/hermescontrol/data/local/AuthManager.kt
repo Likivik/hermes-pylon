@@ -10,9 +10,9 @@ import com.m57.hermescontrol.data.config.resolvedBaseUrl
 import com.m57.hermescontrol.data.config.resolvedHost
 import com.m57.hermescontrol.data.config.resolvedPort
 import com.m57.hermescontrol.data.model.PinnedModel
-import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.CleartextPolicy
 import com.m57.hermescontrol.data.remote.CookiePlatform
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.data.remote.parseForBuild
 import com.m57.hermescontrol.data.security.SecretStore
@@ -711,7 +711,7 @@ object AuthManager : WsAuthConfig {
         return endpointForBuild().webSocketUrl(
             authParameter = authParameter,
             credential = credential,
-            profile = ApiClient.selectedProfileId,
+            profile = GatewayConnection.selectedProfileId,
         )
     }
 

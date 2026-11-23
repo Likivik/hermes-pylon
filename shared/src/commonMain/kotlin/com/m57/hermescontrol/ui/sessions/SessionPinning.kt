@@ -5,7 +5,7 @@ import com.m57.hermescontrol.data.model.SessionTreeItem
 import com.m57.hermescontrol.data.model.flattenSessionTree
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
-import com.m57.hermescontrol.data.remote.source.SessionsSource
+import com.m57.hermescontrol.data.remote.source.Sessions
 
 /**
  * Where pinned session ids are persisted.
@@ -58,7 +58,7 @@ fun buildSessionSections(
 }
 
 suspend fun hydratePinnedSessions(
-    source: SessionsSource,
+    source: Sessions,
     pinIds: List<String>,
 ): List<SessionInfo> =
     pinIds.mapNotNull { pinId ->

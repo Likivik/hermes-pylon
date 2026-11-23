@@ -17,13 +17,13 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
-class ChatPersistenceRepositoryTest {
-    private suspend fun ChatPersistenceRepository.persistMessage(
+class ChatPersistenceStoreTest {
+    private suspend fun ChatPersistenceStore.persistMessage(
         message: ChatMessage,
         sessionId: String,
     ): Boolean = persistMessage(message, sessionId, replacementGeneration(sessionId))
 
-    private suspend fun ChatPersistenceRepository.persistMessages(
+    private suspend fun ChatPersistenceStore.persistMessages(
         messages: List<ChatMessage>,
         sessionId: String,
     ): Boolean = persistMessages(messages, sessionId, replacementGeneration(sessionId))
@@ -32,7 +32,7 @@ class ChatPersistenceRepositoryTest {
     fun acceptedWritesAreFencedBeforeFifoRegistration() =
         runBlocking {
             val dao = RacingDao()
-            val repository = ChatPersistenceRepository(RoomChatMessageStore(dao))
+            val repository = ChatPersistenceStore(RoomChatMessageStore(dao))
             val releasePreUndo = CompletableDeferred<Unit>()
             val acceptedBeforeUndo = repository.replacementGeneration("session-a")
             val preUndoWrite =
@@ -69,7 +69,7 @@ class ChatPersistenceRepositoryTest {
             var registration = 0
             val dao = RacingDao()
             val repository =
-                ChatPersistenceRepository(
+                ChatPersistenceStore(
                     store = RoomChatMessageStore(dao),
                     operationRegistrationHook =
                         OperationRegistrationHook {
@@ -111,7 +111,7 @@ class ChatPersistenceRepositoryTest {
             var registration = 0
             val dao = RacingDao()
             val repository =
-                ChatPersistenceRepository(
+                ChatPersistenceStore(
                     store = RoomChatMessageStore(dao),
                     operationRegistrationHook =
                         OperationRegistrationHook {
@@ -149,7 +149,7 @@ class ChatPersistenceRepositoryTest {
             var registration = 0
             val dao = RacingDao()
             val repository =
-                ChatPersistenceRepository(
+                ChatPersistenceStore(
                     store = RoomChatMessageStore(dao),
                     operationRegistrationHook =
                         OperationRegistrationHook {
@@ -187,7 +187,7 @@ class ChatPersistenceRepositoryTest {
     fun failedOperationPropagatesAndQueueContinues() =
         runBlocking {
             val dao = RacingDao(failContent = "fails")
-            val repository = ChatPersistenceRepository(RoomChatMessageStore(dao))
+            val repository = ChatPersistenceStore(RoomChatMessageStore(dao))
 
             try {
                 repository.persistMessage(message("fails"), "session-a")
@@ -204,7 +204,7 @@ class ChatPersistenceRepositoryTest {
     @Test
     fun writeStartedBeforeReplacementCannotResurrectMessage() {
         val dao = RacingDao(blockContent = "stale")
-        val repository = ChatPersistenceRepository(RoomChatMessageStore(dao))
+        val repository = ChatPersistenceStore(RoomChatMessageStore(dao))
         val executor = Executors.newFixedThreadPool(2)
 
         try {
@@ -252,7 +252,7 @@ class ChatPersistenceRepositoryTest {
     @Test
     fun batchWriteStartedBeforeReplacementCannotResurrectMessages() {
         val dao = RacingDao(blockContent = "stale batch")
-        val repository = ChatPersistenceRepository(RoomChatMessageStore(dao))
+        val repository = ChatPersistenceStore(RoomChatMessageStore(dao))
         val executor = Executors.newFixedThreadPool(2)
 
         try {
@@ -298,7 +298,7 @@ class ChatPersistenceRepositoryTest {
     fun writeStartedAfterReplacementIsRetained() =
         runBlocking {
             val dao = RacingDao()
-            val repository = ChatPersistenceRepository(RoomChatMessageStore(dao))
+            val repository = ChatPersistenceStore(RoomChatMessageStore(dao))
 
             assertTrue(
                 repository.replaceMessagesIfCurrent(
@@ -315,7 +315,7 @@ class ChatPersistenceRepositoryTest {
     @Test
     fun blockedSessionDoesNotBlockUnrelatedSession() {
         val dao = RacingDao(blockContent = "blocked")
-        val repository = ChatPersistenceRepository(RoomChatMessageStore(dao))
+        val repository = ChatPersistenceStore(RoomChatMessageStore(dao))
         val executor = Executors.newFixedThreadPool(2)
 
         try {
@@ -354,7 +354,7 @@ class ChatPersistenceRepositoryTest {
     @Test
     fun singleMessageWriteAndInvalidationAreAtomic() {
         val dao = RacingDao(blockContent = "blocked")
-        val repository = ChatPersistenceRepository(RoomChatMessageStore(dao))
+        val repository = ChatPersistenceStore(RoomChatMessageStore(dao))
         val revision = repository.replacementGeneration("session-a")
         val executor = Executors.newFixedThreadPool(2)
 
@@ -391,7 +391,7 @@ class ChatPersistenceRepositoryTest {
     @Test
     fun replacementAndInvalidationAreAtomic() {
         val dao = RacingDao(blockReplacement = true)
-        val repository = ChatPersistenceRepository(RoomChatMessageStore(dao))
+        val repository = ChatPersistenceStore(RoomChatMessageStore(dao))
         val generation = repository.replacementGeneration("session-a")
         val executor = Executors.newFixedThreadPool(2)
 
@@ -427,7 +427,7 @@ class ChatPersistenceRepositoryTest {
     @Test
     fun blockedReplacementAndItsInvalidationDoNotBlockAnotherSession() {
         val dao = RacingDao(blockReplacementSessionId = "session-a")
-        val repository = ChatPersistenceRepository(RoomChatMessageStore(dao))
+        val repository = ChatPersistenceStore(RoomChatMessageStore(dao))
         val generationA = repository.replacementGeneration("session-a")
         val generationB = repository.replacementGeneration("session-b")
         val executor = Executors.newFixedThreadPool(3)
@@ -473,7 +473,7 @@ class ChatPersistenceRepositoryTest {
 
     @Test
     fun replacementGenerationsAreIsolatedAndNeverReset() {
-        val repository = ChatPersistenceRepository(RoomChatMessageStore(RacingDao()))
+        val repository = ChatPersistenceStore(RoomChatMessageStore(RacingDao()))
         val initialA = repository.replacementGeneration("session-a")
         val initialB = repository.replacementGeneration("session-b")
         repository.invalidateReplacementWrites("session-a")
@@ -497,7 +497,7 @@ class ChatPersistenceRepositoryTest {
     @Test
     fun pagedPersistenceRejectsInvalidatedTranscriptRevision() {
         val dao = RacingDao()
-        val repository = ChatPersistenceRepository(RoomChatMessageStore(dao))
+        val repository = ChatPersistenceStore(RoomChatMessageStore(dao))
         val staleRevision = repository.replacementGeneration("session-a")
         repository.invalidateReplacementWrites("session-a")
 
@@ -518,7 +518,7 @@ class ChatPersistenceRepositoryTest {
     @Test
     fun pagedPersistenceChecksOwnerInsideSerializedWrite() {
         val dao = RacingDao(blockContent = "blocker")
-        val repository = ChatPersistenceRepository(RoomChatMessageStore(dao))
+        val repository = ChatPersistenceStore(RoomChatMessageStore(dao))
         val revision = repository.replacementGeneration("session-a")
         val executor = Executors.newSingleThreadExecutor()
         var ownerCurrent = true

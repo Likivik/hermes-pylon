@@ -5,7 +5,7 @@ import io.ktor.client.plugins.defaultRequest
 import io.ktor.http.HttpHeaders
 
 /**
- * Desktop/JVM side of the [ApiClient] seam: a plain Ktor client, endpoint from
+ * Desktop/JVM side of the [GatewayConnection] seam: a plain Ktor client, endpoint from
  * the `hermes.gatewayUrl` system property (default: a local gateway).
  */
 internal actual object GatewayPlatform {

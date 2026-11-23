@@ -6,7 +6,7 @@ import com.m57.hermescontrol.data.local.AuthManager
 import io.ktor.client.HttpClient
 
 /**
- * Android side of the [ApiClient] seam.
+ * Android side of the [GatewayConnection] seam.
  *
  * No second HTTP stack is created: the gateway client is built *on top of* the
  * the connection pool, the persistent cookie jar, TLS pinning,
@@ -17,7 +17,7 @@ internal actual object GatewayPlatform {
 }
 
 /**
- * Android side of the [ApiClient] seam.
+ * Android side of the [GatewayConnection] seam.
  *
  * The transport is Ktor on CIO (see [createGatewayTransportClient]): jar
  * cookies, the per-request bearer and the one-shot 401 refresh are Ktor

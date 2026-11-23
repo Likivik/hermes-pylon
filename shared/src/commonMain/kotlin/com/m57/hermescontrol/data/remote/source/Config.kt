@@ -11,9 +11,9 @@ import kotlinx.serialization.json.JsonElement
  * What Config needs from the gateway: 6 calls of the 150 it offers.
  *
  * Declared by the consumer, not by the gateway, so a fake for this screen implements 6 methods instead of
- * 150. `ConfigSourceOf` is the production adapter; tests pass their own implementation.
+ * 150. `DefaultConfig` is the production adapter; tests pass their own implementation.
  */
-interface ConfigSource {
+interface Config {
     suspend fun getConfig(): GatewayResponse<Map<String, kotlinx.serialization.json.JsonElement>>
 
     suspend fun getConfigDefaults(): GatewayResponse<Map<String, kotlinx.serialization.json.JsonElement>>

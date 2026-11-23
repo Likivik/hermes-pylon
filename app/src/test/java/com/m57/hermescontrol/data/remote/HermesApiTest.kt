@@ -15,9 +15,9 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
-class HermesGatewayApiTest {
+class HermesApiTest {
     private lateinit var mockWebServer: MockWebServer
-    private lateinit var api: HermesGatewayApi
+    private lateinit var api: HermesApi
 
     @BeforeEach
     fun setUp() {
@@ -33,7 +33,7 @@ class HermesGatewayApiTest {
         // sits on top of OkHttp so MockWebServer records the exact wire
         // requests that the gateway floor sends.
         val client = createHermesHttpClient()
-        api = HermesGatewayApi(client, baseUrl)
+        api = HermesApi(client, baseUrl)
     }
 
     @AfterEach

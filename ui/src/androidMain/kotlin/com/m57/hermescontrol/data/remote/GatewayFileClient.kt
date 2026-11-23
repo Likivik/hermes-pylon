@@ -118,7 +118,7 @@ object GatewayFileClient {
 
     suspend fun fetch(
         path: String,
-        service: HermesGatewayApi,
+        service: HermesApi,
         cache: GatewayMediaCache,
         scope: MediaCacheScope,
         canPublish: () -> Boolean = { true },
@@ -149,7 +149,7 @@ object GatewayFileClient {
 
     private suspend fun fetchNetwork(
         path: String,
-        service: HermesGatewayApi,
+        service: HermesApi,
         cache: GatewayMediaCache,
         key: String,
         canPublish: () -> Boolean,
@@ -225,7 +225,7 @@ data class MediaCacheScope(
 data class MediaRequestContext(
     val scope: MediaCacheScope,
     /** JSON gateway for byte-array downloads. */
-    val service: HermesGatewayApi,
+    val service: HermesApi,
     /** Streaming transport for ranged media reads. */
     val rangeRequester: KtorGatewayRangeRequester,
     val currentScope: () -> MediaCacheScope,

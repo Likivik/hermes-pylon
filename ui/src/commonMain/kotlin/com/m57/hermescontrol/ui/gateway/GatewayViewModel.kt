@@ -4,11 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.m57.hermescontrol.AppEnvironment
 import com.m57.hermescontrol.data.model.StatusResponse
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
-import com.m57.hermescontrol.data.remote.source.GatewaySource
-import com.m57.hermescontrol.data.remote.source.GatewaySourceOf
+import com.m57.hermescontrol.data.remote.source.DefaultGateways
+import com.m57.hermescontrol.data.remote.source.Gateways
 import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.ui.common.reconcilePressureStatus
 import com.m57.hermescontrol.ui.common.safeLaunchLoad
@@ -31,7 +31,7 @@ data class GatewayUiState(
 
 class GatewayViewModel(
     private val ioDispatcher: CoroutineDispatcher = AppEnvironment.current.io,
-    private val source: GatewaySource = GatewaySourceOf(ApiClient.hermesApi),
+    private val source: Gateways = DefaultGateways(GatewayConnection.hermesApi),
 ) :
     ViewModel(),
         ToastHost {
@@ -101,14 +101,14 @@ class GatewayViewModel(
 
     private fun runGatewayAction(
         actionName: String,
-        apiCall: suspend (GatewaySource) -> NetworkResult<Unit>,
+        apiCall: suspend (Gateways) -> NetworkResult<Unit>,
     ) {
         if (_uiState.value.isActionRunning) return
         val requestedProfileId = profileId
         // Re-read per action: a profile or endpoint change rebuilds the client, and this action must travel the
         // current one. The generation number is the fence — the object itself is not compared.
-        val startedAt = ApiClient.generation
-        val gateway = GatewaySourceOf(ApiClient.hermesApi)
+        val startedAt = GatewayConnection.generation
+        val gateway = DefaultGateways(GatewayConnection.hermesApi)
         val generation = ++actionGeneration
         _uiState.update { it.copy(isActionRunning = true) }
         viewModelScope.launch {
@@ -116,7 +116,7 @@ class GatewayViewModel(
             val stale =
                 profileId != requestedProfileId ||
                     generation != actionGeneration ||
-                    startedAt != ApiClient.generation
+                    startedAt != GatewayConnection.generation
             if (stale) return@launch
             when (result) {
                 is NetworkResult.Success -> {

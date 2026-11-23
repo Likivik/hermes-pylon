@@ -14,9 +14,9 @@ import com.m57.hermescontrol.data.remote.GatewayResponse
  * What Channels needs from the gateway: 9 calls of the 150 it offers.
  *
  * Declared by the consumer, not by the gateway, so a fake for this screen implements 9 methods instead of
- * 150. `ChannelsSourceOf` is the production adapter; tests pass their own implementation.
+ * 150. `DefaultChannels` is the production adapter; tests pass their own implementation.
  */
-interface ChannelsSource {
+interface Channels {
     suspend fun applyTelegramOnboarding(
         pairingId: String,
         body: TelegramOnboardingApplyRequest,

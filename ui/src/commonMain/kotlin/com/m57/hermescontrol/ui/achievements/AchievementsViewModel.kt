@@ -3,10 +3,10 @@ package com.m57.hermescontrol.ui.achievements
 import androidx.lifecycle.ViewModel
 import com.m57.hermescontrol.data.model.Achievement
 import com.m57.hermescontrol.data.model.RecentUnlock
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.safeApiCall
-import com.m57.hermescontrol.data.remote.source.AchievementsSource
-import com.m57.hermescontrol.data.remote.source.AchievementsSourceOf
+import com.m57.hermescontrol.data.remote.source.Achievements
+import com.m57.hermescontrol.data.remote.source.DefaultAchievements
 import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.ui.common.safeLaunchLoad
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,7 +42,7 @@ data class AchievementsUiState(
 )
 
 class AchievementsViewModel(
-    private val source: AchievementsSource = AchievementsSourceOf(ApiClient.hermesApi),
+    private val source: Achievements = DefaultAchievements(GatewayConnection.hermesApi),
 ) : ViewModel(), ToastHost {
     private val _uiState = MutableStateFlow(AchievementsUiState())
     val uiState: StateFlow<AchievementsUiState> = _uiState.asStateFlow()

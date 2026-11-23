@@ -21,11 +21,11 @@ import com.m57.hermescontrol.data.model.PortalResponse
 import com.m57.hermescontrol.data.model.StatusResponse
 import com.m57.hermescontrol.data.model.SystemStatsResponse
 import com.m57.hermescontrol.data.model.UpdateCheckResponse
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
-import com.m57.hermescontrol.data.remote.source.SystemSource
-import com.m57.hermescontrol.data.remote.source.SystemSourceOf
+import com.m57.hermescontrol.data.remote.source.DefaultHost
+import com.m57.hermescontrol.data.remote.source.Host
 import com.m57.hermescontrol.data.remote.toJsonObject
 import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.util.HermesLog
@@ -89,7 +89,7 @@ data class SystemUiState(
 
 class SystemViewModel(
     private val ioDispatcher: CoroutineDispatcher = AppEnvironment.current.io,
-    private val source: SystemSource = SystemSourceOf(ApiClient.hermesApi),
+    private val source: Host = DefaultHost(GatewayConnection.hermesApi),
 ) :
     ViewModel(),
         ToastHost {

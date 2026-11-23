@@ -17,9 +17,9 @@ import com.m57.hermescontrol.data.remote.GatewayResponse
  * What Profiles needs from the gateway: 11 calls of the 150 it offers.
  *
  * Declared by the consumer, not by the gateway, so a fake for this screen implements 11 methods instead of
- * 150. `ProfilesSourceOf` is the production adapter; tests pass their own implementation.
+ * 150. `DefaultProfiles` is the production adapter; tests pass their own implementation.
  */
-interface ProfilesSource {
+interface Profiles {
     suspend fun createProfile(body: CreateProfileRequest): GatewayResponse<Unit>
 
     suspend fun getActiveProfile(): GatewayResponse<ActiveProfileResponse>

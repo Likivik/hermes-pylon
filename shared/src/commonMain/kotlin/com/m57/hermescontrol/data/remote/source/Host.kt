@@ -24,9 +24,9 @@ import kotlinx.serialization.json.JsonObject
  * What System needs from the gateway: 34 calls of the 150 it offers.
  *
  * Declared by the consumer, not by the gateway, so a fake for this screen implements 34 methods instead of
- * 150. `SystemSourceOf` is the production adapter; tests pass their own implementation.
+ * 150. `DefaultHost` is the production adapter; tests pass their own implementation.
  */
-interface SystemSource {
+interface Host {
     suspend fun addCredentialPoolEntry(body: Map<String, String>): GatewayResponse<JsonObject>
 
     suspend fun checkHermesUpdate(force: Boolean = false): GatewayResponse<UpdateCheckResponse>

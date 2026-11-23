@@ -7,10 +7,10 @@ import com.m57.hermescontrol.data.remote.GatewayResponse
 /**
  * What the achievements screen needs from the gateway: 4 calls of the 150 it offers.
  *
- * Declared by the consumer, not by the gateway, so a fake for this screen implements 4 methods. `AchievementsSourceOf`
+ * Declared by the consumer, not by the gateway, so a fake for this screen implements 4 methods. `DefaultAchievements`
  * is the production adapter.
  */
-interface AchievementsSource {
+interface Achievements {
     suspend fun getAchievements(): GatewayResponse<AchievementsResponse>
 
     suspend fun getRecentUnlocks(): GatewayResponse<List<RecentUnlock>>

@@ -15,7 +15,7 @@ import com.m57.hermescontrol.data.local.HermesDatabase
 import com.m57.hermescontrol.data.model.Attachment
 import com.m57.hermescontrol.data.model.AttachmentSource
 import com.m57.hermescontrol.data.remote.AndroidAttachmentReader
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.GatewayFile
 import com.m57.hermescontrol.data.remote.GatewayFileClient
 import com.m57.hermescontrol.data.remote.GatewayFileResult
@@ -94,7 +94,7 @@ class ChatViewModelTest {
     private lateinit var resolver: FakeStringResolver
     private lateinit var fakeRepo: FakeChatPersistenceRepository
     private lateinit var fakeSlashUsageStore: FakeSlashUsageStore
-    private lateinit var mockApi: com.m57.hermescontrol.data.remote.HermesGatewayApi
+    private lateinit var mockApi: com.m57.hermescontrol.data.remote.HermesApi
 
     /** Counter used to generate unique WS request IDs. */
     private var reqCount = 0
@@ -123,7 +123,7 @@ class ChatViewModelTest {
         mockkObject(AuthManager)
         every { AuthManager.getPinnedModels() } returns emptyList()
         mockkObject(HermesWsClient)
-        mockkObject(ApiClient)
+        mockkObject(GatewayConnection)
         mockkObject(HermesDatabase)
 
         app = mockk(relaxed = true)
@@ -184,7 +184,7 @@ class ChatViewModelTest {
 
         // Stub model-options so preloadModelOptions() (fired at GatewayReady) is safe.
         mockApi = mockk(relaxed = true)
-        every { ApiClient.hermesApi } returns mockApi
+        every { GatewayConnection.hermesApi } returns mockApi
         coEvery { mockApi.getModelInfo() } returns
             GatewayResponse.success(
                 com.m57.hermescontrol.data.model.ModelInfoResponse(
@@ -2910,7 +2910,7 @@ class ChatViewModelTest {
             val (viewModel, _) = createViewModelWithSession()
             val resumeRequestId = "resume-history"
             coEvery {
-                ApiClient.hermesApi.getSessionMessages(
+                GatewayConnection.hermesApi.getSessionMessages(
                     any(),
                     any(),
                     any(),
@@ -3142,7 +3142,7 @@ class ChatViewModelTest {
     fun testResumePayload_doesNotBreakRestPagination() =
         runTest {
             val (viewModel, _) = createViewModelWithSession()
-            val api = ApiClient.hermesApi
+            val api = GatewayConnection.hermesApi
             coEvery { api.getSessions(any(), any(), any()) } returns
                 GatewayResponse.success(
                     com.m57.hermescontrol.data.model.SessionListResponse(
@@ -3684,7 +3684,7 @@ class ChatViewModelTest {
     fun testCompactedHistory_usesLatestOrderAndPagesBackward() =
         runTest {
             val (viewModel, _) = createViewModelWithSession()
-            val api = ApiClient.hermesApi
+            val api = GatewayConnection.hermesApi
             coEvery { api.getSessions(any(), any(), any()) } returns
                 GatewayResponse.success(
                     com.m57.hermescontrol.data.model.SessionListResponse(
@@ -3792,7 +3792,7 @@ class ChatViewModelTest {
     fun testEmptyInitialRestPage_disablesOlderPagination() =
         runTest {
             val (viewModel, _) = createViewModelWithSession()
-            val api = ApiClient.hermesApi
+            val api = GatewayConnection.hermesApi
             var countRequested = false
             // The server count comes from the one row, not from a 500-row listing: the
             // listing route caps `limit` at 100, so that call never succeeded.
@@ -5675,7 +5675,7 @@ class ChatViewModelTest {
     fun railFailureKeepsLastGoodRowsAndSaysWhy() =
         runTest {
             val (viewModel, sessionId) = createViewModelWithSession()
-            coEvery { ApiClient.hermesApi.getSessions(any(), any(), any(), any(), any(), null) } returns
+            coEvery { GatewayConnection.hermesApi.getSessions(any(), any(), any(), any(), any(), null) } returns
                 GatewayResponse.success(
                     com.m57.hermescontrol.data.model.SessionListResponse(
                         sessions =
@@ -5690,7 +5690,7 @@ class ChatViewModelTest {
             assertEquals(1, viewModel.uiState.value.sessions.size)
 
             coEvery {
-                ApiClient.hermesApi.getSessions(any(), any(), any(), any(), any(), any())
+                GatewayConnection.hermesApi.getSessions(any(), any(), any(), any(), any(), any())
             } returns GatewayResponse.error(500, "boom")
             viewModel.refreshSessions()
             advanceUntilIdle()
@@ -5708,7 +5708,7 @@ class ChatViewModelTest {
         runTest {
             val (viewModel, _) = createViewModelWithSession()
             coEvery {
-                ApiClient.hermesApi.getSessions(any(), any(), any(), any(), any(), any())
+                GatewayConnection.hermesApi.getSessions(any(), any(), any(), any(), any(), any())
             } returns GatewayResponse.error(401, "no_cookie")
 
             viewModel.refreshSessions()
@@ -5723,7 +5723,7 @@ class ChatViewModelTest {
     fun railEmptySuccessIsEmptyNotAFailure() =
         runTest {
             val (viewModel, _) = createViewModelWithSession()
-            coEvery { ApiClient.hermesApi.getSessions(any(), any(), any(), any(), any(), null) } returns
+            coEvery { GatewayConnection.hermesApi.getSessions(any(), any(), any(), any(), any(), null) } returns
                 GatewayResponse.success(
                     com.m57.hermescontrol.data.model.SessionListResponse(sessions = emptyList()),
                 )

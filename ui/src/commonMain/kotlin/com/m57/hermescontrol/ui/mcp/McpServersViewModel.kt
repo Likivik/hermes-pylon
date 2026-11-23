@@ -10,11 +10,11 @@ import com.m57.hermescontrol.data.model.McpOAuthFlowResponse
 import com.m57.hermescontrol.data.model.McpServer
 import com.m57.hermescontrol.data.model.McpServerTestResponse
 import com.m57.hermescontrol.data.model.McpServerToggleRequest
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
-import com.m57.hermescontrol.data.remote.source.McpServersSource
-import com.m57.hermescontrol.data.remote.source.McpServersSourceOf
+import com.m57.hermescontrol.data.remote.source.DefaultMcpServers
+import com.m57.hermescontrol.data.remote.source.McpServers
 import com.m57.hermescontrol.data.remote.toJsonObject
 import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.ui.common.safeLaunchLoad
@@ -73,7 +73,7 @@ data class McpServersUiState(
 
 class McpServersViewModel(
     private val ioDispatcher: kotlinx.coroutines.CoroutineDispatcher = AppEnvironment.current.io,
-    private val source: McpServersSource = McpServersSourceOf(ApiClient.hermesApi),
+    private val source: McpServers = DefaultMcpServers(GatewayConnection.hermesApi),
 ) :
     ViewModel(),
         ToastHost {

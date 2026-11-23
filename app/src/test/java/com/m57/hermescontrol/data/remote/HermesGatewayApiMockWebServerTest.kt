@@ -15,7 +15,7 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * MockWebServer-based tests for [HermesGatewayApi].
+ * MockWebServer-based tests for [HermesApi].
  *
  * Tests the Retrofit serialization + HTTP layer independently of the
  * real Hermes Gateway. Each test starts a local mock server, enqueues
@@ -23,7 +23,7 @@ import org.junit.Test
  */
 class HermesGatewayApiMockWebServerTest {
     private lateinit var mockServer: MockWebServer
-    private lateinit var api: HermesGatewayApi
+    private lateinit var api: HermesApi
 
     @Before
     fun setUp() {
@@ -32,7 +32,7 @@ class HermesGatewayApiMockWebServerTest {
 
         val baseUrl = ServerEndpoint.parse(mockServer.url("/").toString(), CleartextPolicy.ALLOW_WITH_WARNING).baseUrl
         val client = createHermesHttpClient()
-        api = HermesGatewayApi(client, baseUrl)
+        api = HermesApi(client, baseUrl)
     }
 
     @After

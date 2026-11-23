@@ -31,7 +31,7 @@ class McpApiContractTest {
                         CleartextPolicy.ALLOW_WITH_WARNING,
                     ).baseUrl
                 val client = createHermesHttpClient()
-                val api = HermesGatewayApi(client, baseUrl)
+                val api = HermesApi(client, baseUrl)
 
                 val response = api.testMcpServer("local tools")
 

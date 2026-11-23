@@ -8,11 +8,11 @@ import com.m57.hermescontrol.data.model.Skill
 import com.m57.hermescontrol.data.model.SkillHubInstallRequest
 import com.m57.hermescontrol.data.model.SkillHubUninstallRequest
 import com.m57.hermescontrol.data.model.ToggleSkillRequest
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
-import com.m57.hermescontrol.data.remote.source.SkillsSource
-import com.m57.hermescontrol.data.remote.source.SkillsSourceOf
+import com.m57.hermescontrol.data.remote.source.DefaultSkills
+import com.m57.hermescontrol.data.remote.source.Skills
 import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.skills_status_all
 import com.m57.hermescontrol.generated.resources.skills_status_disabled
@@ -84,7 +84,7 @@ data class SkillsUiState(
 
 class SkillsViewModel(
     private val ioDispatcher: CoroutineDispatcher = com.m57.hermescontrol.concurrent.ioDispatcher,
-    private val source: SkillsSource = SkillsSourceOf(ApiClient.hermesApi),
+    private val source: Skills = DefaultSkills(GatewayConnection.hermesApi),
 ) : ViewModel(),
     ToastHost {
     private val _uiState = MutableStateFlow(SkillsUiState())

@@ -10,7 +10,7 @@ package com.m57.hermescontrol.data.remote
  * they bind to one endpoint/auth-mode/token snapshot so a mid-download token
  * refresh cannot change what the request is authenticated with.
  *
- * Everything REST-shaped lives in the shared [ApiClient]; this file only
+ * Everything REST-shaped lives in the shared [GatewayConnection]; this file only
  * constructs OkHttp clients, so it is intentionally not part of the seam.
  */
 object AndroidMediaClient {
@@ -20,8 +20,8 @@ object AndroidMediaClient {
         gated: Boolean,
         token: String?,
         cookieHeader: String? = null,
-    ): HermesGatewayApi =
-        HermesGatewayApi(
+    ): HermesApi =
+        HermesApi(
             createMediaTransportClient(token = token, cookieHeader = cookieHeader),
             endpoint.baseUrl,
         )

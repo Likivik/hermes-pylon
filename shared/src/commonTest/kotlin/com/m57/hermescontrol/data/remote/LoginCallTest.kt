@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 
 /**
  * Password login is the one call made before a session exists, and it is the only place the app still sends a
- * hand-built JSON body. These cases freeze today's behaviour so the move into [HermesGatewayApi] cannot drift.
+ * hand-built JSON body. These cases freeze today's behaviour so the move into [HermesApi] cannot drift.
  *
  * The status is the result: the app switches on 401 and 403 to explain the failure, and never reads a body. The
  * timeout is short on purpose — a login that hangs for the default 100 s is indistinguishable from a frozen app.
@@ -23,7 +23,7 @@ import kotlin.test.assertTrue
 class LoginCallTest {
     private val baseUrl = ServerEndpoint.parse("https://gw.example/").baseUrl
 
-    private fun api(engine: MockEngine) = HermesGatewayApi(createHermesHttpClient(engine), baseUrl)
+    private fun api(engine: MockEngine) = HermesApi(createHermesHttpClient(engine), baseUrl)
 
     @Test
     fun postsTheJsonBodyToTheLoginRouteAndReportsTheStatus() =

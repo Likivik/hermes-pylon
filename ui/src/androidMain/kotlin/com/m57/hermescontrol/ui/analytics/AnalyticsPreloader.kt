@@ -4,11 +4,11 @@ import android.content.Context
 import com.m57.hermescontrol.data.local.AnalyticsCacheStore
 import com.m57.hermescontrol.data.local.AndroidAnalyticsCacheStore
 import com.m57.hermescontrol.data.local.authStore
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
-import com.m57.hermescontrol.data.remote.source.AnalyticsSource
-import com.m57.hermescontrol.data.remote.source.AnalyticsSourceOf
+import com.m57.hermescontrol.data.remote.source.Analytics
+import com.m57.hermescontrol.data.remote.source.DefaultAnalytics
 import com.m57.hermescontrol.util.ioDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -33,7 +33,7 @@ object AnalyticsPreloader {
 
     fun preload(
         context: Context,
-        source: AnalyticsSource = AnalyticsSourceOf(ApiClient.hermesApi),
+        source: Analytics = DefaultAnalytics(GatewayConnection.hermesApi),
     ) {
         if (authStore.getToken().isNullOrBlank()) return
         val store = AndroidAnalyticsCacheStore(context)

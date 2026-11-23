@@ -4,11 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.m57.hermescontrol.data.model.Toolset
 import com.m57.hermescontrol.data.model.ToolsetToggleRequest
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
-import com.m57.hermescontrol.data.remote.source.ToolsetsSource
-import com.m57.hermescontrol.data.remote.source.ToolsetsSourceOf
+import com.m57.hermescontrol.data.remote.source.DefaultToolsets
+import com.m57.hermescontrol.data.remote.source.Toolsets
 import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.ui.common.safeLaunchLoad
 import com.m57.hermescontrol.util.ioDispatcher
@@ -27,7 +27,7 @@ data class ToolsetsUiState(
 )
 
 class ToolsetsViewModel(
-    private val source: ToolsetsSource = ToolsetsSourceOf(ApiClient.hermesApi),
+    private val source: Toolsets = DefaultToolsets(GatewayConnection.hermesApi),
 ) :
     ViewModel(),
         ToastHost {

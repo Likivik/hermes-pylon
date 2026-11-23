@@ -8,10 +8,10 @@ import com.m57.hermescontrol.data.model.MessagingPlatformUpdate
 import com.m57.hermescontrol.data.model.TelegramOnboardingApplyRequest
 import com.m57.hermescontrol.data.model.TelegramOnboardingStartRequest
 import com.m57.hermescontrol.data.model.TelegramOnboardingStartResponse
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.safeApiCall
-import com.m57.hermescontrol.data.remote.source.ChannelsSource
-import com.m57.hermescontrol.data.remote.source.ChannelsSourceOf
+import com.m57.hermescontrol.data.remote.source.Channels
+import com.m57.hermescontrol.data.remote.source.DefaultChannels
 import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.ui.common.safeLaunchLoad
 import com.m57.hermescontrol.util.nowMillis
@@ -61,7 +61,7 @@ data class ChannelsUiState(
 
 class ChannelsViewModel(
     private val ioDispatcher: CoroutineDispatcher = AppEnvironment.current.io,
-    private val source: ChannelsSource = ChannelsSourceOf(ApiClient.hermesApi),
+    private val source: Channels = DefaultChannels(GatewayConnection.hermesApi),
 ) :
     ViewModel(),
         ToastHost {

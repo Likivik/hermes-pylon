@@ -105,7 +105,7 @@ import com.m57.hermescontrol.data.model.WebhookToggleSubscriptionRequest
 import com.m57.hermescontrol.data.model.WebhooksResponse
 import com.m57.hermescontrol.data.model.WebhooksToggleRequest
 import com.m57.hermescontrol.data.remote.GatewayResponse
-import com.m57.hermescontrol.data.remote.HermesGatewayApi
+import com.m57.hermescontrol.data.remote.HermesApi
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
@@ -113,11 +113,11 @@ import kotlinx.serialization.json.JsonObject
  * Production adapters: one per screen interface, one line per call.
  *
  * Pure delegation on purpose. Kotlin forbids default values on an overriding function, so the defaults live on the
- * interface and the adapter passes every argument explicitly. Deleting them from `HermesGatewayApi` instead would
+ * interface and the adapter passes every argument explicitly. Deleting them from `HermesApi` instead would
  * change its public API for 60 calls the app relies on.
  */
 
-class AnalyticsSourceOf(private val api: HermesGatewayApi) : AnalyticsSource {
+class DefaultAnalytics(private val api: HermesApi) : Analytics {
     override suspend fun getAnalytics(
         days: Int,
         profile: String?,
@@ -129,11 +129,11 @@ class AnalyticsSourceOf(private val api: HermesGatewayApi) : AnalyticsSource {
     ): GatewayResponse<ModelsAnalyticsResponse> = api.getModelsAnalytics(days, profile)
 }
 
-class BotsSourceOf(private val api: HermesGatewayApi) : BotsSource {
+class DefaultBots(private val api: HermesApi) : Bots {
     override suspend fun getProfiles(): GatewayResponse<ProfilesResponse> = api.getProfiles()
 }
 
-class ChannelsSourceOf(private val api: HermesGatewayApi) : ChannelsSource {
+class DefaultChannels(private val api: HermesApi) : Channels {
     override suspend fun applyTelegramOnboarding(
         pairingId: String,
         body: TelegramOnboardingApplyRequest,
@@ -167,7 +167,7 @@ class ChannelsSourceOf(private val api: HermesGatewayApi) : ChannelsSource {
         api.testMessagingPlatform(platformId)
 }
 
-class ConfigSourceOf(private val api: HermesGatewayApi) : ConfigSource {
+class DefaultConfig(private val api: HermesApi) : Config {
     override suspend fun getConfig(): GatewayResponse<Map<String, kotlinx.serialization.json.JsonElement>> =
         api.getConfig()
 
@@ -184,11 +184,11 @@ class ConfigSourceOf(private val api: HermesGatewayApi) : ConfigSource {
         api.updateRawConfig(body)
 }
 
-class ConnectSourceOf(private val api: HermesGatewayApi) : ConnectSource {
+class DefaultGatewayStatus(private val api: HermesApi) : GatewayStatus {
     override suspend fun getStatus(): GatewayResponse<StatusResponse> = api.getStatus()
 }
 
-class CronJobsSourceOf(private val api: HermesGatewayApi) : CronJobsSource {
+class DefaultCronJobs(private val api: HermesApi) : CronJobs {
     override suspend fun createCronJob(body: CreateCronJobRequest): GatewayResponse<CronJob> = api.createCronJob(body)
 
     override suspend fun deleteCronJob(id: String): GatewayResponse<Unit> = api.deleteCronJob(id)
@@ -209,7 +209,7 @@ class CronJobsSourceOf(private val api: HermesGatewayApi) : CronJobsSource {
     ): GatewayResponse<CronJob> = api.updateCronJob(id, body)
 }
 
-class GatewaySourceOf(private val api: HermesGatewayApi) : GatewaySource {
+class DefaultGateways(private val api: HermesApi) : Gateways {
     override suspend fun startGateway(): GatewayResponse<Unit> = api.startGateway()
 
     override suspend fun stopGateway(): GatewayResponse<Unit> = api.stopGateway()
@@ -219,7 +219,7 @@ class GatewaySourceOf(private val api: HermesGatewayApi) : GatewaySource {
     override suspend fun getStatus(): GatewayResponse<StatusResponse> = api.getStatus()
 }
 
-class KanbanSourceOf(private val api: HermesGatewayApi) : KanbanSource {
+class DefaultKanban(private val api: HermesApi) : Kanban {
     override suspend fun createKanbanTask(
         board: String?,
         task: CreateTaskBody,
@@ -237,7 +237,7 @@ class KanbanSourceOf(private val api: HermesGatewayApi) : KanbanSource {
     ): GatewayResponse<Unit> = api.updateKanbanTask(taskId, body)
 }
 
-class KeysSourceOf(private val api: HermesGatewayApi) : KeysSource {
+class DefaultKeys(private val api: HermesApi) : Keys {
     override suspend fun deleteEnvVar(request: EnvVarDeleteRequest): GatewayResponse<Unit> = api.deleteEnvVar(request)
 
     override suspend fun getEnvVars(): GatewayResponse<Map<String, EnvVarConfig>> = api.getEnvVars()
@@ -250,7 +250,7 @@ class KeysSourceOf(private val api: HermesGatewayApi) : KeysSource {
     override suspend fun updateEnvVar(body: EnvVarUpdate): GatewayResponse<Unit> = api.updateEnvVar(body)
 }
 
-class McpServersSourceOf(private val api: HermesGatewayApi) : McpServersSource {
+class DefaultMcpServers(private val api: HermesApi) : McpServers {
     override suspend fun addMcpServer(body: AddMcpServerRequest): GatewayResponse<McpServer> = api.addMcpServer(body)
 
     override suspend fun authMcpServer(name: String): GatewayResponse<McpOAuthFlowResponse> = api.authMcpServer(name)
@@ -280,7 +280,7 @@ class McpServersSourceOf(private val api: HermesGatewayApi) : McpServersSource {
     ): GatewayResponse<McpServer> = api.updateMcpServer(name, body)
 }
 
-class ModelSourceOf(private val api: HermesGatewayApi) : ModelSource {
+class DefaultModels(private val api: HermesApi) : Models {
     override suspend fun getActiveProfile(): GatewayResponse<ActiveProfileResponse> = api.getActiveProfile()
 
     override suspend fun getAuxiliaryModels(): GatewayResponse<AuxiliaryModelsResponse> = api.getAuxiliaryModels()
@@ -306,7 +306,7 @@ class ModelSourceOf(private val api: HermesGatewayApi) : ModelSource {
     ): GatewayResponse<Unit> = api.updateProfileModel(name, body)
 }
 
-class PluginsSourceOf(private val api: HermesGatewayApi) : PluginsSource {
+class DefaultPlugins(private val api: HermesApi) : Plugins {
     override suspend fun disablePlugin(name: String): GatewayResponse<Unit> = api.disablePlugin(name)
 
     override suspend fun enablePlugin(name: String): GatewayResponse<Unit> = api.enablePlugin(name)
@@ -330,7 +330,7 @@ class PluginsSourceOf(private val api: HermesGatewayApi) : PluginsSource {
     override suspend fun updatePlugin(name: String): GatewayResponse<Unit> = api.updatePlugin(name)
 }
 
-class ProfilesSourceOf(private val api: HermesGatewayApi) : ProfilesSource {
+class DefaultProfiles(private val api: HermesApi) : Profiles {
     override suspend fun createProfile(body: CreateProfileRequest): GatewayResponse<Unit> = api.createProfile(body)
 
     override suspend fun getActiveProfile(): GatewayResponse<ActiveProfileResponse> = api.getActiveProfile()
@@ -371,7 +371,7 @@ class ProfilesSourceOf(private val api: HermesGatewayApi) : ProfilesSource {
     ): GatewayResponse<Unit> = api.updateProfileSoul(name, body)
 }
 
-class ProvidersSourceOf(private val api: HermesGatewayApi) : ProvidersSource {
+class DefaultProviders(private val api: HermesApi) : Providers {
     override suspend fun cancelOAuthSession(sessionId: String): GatewayResponse<Unit> =
         api.cancelOAuthSession(sessionId)
 
@@ -394,11 +394,11 @@ class ProvidersSourceOf(private val api: HermesGatewayApi) : ProvidersSource {
     ): GatewayResponse<OAuthSubmitResponse> = api.submitOAuthCode(providerId, body)
 }
 
-class SettingsSourceOf(private val api: HermesGatewayApi) : SettingsSource {
+class DefaultSettings(private val api: HermesApi) : Settings {
     override suspend fun getStatus(): GatewayResponse<StatusResponse> = api.getStatus()
 }
 
-class SkillsSourceOf(private val api: HermesGatewayApi) : SkillsSource {
+class DefaultSkills(private val api: HermesApi) : Skills {
     override suspend fun getSkillContent(name: String): GatewayResponse<SkillContentResponse> =
         api.getSkillContent(name)
 
@@ -428,7 +428,7 @@ class SkillsSourceOf(private val api: HermesGatewayApi) : SkillsSource {
         api.updateSkillsFromHub(body)
 }
 
-class SystemSourceOf(private val api: HermesGatewayApi) : SystemSource {
+class DefaultHost(private val api: HermesApi) : Host {
     override suspend fun addCredentialPoolEntry(body: Map<String, String>): GatewayResponse<JsonObject> =
         api.addCredentialPoolEntry(body)
 
@@ -509,7 +509,7 @@ class SystemSourceOf(private val api: HermesGatewayApi) : SystemSource {
         api.updateSkillsFromHub(body)
 }
 
-class ToolsetsSourceOf(private val api: HermesGatewayApi) : ToolsetsSource {
+class DefaultToolsets(private val api: HermesApi) : Toolsets {
     override suspend fun getToolsets(): GatewayResponse<List<Toolset>> = api.getToolsets()
 
     override suspend fun toggleToolset(
@@ -518,7 +518,7 @@ class ToolsetsSourceOf(private val api: HermesGatewayApi) : ToolsetsSource {
     ): GatewayResponse<Unit> = api.toggleToolset(name, body)
 }
 
-class WebhooksSourceOf(private val api: HermesGatewayApi) : WebhooksSource {
+class DefaultWebhooks(private val api: HermesApi) : Webhooks {
     override suspend fun createWebhook(body: CreateWebhookRequest): GatewayResponse<WebhookSubscription> =
         api.createWebhook(body)
 
@@ -534,7 +534,7 @@ class WebhooksSourceOf(private val api: HermesGatewayApi) : WebhooksSource {
     override suspend fun toggleWebhooks(body: WebhooksToggleRequest): GatewayResponse<Unit> = api.toggleWebhooks(body)
 }
 
-class SessionsSourceOf(private val api: HermesGatewayApi) : SessionsSource {
+class DefaultSessions(private val api: HermesApi) : Sessions {
     override suspend fun getSessionLatestDescendant(
         sessionId: String,
     ): GatewayResponse<SessionLatestDescendantResponse> = api.getSessionLatestDescendant(sessionId)
@@ -581,7 +581,7 @@ class SessionsSourceOf(private val api: HermesGatewayApi) : SessionsSource {
     override suspend fun pruneSessions(body: PruneRequest): GatewayResponse<Unit> = api.pruneSessions(body)
 }
 
-class FilesSourceOf(private val api: HermesGatewayApi) : FilesSource {
+class FilesSourceOf(private val api: HermesApi) : FilesSource {
     override suspend fun listManagedFiles(path: String?): GatewayResponse<ManagedFilesListResponse> =
         api.listManagedFiles(path)
 
@@ -602,7 +602,7 @@ class FilesSourceOf(private val api: HermesGatewayApi) : FilesSource {
         api.uploadManagedFileStream(path, overwrite, fileName, content, mimeType)
 }
 
-class LogsSourceOf(private val api: HermesGatewayApi) : LogsSource {
+class LogsSourceOf(private val api: HermesApi) : LogsSource {
     override suspend fun uploadManagedFileStream(
         path: String,
         overwrite: Boolean,
@@ -620,7 +620,7 @@ class LogsSourceOf(private val api: HermesGatewayApi) : LogsSource {
     ): GatewayResponse<LogResponse> = api.getLogs(file, lines, level, component)
 }
 
-class AchievementsSourceOf(private val api: HermesGatewayApi) : AchievementsSource {
+class DefaultAchievements(private val api: HermesApi) : Achievements {
     override suspend fun getAchievements(): GatewayResponse<AchievementsResponse> = api.getAchievements()
 
     override suspend fun getRecentUnlocks(): GatewayResponse<List<RecentUnlock>> = api.getRecentUnlocks()

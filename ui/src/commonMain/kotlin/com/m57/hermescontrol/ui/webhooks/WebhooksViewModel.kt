@@ -6,11 +6,11 @@ import com.m57.hermescontrol.data.model.CreateWebhookRequest
 import com.m57.hermescontrol.data.model.WebhookSubscription
 import com.m57.hermescontrol.data.model.WebhookToggleSubscriptionRequest
 import com.m57.hermescontrol.data.model.WebhooksToggleRequest
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
-import com.m57.hermescontrol.data.remote.source.WebhooksSource
-import com.m57.hermescontrol.data.remote.source.WebhooksSourceOf
+import com.m57.hermescontrol.data.remote.source.DefaultWebhooks
+import com.m57.hermescontrol.data.remote.source.Webhooks
 import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.ui.common.safeLaunchLoad
 import com.m57.hermescontrol.util.ioDispatcher
@@ -45,7 +45,7 @@ data class WebhooksUiState(
 )
 
 class WebhooksViewModel(
-    private val source: WebhooksSource = WebhooksSourceOf(ApiClient.hermesApi),
+    private val source: Webhooks = DefaultWebhooks(GatewayConnection.hermesApi),
 ) :
     ViewModel(),
         ToastHost {

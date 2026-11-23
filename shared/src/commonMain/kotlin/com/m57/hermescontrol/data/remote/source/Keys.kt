@@ -11,9 +11,9 @@ import com.m57.hermescontrol.data.remote.GatewayResponse
  * What Keys needs from the gateway: 5 calls of the 150 it offers.
  *
  * Declared by the consumer, not by the gateway, so a fake for this screen implements 5 methods instead of
- * 150. `KeysSourceOf` is the production adapter; tests pass their own implementation.
+ * 150. `DefaultKeys` is the production adapter; tests pass their own implementation.
  */
-interface KeysSource {
+interface Keys {
     suspend fun deleteEnvVar(request: EnvVarDeleteRequest): GatewayResponse<Unit>
 
     suspend fun getEnvVars(): GatewayResponse<Map<String, EnvVarConfig>>

@@ -11,14 +11,14 @@ import com.m57.hermescontrol.data.local.AuthDefaults
 import com.m57.hermescontrol.data.local.AuthSessionState
 import com.m57.hermescontrol.data.local.authStore
 import com.m57.hermescontrol.data.local.missingRequiredToken
-import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.CleartextPolicy
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.data.remote.parseForBuild
 import com.m57.hermescontrol.data.remote.safeApiCall
-import com.m57.hermescontrol.data.remote.source.SettingsSource
-import com.m57.hermescontrol.data.remote.source.SettingsSourceOf
+import com.m57.hermescontrol.data.remote.source.DefaultSettings
+import com.m57.hermescontrol.data.remote.source.Settings
 import com.m57.hermescontrol.data.theme.ThemePreference
 import com.m57.hermescontrol.data.theme.ThemePreset
 import com.m57.hermescontrol.data.ws.HermesWsClient
@@ -76,7 +76,7 @@ class SettingsViewModel(
     private val connectWebSocket: () -> Unit = {
         HermesWsClient.connect()
     },
-    private val source: SettingsSource = SettingsSourceOf(ApiClient.hermesApi),
+    private val source: Settings = DefaultSettings(GatewayConnection.hermesApi),
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
@@ -133,7 +133,7 @@ class SettingsViewModel(
         }
         authStore.setSelectedProfileId(profileId)
         viewModelScope.launch(ioDispatcher) { loadSettings() }
-        ApiClient.rebuild()
+        GatewayConnection.rebuild()
         if (profileChanged) {
             connectWebSocket()
         }
@@ -157,7 +157,7 @@ class SettingsViewModel(
             authStore.setSelectedProfileId(AuthDefaults.PROFILE_ID)
         }
         viewModelScope.launch(ioDispatcher) { loadSettings() }
-        ApiClient.rebuild()
+        GatewayConnection.rebuild()
         if (wasSelected) {
             connectWebSocket()
         }
@@ -293,7 +293,7 @@ class SettingsViewModel(
 
         closeProfileDialog()
         viewModelScope.launch(ioDispatcher) { loadSettings() }
-        ApiClient.rebuild()
+        GatewayConnection.rebuild()
         if (reconnectWebSocket) {
             connectWebSocket()
         }
@@ -430,7 +430,7 @@ class SettingsViewModel(
         authStore.setSessionCookie(null)
         authStore.setWsAuthParam("token")
         AuthSessionState.requireSignIn()
-        // Don't rebuild ApiClient here — let the navigation complete first
+        // Don't rebuild GatewayConnection here — let the navigation complete first
     }
 
     fun save() {
@@ -453,7 +453,7 @@ class SettingsViewModel(
         authStore.setThemePreset(state.themePreset)
         authStore.setTypingEffectEnabled(state.typingEffectEnabled)
         authStore.setTypingEffectDelayMs(state.typingEffectDelayMs)
-        ApiClient.rebuild()
+        GatewayConnection.rebuild()
 
         viewModelScope.launch(ioDispatcher) {
             loadSettings()
@@ -471,7 +471,7 @@ class SettingsViewModel(
             return
         }
 
-        // Save first so ApiClient uses updated settings
+        // Save first so GatewayConnection uses updated settings
         save()
 
         _uiState.update { it.copy(isTesting = true, testResult = null) }

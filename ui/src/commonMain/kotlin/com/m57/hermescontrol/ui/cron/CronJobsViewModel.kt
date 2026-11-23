@@ -6,11 +6,11 @@ import com.m57.hermescontrol.AppEnvironment
 import com.m57.hermescontrol.data.model.CreateCronJobRequest
 import com.m57.hermescontrol.data.model.CronJob
 import com.m57.hermescontrol.data.model.UpdateCronJobRequest
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
-import com.m57.hermescontrol.data.remote.source.CronJobsSource
-import com.m57.hermescontrol.data.remote.source.CronJobsSourceOf
+import com.m57.hermescontrol.data.remote.source.CronJobs
+import com.m57.hermescontrol.data.remote.source.DefaultCronJobs
 import com.m57.hermescontrol.data.ws.toJsonElement
 import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.ui.common.safeLaunchLoad
@@ -36,7 +36,7 @@ data class CronJobsUiState(
 
 class CronJobsViewModel(
     private val ioDispatcher: kotlinx.coroutines.CoroutineDispatcher = AppEnvironment.current.io,
-    private val source: CronJobsSource = CronJobsSourceOf(ApiClient.hermesApi),
+    private val source: CronJobs = DefaultCronJobs(GatewayConnection.hermesApi),
 ) :
     ViewModel(),
         ToastHost {

@@ -5,11 +5,11 @@ import androidx.lifecycle.viewModelScope
 import com.m57.hermescontrol.data.local.AnalyticsCacheStore
 import com.m57.hermescontrol.data.model.AnalyticsResponse
 import com.m57.hermescontrol.data.model.ModelsAnalyticsResponse
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
-import com.m57.hermescontrol.data.remote.source.AnalyticsSource
-import com.m57.hermescontrol.data.remote.source.AnalyticsSourceOf
+import com.m57.hermescontrol.data.remote.source.Analytics
+import com.m57.hermescontrol.data.remote.source.DefaultAnalytics
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -45,7 +45,7 @@ data class AnalyticsUiState(
 
 class AnalyticsViewModel(
     private val cacheStore: AnalyticsCacheStore,
-    private val source: AnalyticsSource = AnalyticsSourceOf(ApiClient.hermesApi),
+    private val source: Analytics = DefaultAnalytics(GatewayConnection.hermesApi),
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(AnalyticsUiState())
     val uiState: StateFlow<AnalyticsUiState> = _uiState.asStateFlow()

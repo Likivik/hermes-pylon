@@ -11,15 +11,15 @@ import com.m57.hermescontrol.data.model.SessionInfo
 import com.m57.hermescontrol.data.model.SessionLiveStatus
 import com.m57.hermescontrol.data.model.SessionRenameRequest
 import com.m57.hermescontrol.data.model.SessionSearchResult
-import com.m57.hermescontrol.data.remote.ApiClient
-import com.m57.hermescontrol.data.remote.HermesGatewayApi
+import com.m57.hermescontrol.data.remote.GatewayConnection
+import com.m57.hermescontrol.data.remote.HermesApi
 import com.m57.hermescontrol.data.remote.MutationRefusal
 import com.m57.hermescontrol.data.remote.NetworkError
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.asMutationRefusal
 import com.m57.hermescontrol.data.remote.safeApiCall
-import com.m57.hermescontrol.data.remote.source.SessionsSource
-import com.m57.hermescontrol.data.remote.source.SessionsSourceOf
+import com.m57.hermescontrol.data.remote.source.DefaultSessions
+import com.m57.hermescontrol.data.remote.source.Sessions
 import com.m57.hermescontrol.data.ws.ConnectionStatus
 import com.m57.hermescontrol.data.ws.HermesSessionLiveStatusSource
 import com.m57.hermescontrol.data.ws.SessionLiveConnection
@@ -95,7 +95,7 @@ class SessionsViewModel(
             selectedProfileIdsProvider = { authStore.selectedGatewayIdFlow },
             selectedProfileIdProvider = { authStore.getSelectedProfileId() },
         ),
-    private val source: SessionsSource = SessionsSourceOf(ApiClient.hermesApi),
+    private val source: Sessions = DefaultSessions(GatewayConnection.hermesApi),
 ) : ViewModel(), ToastHost {
     private val _uiState =
         MutableStateFlow(
@@ -120,11 +120,11 @@ class SessionsViewModel(
      */
     private fun connectionMoved(
         startedAt: Long,
-        apiAtStart: HermesGatewayApi?,
+        apiAtStart: HermesApi?,
         startedProfileId: String?,
     ): Boolean =
-        apiAtStart !== ApiClient.hermesApi ||
-            startedAt != ApiClient.generation ||
+        apiAtStart !== GatewayConnection.hermesApi ||
+            startedAt != GatewayConnection.generation ||
             startedProfileId != authStore.getSelectedProfileId()
 
     /** Fence pre-mutation pages and pin hydration, including cancellation-resistant calls. */
@@ -361,7 +361,7 @@ class SessionsViewModel(
     private var searchGeneration = 0L
 
     /**
-     * The connection a search was issued against, as [ApiClient.generation].
+     * The connection a search was issued against, as [GatewayConnection.generation].
      *
      * Kept apart from [searchGeneration] on purpose: that one counts searches and fences the A -> B -> A
      * race, this one names the client and the account. Mixing them destroyed both fences at once.
@@ -371,11 +371,11 @@ class SessionsViewModel(
     /**
      * The gateway instance the last search travelled on.
      *
-     * Two signals for one question. A rebuild bumps [ApiClient.generation]; a replaced gateway instance is
+     * Two signals for one question. A rebuild bumps [GatewayConnection.generation]; a replaced gateway instance is
      * also a new connection. In production they always move together, but either one alone is enough to
      * discard an answer, and the object comparison is what callers and tests exercise.
      */
-    private var searchApi: HermesGatewayApi? = null
+    private var searchApi: HermesApi? = null
     private var searchProfileId: String? = null
     private val deletedSearchIds = mutableSetOf<String>()
 
@@ -388,10 +388,10 @@ class SessionsViewModel(
         val generation = ++searchGeneration
         val section = _uiState.value.section
         // A generation number, not object identity: a rebuild while this request is in flight bumps
-        // ApiClient.generation, and the answer that comes back belongs to the old client.
-        val startedAt = ApiClient.generation
+        // GatewayConnection.generation, and the answer that comes back belongs to the old client.
+        val startedAt = GatewayConnection.generation
         val profileId = authStore.getSelectedProfileId()
-        val apiNow = ApiClient.hermesApi
+        val apiNow = GatewayConnection.hermesApi
         val connectionChanged =
             searchApi !== apiNow ||
                 searchConnectionGeneration != startedAt ||
@@ -555,8 +555,8 @@ class SessionsViewModel(
             _uiState.update { it.copy(renamingSessionId = null, toastMessage = "Title cannot be empty") }
             return
         }
-        val startedAt = ApiClient.generation
-        val apiNow = ApiClient.hermesApi
+        val startedAt = GatewayConnection.generation
+        val apiNow = GatewayConnection.hermesApi
         val profileId = authStore.getSelectedProfileId()
         viewModelScope.launch {
             val row = _uiState.value.sessions.firstOrNull { it.id == sessionId }
@@ -632,8 +632,8 @@ class SessionsViewModel(
                 deletingSessionIds = it.deletingSessionIds + sessionId,
             )
         }
-        val startedAt = ApiClient.generation
-        val apiNow = ApiClient.hermesApi
+        val startedAt = GatewayConnection.generation
+        val apiNow = GatewayConnection.hermesApi
         val profileId = authStore.getSelectedProfileId()
         viewModelScope.launch {
             val row = _uiState.value.sessions.firstOrNull { it.id == sessionId }
@@ -814,8 +814,8 @@ class SessionsViewModel(
         bulkDeleteOperation = operation
 
         _uiState.update { it.copy(showBulkDeleteConfirm = false, isDeletingBulk = true) }
-        val startedAt = ApiClient.generation
-        val apiNow = ApiClient.hermesApi
+        val startedAt = GatewayConnection.generation
+        val apiNow = GatewayConnection.hermesApi
         val profileId = authStore.getSelectedProfileId()
         viewModelScope.launch {
             val profile = requireProfile()

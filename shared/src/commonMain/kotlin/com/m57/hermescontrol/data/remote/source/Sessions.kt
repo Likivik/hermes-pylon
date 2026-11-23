@@ -16,9 +16,9 @@ import com.m57.hermescontrol.data.remote.GatewayResponse
  * What the sessions screen needs from the gateway: 3 calls of the 150 it offers.
  *
  * Replaces the `SessionsGateway` wrapper added in #257. The wrapper duplicated signatures for no gain; this names
- * only what this screen calls, and `SessionsSourceOf` is the production adapter.
+ * only what this screen calls, and `DefaultSessions` is the production adapter.
  */
-interface SessionsSource {
+interface Sessions {
     suspend fun getSessionLatestDescendant(sessionId: String): GatewayResponse<SessionLatestDescendantResponse>
 
     suspend fun getSession(sessionId: String): GatewayResponse<SessionInfo>

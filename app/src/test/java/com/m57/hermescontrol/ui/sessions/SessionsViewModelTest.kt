@@ -3,9 +3,9 @@ package com.m57.hermescontrol.ui.sessions
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.model.SessionInfo
 import com.m57.hermescontrol.data.model.SessionListResponse
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.GatewayResponse
-import com.m57.hermescontrol.data.remote.HermesGatewayApi
+import com.m57.hermescontrol.data.remote.HermesApi
 import com.m57.hermescontrol.ui.profiles.ProfileProvider
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -32,7 +32,7 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class SessionsViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
-    private val mockApi = mockk<HermesGatewayApi>(relaxed = true)
+    private val mockApi = mockk<HermesApi>(relaxed = true)
 
     private fun createViewModel(): SessionsViewModel {
         val vm =
@@ -48,10 +48,10 @@ class SessionsViewModelTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         mockkObject(AuthManager)
-        mockkObject(ApiClient)
+        mockkObject(GatewayConnection)
         every { AuthManager.getSelectedProfileId() } returns null
         every { AuthManager.getPinnedSessionIds(AuthManager.DEFAULT_PROFILE_ID) } returns emptyList()
-        every { ApiClient.hermesApi } returns mockApi
+        every { GatewayConnection.hermesApi } returns mockApi
     }
 
     @After

@@ -12,15 +12,15 @@ import com.m57.hermescontrol.data.local.AuthSessionState
 import com.m57.hermescontrol.data.local.authStore
 import com.m57.hermescontrol.data.local.missingRequiredToken
 import com.m57.hermescontrol.data.model.StatusResponse
-import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.CleartextPolicy
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.NetworkError
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.data.remote.parseForBuild
 import com.m57.hermescontrol.data.remote.safeApiCall
-import com.m57.hermescontrol.data.remote.source.ConnectSource
-import com.m57.hermescontrol.data.remote.source.ConnectSourceOf
+import com.m57.hermescontrol.data.remote.source.DefaultGatewayStatus
+import com.m57.hermescontrol.data.remote.source.GatewayStatus
 import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.connect_error_401
 import com.m57.hermescontrol.generated.resources.connect_error_403
@@ -71,7 +71,7 @@ data class ConnectUiState(
 class ConnectViewModel(
     private val resolver: StringResolver,
     private val ioDispatcher: CoroutineDispatcher = AppEnvironment.current.io,
-    private val source: ConnectSource = ConnectSourceOf(ApiClient.hermesApi),
+    private val source: GatewayStatus = DefaultGatewayStatus(GatewayConnection.hermesApi),
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ConnectUiState())
     val uiState: StateFlow<ConnectUiState> = _uiState.asStateFlow()
@@ -135,7 +135,7 @@ class ConnectViewModel(
                 status = null,
             )
         }
-        ApiClient.rebuild()
+        GatewayConnection.rebuild()
         loadStatus()
     }
 
@@ -234,7 +234,7 @@ class ConnectViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    val tempApi = ApiClient.tempService(endpoint.baseUrl.toString(), state.token)
+                    val tempApi = GatewayConnection.tempService(endpoint.baseUrl.toString(), state.token)
                     safeApiCall(reportAuthExpiry = false) { tempApi.getStatus() }
                 }
             val current = _uiState.value
@@ -256,7 +256,7 @@ class ConnectViewModel(
                     // endpoint before rebuilding the clients.
                     authStore.setSessionCookie(null)
                     authStore.setWsAuthParam("token")
-                    ApiClient.rebuild()
+                    GatewayConnection.rebuild()
                     AuthSessionState.markAuthenticated()
 
                     if (state.saveProfile) {
@@ -298,7 +298,7 @@ class ConnectViewModel(
                         authStore.setSelectedProfileId(AuthDefaults.PROFILE_ID)
                         authStore.setProfileToken(AuthDefaults.PROFILE_ID, state.token)
                     }
-                    ApiClient.rebuild()
+                    GatewayConnection.rebuild()
                     _uiState.update {
                         it.copy(
                             isConnecting = false,

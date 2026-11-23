@@ -43,10 +43,10 @@ import com.m57.hermescontrol.data.model.StatusResponse
 import com.m57.hermescontrol.data.model.SystemStatsResponse
 import com.m57.hermescontrol.data.model.ToggleSkillRequest
 import com.m57.hermescontrol.data.model.UpdateCheckResponse
-import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.CleartextPolicy
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.GatewayResponse
-import com.m57.hermescontrol.data.remote.HermesGatewayApi
+import com.m57.hermescontrol.data.remote.HermesApi
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.connect_error_401
@@ -77,7 +77,7 @@ import java.io.IOException
 @OptIn(ExperimentalCoroutinesApi::class)
 class E2eIntegrationTest {
     private val testDispatcher = StandardTestDispatcher()
-    private lateinit var mockApiService: HermesGatewayApi
+    private lateinit var mockApiService: HermesApi
     private val mockApp = mockk<Application>(relaxed = true)
     private lateinit var connectResolver: FakeStringResolver
 
@@ -86,12 +86,12 @@ class E2eIntegrationTest {
         Dispatchers.setMain(testDispatcher)
 
         mockkObject(AuthManager)
-        mockkObject(ApiClient)
+        mockkObject(GatewayConnection)
 
         mockApiService = mockk()
-        every { ApiClient.hermesApi } returns mockApiService
-        every { ApiClient.tempService(any(), any()) } returns mockApiService
-        every { ApiClient.rebuild() } returns Unit
+        every { GatewayConnection.hermesApi } returns mockApiService
+        every { GatewayConnection.tempService(any(), any()) } returns mockApiService
+        every { GatewayConnection.rebuild() } returns Unit
 
         // Default AuthManager stubs
         every { AuthManager.getToken() } returns "mock-token"

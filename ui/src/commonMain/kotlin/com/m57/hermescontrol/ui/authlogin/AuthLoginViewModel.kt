@@ -11,8 +11,8 @@ import com.m57.hermescontrol.data.local.AuthSessionState
 import com.m57.hermescontrol.data.local.authStore
 import com.m57.hermescontrol.data.local.defaultServerBaseUrl
 import com.m57.hermescontrol.data.local.serverBaseUrlIsPageOrigin
-import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.AuthPayloads
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.HermesHttpConfig
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.data.remote.createHermesHttpClient
@@ -117,7 +117,7 @@ class AuthLoginViewModel(
             HermesWsClient.disconnect(clearPendingMessages = true)
         }
         authStore.setSelectedProfileId(profileId)
-        ApiClient.rebuild()
+        GatewayConnection.rebuild()
         if (profileChanged) {
             HermesWsClient.connect()
         }
@@ -436,7 +436,7 @@ class AuthLoginViewModel(
                     authStore.setToken(null)
                     authStore.setWsAuthParam("ticket")
                 }
-                ApiClient.rebuild()
+                GatewayConnection.rebuild()
                 // A previous failed session may have left the singleton in
                 // AUTH_EXPIRED, which connect() intentionally refuses to clear.
                 HermesWsClient.connect()
@@ -461,7 +461,7 @@ class AuthLoginViewModel(
         }
 
         val tempApi =
-            ApiClient.tempService(
+            GatewayConnection.tempService(
                 endpoint.baseUrl.toString(),
                 token,
             )
