@@ -169,7 +169,7 @@ class ChatViewModel(
     /** Profile changes to follow; empty in tests, the client's selection flow in production. */
     private val profileChanges: Flow<String?> = emptyFlow(),
     /** The selection, synchronously, for per-profile storage keys. */
-    private val selectedProfileNow: () -> String? = { DefaultChatApi.selectedProfileId },
+    private val selectedProfileNow: () -> String? = { DefaultChatGateway.selectedProfileId },
     internal val selectedGatewayId: () -> String = {
         AppEnvironment.current.auth.getSelectedProfileId() ?: AuthDefaults.PROFILE_ID
     },
@@ -181,7 +181,7 @@ class ChatViewModel(
     /** The websocket seam. Production is the singleton; tests pass a fake. */
     private val wsClient: ChatTransport = DefaultChatTransport,
     /** The HTTP seam, same rule. */
-    private val api: ChatApi = DefaultChatApi,
+    private val api: ChatGateway = DefaultChatGateway,
 ) : ViewModel() {
     /** Batch 3 seam: the history reads, out of this class. */
     private val historyLoader = ChatHistoryLoader(api, io)

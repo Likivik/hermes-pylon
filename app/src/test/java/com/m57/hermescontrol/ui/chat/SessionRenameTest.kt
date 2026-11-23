@@ -16,7 +16,7 @@ import com.m57.hermescontrol.data.ws.WsEvent
 import com.m57.hermescontrol.data.ws.WsMethods
 import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.chat_model_switch_failed
-import com.m57.hermescontrol.ui.chat.fakes.FakeChatApi
+import com.m57.hermescontrol.ui.chat.fakes.FakeChatGateway
 import com.m57.hermescontrol.ui.chat.fakes.FakeChatPersistenceRepository
 import com.m57.hermescontrol.ui.chat.fakes.FakeChatTransport
 import com.m57.hermescontrol.ui.chat.fakes.FakeSlashUsageStore
@@ -66,7 +66,7 @@ class SessionRenameTest {
     private lateinit var app: Application
     private lateinit var resolver: FakeStringResolver
     private val fakeTransport = FakeChatTransport()
-    private lateinit var fakeApi: FakeChatApi
+    private lateinit var fakeApi: FakeChatGateway
     private lateinit var fakeRepo: FakeChatPersistenceRepository
     private lateinit var fakeSlashUsageStore: FakeSlashUsageStore
     private lateinit var mockApi: com.m57.hermescontrol.data.remote.HermesApi
@@ -116,7 +116,7 @@ class SessionRenameTest {
             }
         }
 
-        fakeApi = FakeChatApi()
+        fakeApi = FakeChatGateway()
         mockApi = mockk(relaxed = true)
         fakeApi.hermesApi = mockApi
         coEvery { mockApi.getModelInfo() } returns

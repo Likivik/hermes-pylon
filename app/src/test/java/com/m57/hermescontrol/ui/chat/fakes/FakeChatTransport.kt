@@ -7,7 +7,7 @@ import com.m57.hermescontrol.data.ws.HermesWsClient
 import com.m57.hermescontrol.data.ws.PrivilegedRequestBinding
 import com.m57.hermescontrol.data.ws.ServerRequestBinding
 import com.m57.hermescontrol.data.ws.WsEvent
-import com.m57.hermescontrol.ui.chat.ChatApi
+import com.m57.hermescontrol.ui.chat.ChatGateway
 import com.m57.hermescontrol.ui.chat.ChatTransport
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
@@ -188,12 +188,12 @@ class FakeChatTransport : ChatTransport {
 }
 
 /**
- * A `ChatApi` a test can drive. `hermesApi` defaults to a relaxed mock so callers that do not care
+ * A `ChatGateway` a test can drive. `hermesApi` defaults to a relaxed mock so callers that do not care
  * about HTTP get a working object.
  */
-class FakeChatApi(
+class FakeChatGateway(
     override var hermesApi: HermesApi = mockk(relaxed = true),
-) : ChatApi {
+) : ChatGateway {
     override var selectedProfileId: String? = "profile-test"
 
     var clearedProfile = false

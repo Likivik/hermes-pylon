@@ -6,7 +6,7 @@ import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.local.HermesDatabase
 import com.m57.hermescontrol.data.ws.ConnectionStatus
 import com.m57.hermescontrol.data.ws.WsEvent
-import com.m57.hermescontrol.ui.chat.fakes.FakeChatApi
+import com.m57.hermescontrol.ui.chat.fakes.FakeChatGateway
 import com.m57.hermescontrol.ui.chat.fakes.FakeChatPersistenceRepository
 import com.m57.hermescontrol.ui.chat.fakes.FakeChatTransport
 import com.m57.hermescontrol.ui.chat.fakes.FakeSlashUsageStore
@@ -48,7 +48,7 @@ import org.junit.Test
 class ChatRouterCharacterizationTest {
     private val testDispatcher = StandardTestDispatcher()
     private val fakeTransport = FakeChatTransport()
-    private val fakeApi = FakeChatApi()
+    private val fakeApi = FakeChatGateway()
     private lateinit var app: Application
     private lateinit var resolver: FakeStringResolver
     private lateinit var fakeRepo: FakeChatPersistenceRepository

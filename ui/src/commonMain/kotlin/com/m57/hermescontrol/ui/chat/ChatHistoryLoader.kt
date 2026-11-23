@@ -15,10 +15,10 @@ import kotlinx.coroutines.withContext
  * retirement) stay where they are until they get a real seam.
  *
  * The reason this exists at all: history had no unit test for "ask for the right page", because asking
- * went through a private ViewModel method that also wrote state. Now a fake `ChatApi` can answer.
+ * went through a private ViewModel method that also wrote state. Now a fake `ChatGateway` can answer.
  */
 internal class ChatHistoryLoader(
-    private val api: ChatApi,
+    private val api: ChatGateway,
     private val io: CoroutineDispatcher,
 ) {
     /**
