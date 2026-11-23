@@ -7,51 +7,35 @@ package com.m57.hermescontrol.ui.chat
  * anywhere else. That is what makes it testable and what makes an update atomic — a caller sends one intent and
  * gets one whole new state, so the screen cannot show a half-applied change.
  *
- * Each branch delegates to a rule in [ConnectionStateUpdates], [ComposerStateUpdates] or [TranscriptReducer].
- * Those rules answer "what changes, and what is deliberately kept". This answers only "which rule runs".
+ * This is a composing pass, not a rule book. Each slice answers for itself and ignores what is not its business,
+ * so one intent can reach several slices in the same pass and still produce exactly one new state. The rules
+ * live in [ConnectionReducer], [ComposerReducer] and [TranscriptReducer].
  */
 object ChatReducer {
     fun reduce(
         state: ChatUiState,
         intent: ChatIntent,
     ): ChatUiState =
+        state.copy(
+            transcript = reduceTranscript(state.transcript, intent),
+            composer = ComposerReducer.reduce(state.composer, intent),
+            connection = ConnectionReducer.reduce(state.connection, intent),
+        )
+
+    /**
+     * The adapter onto [TranscriptReducer], which predates [ChatIntent] and takes its own intent type.
+     *
+     * Not a layer with no job: it unwraps. The transcript slice already worked by intent before the rest of the
+     * screen did, and rewriting it to take [ChatIntent] would churn a reducer that is already tested.
+     */
+    private fun reduceTranscript(
+        state: TranscriptState,
+        intent: ChatIntent,
+    ): TranscriptState =
         when (intent) {
-            // Connection
-            ChatIntent.FirstConnected -> state.copy(connection = state.connection.afterFirstConnected())
+            is ChatIntent.Transcript -> TranscriptReducer.reduce(state, intent.intent)
 
-            is ChatIntent.StatusPillChanged ->
-                state.copy(connection = state.connection.afterStatusPill(intent.text))
-
-            ChatIntent.StatusPillCleared -> state.copy(connection = state.connection.afterStatusPillCleared())
-
-            // Composer
-            is ChatIntent.SlashUsageCountsChanged ->
-                state.copy(composer = state.composer.afterSlashUsageCounts(intent.counts))
-
-            is ChatIntent.HistorySheetRequested ->
-                state.copy(composer = state.composer.afterOpenHistoryRequest(intent.open))
-
-            is ChatIntent.PrefillRequested ->
-                state.copy(composer = state.composer.afterPendingPrefill(intent.text))
-
-            ChatIntent.ProfileChanged -> state.copy(composer = state.composer.afterProfileChange())
-
-            is ChatIntent.ModelContextMeasured ->
-                state.copy(
-                    composer = state.composer.afterModelContextLength(intent.length, intent.model),
-                )
-
-            is ChatIntent.TypingSettingsLoaded ->
-                state.copy(composer = state.composer.afterTypingSettings(intent.enabled, intent.delayMs))
-
-            is ChatIntent.SessionModelConfirmed ->
-                state.copy(composer = state.composer.afterSessionModel(intent.label))
-
-            is ChatIntent.ReasoningLevelChanged ->
-                state.copy(composer = state.composer.afterReasoningLevel(intent.level))
-
-            // Transcript: already an intent-driven slice.
-            is ChatIntent.Transcript ->
-                state.copy(transcript = TranscriptReducer.reduce(state.transcript, intent.intent))
+            // Not this slice's business.
+            else -> state
         }
 }
