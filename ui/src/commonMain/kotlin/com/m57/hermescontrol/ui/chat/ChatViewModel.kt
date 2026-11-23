@@ -1055,9 +1055,17 @@ class ChatViewModel(
      * This is the only way state is meant to change. Call sites that update several slices at once still write
      * their own `copy` — splitting those would emit two states where there was one, so they move only once the
      * reducer can express the whole update.
+     *
+     * [whenValid] is evaluated against the state **inside** the write, so a fence cannot be checked and then
+     * lost. A request whose identity moved on is dropped, and the state is left exactly as it was.
      */
-    private fun dispatch(intent: ChatIntent) {
-        uiStateMutable.update { ChatReducer.reduce(it, intent) }
+    private fun dispatch(
+        intent: ChatIntent,
+        whenValid: (ChatUiState) -> Boolean = { true },
+    ) {
+        uiStateMutable.update { current ->
+            if (!whenValid(current)) current else ChatReducer.reduce(current, intent)
+        }
     }
 
     private fun applyHistoryUpdate(update: ChatHistoryUpdate) {
@@ -1520,25 +1528,7 @@ class ChatViewModel(
         streamingController.resetStreaming()
         streamingStateMutable.update { StreamingState() }
         ActiveSessionHolder.set(null, null)
-        uiStateMutable.update {
-            it.copy(
-                transcript =
-                    it.transcript.copy(
-                        currentSessionId = null,
-                        isSessionReady = false,
-                        isLoading = false,
-                        isLoadingOlder = false,
-                        hasOlderMessages = false,
-                        messages = emptyList(),
-                        subagentIndicators = emptyList(),
-                        todos = emptyList(),
-                        chatTitle = "Hermes",
-                        isAgentTyping = false,
-                        contextUsage = null,
-                    ),
-                composer = it.composer.afterProfileChange(),
-            )
-        }
+        dispatch(ChatIntent.ProfileChanged)
     }
 
     // ── Likivik patch: per-session rail customization (icon emoji only; the
@@ -2295,14 +2285,9 @@ class ChatViewModel(
                     } else {
                         displayLabel
                     }
-                uiStateMutable.update {
-                    if (requestContext.isStaleAgainst(currentRequestContext())) return@update it
-                    it.copy(
-                        transcript = it.transcript.copy(contextUsage = it.contextUsage?.copy(maxTokens = null)),
-                        composer = it.composer.afterSessionModel(confirmedLabel),
-                        overlays = it.overlays.afterModelSwitchConfirmationDismissed(),
-                    )
-                }
+                dispatch(
+                    ChatIntent.SessionModelConfirmed(confirmedLabel),
+                ) { !requestContext.isStaleAgainst(currentRequestContext()) }
                 if (recordUsage) recordAcceptedSlash("/model")
             } catch (e: HermesWsClient.HermesRpcException) {
                 val msg = resolver.get(Res.string.chat_model_switch_failed, e.message ?: "")

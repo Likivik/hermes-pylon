@@ -71,6 +71,23 @@ sealed interface TranscriptIntent {
         val effectiveOffset: Int,
         val limit: Int,
     ) : TranscriptIntent
+
+    /**
+     * The account changed. Everything from the old account goes.
+     *
+     * **Cleared:** the session, its messages, its indicators and todos, the paging flags, the title and the
+     * context usage. The whole transcript is the old account's; keeping any of it would show one account's
+     * conversation under another's name.
+     */
+    data object ProfileSwitched : TranscriptIntent
+
+    /**
+     * The session confirmed its model, so the measured context window is no longer known.
+     *
+     * **Set:** [TranscriptState.contextUsage] loses its `maxTokens` only. The usage counts themselves are
+     * still real, so they stay; only the ceiling, which belonged to the model that just went away, is dropped.
+     */
+    data object SessionModelConfirmed : TranscriptIntent
 }
 
 object TranscriptReducer {
@@ -90,7 +107,34 @@ object TranscriptReducer {
                 state.copy(isLoadingOlder = true)
 
             is TranscriptIntent.OlderLoaded -> reduceOlderLoaded(state, intent)
+
+            TranscriptIntent.ProfileSwitched -> reduceProfileSwitched(state)
+
+            TranscriptIntent.SessionModelConfirmed ->
+                state.copy(contextUsage = state.contextUsage?.copy(maxTokens = null))
         }
+
+    /**
+     * The account changed: everything from the old one goes, and the title resets.
+     *
+     * Wiped on purpose: the session and its transcript, the paging flags, the typing indicator and the context
+     * usage. What survives is nothing — a transcript is one account's conversation and cannot be shown under
+     * another account's name. The composer and the overlays answer for themselves on the same intent.
+     */
+    private fun reduceProfileSwitched(state: TranscriptState): TranscriptState =
+        state.copy(
+            currentSessionId = null,
+            isSessionReady = false,
+            isLoading = false,
+            isLoadingOlder = false,
+            hasOlderMessages = false,
+            messages = emptyList(),
+            subagentIndicators = emptyList(),
+            todos = emptyList(),
+            chatTitle = "Hermes",
+            isAgentTyping = false,
+            contextUsage = null,
+        )
 
     private fun reduceLoaded(
         state: TranscriptState,
