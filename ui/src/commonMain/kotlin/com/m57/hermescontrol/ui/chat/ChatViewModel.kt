@@ -168,8 +168,14 @@ class ChatViewModel(
     private val profileProvider: ProfileProvider = ProfileProvider { null },
     /** Profile changes to follow; empty in tests, the client's selection flow in production. */
     private val profileChanges: Flow<String?> = emptyFlow(),
-    /** The selection, synchronously, for per-profile storage keys. */
-    private val selectedProfileNow: () -> String? = { DefaultChatGateway.selectedProfileId },
+    /**
+     * Test seam for the synchronous profile selection.
+     *
+     * Production passes nothing and the class reads the injected [api]; a test that needs a fixed account
+     * passes a lambda. The default used to reach `DefaultChatGateway` directly, which gave one value two
+     * sources of truth — the seam and the singleton behind it.
+     */
+    private val selectedProfileNowOverride: (() -> String?)? = null,
     internal val selectedGatewayId: () -> String = {
         AppEnvironment.current.auth.getSelectedProfileId() ?: AuthDefaults.PROFILE_ID
     },
@@ -183,6 +189,9 @@ class ChatViewModel(
     /** The HTTP seam, same rule. */
     private val api: ChatGateway = DefaultChatGateway,
 ) : ViewModel() {
+    /** The selection, synchronously, for per-profile storage keys. Reads the injected seam, not the singleton. */
+    private val selectedProfileNow: () -> String? = selectedProfileNowOverride ?: { api.selectedProfileId }
+
     /** Batch 3 seam: the history reads, out of this class. */
     private val historyLoader = ChatHistoryLoader(api, io)
 
