@@ -2294,6 +2294,25 @@ class ChatViewModel(
         }
     }
 
+    /**
+     * Generation half of [RequestContext] for chat.
+     *
+     * Constant on purpose: chat has one socket per conversation, so unlike the HTTP screens there is no
+     * client rebuild to outlive. A constant keeps [RequestContext.isStaleAgainst] total instead of
+     * leaving a field that is never compared.
+     */
+    private val chatTransportGeneration = 0L
+
+    /**
+     * The answer's address, as it stands now.
+     *
+     * Chat travels on one socket per conversation, so the session is the transport identity and the HTTP client
+     * generation is not part of it. Both sides carry the same constant so the comparison stays total — what is
+     * actually compared is the conversation and the account.
+     */
+    private fun currentRequestContext(): RequestContext =
+        RequestContext(runtimeSessionId, chatTransportGeneration, selectedProfileNow())
+
     private fun applySessionModel(
         spec: String,
         displayLabel: String? = null,
@@ -2315,6 +2334,7 @@ class ChatViewModel(
             }
             return
         }
+        val requestContext = RequestContext(sessionId, chatTransportGeneration, selectedProfileNow())
 
         viewModelScope.launch(io) {
             val params =
@@ -2336,7 +2356,7 @@ class ChatViewModel(
                             ?.takeIf { it.isNotBlank() }
                             ?: resolver.get(Res.string.chat_model_confirm_default_message)
                     uiStateMutable.update {
-                        if (runtimeSessionId != sessionId) return@update it
+                        if (requestContext.isStaleAgainst(currentRequestContext())) return@update it
                         it.copy(
                             overlays =
                                 it.overlays.copy(
@@ -2362,7 +2382,7 @@ class ChatViewModel(
                         displayLabel
                     }
                 uiStateMutable.update {
-                    if (runtimeSessionId != sessionId) return@update it
+                    if (requestContext.isStaleAgainst(currentRequestContext())) return@update it
                     it.copy(
                         transcript = it.transcript.copy(contextUsage = it.contextUsage?.copy(maxTokens = null)),
                         composer = it.composer.afterSessionModel(confirmedLabel),
@@ -2373,7 +2393,7 @@ class ChatViewModel(
             } catch (e: HermesWsClient.HermesRpcException) {
                 val msg = resolver.get(Res.string.chat_model_switch_failed, e.message ?: "")
                 uiStateMutable.update {
-                    if (runtimeSessionId != sessionId) return@update it
+                    if (requestContext.isStaleAgainst(currentRequestContext())) return@update it
                     it.copy(
                         transcript = it.transcript.copy(errorMessage = msg),
                         overlays = it.overlays.afterModelSwitchConfirmationDismissed(),
