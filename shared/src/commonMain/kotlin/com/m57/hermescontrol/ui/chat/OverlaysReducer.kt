@@ -45,6 +45,14 @@ sealed interface OverlaysIntent {
 
     /** The prompt is done — the turn answered it, or it was dismissed. Unconditional by design. */
     data object ClarifyCleared : OverlaysIntent
+
+    /**
+     * The model switch was confirmed, so the dialog that asked for it goes.
+     *
+     * **Set:** the model switch confirmation is closed. Unconditional — a confirmation is only ever closed by
+     * the answer to itself, and a stale dialog would offer to switch to a model that is already chosen.
+     */
+    data object ModelSwitchConfirmationDismissed : OverlaysIntent
 }
 
 object OverlaysReducer {
@@ -83,5 +91,7 @@ object OverlaysReducer {
             }
 
             OverlaysIntent.ClarifyCleared -> state.copy(clarifyRequest = null)
+
+            OverlaysIntent.ModelSwitchConfirmationDismissed -> state.afterModelSwitchConfirmationDismissed()
         }
 }

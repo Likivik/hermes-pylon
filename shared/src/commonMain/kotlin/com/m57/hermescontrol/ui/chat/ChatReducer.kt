@@ -20,6 +20,7 @@ object ChatReducer {
             transcript = reduceTranscript(state.transcript, intent),
             composer = ComposerReducer.reduce(state.composer, intent),
             connection = ConnectionReducer.reduce(state.connection, intent),
+            overlays = reduceOverlays(state.overlays, intent),
         )
 
     /**
@@ -34,6 +35,26 @@ object ChatReducer {
     ): TranscriptState =
         when (intent) {
             is ChatIntent.Transcript -> TranscriptReducer.reduce(state, intent.intent)
+
+            // The account changed, so the whole transcript is the old account's.
+            ChatIntent.ProfileChanged -> TranscriptReducer.reduce(state, TranscriptIntent.ProfileSwitched)
+
+            // The model changed, so its measured context window is no longer known.
+            is ChatIntent.SessionModelConfirmed ->
+                TranscriptReducer.reduce(state, TranscriptIntent.SessionModelConfirmed)
+
+            // Not this slice's business.
+            else -> state
+        }
+
+    /** The adapter onto [OverlaysReducer]. See [reduceTranscript] for why an adapter and not a direct call. */
+    private fun reduceOverlays(
+        state: OverlaysState,
+        intent: ChatIntent,
+    ): OverlaysState =
+        when (intent) {
+            is ChatIntent.SessionModelConfirmed ->
+                OverlaysReducer.reduce(state, OverlaysIntent.ModelSwitchConfirmationDismissed)
 
             // Not this slice's business.
             else -> state
