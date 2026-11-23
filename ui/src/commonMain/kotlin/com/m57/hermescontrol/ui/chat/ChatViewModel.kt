@@ -2028,12 +2028,13 @@ class ChatViewModel(
             when (result) {
                 is NetworkResult.Success -> {
                     cachedModelOptions = result.data.providers.orEmpty()
+                    val pinnedModels = authStore.getPinnedModels()
                     uiStateMutable.update {
                         it.copy(
                             overlays =
                                 it.overlays.copy(
                                     modelPickerProviders = cachedModelOptions,
-                                    modelPickerPinned = authStore.getPinnedModels(),
+                                    modelPickerPinned = pinnedModels,
                                     modelInventoryResolved = true,
                                 ),
                         )
@@ -2059,13 +2060,14 @@ class ChatViewModel(
      */
     fun openModelPicker() {
         val hasCached = cachedModelOptions.isNotEmpty()
+        val pinnedModels = authStore.getPinnedModels()
         uiStateMutable.update {
             it.copy(
                 overlays =
                     it.overlays.copy(
                         showModelPicker = true,
                         modelPickerProviders = if (hasCached) cachedModelOptions else emptyList(),
-                        modelPickerPinned = authStore.getPinnedModels(),
+                        modelPickerPinned = pinnedModels,
                         modelPickerLoading = !hasCached,
                     ),
             )
