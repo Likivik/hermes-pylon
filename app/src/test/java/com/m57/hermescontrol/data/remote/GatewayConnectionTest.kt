@@ -22,7 +22,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
 /**
- * Tests for [ApiClient] — auth interceptor and BuildConfig.DEBUG logging gate.
+ * Tests for [GatewayConnection] — auth interceptor and BuildConfig.DEBUG logging gate.
  *
  * Uses a real MockWebServer so the interceptor chain is exercised end-to-end.
  * [AuthManager] is fully mocked so we control the stored host/port/token.
@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Test
  *
  * TEST-04 (issue #292)
  */
-class ApiClientTest {
+class GatewayConnectionTest {
     private lateinit var mockWebServer: MockWebServer
 
     companion object {
@@ -45,7 +45,7 @@ class ApiClientTest {
         mockkObject(AuthManager)
         AuthSessionState.markAuthenticated()
 
-        // Issue #470: ApiClient builds through OkHttpProvider, which resolves
+        // Issue #470: GatewayConnection builds through OkHttpProvider, which resolves
         // the shared CookieManager.cookieJar. Inject a fake jar so the test
         // can build clients without app context.
         cookieJar.clearAll()
@@ -80,12 +80,12 @@ class ApiClientTest {
             for (connectionId in listOf("default", "local-connection-id")) {
                 every { AuthManager.getSelectedProfileId() } returns
                     connectionId
-                ApiClient.rebuild()
+                GatewayConnection.rebuild()
                 mockWebServer.enqueue(
                     MockResponse().setResponseCode(200).setBody("{}"),
                 )
 
-                assertTrue(ApiClient.hermesApi.getConfig().isSuccessful)
+                assertTrue(GatewayConnection.hermesApi.getConfig().isSuccessful)
 
                 val request = mockWebServer.takeRequest()
                 assertNull(request.requestUrl!!.queryParameter("profile"))
@@ -99,10 +99,10 @@ class ApiClientTest {
             every { AuthManager.getToken() } returns "test-token"
             every { AuthManager.getSelectedProfileId() } returns
                 "local-connection-id"
-            ApiClient.rebuild()
+            GatewayConnection.rebuild()
             mockWebServer.enqueue(MockResponse().setResponseCode(204))
 
-            ApiClient.hermesApi.getAnalytics(days = 7, profile = "work")
+            GatewayConnection.hermesApi.getAnalytics(days = 7, profile = "work")
 
             val url = mockWebServer.takeRequest().requestUrl!!
             assertEquals(listOf("work"), url.queryParameterValues("profile"))
@@ -120,10 +120,10 @@ class ApiClientTest {
                 )
             every { AuthManager.endpointForBuild() } returns endpoint
             every { AuthManager.endpoint() } returns endpoint
-            ApiClient.rebuild()
+            GatewayConnection.rebuild()
             mockWebServer.enqueue(MockResponse().setResponseCode(204))
 
-            ApiClient.hermesApi.updateConfig(
+            GatewayConnection.hermesApi.updateConfig(
                 com.m57.hermescontrol.data.model.ConfigUpdateRequest(
                     config = emptyMap(),
                 ),
@@ -141,13 +141,13 @@ class ApiClientTest {
             every { AuthManager.getSessionCookie() } returns null
 
             // Rebuild to pick up the new mock values
-            ApiClient.rebuild()
+            GatewayConnection.rebuild()
 
             mockWebServer.enqueue(
                 MockResponse().setResponseCode(200).setBody("""{"gateway_running":true}"""),
             )
 
-            val response = ApiClient.hermesApi.getStatus()
+            val response = GatewayConnection.hermesApi.getStatus()
             assertTrue(response.isSuccessful)
 
             val request = mockWebServer.takeRequest()
@@ -162,13 +162,13 @@ class ApiClientTest {
             every { AuthManager.getToken() } returns ""
             every { AuthManager.getSessionCookie() } returns null
 
-            ApiClient.rebuild()
+            GatewayConnection.rebuild()
 
             mockWebServer.enqueue(
                 MockResponse().setResponseCode(200).setBody("""{"gateway_running":true}"""),
             )
 
-            val response = ApiClient.hermesApi.getStatus()
+            val response = GatewayConnection.hermesApi.getStatus()
             assertTrue(response.isSuccessful)
 
             val request = mockWebServer.takeRequest()
@@ -183,13 +183,13 @@ class ApiClientTest {
             every { AuthManager.getToken() } returns null
             every { AuthManager.getSessionCookie() } returns null
 
-            ApiClient.rebuild()
+            GatewayConnection.rebuild()
 
             mockWebServer.enqueue(
                 MockResponse().setResponseCode(200).setBody("""{"gateway_running":true}"""),
             )
 
-            val response = ApiClient.hermesApi.getStatus()
+            val response = GatewayConnection.hermesApi.getStatus()
             assertTrue(response.isSuccessful)
 
             val request = mockWebServer.takeRequest()
@@ -204,13 +204,13 @@ class ApiClientTest {
             every { AuthManager.getToken() } returns rawToken
             every { AuthManager.getSessionCookie() } returns null
 
-            ApiClient.rebuild()
+            GatewayConnection.rebuild()
 
             mockWebServer.enqueue(
                 MockResponse().setResponseCode(200).setBody("""{"gateway_running":true}"""),
             )
 
-            val response = ApiClient.hermesApi.getStatus()
+            val response = GatewayConnection.hermesApi.getStatus()
             assertTrue(response.isSuccessful)
 
             val request = mockWebServer.takeRequest()
@@ -223,13 +223,13 @@ class ApiClientTest {
             every { AuthManager.getToken() } returns "stale-loopback-token"
             every { AuthManager.isGatedMode() } returns true
 
-            ApiClient.rebuild()
+            GatewayConnection.rebuild()
 
             mockWebServer.enqueue(
                 MockResponse().setResponseCode(200).setBody("""{"gateway_running":true}"""),
             )
 
-            val response = ApiClient.hermesApi.getStatus()
+            val response = GatewayConnection.hermesApi.getStatus()
 
             assertTrue(response.isSuccessful)
             assertNull(mockWebServer.takeRequest().getHeader("Authorization"))
@@ -240,10 +240,10 @@ class ApiClientTest {
         runTest {
             every { AuthManager.getToken() } returns "media-token"
             every { AuthManager.getSessionCookie() } returns null
-            ApiClient.rebuild()
+            GatewayConnection.rebuild()
             mockWebServer.enqueue(MockResponse().setResponseCode(200).setBody("media"))
 
-            ApiClient.hermesApi.downloadManagedFile("/private/photo.png").body()
+            GatewayConnection.hermesApi.downloadManagedFile("/private/photo.png").body()
 
             val request = mockWebServer.takeRequest()
             assertEquals("/api/files/download?path=%2Fprivate%2Fphoto.png", request.path)
@@ -265,10 +265,10 @@ class ApiClientTest {
             )
             assertEquals("cookie-secret", cookieJar.getSessionCookieValue())
             assertEquals(1, cookieJar.loadForRequest(Url(mockWebServer.url("/").toString())).size)
-            ApiClient.rebuild()
+            GatewayConnection.rebuild()
             mockWebServer.enqueue(MockResponse().setResponseCode(200).setBody("media"))
 
-            ApiClient.hermesApi.downloadManagedFile("/private/photo.png").body()
+            GatewayConnection.hermesApi.downloadManagedFile("/private/photo.png").body()
 
             val request = mockWebServer.takeRequest()
             assertEquals("/api/files/download?path=%2Fprivate%2Fphoto.png", request.path)
@@ -282,10 +282,10 @@ class ApiClientTest {
             every { AuthManager.getToken() } returns "stale-loopback-token"
             every { AuthManager.isGatedMode() } returns true
 
-            ApiClient.rebuild()
+            GatewayConnection.rebuild()
             mockWebServer.enqueue(MockResponse().setResponseCode(401))
 
-            val result = safeApiCall { ApiClient.hermesApi.getSessions() }
+            val result = safeApiCall { GatewayConnection.hermesApi.getSessions() }
 
             assertTrue(result is NetworkResult.Failure)
             assertTrue(AuthSessionState.signInRequired.value)
@@ -317,7 +317,7 @@ class ApiClientTest {
             }
             every { AuthManager.getSessionCookie() } returns null
 
-            ApiClient.rebuild()
+            GatewayConnection.rebuild()
 
             mockWebServer.enqueue(MockResponse().setResponseCode(401))
             mockWebServer.enqueue(
@@ -329,7 +329,7 @@ class ApiClientTest {
                 MockResponse().setResponseCode(200).setBody("""{"sessions":[],"total":0}"""),
             )
 
-            val result = safeApiCall { ApiClient.hermesApi.getSessions() }
+            val result = safeApiCall { GatewayConnection.hermesApi.getSessions() }
 
             assertTrue(result is NetworkResult.Success)
             assertFalse(AuthSessionState.signInRequired.value)

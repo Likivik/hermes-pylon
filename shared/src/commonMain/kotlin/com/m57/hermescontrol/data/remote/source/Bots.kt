@@ -7,8 +7,8 @@ import com.m57.hermescontrol.data.remote.GatewayResponse
  * What Bots needs from the gateway: 1 calls of the 150 it offers.
  *
  * Declared by the consumer, not by the gateway, so a fake for this screen implements 1 methods instead of
- * 150. `BotsSourceOf` is the production adapter; tests pass their own implementation.
+ * 150. `DefaultBots` is the production adapter; tests pass their own implementation.
  */
-interface BotsSource {
+interface Bots {
     suspend fun getProfiles(): GatewayResponse<ProfilesResponse>
 }

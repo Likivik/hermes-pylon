@@ -10,9 +10,9 @@ import com.m57.hermescontrol.data.remote.GatewayResponse
  * What Kanban needs from the gateway: 5 calls of the 150 it offers.
  *
  * Declared by the consumer, not by the gateway, so a fake for this screen implements 5 methods instead of
- * 150. `KanbanSourceOf` is the production adapter; tests pass their own implementation.
+ * 150. `DefaultKanban` is the production adapter; tests pass their own implementation.
  */
-interface KanbanSource {
+interface Kanban {
     suspend fun createKanbanTask(
         board: String?,
         task: CreateTaskBody,

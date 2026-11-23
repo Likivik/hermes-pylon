@@ -1,6 +1,6 @@
 package com.m57.hermescontrol.ui.chat.fakes
 
-import com.m57.hermescontrol.data.remote.HermesGatewayApi
+import com.m57.hermescontrol.data.remote.HermesApi
 import com.m57.hermescontrol.data.ws.ConnectionBinding
 import com.m57.hermescontrol.data.ws.ConnectionStatus
 import com.m57.hermescontrol.data.ws.HermesWsClient
@@ -192,7 +192,7 @@ class FakeChatTransport : ChatTransport {
  * about HTTP get a working object.
  */
 class FakeChatApi(
-    override var hermesApi: HermesGatewayApi = mockk(relaxed = true),
+    override var hermesApi: HermesApi = mockk(relaxed = true),
 ) : ChatApi {
     override var selectedProfileId: String? = "profile-test"
 

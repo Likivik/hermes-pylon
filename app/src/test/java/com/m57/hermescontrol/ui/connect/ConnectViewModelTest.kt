@@ -3,10 +3,10 @@ package com.m57.hermescontrol.ui.connect
 import com.m57.hermescontrol.data.config.GatewayInstance
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.model.StatusResponse
-import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.CleartextPolicy
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.GatewayResponse
-import com.m57.hermescontrol.data.remote.HermesGatewayApi
+import com.m57.hermescontrol.data.remote.HermesApi
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.connect_error_401
@@ -39,7 +39,7 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class ConnectViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
-    private lateinit var mockApiService: HermesGatewayApi
+    private lateinit var mockApiService: HermesApi
     private lateinit var resolver: FakeStringResolver
 
     @Before
@@ -51,7 +51,7 @@ class ConnectViewModelTest {
         every { Dispatchers.Main } returns testMainDispatcher
 
         mockkObject(AuthManager)
-        mockkObject(ApiClient)
+        mockkObject(GatewayConnection)
         mockkStatic(android.util.Base64::class)
         mockkStatic(android.net.Uri::class)
 
@@ -60,9 +60,9 @@ class ConnectViewModelTest {
         every { android.net.Uri.parse(any()) } returns mockUri
 
         mockApiService = mockk()
-        every { ApiClient.hermesApi } returns mockApiService
-        every { ApiClient.tempService(any(), any()) } returns mockApiService
-        every { ApiClient.rebuild() } returns Unit
+        every { GatewayConnection.hermesApi } returns mockApiService
+        every { GatewayConnection.tempService(any(), any()) } returns mockApiService
+        every { GatewayConnection.rebuild() } returns Unit
 
         // Default AuthManager stubs
         every { AuthManager.getToken() } returns ""
@@ -282,7 +282,7 @@ class ConnectViewModelTest {
             verify { AuthManager.setBaseUrl("https://127.0.0.1:9119/") }
             verify { AuthManager.setSessionCookie(null) }
             verify { AuthManager.setWsAuthParam("token") }
-            verify { ApiClient.rebuild() }
+            verify { GatewayConnection.rebuild() }
 
             val state = viewModel.uiState.value
             assertFalse(state.isConnecting)
@@ -495,7 +495,7 @@ class ConnectViewModelTest {
             assertEquals("https://127.0.0.1:9119/", savedProfile.baseUrl)
             assertEquals("token", savedProfile.wsAuthParam)
             assertEquals(savedProfile.id, selectedGatewayId.captured)
-            verify { ApiClient.rebuild() }
+            verify { GatewayConnection.rebuild() }
 
             val state = viewModel.uiState.value
             assertTrue(state.connectionSuccess)

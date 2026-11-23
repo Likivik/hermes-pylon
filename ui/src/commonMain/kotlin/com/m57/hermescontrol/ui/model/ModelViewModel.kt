@@ -11,11 +11,11 @@ import com.m57.hermescontrol.data.model.ModelProvider
 import com.m57.hermescontrol.data.model.PinnedModel
 import com.m57.hermescontrol.data.model.ProfileInfo
 import com.m57.hermescontrol.data.model.UpdateProfileModelRequest
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
-import com.m57.hermescontrol.data.remote.source.ModelSource
-import com.m57.hermescontrol.data.remote.source.ModelSourceOf
+import com.m57.hermescontrol.data.remote.source.DefaultModels
+import com.m57.hermescontrol.data.remote.source.Models
 import com.m57.hermescontrol.ui.common.ToastHost
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.async
@@ -72,7 +72,7 @@ data class ModelUiState(
 
 class ModelViewModel(
     private val ioDispatcher: CoroutineDispatcher = AppEnvironment.current.io,
-    private val source: ModelSource = ModelSourceOf(ApiClient.hermesApi),
+    private val source: Models = DefaultModels(GatewayConnection.hermesApi),
 ) :
     ViewModel(),
         ToastHost {

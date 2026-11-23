@@ -12,11 +12,11 @@ import com.m57.hermescontrol.data.model.Skill
 import com.m57.hermescontrol.data.model.UpdateProfileDescriptionRequest
 import com.m57.hermescontrol.data.model.UpdateProfileModelRequest
 import com.m57.hermescontrol.data.model.UpdateProfileSoulRequest
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
-import com.m57.hermescontrol.data.remote.source.ProfilesSource
-import com.m57.hermescontrol.data.remote.source.ProfilesSourceOf
+import com.m57.hermescontrol.data.remote.source.DefaultProfiles
+import com.m57.hermescontrol.data.remote.source.Profiles
 import com.m57.hermescontrol.ui.common.ToastHost
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.async
@@ -51,7 +51,7 @@ data class ProfilesUiState(
 
 class ProfilesViewModel(
     private val ioDispatcher: CoroutineDispatcher = AppEnvironment.current.io,
-    private val source: ProfilesSource = ProfilesSourceOf(ApiClient.hermesApi),
+    private val source: Profiles = DefaultProfiles(GatewayConnection.hermesApi),
 ) :
     ViewModel(),
         ToastHost {
@@ -81,8 +81,8 @@ class ProfilesViewModel(
                         }
                         // First sight of the gateway: adopt the serving profile as the
                         // selection, so requests are scoped before the user picks anything.
-                        if (ApiClient.selectedProfileId == null) {
-                            ApiClient.setSelectedProfile(
+                        if (GatewayConnection.selectedProfileId == null) {
+                            GatewayConnection.setSelectedProfile(
                                 activeResult.data.current ?: activeResult.data.active,
                             )
                         }
@@ -151,7 +151,7 @@ class ProfilesViewModel(
 
                 is NetworkResult.Failure -> {
                     // The request never landed: put the app back where the user was.
-                    ApiClient.setSelectedProfile(previous)
+                    GatewayConnection.setSelectedProfile(previous)
                     _uiState.update {
                         it.copy(
                             activeProfileName = previous,

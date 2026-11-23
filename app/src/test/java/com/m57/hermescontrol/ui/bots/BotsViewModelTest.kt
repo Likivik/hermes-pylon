@@ -5,9 +5,9 @@ import com.m57.hermescontrol.data.model.CanonicalSessionInfo
 import com.m57.hermescontrol.data.model.ProfileInfo
 import com.m57.hermescontrol.data.model.ProfileWorkerSummary
 import com.m57.hermescontrol.data.model.ProfilesResponse
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.GatewayResponse
-import com.m57.hermescontrol.data.remote.HermesGatewayApi
+import com.m57.hermescontrol.data.remote.HermesApi
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -33,19 +33,19 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class BotsViewModelTest {
     private val dispatcher = StandardTestDispatcher()
-    private lateinit var api: HermesGatewayApi
+    private lateinit var api: HermesApi
 
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
-        mockkObject(ApiClient)
+        mockkObject(GatewayConnection)
         api = mockk(relaxed = true)
-        every { ApiClient.hermesApi } returns api
+        every { GatewayConnection.hermesApi } returns api
     }
 
     @After
     fun tearDown() {
-        unmockkObject(ApiClient)
+        unmockkObject(GatewayConnection)
         Dispatchers.resetMain()
     }
 

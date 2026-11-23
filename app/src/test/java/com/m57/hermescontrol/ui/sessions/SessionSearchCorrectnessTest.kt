@@ -7,9 +7,9 @@ import com.m57.hermescontrol.data.model.SessionLatestDescendantResponse
 import com.m57.hermescontrol.data.model.SessionListResponse
 import com.m57.hermescontrol.data.model.SessionSearchResponse
 import com.m57.hermescontrol.data.model.SessionSearchResult
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.GatewayResponse
-import com.m57.hermescontrol.data.remote.HermesGatewayApi
+import com.m57.hermescontrol.data.remote.HermesApi
 import com.m57.hermescontrol.ui.profiles.ProfileProvider
 import io.mockk.coEvery
 import io.mockk.every
@@ -35,14 +35,14 @@ import kotlin.coroutines.suspendCoroutine
 @OptIn(ExperimentalCoroutinesApi::class)
 class SessionSearchCorrectnessTest {
     private val dispatcher = StandardTestDispatcher()
-    private val api = mockk<HermesGatewayApi>(relaxed = true)
+    private val api = mockk<HermesApi>(relaxed = true)
 
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
-        mockkObject(AuthManager, ApiClient)
+        mockkObject(AuthManager, GatewayConnection)
         every { AuthManager.getSelectedProfileId() } returns "profile-a"
-        every { ApiClient.hermesApi } returns api
+        every { GatewayConnection.hermesApi } returns api
         coEvery { api.getSessions(any(), any(), any(), any(), any()) } returns
             GatewayResponse.success(SessionListResponse(emptyList()))
         coEvery { api.getSessionStats() } returns
@@ -151,21 +151,21 @@ class SessionSearchCorrectnessTest {
         vm.selectAll(setOf("a"))
         vm.confirmBulkDelete()
         dispatcher.scheduler.advanceUntilIdle()
-        every { ApiClient.hermesApi } returns mockk(relaxed = true)
+        every { GatewayConnection.hermesApi } returns mockk(relaxed = true)
         every { AuthManager.getSelectedProfileId() } returns "profile-b"
-        every { ApiClient.hermesApi } returns api
+        every { GatewayConnection.hermesApi } returns api
         vm.confirmBulkDelete()
         dispatcher.scheduler.advanceUntilIdle()
         first.resume(GatewayResponse.success(BulkDeleteResponse(ok = true, deleted = 1)))
         dispatcher.scheduler.advanceUntilIdle()
         assertTrue(vm.uiState.value.isDeletingBulk)
-        every { ApiClient.hermesApi } returns mockk(relaxed = true)
+        every { GatewayConnection.hermesApi } returns mockk(relaxed = true)
         second.resume(GatewayResponse.success(BulkDeleteResponse(ok = true, deleted = 1)))
         dispatcher.scheduler.advanceUntilIdle()
         assertFalse(vm.uiState.value.isDeletingBulk)
         assertEquals(setOf("a"), vm.uiState.value.selectedIds)
         assertNull(vm.uiState.value.toastMessage)
-        every { ApiClient.hermesApi } returns api
+        every { GatewayConnection.hermesApi } returns api
         every { AuthManager.getSelectedProfileId() } returns "profile-a"
     }
 
@@ -336,7 +336,7 @@ class SessionSearchCorrectnessTest {
     @Test
     fun `response from changed service or profile is discarded`() {
         for (changeService in listOf(false, true)) {
-            every { ApiClient.hermesApi } returns api
+            every { GatewayConnection.hermesApi } returns api
             every { AuthManager.getSelectedProfileId() } returns "profile-a"
             lateinit var stale: Continuation<GatewayResponse<SessionSearchResponse>>
             coEvery { api.searchSessions(any(), any(), any(), any()) } coAnswers {
@@ -346,7 +346,7 @@ class SessionSearchCorrectnessTest {
             vm.setSearchQuery("a")
             dispatcher.scheduler.advanceUntilIdle()
             if (changeService) {
-                every { ApiClient.hermesApi } returns mockk(relaxed = true)
+                every { GatewayConnection.hermesApi } returns mockk(relaxed = true)
             } else {
                 every { AuthManager.getSelectedProfileId() } returns "profile-b"
             }

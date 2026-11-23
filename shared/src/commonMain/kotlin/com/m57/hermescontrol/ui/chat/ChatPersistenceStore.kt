@@ -20,7 +20,7 @@ fun interface OperationRegistrationHook {
  * Storage reaches this through [ChatMessageStore], so the repository itself has no
  * idea whether messages land in Room, a file or memory.
  */
-open class ChatPersistenceRepository(
+open class ChatPersistenceStore(
     private val store: ChatMessageStore,
     private val operationRegistrationHook: OperationRegistrationHook,
 ) {

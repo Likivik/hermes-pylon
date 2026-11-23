@@ -7,9 +7,9 @@ import androidx.lifecycle.viewModelScope
 import com.m57.hermescontrol.data.model.ConfigSchemaResponse
 import com.m57.hermescontrol.data.model.RawConfigResponse
 import com.m57.hermescontrol.data.model.SchemaField
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.GatewayResponse
-import com.m57.hermescontrol.data.remote.HermesGatewayApi
+import com.m57.hermescontrol.data.remote.HermesApi
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -45,7 +45,7 @@ import java.util.concurrent.atomic.AtomicInteger
 @OptIn(ExperimentalCoroutinesApi::class)
 class ConfigViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()
-    private val mockApi = mockk<HermesGatewayApi>()
+    private val mockApi = mockk<HermesApi>()
     private lateinit var viewModelStore: ViewModelStore
     private val viewModelJobs = mutableListOf<Job>()
     private var viewModelKey = 0
@@ -56,8 +56,8 @@ class ConfigViewModelTest {
         viewModelJobs.clear()
         viewModelKey = 0
         Dispatchers.setMain(testDispatcher)
-        mockkObject(ApiClient)
-        every { ApiClient.hermesApi } returns mockApi
+        mockkObject(GatewayConnection)
+        every { GatewayConnection.hermesApi } returns mockApi
     }
 
     @After

@@ -69,7 +69,7 @@ class SessionRenameTest {
     private lateinit var fakeApi: FakeChatApi
     private lateinit var fakeRepo: FakeChatPersistenceRepository
     private lateinit var fakeSlashUsageStore: FakeSlashUsageStore
-    private lateinit var mockApi: com.m57.hermescontrol.data.remote.HermesGatewayApi
+    private lateinit var mockApi: com.m57.hermescontrol.data.remote.HermesApi
 
     /** Request id of the most recent session.resume send. */
     private var resumeRequestId = ""

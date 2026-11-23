@@ -14,11 +14,11 @@ import kotlinx.coroutines.flow.StateFlow
  * TLS pinning, token refresh) by building Ktor *on top of* it; desktop and wasm
  * build a plain Ktor client.
  */
-object ApiClient {
+object GatewayConnection {
     /** A built client together with the gateway that drives it. */
     private class Gateway(
         val client: HttpClient,
-        val api: HermesGatewayApi,
+        val api: HermesApi,
     )
 
     /**
@@ -88,8 +88,8 @@ object ApiClient {
         return resolved
     }
 
-    /** The current [HermesGatewayApi] instance. Lazily created on first access. */
-    val hermesApi: HermesGatewayApi
+    /** The current [HermesApi] instance. Lazily created on first access. */
+    val hermesApi: HermesApi
         get() = current.value.api
 
     /**
@@ -113,9 +113,9 @@ object ApiClient {
     fun tempService(
         baseUrl: String,
         token: String,
-    ): HermesGatewayApi {
+    ): HermesApi {
         val endpoint = ServerEndpoint.parseForBuild(baseUrl)
-        return HermesGatewayApi(
+        return HermesApi(
             createGatewayHttpClient(GatewayClientAuth.FixedBearer(token)),
             endpoint.baseUrl,
         )
@@ -138,6 +138,6 @@ object ApiClient {
         // so "forgot the parameter" is not a failure mode.
         val client = createGatewayHttpClient(GatewayClientAuth.SessionCredentials, profile)
         generation++
-        return Gateway(client, HermesGatewayApi(client, endpoint.baseUrl))
+        return Gateway(client, HermesApi(client, endpoint.baseUrl))
     }
 }

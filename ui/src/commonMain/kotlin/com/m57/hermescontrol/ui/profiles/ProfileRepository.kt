@@ -1,6 +1,6 @@
 package com.m57.hermescontrol.ui.profiles
 
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.util.HermesLog
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -15,7 +15,7 @@ import kotlin.time.TimeSource
  *
  * The value itself lives in the client, because the transport needs it to scope every request.
  * This class is the only thing allowed to change it — nothing else calls
- * [ApiClient.setSelectedProfile] — and it adds the one piece of state the client cannot own:
+ * [GatewayConnection.setSelectedProfile] — and it adds the one piece of state the client cannot own:
  * what the gateway process was last *observed* to serve.
  *
  * `current` is a snapshot, not a promise: it never follows a selection on its own, so the value
@@ -23,11 +23,11 @@ import kotlin.time.TimeSource
  */
 class ProfileRepository(
     /** Reads what the gateway process serves (`/api/profiles/active` → `current`). */
-    private val fetchServing: suspend () -> String? = { ApiClient.currentProfileName() },
+    private val fetchServing: suspend () -> String? = { GatewayConnection.currentProfileName() },
     /** Writes the selection; the client stores it because the transport scopes every request. */
-    private val apply: (String?) -> Unit = { ApiClient.setSelectedProfile(it) },
+    private val apply: (String?) -> Unit = { GatewayConnection.setSelectedProfile(it) },
     /** The selection as a value stream. */
-    selection: StateFlow<String?> = ApiClient.profileFlow,
+    selection: StateFlow<String?> = GatewayConnection.profileFlow,
     private val io: CoroutineDispatcher = Dispatchers.Default,
 ) {
     /** Timestamped because it is evidence, not truth; millis since this repository started. */

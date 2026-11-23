@@ -3,7 +3,7 @@ package com.m57.hermescontrol.ui.toolsets
 import com.m57.hermescontrol.data.model.Toolset
 import com.m57.hermescontrol.data.model.ToolsetToggleRequest
 import com.m57.hermescontrol.data.remote.GatewayResponse
-import com.m57.hermescontrol.data.remote.source.ToolsetsSource
+import com.m57.hermescontrol.data.remote.source.Toolsets
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -20,12 +20,12 @@ import org.junit.Test
 /**
  * The point of the `*Source` interfaces: this ViewModel can be driven with a fake.
  *
- * Note what is absent — no `mockkObject(ApiClient)`, no relaxed mock of a 150-method class. The screen names two
+ * Note what is absent — no `mockkObject(GatewayConnection)`, no relaxed mock of a 150-method class. The screen names two
  * calls, so the fake implements two. That is the whole testability argument for the gateway split; if this test
  * ever needs a mocked singleton to pass, the seam has been lost.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
-class ToolsetsSourceSeamTest {
+class ToolsetsSeamTest {
     private val testDispatcher = UnconfinedTestDispatcher()
 
     @Before
@@ -38,7 +38,7 @@ class ToolsetsSourceSeamTest {
         Dispatchers.resetMain()
     }
 
-    private class FakeToolsetsSource : ToolsetsSource {
+    private class FakeToolsetsSource : Toolsets {
         var loadCount = 0
         var toggled: Pair<String, Boolean>? = null
 

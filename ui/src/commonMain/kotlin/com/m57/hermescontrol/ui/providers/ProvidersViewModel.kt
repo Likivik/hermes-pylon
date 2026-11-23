@@ -6,12 +6,12 @@ import com.m57.hermescontrol.data.model.OAuthPollResponse
 import com.m57.hermescontrol.data.model.OAuthProvider
 import com.m57.hermescontrol.data.model.OAuthStartResponse
 import com.m57.hermescontrol.data.model.OAuthSubmitRequest
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.NetworkError
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
-import com.m57.hermescontrol.data.remote.source.ProvidersSource
-import com.m57.hermescontrol.data.remote.source.ProvidersSourceOf
+import com.m57.hermescontrol.data.remote.source.DefaultProviders
+import com.m57.hermescontrol.data.remote.source.Providers
 import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.ui.common.safeLaunchLoad
 import kotlinx.coroutines.Job
@@ -62,7 +62,7 @@ data class ProvidersUiState(
 )
 
 class ProvidersViewModel(
-    private val source: ProvidersSource = ProvidersSourceOf(ApiClient.hermesApi),
+    private val source: Providers = DefaultProviders(GatewayConnection.hermesApi),
 ) :
     ViewModel(),
         ToastHost {

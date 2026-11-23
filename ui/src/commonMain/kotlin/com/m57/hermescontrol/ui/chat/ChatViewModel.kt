@@ -153,7 +153,7 @@ class ChatViewModel(
     environment: ChatEnvironment,
     private val resolver: StringResolver,
     private val startCleanup: Boolean,
-    repo: ChatPersistenceRepository = ChatPersistenceRepository(environment.messageStore),
+    repo: ChatPersistenceStore = ChatPersistenceStore(environment.messageStore),
     slashUsageStore: SlashUsageStore = environment.slashUsageStore,
     searchDispatcher: kotlinx.coroutines.CoroutineDispatcher = kotlinx.coroutines.Dispatchers.Default,
     /**
@@ -228,7 +228,7 @@ class ChatViewModel(
     internal val approvalExpiry = ApprovalExpiryScheduler(viewModelScope)
 
     // ── Session persistence ──────────────────────────────────────────────
-    internal val repo: ChatPersistenceRepository = repo
+    internal val repo: ChatPersistenceStore = repo
     private val slashUsageStore: SlashUsageStore = slashUsageStore
     private val slashUsageProfileIds = selectedProfileIds.distinctUntilChanged()
     private val slashDispatcher = SlashCommandDispatcher()

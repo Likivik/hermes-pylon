@@ -1,16 +1,16 @@
 package com.m57.hermescontrol.ui.chat
 
-import com.m57.hermescontrol.data.remote.ApiClient
-import com.m57.hermescontrol.data.remote.HermesGatewayApi
+import com.m57.hermescontrol.data.remote.GatewayConnection
+import com.m57.hermescontrol.data.remote.HermesApi
 
 /**
  * The chat screen's view of the HTTP client, as a seam instead of a global.
  *
- * Same reason as [ChatTransport]: `ApiClient` is an `object`, so every test that touches it mocks a
+ * Same reason as [ChatTransport]: `GatewayConnection` is an `object`, so every test that touches it mocks a
  * static. This names the five members the chat screen uses.
  */
 interface ChatApi {
-    val hermesApi: HermesGatewayApi
+    val hermesApi: HermesApi
 
     val selectedProfileId: String?
 
@@ -28,18 +28,18 @@ interface ChatApi {
 
 /** Production adapter: the singleton, unchanged. */
 object DefaultChatApi : ChatApi {
-    override val hermesApi: HermesGatewayApi get() = ApiClient.hermesApi
+    override val hermesApi: HermesApi get() = GatewayConnection.hermesApi
 
-    override val selectedProfileId: String? get() = ApiClient.selectedProfileId
+    override val selectedProfileId: String? get() = GatewayConnection.selectedProfileId
 
-    override suspend fun currentProfileName(): String? = ApiClient.currentProfileName()
+    override suspend fun currentProfileName(): String? = GatewayConnection.currentProfileName()
 
     override suspend fun loginWithPassword(
         jsonBody: String,
         timeoutMillis: Long,
-    ): Int = ApiClient.hermesApi.loginWithPassword(jsonBody, timeoutMillis).code
+    ): Int = GatewayConnection.hermesApi.loginWithPassword(jsonBody, timeoutMillis).code
 
-    override fun setSelectedProfile(profile: String?) = ApiClient.setSelectedProfile(profile)
+    override fun setSelectedProfile(profile: String?) = GatewayConnection.setSelectedProfile(profile)
 
-    override fun clearSelectedProfile() = ApiClient.clearSelectedProfile()
+    override fun clearSelectedProfile() = GatewayConnection.clearSelectedProfile()
 }

@@ -79,7 +79,7 @@ import com.m57.hermescontrol.data.model.SessionLiveStatus
 import com.m57.hermescontrol.data.model.SessionSearchResult
 import com.m57.hermescontrol.data.model.SessionTreeItem
 import com.m57.hermescontrol.data.model.flattenSessionTree
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.action_cancel
 import com.m57.hermescontrol.generated.resources.action_delete
@@ -349,7 +349,7 @@ fun SessionsScreen(
             ) {
                 SessionsViewModel(
                     pinStore = AuthManagerSessionPinStore(gatewayInstanceId),
-                    profileProvider = ProfileProvider { ApiClient.currentProfileName() },
+                    profileProvider = ProfileProvider { GatewayConnection.currentProfileName() },
                 )
             }
     val state by screenViewModel.uiState.collectAsStateWithLifecycle()

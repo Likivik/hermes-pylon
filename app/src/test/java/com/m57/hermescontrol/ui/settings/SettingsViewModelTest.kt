@@ -4,7 +4,7 @@ package com.m57.hermescontrol.ui.settings
 
 import com.m57.hermescontrol.data.config.GatewayInstance
 import com.m57.hermescontrol.data.local.AuthManager
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.theme.ThemePreference
 import com.m57.hermescontrol.theme.ThemePreset
@@ -64,7 +64,7 @@ class SettingsViewModelTest {
         Dispatchers.setMain(testDispatcher)
 
         mockkObject(AuthManager)
-        mockkObject(ApiClient)
+        mockkObject(GatewayConnection)
 
         // Default stubs
         storedSelectedProfileId = null
@@ -107,8 +107,8 @@ class SettingsViewModelTest {
         every { AuthManager.setSessionCookie(any()) } returns Unit
         every { AuthManager.setWsAuthParam(any()) } returns Unit
 
-        // Ensure ApiClient.rebuild() is stubbed (used by selectGateway)
-        every { ApiClient.rebuild() } returns Unit
+        // Ensure GatewayConnection.rebuild() is stubbed (used by selectGateway)
+        every { GatewayConnection.rebuild() } returns Unit
     }
 
     @After
@@ -213,7 +213,7 @@ class SettingsViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         verify { AuthManager.setSelectedProfileId("prof-2") }
-        verify { ApiClient.rebuild() }
+        verify { GatewayConnection.rebuild() }
         verify { disconnectWebSocket() }
         verify { connectWebSocket() }
         assertEquals("prof-2", viewModel.uiState.value.selectedGatewayId)
@@ -231,7 +231,7 @@ class SettingsViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         verify { AuthManager.setSelectedProfileId(AuthManager.DEFAULT_PROFILE_ID) }
-        verify { ApiClient.rebuild() }
+        verify { GatewayConnection.rebuild() }
         assertEquals(AuthManager.DEFAULT_PROFILE_ID, viewModel.uiState.value.selectedGatewayId)
     }
 
@@ -247,7 +247,7 @@ class SettingsViewModelTest {
         verify { AuthManager.saveGatewayInstances(any()) }
         verify { AuthManager.setProfileToken("prof-1", null) }
         verify { AuthManager.setSelectedProfileId(AuthManager.DEFAULT_PROFILE_ID) }
-        verify { ApiClient.rebuild() }
+        verify { GatewayConnection.rebuild() }
         verify { disconnectWebSocket() }
         verify { connectWebSocket() }
     }
@@ -265,7 +265,7 @@ class SettingsViewModelTest {
         verify { AuthManager.setProfileToken("prof-2", null) }
         // Selected profile (prof-1) was NOT deleted — should NOT change selection
         verify(exactly = 0) { AuthManager.setSelectedProfileId(any()) }
-        verify { ApiClient.rebuild() }
+        verify { GatewayConnection.rebuild() }
         verify(exactly = 0) { disconnectWebSocket() }
         verify(exactly = 0) { connectWebSocket() }
     }
@@ -363,7 +363,7 @@ class SettingsViewModelTest {
                 "prof-1",
                 "",
             )
-            ApiClient.rebuild()
+            GatewayConnection.rebuild()
             connectWebSocket()
         }
     }
@@ -404,7 +404,7 @@ class SettingsViewModelTest {
                 "prof-1",
                 "new-token",
             )
-            ApiClient.rebuild()
+            GatewayConnection.rebuild()
             connectWebSocket()
         }
     }

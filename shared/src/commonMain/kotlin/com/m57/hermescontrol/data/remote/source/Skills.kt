@@ -14,9 +14,9 @@ import com.m57.hermescontrol.data.remote.GatewayResponse
  * What Skills needs from the gateway: 9 calls of the 150 it offers.
  *
  * Declared by the consumer, not by the gateway, so a fake for this screen implements 9 methods instead of
- * 150. `SkillsSourceOf` is the production adapter; tests pass their own implementation.
+ * 150. `DefaultSkills` is the production adapter; tests pass their own implementation.
  */
-interface SkillsSource {
+interface Skills {
     suspend fun getSkillContent(name: String): GatewayResponse<SkillContentResponse>
 
     suspend fun getSkills(): GatewayResponse<List<Skill>>

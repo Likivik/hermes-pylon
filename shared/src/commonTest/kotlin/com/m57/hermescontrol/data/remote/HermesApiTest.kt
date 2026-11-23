@@ -51,14 +51,14 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * Parity spec for [HermesGatewayApi] against the frozen Retrofit contract in
+ * Parity spec for [HermesApi] against the frozen Retrofit contract in
  * `HermesApiServiceTest` (which is never edited): same paths, same method, same
  * encoded body, same exception on malformed payloads.
  */
-class HermesGatewayApiTest {
+class HermesApiTest {
     private val baseUrl = ServerEndpoint.parse("https://gw.example/").baseUrl
 
-    private fun api(engine: MockEngine) = HermesGatewayApi(createHermesHttpClient(engine), baseUrl)
+    private fun api(engine: MockEngine) = HermesApi(createHermesHttpClient(engine), baseUrl)
 
     private fun jsonResponder(
         body: String,

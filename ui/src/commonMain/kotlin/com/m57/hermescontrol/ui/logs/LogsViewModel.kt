@@ -3,7 +3,7 @@ package com.m57.hermescontrol.ui.logs
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.m57.hermescontrol.AppEnvironment
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.safeApiCall
 import com.m57.hermescontrol.data.remote.source.LogsSource
 import com.m57.hermescontrol.data.remote.source.LogsSourceOf
@@ -42,7 +42,7 @@ data class LogsUiState(
 
 class LogsViewModel(
     private val ioDispatcher: CoroutineDispatcher = AppEnvironment.current.io,
-    private val source: LogsSource = LogsSourceOf(ApiClient.hermesApi),
+    private val source: LogsSource = LogsSourceOf(GatewayConnection.hermesApi),
 ) :
     ViewModel(),
         ToastHost {

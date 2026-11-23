@@ -6,7 +6,7 @@ import io.ktor.http.HttpHeaders
 import kotlinx.browser.window
 
 /**
- * Web side of the [ApiClient] seam.
+ * Web side of the [GatewayConnection] seam.
  *
  * The page's own origin is the gateway: requests must stay same-origin, because
  * the dev server is plain HTTP on loopback while a tailnet origin is HTTPS, and

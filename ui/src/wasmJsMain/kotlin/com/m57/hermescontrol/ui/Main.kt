@@ -27,7 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.ComposeViewport
 import com.m57.hermescontrol.data.model.StatusResponse
 import com.m57.hermescontrol.data.remote.CleartextPolicy
-import com.m57.hermescontrol.data.remote.HermesGatewayApi
+import com.m57.hermescontrol.data.remote.HermesApi
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.data.remote.createHermesHttpClient
 import com.m57.hermescontrol.data.theme.ThemePreference
@@ -415,7 +415,7 @@ private suspend fun fetchGatewayStatus(): GatewayStatusUi {
             return GatewayStatusUi.Failed("bad endpoint: ${e.message}")
         }
 
-    val api = HermesGatewayApi(createHermesHttpClient(), endpoint.baseUrl)
+    val api = HermesApi(createHermesHttpClient(), endpoint.baseUrl)
 
     return try {
         val response = api.getStatus()
@@ -482,7 +482,7 @@ private fun adoptVerifiedSession() {
         seedProfileForThisOrigin(manager, origin)
 
         com.m57.hermescontrol.data.local.AuthSessionState.markAuthenticated()
-        com.m57.hermescontrol.data.remote.ApiClient.rebuild()
+        com.m57.hermescontrol.data.remote.GatewayConnection.rebuild()
         com.m57.hermescontrol.data.ws.HermesWsClient.connect()
     }.onFailure {
         // Never silent: a failure here can leave the profile on token auth (or with no

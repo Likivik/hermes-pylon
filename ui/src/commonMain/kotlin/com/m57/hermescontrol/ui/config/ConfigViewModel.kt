@@ -7,11 +7,11 @@ import com.m57.hermescontrol.data.model.ConfigUpdateRequest
 import com.m57.hermescontrol.data.model.RawConfigResponse
 import com.m57.hermescontrol.data.model.SchemaField
 import com.m57.hermescontrol.data.model.UpdateRawConfigRequest
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
-import com.m57.hermescontrol.data.remote.source.ConfigSource
-import com.m57.hermescontrol.data.remote.source.ConfigSourceOf
+import com.m57.hermescontrol.data.remote.source.Config
+import com.m57.hermescontrol.data.remote.source.DefaultConfig
 import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.config_load_failed
 import com.m57.hermescontrol.generated.resources.config_load_yaml_failed
@@ -192,7 +192,7 @@ fun structuredRefreshAfterYamlSave(
     }
 
 class ConfigViewModel(
-    private val source: ConfigSource = ConfigSourceOf(ApiClient.hermesApi),
+    private val source: Config = DefaultConfig(GatewayConnection.hermesApi),
 ) :
     ViewModel(),
         ToastHost {

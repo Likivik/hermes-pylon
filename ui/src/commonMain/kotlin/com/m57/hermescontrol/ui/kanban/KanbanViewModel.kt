@@ -6,11 +6,11 @@ import com.m57.hermescontrol.AppEnvironment
 import com.m57.hermescontrol.data.model.KanbanBoard
 import com.m57.hermescontrol.data.model.KanbanColumn
 import com.m57.hermescontrol.data.model.KanbanTask
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
-import com.m57.hermescontrol.data.remote.source.KanbanSource
-import com.m57.hermescontrol.data.remote.source.KanbanSourceOf
+import com.m57.hermescontrol.data.remote.source.DefaultKanban
+import com.m57.hermescontrol.data.remote.source.Kanban
 import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.ui.common.safeLaunchLoad
 import kotlinx.coroutines.CoroutineDispatcher
@@ -34,7 +34,7 @@ data class KanbanUiState(
 
 class KanbanViewModel(
     private val ioDispatcher: CoroutineDispatcher = AppEnvironment.current.io,
-    private val source: KanbanSource = KanbanSourceOf(ApiClient.hermesApi),
+    private val source: Kanban = DefaultKanban(GatewayConnection.hermesApi),
 ) :
     ViewModel(),
         ToastHost {

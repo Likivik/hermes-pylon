@@ -7,11 +7,11 @@ import com.m57.hermescontrol.data.model.EnvVarConfig
 import com.m57.hermescontrol.data.model.EnvVarDeleteRequest
 import com.m57.hermescontrol.data.model.EnvVarRevealRequest
 import com.m57.hermescontrol.data.model.EnvVarUpdate
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
-import com.m57.hermescontrol.data.remote.source.KeysSource
-import com.m57.hermescontrol.data.remote.source.KeysSourceOf
+import com.m57.hermescontrol.data.remote.source.DefaultKeys
+import com.m57.hermescontrol.data.remote.source.Keys
 import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.ui.common.safeLaunchLoad
 import kotlinx.coroutines.CoroutineDispatcher
@@ -55,7 +55,7 @@ private val CATEGORY_ORDER =
 
 class KeysViewModel(
     private val ioDispatcher: CoroutineDispatcher = AppEnvironment.current.io,
-    private val source: KeysSource = KeysSourceOf(ApiClient.hermesApi),
+    private val source: Keys = DefaultKeys(GatewayConnection.hermesApi),
 ) :
     ViewModel(),
         ToastHost {

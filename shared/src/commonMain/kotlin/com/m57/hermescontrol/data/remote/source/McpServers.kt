@@ -15,9 +15,9 @@ import kotlinx.serialization.json.JsonObject
  * What McpServers needs from the gateway: 10 calls of the 150 it offers.
  *
  * Declared by the consumer, not by the gateway, so a fake for this screen implements 10 methods instead of
- * 150. `McpServersSourceOf` is the production adapter; tests pass their own implementation.
+ * 150. `DefaultMcpServers` is the production adapter; tests pass their own implementation.
  */
-interface McpServersSource {
+interface McpServers {
     suspend fun addMcpServer(body: AddMcpServerRequest): GatewayResponse<McpServer>
 
     suspend fun authMcpServer(name: String): GatewayResponse<McpOAuthFlowResponse>
