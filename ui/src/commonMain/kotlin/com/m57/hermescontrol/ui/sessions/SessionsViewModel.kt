@@ -12,6 +12,7 @@ import com.m57.hermescontrol.data.model.SessionLiveStatus
 import com.m57.hermescontrol.data.model.SessionRenameRequest
 import com.m57.hermescontrol.data.model.SessionSearchResult
 import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.HermesGatewayApi
 import com.m57.hermescontrol.data.remote.MutationRefusal
 import com.m57.hermescontrol.data.remote.NetworkError
 import com.m57.hermescontrol.data.remote.NetworkResult
@@ -109,7 +110,25 @@ class SessionsViewModel(
     private val deleteOperations = mutableMapOf<String, Long>()
     private var bulkDeleteOperation = 0L
 
+    /**
+     * True when the answer is for a connection that is no longer current.
+     *
+     * Three signals, any one of which is enough. The gateway instance is compared by identity because a replaced
+     * instance is a new connection; the generation is compared because a rebuild bumps it; the profile is compared
+     * because a switch means a different account. In production the first two always move together, so this is
+     * belt and braces on purpose — one missed signal means stale data reaches the screen.
+     */
+    private fun connectionMoved(
+        startedAt: Long,
+        apiAtStart: HermesGatewayApi?,
+        startedProfileId: String?,
+    ): Boolean =
+        apiAtStart !== ApiClient.hermesApi ||
+            startedAt != ApiClient.generation ||
+            startedProfileId != authStore.getSelectedProfileId()
+
     /** Fence pre-mutation pages and pin hydration, including cancellation-resistant calls. */
+
     private fun fencePendingSessionLoads() {
         loadGeneration += 1
         loadJob?.cancel()
@@ -340,6 +359,23 @@ class SessionsViewModel(
 
     private var searchJob: Job? = null
     private var searchGeneration = 0L
+
+    /**
+     * The connection a search was issued against, as [ApiClient.generation].
+     *
+     * Kept apart from [searchGeneration] on purpose: that one counts searches and fences the A -> B -> A
+     * race, this one names the client and the account. Mixing them destroyed both fences at once.
+     */
+    private var searchConnectionGeneration = -1L
+
+    /**
+     * The gateway instance the last search travelled on.
+     *
+     * Two signals for one question. A rebuild bumps [ApiClient.generation]; a replaced gateway instance is
+     * also a new connection. In production they always move together, but either one alone is enough to
+     * discard an answer, and the object comparison is what callers and tests exercise.
+     */
+    private var searchApi: HermesGatewayApi? = null
     private var searchProfileId: String? = null
     private val deletedSearchIds = mutableSetOf<String>()
 
@@ -355,8 +391,13 @@ class SessionsViewModel(
         // ApiClient.generation, and the answer that comes back belongs to the old client.
         val startedAt = ApiClient.generation
         val profileId = authStore.getSelectedProfileId()
-        val connectionChanged = searchGeneration != startedAt || searchProfileId != profileId
-        searchGeneration = startedAt
+        val apiNow = ApiClient.hermesApi
+        val connectionChanged =
+            searchApi !== apiNow ||
+                searchConnectionGeneration != startedAt ||
+                searchProfileId != profileId
+        searchApi = apiNow
+        searchConnectionGeneration = startedAt
         searchProfileId = profileId
         if (connectionChanged) deletedSearchIds.clear()
         searchJob?.cancel()
@@ -382,7 +423,7 @@ class SessionsViewModel(
         searchJob =
             viewModelScope.launch {
                 delay(SEARCH_DEBOUNCE_MS)
-                if (startedAt != ApiClient.generation || profileId != authStore.getSelectedProfileId()) {
+                if (connectionMoved(startedAt, apiNow, profileId)) {
                     if (generation == searchGeneration) {
                         _uiState.update {
                             it.copy(
@@ -406,7 +447,7 @@ class SessionsViewModel(
                     }
                 // #1186: query text alone cannot fence an A -> B -> A race.
                 if (generation != searchGeneration || _uiState.value.section != section) return@launch
-                if (startedAt != ApiClient.generation || profileId != authStore.getSelectedProfileId()) {
+                if (connectionMoved(startedAt, apiNow, profileId)) {
                     _uiState.update {
                         it.copy(
                             isSearching = false,
@@ -515,6 +556,7 @@ class SessionsViewModel(
             return
         }
         val startedAt = ApiClient.generation
+        val apiNow = ApiClient.hermesApi
         val profileId = authStore.getSelectedProfileId()
         viewModelScope.launch {
             val row = _uiState.value.sessions.firstOrNull { it.id == sessionId }
@@ -540,7 +582,7 @@ class SessionsViewModel(
                             ),
                     )
                 }
-            if (startedAt != ApiClient.generation || profileId != authStore.getSelectedProfileId()) return@launch
+            if (connectionMoved(startedAt, apiNow, profileId)) return@launch
             when (result) {
                 is NetworkResult.Success -> {
                     fencePendingSessionLoads()
@@ -591,6 +633,7 @@ class SessionsViewModel(
             )
         }
         val startedAt = ApiClient.generation
+        val apiNow = ApiClient.hermesApi
         val profileId = authStore.getSelectedProfileId()
         viewModelScope.launch {
             val row = _uiState.value.sessions.firstOrNull { it.id == sessionId }
@@ -613,7 +656,7 @@ class SessionsViewModel(
                 }
             if (deleteOperations[sessionId] != operation) return@launch
             deleteOperations.remove(sessionId)
-            if (startedAt != ApiClient.generation || profileId != authStore.getSelectedProfileId()) {
+            if (connectionMoved(startedAt, apiNow, profileId)) {
                 _uiState.update { it.copy(deletingSessionIds = it.deletingSessionIds - sessionId) }
                 return@launch
             }
@@ -772,6 +815,7 @@ class SessionsViewModel(
 
         _uiState.update { it.copy(showBulkDeleteConfirm = false, isDeletingBulk = true) }
         val startedAt = ApiClient.generation
+        val apiNow = ApiClient.hermesApi
         val profileId = authStore.getSelectedProfileId()
         viewModelScope.launch {
             val profile = requireProfile()
@@ -786,7 +830,7 @@ class SessionsViewModel(
                     )
                 }
             if (bulkDeleteOperation != operation) return@launch
-            if (startedAt != ApiClient.generation || profileId != authStore.getSelectedProfileId()) {
+            if (connectionMoved(startedAt, apiNow, profileId)) {
                 _uiState.update { it.copy(isDeletingBulk = false) }
                 return@launch
             }
