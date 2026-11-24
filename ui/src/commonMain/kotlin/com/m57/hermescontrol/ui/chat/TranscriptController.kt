@@ -135,6 +135,13 @@ internal class TranscriptController(
                     state.copy(transcript = state.transcript.copy(isLoadingOlder = false))
                 }
 
+            ChatHistoryUpdate.OlderSeamBroken ->
+                updateState { state ->
+                    state.copy(
+                        transcript = TranscriptReducer.reduce(state.transcript, TranscriptIntent.OlderSeamBroken),
+                    )
+                }
+
             // Not the transcript's slice.
             is ChatHistoryUpdate.MessageCountKnown -> Unit
             ChatHistoryUpdate.LoadFinished -> Unit

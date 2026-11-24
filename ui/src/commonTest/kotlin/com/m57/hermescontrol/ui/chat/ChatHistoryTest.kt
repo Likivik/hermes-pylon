@@ -32,6 +32,179 @@ class ChatHistoryTest {
         pagination = SessionMessagePagination(offset = offset, returned = count),
     )
 
+    /**
+     * Timestamp is pinned: `ChatMessage.timestamp` defaults to `nowMillis()`, so two fixtures standing for the
+     * same row would otherwise carry different timestamps and fail the seam for the wrong reason.
+     */
+    private fun msg(id: String) = ChatMessage(id = id, role = MessageRole.USER, content = "c-$id", timestamp = 1_000L)
+
+    @Test
+    fun aPageThatDoesNotJoinIsRefusedAndNeverPersisted() =
+        runTest {
+            val updates = mutableListOf<ChatHistoryUpdate>()
+            var persisted = 0
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val history =
+                ChatHistory(
+                    io = dispatcher,
+                    launch = { block -> launch { block() } },
+                    fetchPage = { _, _, _, _ -> NetworkResult.Success(page(offset = 150)) },
+                    mapMessages = { _, _, _, _ -> listOf(msg("f1"), msg("f2"), msg("h9"), msg("h8")) },
+                    persist = { _, _, _, _ ->
+                        persisted++
+                        true
+                    },
+                    captureFence = { fence() },
+                    readMessages = { listOf(msg("h1"), msg("h2"), msg("h3")) },
+                    write = { updates += it },
+                )
+
+            history.loadOlder(
+                sessionId = "s-1",
+                hasOlderMessages = true,
+                isLoadingOlder = false,
+                latestPaging = true,
+                loadedOffset = 0,
+                pageSize = 150,
+            )
+            advanceUntilIdle()
+
+            assertTrue(updates.contains(ChatHistoryUpdate.OlderSeamBroken))
+            assertTrue(
+                updates.filterIsInstance<ChatHistoryUpdate.OlderLoaded>().isEmpty(),
+                "two unrelated ranges must never be spliced into one transcript",
+            )
+            assertEquals(0, persisted, "a page that does not join must never become durable")
+        }
+
+    @Test
+    fun aVerifiedSeamDropsTheRepeatedRowsItAlreadyHad() =
+        runTest {
+            val updates = mutableListOf<ChatHistoryUpdate>()
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val history =
+                ChatHistory(
+                    io = dispatcher,
+                    launch = { block -> launch { block() } },
+                    fetchPage = { _, _, _, _ -> NetworkResult.Success(page(offset = 150)) },
+                    mapMessages = { _, _, _, _ -> listOf(msg("f1"), msg("f2"), msg("h1"), msg("h2"), msg("h3")) },
+                    persist = { _, _, _, _ -> true },
+                    captureFence = { fence() },
+                    readMessages = { listOf(msg("h1"), msg("h2"), msg("h3")) },
+                    write = { updates += it },
+                )
+
+            history.loadOlder(
+                sessionId = "s-1",
+                hasOlderMessages = true,
+                isLoadingOlder = false,
+                latestPaging = true,
+                loadedOffset = 0,
+                pageSize = 150,
+            )
+            advanceUntilIdle()
+
+            val loaded = updates.filterIsInstance<ChatHistoryUpdate.OlderLoaded>().single()
+            assertEquals(
+                listOf("f1", "f2"),
+                loaded.older.map { it.id },
+                "the three rows we already hold must not be shown twice",
+            )
+        }
+
+    @Test
+    fun aBrokenSeamIsReanchoredWithAWiderViewRatherThanGivenUpOn() =
+        runTest {
+            val updates = mutableListOf<ChatHistoryUpdate>()
+            val held = (1..12).map { msg("h$it") }
+            var fetches = 0
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val history =
+                ChatHistory(
+                    io = dispatcher,
+                    launch = { block -> launch { block() } },
+                    fetchPage = { _, _, _, _ ->
+                        fetches++
+                        NetworkResult.Success(page(offset = 150))
+                    },
+                    mapMessages = {
+                            _,
+                            _,
+                            _,
+                            _,
+                        ->
+                        // First attempt: the window has shifted, so nothing joins. Second: the wider view
+                        // now covers the seam, and the tail repeats exactly what we hold.
+                        if (fetches == 1) {
+                            listOf(msg("a1"), msg("a2"), msg("q1"), msg("q2"), msg("q3"))
+                        } else {
+                            listOf(msg("a1"), msg("a2")) + held
+                        }
+                    },
+                    persist = { _, _, _, _ -> true },
+                    captureFence = { fence() },
+                    readMessages = { held },
+                    write = { updates += it },
+                )
+
+            history.loadOlder(
+                sessionId = "s-1",
+                hasOlderMessages = true,
+                isLoadingOlder = false,
+                latestPaging = true,
+                loadedOffset = 0,
+                pageSize = 150,
+                seamRetries = 2,
+            )
+            advanceUntilIdle()
+
+            assertEquals(2, fetches, "the first view missed the seam; the wider one found it")
+            val loaded = updates.filterIsInstance<ChatHistoryUpdate.OlderLoaded>().single()
+            assertEquals(listOf("a1", "a2"), loaded.older.map { it.id })
+        }
+
+    @Test
+    fun aSeamThatNeverJoinsIsReportedBrokenAtTheCap() =
+        runTest {
+            val updates = mutableListOf<ChatHistoryUpdate>()
+            val held = (1..12).map { msg("h$it") }
+            var fetches = 0
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val history =
+                ChatHistory(
+                    io = dispatcher,
+                    launch = { block -> launch { block() } },
+                    fetchPage = { _, _, _, _ ->
+                        fetches++
+                        NetworkResult.Success(page(offset = 150))
+                    },
+                    mapMessages = { _, _, _, _ -> listOf(msg("q1"), msg("q2"), msg("q3")) },
+                    persist = { _, _, _, _ -> true },
+                    captureFence = { fence() },
+                    readMessages = { held },
+                    write = { updates += it },
+                )
+
+            history.loadOlder(
+                sessionId = "s-1",
+                hasOlderMessages = true,
+                isLoadingOlder = false,
+                latestPaging = true,
+                loadedOffset = 0,
+                pageSize = 150,
+                seamRetries = 2,
+            )
+            advanceUntilIdle()
+
+            assertEquals(
+                3,
+                fetches,
+                "one attempt per seam width, then stop: retrying forever would spin on a broken window",
+            )
+            assertTrue(updates.contains(ChatHistoryUpdate.OlderSeamBroken))
+            assertTrue(updates.filterIsInstance<ChatHistoryUpdate.OlderLoaded>().isEmpty())
+        }
+
     @Test
     fun aCompletedLoadWritesStartedThenLoadedThenFinished() =
         runTest {

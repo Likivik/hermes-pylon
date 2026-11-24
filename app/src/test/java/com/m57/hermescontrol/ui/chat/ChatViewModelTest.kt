@@ -3781,9 +3781,12 @@ class ChatViewModelTest {
                 listOf("Archived turn", "Recent turn", "Recent reply"),
                 viewModel.uiState.value.messages.map { it.content },
             )
+            // Identity is content-derived, never the rowid: this fixture carries no `message_uid`, so the
+            // id must be the row's own fingerprint rather than `rest-session-root-<rowid>`, which moves.
+            val first = viewModel.uiState.value.messages.first()
             assertEquals(
-                "rest-session-root-2686",
-                viewModel.uiState.value.messages.first().id,
+                messageRowFingerprint("session-root", first.role, first.timestamp, first.content),
+                first.id,
             )
             assertFalse(viewModel.uiState.value.hasOlderMessages)
         }

@@ -212,14 +212,6 @@ kotlin {
                 // backends (WebLocalStorage / WebOpfsStorage).
                 api(libs.androidx.datastore.core)
                 api(libs.androidx.datastore.core.okio)
-                // Paging 3 over the chat history. 3.4.0+ publishes `paging-common`
-                // and `paging-compose` for every target this module builds
-                // (android, jvm desktop, wasmJs), so this resolves on all three.
-                // The Android-only artifacts (`paging-runtime`, `paging-guava`,
-                // `paging-rxjava*`) are not used — `paging-common` is the portable
-                // half and `paging-compose` is its Compose Multiplatform pair.
-                api(libs.androidx.paging.common)
-                api(libs.androidx.paging.compose)
                 // Navigation 3 on every target: the JetBrains KMP build. Google's
                 // `androidx.navigation3` artifacts are Android-only and carry the
                 // same packages, so both cannot be on the classpath at once.

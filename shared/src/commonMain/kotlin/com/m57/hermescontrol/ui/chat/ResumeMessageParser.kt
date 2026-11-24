@@ -19,6 +19,7 @@ fun parseResumeMessages(
     nowMillis: Long,
 ): List<ChatMessage> {
     return collapseDuplicateRows(
+        sessionId,
         raw.mapIndexedNotNull { index, item ->
             val message =
                 item as? Map<*, *> ?: return@mapIndexedNotNull null
