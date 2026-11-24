@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-API = ROOT / "shared/src/commonMain/kotlin/com/m57/hermescontrol/data/remote/HermesGatewayApi.kt"
+API = ROOT / "shared/src/commonMain/kotlin/com/m57/hermescontrol/data/remote/HermesApi.kt"
 INVENTORY = ROOT / "tools/route_scopes.json"
 
 # Path helpers that build the prefix of a request path. Keep this list short and reviewed:
@@ -27,6 +27,23 @@ INVENTORY = ROOT / "tools/route_scopes.json"
 HELPERS = {
     "sessionPath": "api/sessions/{}",
 }
+
+# `api/` route literals are not confined to the one interface any more. They live across the
+# shared layer, the websocket client and the UI view models. Reading a single file left the rest
+# unguarded, which is how callers escaped this check when the interface was split up.
+CLIENT_ROOTS = (ROOT / "shared/src", ROOT / "ui/src")
+
+
+def client_sources() -> list[Path]:
+    """Every production file that may hold an `api/` route literal."""
+    if not API.is_relative_to(ROOT):
+        return [API]
+    found = {API}
+    for root in CLIENT_ROOTS:
+        for path in root.rglob("*.kt"):
+            if "Test" not in path.name:
+                found.add(path)
+    return sorted(found)
 
 
 def normalise(path: str) -> str:
@@ -131,9 +148,14 @@ def main() -> int:
         return 2
     routes = json.loads(INVENTORY.read_text())["routes"]
     known = inventory_paths(routes)
-    called = client_paths(API.read_text())
     sources = sorted((ROOT / "shared/src/commonMain").rglob("*.kt"))
-    return report(called - known, called, body_scopes(API.read_text(), routes, sources))
+    called: set[str] = set()
+    unscoped: set[str] = set()
+    for path in client_sources():
+        text = path.read_text()
+        called |= client_paths(text)
+        unscoped |= body_scopes(text, routes, sources)
+    return report(called - known, called, unscoped)
 
 
 if __name__ == "__main__":

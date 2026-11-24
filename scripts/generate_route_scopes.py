@@ -11,6 +11,7 @@ are not in `web_routers`; they are classified by hand after a probe (an unknown 
 from __future__ import annotations
 
 import glob
+import hashlib
 import json
 import os
 import re
@@ -66,14 +67,23 @@ def classify(source: str, start: int) -> str:
     return "none"
 
 
+def route_dirs(hermes_cli: Path) -> tuple[Path, ...]:
+    """Directories that own gateway routes."""
+    return (hermes_cli / "web_routers", hermes_cli / "dashboard_auth")
+
+
 def collect(hermes_cli: Path) -> list[dict]:
+    # Two directories own gateway routes: `web_routers/` and `dashboard_auth/` (the websocket
+    # ticket lives in the latter). Scanning only the first left real routes invisible to the guard.
+    # `.websocket(...)` is included because a websocket handshake is a route the client dials.
     routes: list[dict] = []
-    for path in sorted(glob.glob(str(hermes_cli / "web_routers" / "*.py"))):
+    for directory in route_dirs(hermes_cli):
+      for path in sorted(glob.glob(str(directory / "*.py"))):
         source = Path(path).read_text()
-        for match in re.finditer(r'@(\w+)\.(get|post|put|patch|delete)\("([^"]+)"\)', source):
+        for match in re.finditer(r'@(\w+)\.(get|post|put|patch|delete|websocket)\("([^"]+)"[^)]*\)', source):
             routes.append(
                 {
-                    "method": match.group(2).upper(),
+                    "method": "WEBSOCKET" if match.group(2) == "websocket" else match.group(2).upper(),
                     "path": match.group(3),
                     "scope": classify(source, match.end()),
                     "file": os.path.basename(path),
@@ -97,7 +107,16 @@ def main(argv: list[str]) -> int:
     for route in routes:
         merged[(route["path"], route["method"])] = route
     ordered = sorted(merged.values(), key=lambda r: (r["path"], r["method"]))
-    OUT.write_text(json.dumps({"gateway": argv[1], "routes": ordered}, indent=1) + "\n")
+    # Provenance: which gateway source produced this inventory, so drift is detectable instead
+    # of silent. A regenerated file that changes nothing still records what it was built from.
+    generated_from = {
+        os.path.relpath(str(f), str(hermes_cli)): hashlib.sha256(f.read_bytes()).hexdigest()[:16]
+        for d in route_dirs(hermes_cli)
+        for f in sorted(d.glob("*.py"))
+    }
+    OUT.write_text(json.dumps(
+        {"gateway": argv[1], "generated_from": generated_from, "routes": ordered},
+        indent=1) + "\n")
     print(f"wrote {len(ordered)} routes to {OUT}")
     return 0
 
