@@ -1042,7 +1042,6 @@ class ChatViewModel(
             activeCacheMessageIds = { activeCacheMessageIds },
             readMessages = { uiStateMutable.value.messages },
             retireCacheLoad = { retireCacheLoad() },
-            serverMessageIndex = { id, sessionId -> serverMessageIndex(id, sessionId) },
             restoredTodos = { todos, messages -> restoredTodos(todos, messages) },
             nowMs = { nowMs() },
             pageSize = MESSAGE_PAGE_SIZE,
@@ -2495,7 +2494,7 @@ class ChatViewModel(
             isAgentTyping = state.isAgentTyping,
             isStreaming = streamingStateMutable.value.streamingMessage != null,
             latestPaging = latestPaging,
-            serverIndexes = state.messages.mapNotNull { serverMessageIndex(it.id, sessionId) },
+            serverIndexes = state.messages.mapNotNull { (it.origin as? MessageOrigin.Rest)?.serverIndex },
             loadedOffset = loadedMessageOffset,
             pageSize = MESSAGE_PAGE_SIZE,
         )
@@ -2546,7 +2545,7 @@ class ChatViewModel(
             val hasTranscript =
                 !replaceExisting &&
                     state.messages.any { message ->
-                        serverMessageIndex(message.id, sessionId) != null ||
+                        message.origin is MessageOrigin.Rest ||
                             message.role != MessageRole.SYSTEM
                     }
             if (hasTranscript) {
@@ -2567,7 +2566,7 @@ class ChatViewModel(
         }
         val hasResumeHistory =
             uiStateMutable.value.messages.any {
-                it.id.startsWith("resume-$sessionId-")
+                it.origin is MessageOrigin.Resume
             }
         if (hasResumeHistory) {
             loadedMessageOffset = 0
@@ -2731,11 +2730,6 @@ class ChatViewModel(
             )
         }
     }
-
-    private fun serverMessageIndex(
-        id: String,
-        sessionId: String,
-    ): Int? = id.removePrefix("rest-$sessionId-").takeIf { it != id }?.toIntOrNull()
 
     // ── UI actions ───────────────────────────────────────────────────────
 

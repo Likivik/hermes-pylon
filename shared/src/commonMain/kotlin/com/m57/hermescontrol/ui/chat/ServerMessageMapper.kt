@@ -62,13 +62,15 @@ object ServerMessageMapper {
                     else -> MessageRole.ASSISTANT
                 }
             val globalIndex = offset + index
+            // The handle this row carries in the source's own ordering. It is deliberately not the identity:
+            // with `useLatestPaging` off it is a list offset, which shifts the moment an older page prepends.
+            val serverIndex = if (useLatestPaging) msg.id ?: globalIndex else globalIndex
+            // Identity is the store's own `message_uid`, which does not move across reads. Without one we degrade
+            // to the best handle that is left: the rowid, then the offset as an absolute last resort. The offset is
+            // the worst of the three — it shifts the moment an older page prepends.
             val id =
-                if (useLatestPaging) {
-                    msg.id?.let { "rest-$sessionId-$it" }
-                        ?: "rest-$sessionId-$globalIndex"
-                } else {
-                    "rest-$sessionId-$globalIndex"
-                }
+                msg.messageUid
+                    ?: "rest-$sessionId-${msg.id ?: globalIndex}"
             val content = msg.contentText
             val roleAndContent = role to content
             val preservedReasoning =
@@ -111,6 +113,7 @@ object ServerMessageMapper {
             }
             ChatMessage(
                 id = id,
+                origin = MessageOrigin.Rest(serverIndex),
                 role = role,
                 content = finalContent,
                 reasoningText = reasoning,
