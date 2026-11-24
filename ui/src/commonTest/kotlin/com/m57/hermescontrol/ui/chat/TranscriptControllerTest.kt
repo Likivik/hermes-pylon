@@ -26,9 +26,6 @@ class TranscriptControllerTest {
                 activeCacheMessageIds = { emptySet() },
                 readMessages = { emptyList() },
                 retireCacheLoad = { retireCalls += 1 },
-                serverMessageIndex = { id, sessionId ->
-                    id.removePrefix("rest-$sessionId-").takeIf { it != id }?.toIntOrNull()
-                },
                 restoredTodos = { current, messages -> messages.mapNotNull { null }.ifEmpty { current } },
                 nowMs = { 1_000L },
                 pageSize = 150,

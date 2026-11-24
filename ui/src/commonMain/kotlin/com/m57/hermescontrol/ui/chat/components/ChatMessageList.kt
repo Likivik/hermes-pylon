@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -24,6 +25,7 @@ import com.m57.hermescontrol.ui.chat.ChatMessage
 import com.m57.hermescontrol.ui.chat.ClarifyUi
 import com.m57.hermescontrol.ui.chat.ImageViewerModel
 import com.m57.hermescontrol.ui.chat.MessageRole
+import com.m57.hermescontrol.ui.chat.messageRowKeys
 import com.m57.hermescontrol.ui.common.EmptyState
 import org.jetbrains.compose.resources.stringResource
 
@@ -88,6 +90,8 @@ fun ChatMessageList(
             )
         }
     } else {
+        // Row identity must survive a re-read: `message.id` carries the server rowid, which moves.
+        val rowKeys = remember(messages) { messageRowKeys(messages) }
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
@@ -105,7 +109,7 @@ fun ChatMessageList(
             }
             itemsIndexed(
                 items = messages,
-                key = { _, message -> message.id },
+                key = { index, _ -> rowKeys[index] },
                 contentType = { _, message -> chatMessageContentType(message) },
             ) { index, message ->
                 val isCurrentMatch =

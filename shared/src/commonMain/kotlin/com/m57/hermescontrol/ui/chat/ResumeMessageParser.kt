@@ -68,8 +68,14 @@ fun parseResumeMessages(
                         source = AttachmentSource.GATEWAY,
                     )
                 }.takeIf { it.isNotEmpty() }
+        val rowId =
+            (message["row_id"] as? Number)?.toLong()
+                ?: (message["row_id"] as? String)?.toLongOrNull()
         ChatMessage(
-            id = "resume-$sessionId-$index",
+            // Identity follows the durable handle the resume ack carries. The index is a last resort for a
+            // payload without `row_id`: it is positional, so it shifts whenever the payload's row set changes.
+            id = rowId?.let { "$sessionId-row-$it" } ?: "resume-$sessionId-$index",
+            origin = MessageOrigin.Resume(rowId),
             role = role,
             content =
                 if (mediaItems.isEmpty()) {

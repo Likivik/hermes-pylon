@@ -6,14 +6,13 @@ package com.m57.hermescontrol.ui.chat
 fun mergeSyncedMessages(
     current: List<ChatMessage>,
     incoming: List<ChatMessage>,
-    isServerMessage: (String) -> Boolean,
 ): List<ChatMessage> {
     val unmatchedIncoming = incoming.toMutableList()
     val merged = mutableListOf<ChatMessage>()
     val localRunningToolCounts =
         current
             .filter {
-                !isServerMessage(it.id) &&
+                it.origin !is MessageOrigin.Rest &&
                     it.role == MessageRole.TOOL &&
                     it.toolStatus == ToolStatus.RUNNING &&
                     it.toolName != null
@@ -27,7 +26,7 @@ fun mergeSyncedMessages(
 
     for (existing in current) {
         val matchIndex =
-            if (isServerMessage(existing.id)) {
+            if (existing.origin is MessageOrigin.Rest) {
                 unmatchedIncoming.indexOfFirst { it.id == existing.id }
             } else {
                 unmatchedIncoming.indexOfFirst { candidate ->

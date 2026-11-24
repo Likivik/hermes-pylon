@@ -51,20 +51,38 @@ class ServerMessageMapperTest {
     }
 
     @Test
-    fun `ids come from the offset when not latest paging`() {
+    fun `the identity follows the store's own message uid`() {
+        val out = map(listOf(SessionMessage(id = 9, role = "user", content = "a", messageUid = "mu-7")))
+        assertEquals("mu-7", out.single().id)
+    }
+
+    @Test
+    fun `a payload with no message uid degrades to the rowid`() {
         val out = map(listOf(SessionMessage(id = 9, role = "user", content = "a")), offset = 5)
+        assertEquals("rest-s1-9", out.single().id)
+    }
+
+    @Test
+    fun `a payload with neither uid nor rowid falls back to the offset`() {
+        val out = map(listOf(SessionMessage(id = null, role = "user", content = "a")), offset = 5)
         assertEquals("rest-s1-5", out.single().id)
     }
 
     @Test
-    fun `ids prefer the server id when latest paging`() {
+    fun `the server index is the offset when not latest paging`() {
+        val out = map(listOf(SessionMessage(id = 9, role = "user", content = "a")), offset = 5)
+        assertEquals(MessageOrigin.Rest(5), out.single().origin)
+    }
+
+    @Test
+    fun `the server index prefers the server id when latest paging`() {
         val out =
             map(
                 listOf(SessionMessage(id = 9, role = "user", content = "a")),
                 offset = 5,
                 useLatestPaging = true,
             )
-        assertEquals("rest-s1-9", out.single().id)
+        assertEquals(MessageOrigin.Rest(9), out.single().origin)
     }
 
     @Test

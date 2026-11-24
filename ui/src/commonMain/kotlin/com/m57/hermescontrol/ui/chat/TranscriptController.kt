@@ -23,8 +23,6 @@ internal class TranscriptController(
     private val readMessages: () -> List<ChatMessage>,
     /** Ends the cache load. Returns nothing; what it held is read before this is called. */
     private val retireCacheLoad: () -> Unit,
-    /** The server index a restored message id carries, or `null` when it is not a restored one. */
-    private val serverMessageIndex: (String, String) -> Int?,
     /** Todos recovered from the transcript, falling back to what is already there. */
     private val restoredTodos: (List<TodoItem>, List<ChatMessage>) -> List<TodoItem>,
     /** The clock, so a failure can be stamped without the controller owning time. */
@@ -78,7 +76,7 @@ internal class TranscriptController(
                 retireCacheLoad()
                 setLatestPaging(update.useLatestPaging)
                 updateState { state ->
-                    val hasResumeHistory = state.messages.any { it.id.startsWith("resume-${update.sessionId}-") }
+                    val hasResumeHistory = state.messages.any { it.origin is MessageOrigin.Resume }
                     state.copy(
                         transcript =
                             TranscriptReducer.reduce(
@@ -97,7 +95,7 @@ internal class TranscriptController(
                     )
                 }
                 val hasRestHistory =
-                    readMessages().any { serverMessageIndex(it.id, update.sessionId) != null }
+                    readMessages().any { it.origin is MessageOrigin.Rest }
                 if (update.messages.isNotEmpty() && hasRestHistory) setMessageOffset(update.offset)
             }
 
@@ -118,7 +116,6 @@ internal class TranscriptController(
                         mergeSyncedMessages(
                             current = current.messages,
                             incoming = update.incoming,
-                            isServerMessage = { id -> serverMessageIndex(id, update.sessionId) != null },
                         )
                     if (sameTranscript(current.messages, merged)) {
                         current
