@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Serve the built app, and proxy the API, auth and the websocket to the dashboard.
+"""Serve the built app, and proxy the API, auth and the websocket to the gateway.
+
+This is the one server for local previews and for the test pod alike. There is deliberately no
+second implementation of the same job.
 
 Why this exists: a bare `http.server` can serve the bundle but the app then dials its own
 origin for `/api` and `/ws`, finds nothing, and sits in "Reconnecting…" — so no browser test
@@ -9,16 +12,26 @@ deployment: static files from the dist, everything else forwarded.
 Environment:
   DIST_ROOT            directory holding index.html and the wasm bundle (default /srv)
   PYLON_PROXY_TARGET   upstream origin, e.g. http://127.0.0.1:9119
+  PORT                 listen port (default 8080)
+  BIND                 listen address (default 127.0.0.1)
+  PROXY_LOG            optional path for one JSON line per request
+
+This server is deliberately host-agnostic: it binds localhost and is configured only by
+environment variables. How localhost reaches a phone or another machine — tailscale serve,
+an SSH tunnel, a LAN bind — is the caller's business, never this file's.
 """
 
 from __future__ import annotations
 
 import http.server
+import json
 import os
+import re
 import socket
 import socketserver
 import sys
 import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -27,9 +40,15 @@ DIST_ROOT = os.environ.get("DIST_ROOT", "/srv")
 TARGET = urllib.parse.urlsplit(os.environ.get("PYLON_PROXY_TARGET", "http://127.0.0.1:9119"))
 TARGET_HOST = TARGET.hostname or "127.0.0.1"
 TARGET_PORT = TARGET.port or 80
+BIND = os.environ.get("BIND", "127.0.0.1")
+PROXY_LOG = os.environ.get("PROXY_LOG") or None
+_LOG_LOCK = threading.Lock()
 
-# Paths the app expects to reach the backend on its own origin.
-PROXY_PREFIXES = ("/api", "/auth", "/ws", "/webhook", "/dashboard")
+# Paths the app expects to reach the backend on its own origin. Measured from the built bundle:
+# the app calls `api/dashboard/...` (covered by /api), `/auth/...`, `/ws` and `/webhook` (25 refs).
+# The bare `/dashboard` prefix is NOT used by the app and is not listed: it only ever answered
+# `302 -> /login?next=...`, which put the gateway's own sign-in page on this origin.
+PROXY_PREFIXES = ("/api", "/auth", "/ws", "/webhook")
 
 HOP_BY_HOP = {
     "connection",
@@ -43,12 +62,72 @@ HOP_BY_HOP = {
 }
 
 
+def log_event(**fields) -> None:
+    """One JSON line per request, so host-side events can be joined with client logs.
+
+    Every response carries `X-Pylon-Request-Id`; when the client sends one it is echoed back, so a
+    browser log and this file can be matched. Errors stay diagnosable after the fact.
+    """
+    if not PROXY_LOG:
+        return
+    record = {"ts": time.time()}
+    record.update({k: v for k, v in fields.items() if v is not None})
+    line = json.dumps(record, ensure_ascii=False, default=str)
+    with _LOG_LOCK:
+        try:
+            with open(PROXY_LOG, "a", encoding="utf-8") as fh:
+                fh.write(line + "\n")
+        except OSError as error:
+            sys.stderr.write(f"dev-server: cannot write log: {error}\n")
+
+
+def cache_control_for(path: str) -> str:
+    """Hashed filenames may be cached forever; everything else must not be cached at all.
+
+    `ui.js` and the HTML entry points are not content-hashed, but the wasm is. A browser that keeps a
+    cached `ui.js` will pair it with a newer wasm and fail with a confusing load error.
+    """
+    name = os.path.basename(path.split("?", 1)[0])
+    if re.search(r"[0-9a-f]{8,}", os.path.splitext(name)[0]):
+        return "public, max-age=31536000, immutable"
+    return "no-store"
+
+
 class Handler(http.server.SimpleHTTPRequestHandler):
+    # HTTP/1.1 keeps a connection alive for the browser's next request. The stdlib default of
+    # HTTP/1.0 closes after every response, which forces a reconnect per asset.
+    protocol_version = "HTTP/1.1"
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=DIST_ROOT, **kwargs)
 
     def log_message(self, fmt: str, *args) -> None:
-        sys.stderr.write("dist-proxy: %s\n" % (fmt % args))
+        sys.stderr.write("dev-server: %s\n" % (fmt % args))
+
+    def end_headers(self) -> None:
+        # Emitted on every response, including errors and proxied ones.
+        if not getattr(self, "request_id", ""):
+            incoming = self.headers.get("X-Pylon-Request-Id") if self.headers else None
+            self.request_id = incoming or f"host-{int(time.time() * 1000)}"
+        self.send_header("X-Pylon-Request-Id", self.request_id)
+        # Only our own files get our cache policy. A proxied response already carries the
+        # upstream's, and sending a second Cache-Control header would make it ambiguous.
+        if not self._is_proxied():
+            self.send_header("Cache-Control", cache_control_for(self.path))
+        super().end_headers()
+
+    def log_request(self, code: str = "-", size: str = "-") -> None:
+        self.request_id = (self.headers.get("X-Pylon-Request-Id") if self.headers else None) or (
+            getattr(self, "request_id", "") or f"host-{int(time.time() * 1000)}"
+        )
+        log_event(
+            kind="static" if not self._is_proxied() else "proxy",
+            method=self.command,
+            path=self.path.split("?", 1)[0],
+            status=str(code),
+            req=self.request_id,
+        )
+        super().log_request(code, size)
 
     def _is_proxied(self) -> bool:
         return self.path.startswith(PROXY_PREFIXES)
@@ -201,10 +280,12 @@ class Server(socketserver.ThreadingTCPServer):
 def main() -> int:
     port = int(os.environ.get("PORT", "8080"))
     if not os.path.isdir(DIST_ROOT):
-        sys.stderr.write(f"dist-proxy: DIST_ROOT {DIST_ROOT} does not exist\n")
+        sys.stderr.write(f"dev-server: DIST_ROOT {DIST_ROOT} does not exist\n")
         return 2
-    print(f"dist-proxy: serving {DIST_ROOT} on :{port}, proxying to {TARGET_HOST}:{TARGET_PORT}")
-    with Server(("0.0.0.0", port), Handler) as server:
+    print(f"dev-server: serving {DIST_ROOT} on {BIND}:{port}, proxying to {TARGET_HOST}:{TARGET_PORT}")
+    if PROXY_LOG:
+        print(f"dev-server: request log {PROXY_LOG}")
+    with Server((BIND, port), Handler) as server:
         server.serve_forever()
     return 0
 

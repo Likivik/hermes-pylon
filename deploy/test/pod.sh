@@ -81,13 +81,14 @@ up() {
     # The built app, served over the pod's shared loopback and published to the host.
     # It must also forward /api, /auth and the websocket to the dashboard: a bare static
     # server leaves the app dialling its own origin and failing, so nothing can assert a
-    # connected socket. See dist_proxy.py.
+    # connected socket. See tools/dev-server/serve.py.
     podman run -d --pod "$POD" --name "${POD}-dist" \
         -e DIST_ROOT=/srv \
         -e PYLON_PROXY_TARGET=http://127.0.0.1:9119 \
+        -e BIND=0.0.0.0 \
         -v "$DIST:/srv:ro,Z" \
-        -v "$HERE/dist_proxy.py:/opt/dist_proxy.py:ro,Z" \
-        "$IMAGE" python3 /opt/dist_proxy.py >/dev/null
+        -v "$HERE/../../tools/dev-server/serve.py:/opt/serve.py:ro,Z" \
+        "$IMAGE" python3 /opt/serve.py >/dev/null
 
     wait_for "http://127.0.0.1:${PREVIEW_PORT}/" "dist server"
     # 19119 belongs to the dashboard, which starts after auth is configured, so wait here
