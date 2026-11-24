@@ -205,6 +205,58 @@ class ChatHistoryTest {
             assertTrue(updates.filterIsInstance<ChatHistoryUpdate.OlderLoaded>().isEmpty())
         }
 
+    /**
+     * The rule that broke this twice. `returned` and `limit` describe the PAGE, not the fetch window: the seam
+     * rows are asked for on top so the join can be checked, and they are already on screen, so counting them
+     * would make every short page look full. `hasOlderMessages` is `returned >= limit`, so getting this wrong
+     * either spins the pager forever or blocks the last page.
+     */
+    @Test
+    fun theSeamRowsAreNotCountedAsNewHistory() =
+        runTest {
+            val updates = mutableListOf<ChatHistoryUpdate>()
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val held = listOf(msg("h1"), msg("h2"))
+            val history =
+                ChatHistory(
+                    io = dispatcher,
+                    launch = { block -> launch { block() } },
+                    fetchPage = { _, _, _, _ -> NetworkResult.Success(page(offset = 150, count = 5)) },
+                    mapMessages = {
+                            _,
+                            _,
+                            _,
+                            _,
+                        ->
+                        listOf(msg("n1"), msg("n2"), msg("n3"), msg("h1"), msg("h2"))
+                    },
+                    persist = { _, _, _, _ -> true },
+                    captureFence = { fence() },
+                    readMessages = { held },
+                    write = { updates += it },
+                )
+
+            history.loadOlder(
+                sessionId = "s-1",
+                hasOlderMessages = true,
+                isLoadingOlder = false,
+                latestPaging = true,
+                loadedOffset = 0,
+                pageSize = 3,
+                seamOverlap = 2,
+            )
+            advanceUntilIdle()
+
+            val loaded = updates.filterIsInstance<ChatHistoryUpdate.OlderLoaded>().single()
+            assertEquals(
+                3,
+                loaded.returned,
+                "three new rows arrived; the two seam rows were already on screen",
+            )
+            assertEquals(3, loaded.limit, "the limit is the page, not the page plus the seam")
+            assertEquals(listOf("n1", "n2", "n3"), loaded.older.map { it.id })
+        }
+
     @Test
     fun aCompletedLoadWritesStartedThenLoadedThenFinished() =
         runTest {

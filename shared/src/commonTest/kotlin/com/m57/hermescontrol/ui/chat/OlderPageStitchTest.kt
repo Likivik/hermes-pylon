@@ -111,4 +111,34 @@ class OlderPageStitchTest {
         val out = stitchOlderPage("s-1", held = held, fetched = emptyList(), overlap = 2)
         assertTrue(out is OlderPageStitch.Joined)
     }
+
+    /**
+     * The mutant detector for the seam orientation. The reducer prepends `older + held`, so the page's tail
+     * meets the held head — `fetched.takeLast(overlap)` against `held.take(overlap)`. Swap either side and this
+     * fails: the repeat sits at the tail, so only one orientation joins.
+     */
+    @Test
+    fun theSeamIsThePagesTailAgainstTheHeldHead() {
+        val fetched = listOf(msg("m1"), msg("m2"), msg("m4"), msg("m5"))
+        val out = stitchOlderPage("s-1", held = held, fetched = fetched, overlap = 2)
+
+        assertEquals(
+            OlderPageStitch.Joined(listOf(msg("m1"), msg("m2"))),
+            out,
+            "the two repeated rows are dropped exactly once, leaving the genuinely new page",
+        )
+    }
+
+    /** The mirror: a repeat at the page's *head* is not the seam, and must not be spliced. */
+    @Test
+    fun aRepeatAtThePagesHeadIsNotTheSeam() {
+        val fetched = listOf(msg("m4"), msg("m5"), msg("m9"))
+        val out = stitchOlderPage("s-1", held = held, fetched = fetched, overlap = 2)
+
+        assertEquals(
+            OlderPageStitch.SeamBroken,
+            out,
+            "matching on the wrong end would splice two unrelated ranges into one transcript",
+        )
+    }
 }
