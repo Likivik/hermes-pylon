@@ -23,6 +23,50 @@ class MessageRowKeyTest {
 
     // ── keys ───────────────────────────────────────────────────────────
 
+    /**
+     * The reason [messageRowSeamKey] exists at all. `ServerMessageMapper` synthesises `nowMillis` per call when
+     * the wire omits a timestamp, so the same row hashes differently every time it is fetched. A seam built on
+     * [messageRowFingerprint] can never join; this is the test that stops anyone "simplifying" them into one.
+     */
+    @Test
+    fun theSeamKeySurvivesATimestampTheMapperResynthesises() {
+        val fetched = message(id = "a", content = "same", timestamp = 1_000L)
+        val reread = message(id = "b", content = "same", timestamp = 9_999L)
+
+        assertEquals(
+            messageRowSeamKey("s-1", fetched),
+            messageRowSeamKey("s-1", reread),
+            "one row, re-read with a fresh nowMillis, must still match at the seam",
+        )
+    }
+
+    @Test
+    fun theSeamKeyIgnoresTheIdBecauseThatIsPerReadToo() {
+        val one = message(id = "a", content = "same", timestamp = 1_000L)
+        val two = message(id = "b", content = "same", timestamp = 1_000L)
+
+        assertEquals(messageRowSeamKey("s-1", one), messageRowSeamKey("s-1", two))
+    }
+
+    @Test
+    fun theSeamKeyIsScopedToTheSession() {
+        val m = message(id = "a", content = "same")
+
+        assertNotEquals(
+            messageRowSeamKey("s-1", m),
+            messageRowSeamKey("s-2", m),
+            "content alone is only unique inside a session; the scope is what makes it cross-read",
+        )
+    }
+
+    @Test
+    fun theSeamKeyStillSeparatesDifferentContent() {
+        assertNotEquals(
+            messageRowSeamKey("s-1", message(id = "a", content = "one")),
+            messageRowSeamKey("s-1", message(id = "b", content = "two")),
+        )
+    }
+
     @Test
     fun theKeyIsTheIdentity() {
         assertEquals(listOf("m-1"), messageRowKeys(listOf(message(id = "m-1"))))
