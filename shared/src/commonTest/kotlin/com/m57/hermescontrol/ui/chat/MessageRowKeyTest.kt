@@ -86,4 +86,74 @@ class MessageRowKeyTest {
             messageRowFingerprint(message(id = "b", timestamp = 1_001L)),
         )
     }
+
+    // ── collapse ───────────────────────────────────────────────────────
+
+    @Test
+    fun theStoresTriplesCollapseToOneRow() {
+        val triple =
+            listOf(
+                message(id = "297874", content = "same bytes"),
+                message(id = "298338", content = "same bytes"),
+                message(id = "298339", content = "same bytes"),
+            )
+        val out = collapseDuplicateRows(triple)
+        assertEquals(1, out.size, "one logical message must render once")
+        assertEquals("297874", out.single().id, "the first row wins, and its identity is kept")
+    }
+
+    @Test
+    fun distinctRowsAreAllKept() {
+        val out =
+            collapseDuplicateRows(
+                listOf(
+                    message(id = "1", content = "one"),
+                    message(id = "2", content = "two"),
+                    message(id = "3", content = "three"),
+                ),
+            )
+        assertEquals(3, out.size)
+    }
+
+    @Test
+    fun theSameTextAtADifferentMomentIsNotADuplicate() {
+        val out =
+            collapseDuplicateRows(
+                listOf(
+                    message(id = "1", content = "yes", timestamp = 1_000L),
+                    message(id = "2", content = "yes", timestamp = 2_000L),
+                ),
+            )
+        assertEquals(2, out.size, "a person can say the same thing twice")
+    }
+
+    @Test
+    fun theSameTextFromADifferentSpeakerIsNotADuplicate() {
+        val out =
+            collapseDuplicateRows(
+                listOf(
+                    message(id = "1", content = "ok", role = MessageRole.USER),
+                    message(id = "2", content = "ok", role = MessageRole.ASSISTANT),
+                ),
+            )
+        assertEquals(2, out.size)
+    }
+
+    @Test
+    fun theCollapseKeepsTheOriginalOrder() {
+        val out =
+            collapseDuplicateRows(
+                listOf(
+                    message(id = "1", content = "a", timestamp = 1L),
+                    message(id = "2", content = "b", timestamp = 2L),
+                    message(id = "3", content = "a", timestamp = 1L),
+                ),
+            )
+        assertEquals(listOf("1", "2"), out.map { it.id })
+    }
+
+    @Test
+    fun collapsingAnEmptyListIsEmpty() {
+        assertTrue(collapseDuplicateRows(emptyList()).isEmpty())
+    }
 }
