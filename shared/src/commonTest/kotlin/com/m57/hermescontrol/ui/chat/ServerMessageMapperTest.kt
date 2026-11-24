@@ -57,15 +57,20 @@ class ServerMessageMapperTest {
     }
 
     @Test
-    fun `a payload with no message uid degrades to the rowid`() {
+    fun `a payload with no message uid falls back to the content fingerprint`() {
         val out = map(listOf(SessionMessage(id = 9, role = "user", content = "a")), offset = 5)
-        assertEquals("rest-s1-9", out.single().id)
+        assertEquals(
+            messageRowFingerprint("s1", MessageRole.USER, out.single().timestamp, "a"),
+            out.single().id,
+            "never a rowid and never an offset: both move, and a cross-read identity may not",
+        )
     }
 
     @Test
-    fun `a payload with neither uid nor rowid falls back to the offset`() {
-        val out = map(listOf(SessionMessage(id = null, role = "user", content = "a")), offset = 5)
-        assertEquals("rest-s1-5", out.single().id)
+    fun `the same message under a moved rowid keeps its identity`() {
+        val first = map(listOf(SessionMessage(id = 9, role = "user", content = "a")), offset = 5)
+        val reread = map(listOf(SessionMessage(id = 2686, role = "user", content = "a")), offset = 400)
+        assertEquals(first.single().id, reread.single().id, "the rowid moved; the message did not")
     }
 
     @Test
