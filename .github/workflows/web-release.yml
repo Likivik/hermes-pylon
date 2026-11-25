@@ -11,10 +11,18 @@
 #   > was added by unknown code
 #
 # Relaxing the policy to allow one download would drop a supply-chain guarantee
-# for every dependency in the project. Instead the build runs with
-# `-x kotlinWasmBinaryenSetup` and Binaryen is invoked as a post-build step on the
-# artifact (scripts/optimize-wasm-size.sh). Optimising an artifact is a build
-# step, not a dependency, so the repository policy stays intact.
+# for every dependency in the project. Instead Binaryen is fetched here, by this
+# workflow, checksum-verified, and placed where the Kotlin plugin looks for it:
+# `$HOME/.gradle/binaryen/binaryen-version_<N>/bin/wasm-opt`. With the binary in
+# place the build only needs `-x kotlinWasmBinaryenSetup` to skip the *download*,
+# and `compileProductionExecutableKotlinWasmJsOptimize` runs normally.
+#
+# The path is a contract, not a preference: the plugin ignores PATH. Installing a
+# different version into a different directory is silent at install time and fatal
+# at compile time -- this workflow failed on its first ever run for exactly that
+# reason (Binaryen 133 in ~/.cache, plugin asking for 130 in ~/.gradle).
+# scripts/optimize-wasm-size.sh still runs afterwards as a measured size pass and
+# a budget check; it keeps each file only if the result is genuinely smaller.
 #
 # MEASURED (2026-11-04, this project):
 #   development bundle   47.36 MB raw / 10.40 MB gzip   (what the preview serves)
@@ -40,8 +48,13 @@ permissions:
   contents: read
 
 env:
-  BINARYEN_VERSION: "133"
-  BINARYEN_SHA256: "2dc9c7813f5375db93d96ead4b78222fcc3e2677bbb832297af4797782a37489"
+  # Must match the version the Kotlin plugin asks for: it looks for
+  # $HOME/.gradle/binaryen/binaryen-version_<N>/bin/wasm-opt, with N fixed by the
+  # Kotlin release (2.4.21 -> 130). Installing a different version lands it on PATH
+  # where the plugin never looks, and compileProductionExecutableKotlinWasmJsOptimize
+  # dies with "A problem occurred starting process ... binaryen-version_130/bin/wasm-opt".
+  BINARYEN_VERSION: "130"
+  BINARYEN_SHA256: "0a18362361ad05465118cd8eeb72edaeec89de6894bc283576ef4e07aa3babcc"
 
 jobs:
   web:
@@ -74,13 +87,15 @@ jobs:
       - name: Cache Binaryen
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
-          path: ~/.cache/binaryen-${{ env.BINARYEN_VERSION }}
+          path: ~/.gradle/binaryen/binaryen-version_${{ env.BINARYEN_VERSION }}
           key: binaryen-${{ env.BINARYEN_VERSION }}-linux-x86_64
 
       - name: Install Binaryen (pinned, checksum-verified)
         run: |
           set -euo pipefail
-          DIR="$HOME/.cache/binaryen-${BINARYEN_VERSION}"
+          # The Kotlin plugin reads this exact path and ignores PATH, so the install
+          # location is part of the contract, not a preference.
+          DIR="$HOME/.gradle/binaryen/binaryen-version_${BINARYEN_VERSION}"
           if [ -x "$DIR/bin/wasm-opt" ]; then
             echo "cached: $("$DIR/bin/wasm-opt" --version)"
             echo "$DIR/bin" >> "$GITHUB_PATH"
