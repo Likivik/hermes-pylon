@@ -2,7 +2,6 @@
 
 package com.m57.hermescontrol.data.ws
 
-import android.util.Log
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.remote.CleartextPolicy
 import com.m57.hermescontrol.data.remote.CookieManager
@@ -15,7 +14,6 @@ import com.m57.hermescontrol.data.session.ActiveSessionHolder
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
-import io.mockk.mockkStatic
 import io.mockk.unmockkAll
 import io.mockk.verify
 import kotlinx.coroutines.CompletableDeferred
@@ -89,12 +87,6 @@ class HermesWsClientTest {
 
     @Before
     fun setUp() {
-        mockkStatic(Log::class)
-        every { Log.d(any<String>(), any<String>()) } returns 0
-        every { Log.i(any<String>(), any<String>()) } returns 0
-        every { Log.w(any<String>(), any<String>()) } returns 0
-        every { Log.e(any<String>(), any<String>()) } returns 0
-        every { Log.isLoggable(any<String>(), any<Int>()) } returns false
 
         mockWebServer = sharedServer
         // Fresh queue per test: a leftover response from a previous test would

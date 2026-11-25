@@ -66,13 +66,6 @@ class AuthManagerTest {
         every { mockPrefs.getBoolean("migrated_to_datastore", any()) } returns true
 
         // Mock Log to prevent "Method d in android.util.Log not mocked"
-        mockkStatic(android.util.Log::class)
-        every { android.util.Log.d(any(), any()) } returns 0
-        every { android.util.Log.isLoggable(any(), any()) } returns false
-        every { android.util.Log.e(any(), any()) } returns 0
-        every { android.util.Log.e(any(), any(), any()) } returns 0
-        every { android.util.Log.w(any(), any<String>()) } returns 0
-        every { android.util.Log.i(any(), any()) } returns 0
         mockkStatic(android.util.Base64::class)
         every { android.util.Base64.encodeToString(any(), android.util.Base64.NO_WRAP) } answers {
             java.util.Base64.getEncoder().withoutPadding().encodeToString(firstArg())

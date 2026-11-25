@@ -3,7 +3,6 @@
 package com.m57.hermescontrol.ui.chat
 
 import android.app.Application
-import android.util.Log
 import androidx.lifecycle.viewModelScope
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.local.HermesDatabase
@@ -79,12 +78,6 @@ class SessionRenameTest {
         Dispatchers.setMain(testDispatcher)
         val testMainDispatcher = Dispatchers.Main
         resumeRequestId = ""
-
-        mockkStatic(Log::class)
-        every { Log.d(any(), any()) } returns 0
-        every { Log.i(any(), any()) } returns 0
-        every { Log.w(any(), any<String>()) } returns 0
-        every { Log.e(any(), any()) } returns 0
 
         mockkStatic(Dispatchers::class)
         every { Dispatchers.IO } returns testDispatcher
