@@ -118,6 +118,30 @@ Release builds require HTTPS and derive `wss://` WebSocket URLs from the same
 base URL. Debug builds can use explicit HTTP URLs for local development and
 show a cleartext warning.
 
+### OAuth sign-in needs the gateway's public URL
+
+Password sign-in works at whatever address you reach the gateway on. **OAuth does
+not.** The provider is told a single absolute `redirect_uri` up front and will only
+send the browser back to exactly that address, so the gateway must know the URL
+users actually open.
+
+Set `HERMES_DASHBOARD_PUBLIC_URL` on the gateway to that origin, including scheme,
+explicit port and any path prefix:
+
+```text
+HERMES_DASHBOARD_PUBLIC_URL=https://hermes.example.com:8443
+```
+
+Leaving it unset does not fail at startup. It fails later and confusingly: the
+button sends the browser to an address that is not yours, or to a page belonging
+to someone else. Nothing in this app can correct it, because the redirect target
+never reaches the app — it is decided inside the provider's authorize request.
+
+OAuth also requires a client registered **for your deployment**, since providers
+pin the allowed callback per client. Do not reuse another installation's client
+identifier. Serve the gateway behind a reverse proxy, tunnel or VPN as you like —
+that part is free — but the public URL must match the origin the browser uses.
+
 ### Connection profiles
 
 Use **Settings → Connection profiles** to switch among complete server URLs.
