@@ -2,9 +2,10 @@ package com.m57.hermescontrol.ui.sessions
 
 import com.m57.hermescontrol.data.model.SessionInfo
 import com.m57.hermescontrol.data.model.SessionLatestDescendantResponse
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.GatewayResponse
-import com.m57.hermescontrol.data.remote.HermesGatewayApi
+import com.m57.hermescontrol.data.remote.HermesApi
+import com.m57.hermescontrol.data.remote.source.DefaultSessions
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -27,13 +28,13 @@ import java.io.IOException
 @OptIn(ExperimentalCoroutinesApi::class)
 class SessionPinningTest {
     private val dispatcher = StandardTestDispatcher()
-    private val api = mockk<HermesGatewayApi>(relaxed = true)
+    private val api = mockk<HermesApi>(relaxed = true)
 
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
-        mockkObject(ApiClient)
-        every { ApiClient.hermesApi } returns api
+        mockkObject(GatewayConnection)
+        every { GatewayConnection.hermesApi } returns api
         coEvery { api.getSessionLatestDescendant(any()) } throws
             IOException("Endpoint unavailable")
     }
@@ -77,7 +78,7 @@ class SessionPinningTest {
             val pinnedTip = SessionInfo(id = "tip", title = "Pinned")
             coEvery { api.getSession("root") } returns GatewayResponse.success(pinnedTip)
 
-            val hydrated = hydratePinnedSessions(api, listOf("root"))
+            val hydrated = hydratePinnedSessions(DefaultSessions(api), listOf("root"))
 
             assertEquals(listOf("tip"), hydrated.map { it.id })
             assertEquals("root", hydrated.single()._lineage_root_id)
@@ -91,7 +92,7 @@ class SessionPinningTest {
             coEvery { api.getSession("tip") } returns
                 GatewayResponse.success(SessionInfo(id = "tip", title = "Live tip"))
 
-            val hydrated = hydratePinnedSessions(api, listOf("root"))
+            val hydrated = hydratePinnedSessions(DefaultSessions(api), listOf("root"))
 
             assertEquals(listOf("tip"), hydrated.map { it.id })
             assertEquals("root", hydrated.single()._lineage_root_id)

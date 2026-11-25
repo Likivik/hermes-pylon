@@ -37,6 +37,13 @@ data class ToolOutputRiskData(
 
 data class ChatMessage(
     val id: String = Uuid.random().toString(),
+    /**
+     * Where this row came from, and the source's own handle for it. See [MessageOrigin].
+     *
+     * Kept off [id] on purpose: [id] is identity and must not move, while a source handle may (a list offset
+     * shifts when a page prepends; a SQLite rowid moves when compaction rewrites a row).
+     */
+    val origin: MessageOrigin = MessageOrigin.Local,
     val role: MessageRole,
     val content: String,
     val reasoningText: String = "",

@@ -43,10 +43,10 @@ import com.m57.hermescontrol.data.model.StatusResponse
 import com.m57.hermescontrol.data.model.SystemStatsResponse
 import com.m57.hermescontrol.data.model.ToggleSkillRequest
 import com.m57.hermescontrol.data.model.UpdateCheckResponse
-import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.CleartextPolicy
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.GatewayResponse
-import com.m57.hermescontrol.data.remote.HermesGatewayApi
+import com.m57.hermescontrol.data.remote.HermesApi
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.connect_error_401
@@ -77,7 +77,7 @@ import java.io.IOException
 @OptIn(ExperimentalCoroutinesApi::class)
 class E2eIntegrationTest {
     private val testDispatcher = StandardTestDispatcher()
-    private lateinit var mockApiService: HermesGatewayApi
+    private lateinit var mockApiService: HermesApi
     private val mockApp = mockk<Application>(relaxed = true)
     private lateinit var connectResolver: FakeStringResolver
 
@@ -86,12 +86,12 @@ class E2eIntegrationTest {
         Dispatchers.setMain(testDispatcher)
 
         mockkObject(AuthManager)
-        mockkObject(ApiClient)
+        mockkObject(GatewayConnection)
 
         mockApiService = mockk()
-        every { ApiClient.hermesApi } returns mockApiService
-        every { ApiClient.tempService(any(), any()) } returns mockApiService
-        every { ApiClient.rebuild() } returns Unit
+        every { GatewayConnection.hermesApi } returns mockApiService
+        every { GatewayConnection.tempService(any(), any()) } returns mockApiService
+        every { GatewayConnection.rebuild() } returns Unit
 
         // Default AuthManager stubs
         every { AuthManager.getToken() } returns "mock-token"
@@ -106,7 +106,7 @@ class E2eIntegrationTest {
         every {
             AuthManager.endpoint()
         } answers { ServerEndpoint.parse("https://127.0.0.1:9119/", CleartextPolicy.ALLOW_WITH_WARNING) }
-        every { AuthManager.getConnectionProfiles() } returns emptyList()
+        every { AuthManager.getGatewayInstances() } returns emptyList()
         every { AuthManager.getSelectedProfileId() } returns null
 
         // Mock Application string resources (no real resources in unit tests)
@@ -117,7 +117,7 @@ class E2eIntegrationTest {
         every { AuthManager.ensureDefaultSelected() } returns Unit
         every { AuthManager.getProfileToken(any()) } returns null
         every { AuthManager.setProfileToken(any(), any()) } returns Unit
-        every { AuthManager.saveConnectionProfiles(any()) } returns Unit
+        every { AuthManager.saveGatewayInstances(any()) } returns Unit
         every { AuthManager.getPinnedModels() } returns emptyList()
         every { AuthManager.savePinnedModels(any()) } returns Unit
         every { AuthManager.getPinnedSessionIds(AuthManager.DEFAULT_PROFILE_ID) } returns emptyList()
@@ -155,7 +155,7 @@ class E2eIntegrationTest {
             val skill2 = Skill("Skill 2", "Description 2", "Category 2", false)
             coEvery { mockApiService.getSkills() } returns GatewayResponse.success(listOf(skill1, skill2))
 
-            val viewModel = SkillsViewModel(application = mockApp, ioDispatcher = testDispatcher)
+            val viewModel = SkillsViewModel(ioDispatcher = testDispatcher)
             viewModel.loadSkills()
 
             assertTrue(viewModel.uiState.value.isLoading)
@@ -207,7 +207,7 @@ class E2eIntegrationTest {
                 )
             } returns GatewayResponse.success(Unit)
 
-            val viewModel = SkillsViewModel(application = mockApp, ioDispatcher = testDispatcher)
+            val viewModel = SkillsViewModel(ioDispatcher = testDispatcher)
             viewModel.loadSkills()
             advanceUntilIdle()
 
@@ -239,7 +239,7 @@ class E2eIntegrationTest {
             coEvery { mockApiService.getSkills() } returns GatewayResponse.success(listOf(skill))
             coEvery { mockApiService.toggleSkill(ToggleSkillRequest("Skill 1", true)) } returns createErrorResponse(500)
 
-            val viewModel = SkillsViewModel(application = mockApp, ioDispatcher = testDispatcher)
+            val viewModel = SkillsViewModel(ioDispatcher = testDispatcher)
             viewModel.loadSkills()
             advanceUntilIdle()
 
@@ -273,7 +273,7 @@ class E2eIntegrationTest {
         runTest {
             coEvery { mockApiService.getSkills() } returns createErrorResponse(500)
 
-            val viewModel = SkillsViewModel(application = mockApp, ioDispatcher = testDispatcher)
+            val viewModel = SkillsViewModel(ioDispatcher = testDispatcher)
             viewModel.loadSkills()
             advanceUntilIdle()
 
@@ -297,7 +297,7 @@ class E2eIntegrationTest {
                     GatewayResponse.success(listOf(skillB)),
                 )
 
-            val viewModel = SkillsViewModel(application = mockApp, ioDispatcher = testDispatcher)
+            val viewModel = SkillsViewModel(ioDispatcher = testDispatcher)
             viewModel.loadSkills()
             advanceUntilIdle()
             assertEquals(
@@ -324,7 +324,7 @@ class E2eIntegrationTest {
             coEvery { mockApiService.searchSkillsHub(any()) } returns
                 GatewayResponse.success(SkillHubSearchResponse(results = listOf(hubSkill)))
 
-            val viewModel = SkillsViewModel(application = mockApp, ioDispatcher = testDispatcher)
+            val viewModel = SkillsViewModel(ioDispatcher = testDispatcher)
             viewModel.searchHub("test")
 
             advanceUntilIdle()
@@ -348,7 +348,7 @@ class E2eIntegrationTest {
             coEvery { mockApiService.searchSkillsHub(any()) } returns
                 GatewayResponse.success(SkillHubSearchResponse(results = emptyList()))
 
-            val viewModel = SkillsViewModel(application = mockApp, ioDispatcher = testDispatcher)
+            val viewModel = SkillsViewModel(ioDispatcher = testDispatcher)
             viewModel.searchHub("nonexistent")
 
             advanceUntilIdle()
@@ -366,7 +366,7 @@ class E2eIntegrationTest {
             coEvery { mockApiService.searchSkillsHub(any()) } returns
                 createErrorResponse(500)
 
-            val viewModel = SkillsViewModel(application = mockApp, ioDispatcher = testDispatcher)
+            val viewModel = SkillsViewModel(ioDispatcher = testDispatcher)
             viewModel.searchHub("test")
 
             advanceUntilIdle()
@@ -381,7 +381,7 @@ class E2eIntegrationTest {
     @Test
     fun testSkillsHub_search_emptyQuery() =
         runTest {
-            val viewModel = SkillsViewModel(application = mockApp, ioDispatcher = testDispatcher)
+            val viewModel = SkillsViewModel(ioDispatcher = testDispatcher)
             viewModel.searchHub("")
 
             // Empty query should clear immediately without API call
@@ -404,7 +404,7 @@ class E2eIntegrationTest {
             coEvery { mockApiService.getSkills() } returns
                 GatewayResponse.success(listOf(installed))
 
-            val viewModel = SkillsViewModel(application = mockApp, ioDispatcher = testDispatcher)
+            val viewModel = SkillsViewModel(ioDispatcher = testDispatcher)
             viewModel.installSkill("new-skill")
 
             advanceUntilIdle()
@@ -426,7 +426,7 @@ class E2eIntegrationTest {
             coEvery { mockApiService.installHubSkill(any()) } returns
                 createErrorResponse(500)
 
-            val viewModel = SkillsViewModel(application = mockApp, ioDispatcher = testDispatcher)
+            val viewModel = SkillsViewModel(ioDispatcher = testDispatcher)
             viewModel.installSkill("failing-skill")
 
             advanceUntilIdle()
@@ -447,7 +447,7 @@ class E2eIntegrationTest {
             coEvery { mockApiService.getSkills() } returns
                 GatewayResponse.success(emptyList())
 
-            val viewModel = SkillsViewModel(application = mockApp, ioDispatcher = testDispatcher)
+            val viewModel = SkillsViewModel(ioDispatcher = testDispatcher)
             viewModel.uninstallSkill("hub-skill")
 
             advanceUntilIdle()
@@ -468,7 +468,7 @@ class E2eIntegrationTest {
             coEvery { mockApiService.uninstallHubSkill(any()) } returns
                 createErrorResponse(500)
 
-            val viewModel = SkillsViewModel(application = mockApp, ioDispatcher = testDispatcher)
+            val viewModel = SkillsViewModel(ioDispatcher = testDispatcher)
             viewModel.uninstallSkill("failing-skill")
 
             advanceUntilIdle()
@@ -750,7 +750,7 @@ class E2eIntegrationTest {
     fun testSkillsLoad_httpError_400() =
         runTest {
             coEvery { mockApiService.getSkills() } returns createErrorResponse(400)
-            val viewModel = SkillsViewModel(application = mockApp, ioDispatcher = testDispatcher)
+            val viewModel = SkillsViewModel(ioDispatcher = testDispatcher)
             viewModel.loadSkills()
             advanceUntilIdle()
             assertTrue(
@@ -763,7 +763,7 @@ class E2eIntegrationTest {
     fun testSkillsLoad_httpError_404() =
         runTest {
             coEvery { mockApiService.getSkills() } returns createErrorResponse(404)
-            val viewModel = SkillsViewModel(application = mockApp, ioDispatcher = testDispatcher)
+            val viewModel = SkillsViewModel(ioDispatcher = testDispatcher)
             viewModel.loadSkills()
             advanceUntilIdle()
             assertTrue(
@@ -776,7 +776,7 @@ class E2eIntegrationTest {
     fun testSkillsLoad_httpError_500() =
         runTest {
             coEvery { mockApiService.getSkills() } returns createErrorResponse(500)
-            val viewModel = SkillsViewModel(application = mockApp, ioDispatcher = testDispatcher)
+            val viewModel = SkillsViewModel(ioDispatcher = testDispatcher)
             viewModel.loadSkills()
             advanceUntilIdle()
             assertTrue(
@@ -789,7 +789,7 @@ class E2eIntegrationTest {
     fun testSkillsLoad_networkTimeout() =
         runTest {
             coEvery { mockApiService.getSkills() } throws IOException("Timeout")
-            val viewModel = SkillsViewModel(application = mockApp, ioDispatcher = testDispatcher)
+            val viewModel = SkillsViewModel(ioDispatcher = testDispatcher)
             viewModel.loadSkills()
             advanceUntilIdle()
             assertTrue(
@@ -802,7 +802,7 @@ class E2eIntegrationTest {
     fun testSkillsLoad_emptyResponse() =
         runTest {
             coEvery { mockApiService.getSkills() } returns GatewayResponse.success(emptyList())
-            val viewModel = SkillsViewModel(application = mockApp, ioDispatcher = testDispatcher)
+            val viewModel = SkillsViewModel(ioDispatcher = testDispatcher)
             viewModel.loadSkills()
             advanceUntilIdle()
             assertFalse(viewModel.uiState.value.isLoading)
@@ -820,7 +820,7 @@ class E2eIntegrationTest {
             coEvery { mockApiService.getSkills() } returns GatewayResponse.success(listOf(skill))
             coEvery { mockApiService.toggleSkill(any()) } returns createErrorResponse(500)
 
-            val viewModel = SkillsViewModel(application = mockApp, ioDispatcher = testDispatcher)
+            val viewModel = SkillsViewModel(ioDispatcher = testDispatcher)
             viewModel.loadSkills()
             advanceUntilIdle()
 
@@ -949,7 +949,7 @@ class E2eIntegrationTest {
             coEvery { mockApiService.getSkills() } returns GatewayResponse.success(listOf(skill))
             coEvery { mockApiService.toggleSkill(any()) } returns GatewayResponse.success(Unit)
 
-            val viewModel = SkillsViewModel(application = mockApp, ioDispatcher = testDispatcher)
+            val viewModel = SkillsViewModel(ioDispatcher = testDispatcher)
             viewModel.loadSkills()
             advanceUntilIdle()
 
@@ -1019,7 +1019,7 @@ class E2eIntegrationTest {
             coEvery { mockApiService.getSkills() } returns GatewayResponse.success(listOf(skill))
             coEvery { mockApiService.toggleSkill(any()) } returns createErrorResponse(500)
 
-            val skillsViewModel = SkillsViewModel(application = mockApp, ioDispatcher = testDispatcher)
+            val skillsViewModel = SkillsViewModel(ioDispatcher = testDispatcher)
             skillsViewModel.loadSkills()
             advanceUntilIdle()
 

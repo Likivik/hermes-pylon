@@ -7,12 +7,14 @@ import com.m57.hermescontrol.data.model.ManagedDirectoryCreate
 import com.m57.hermescontrol.data.model.ManagedFileActionResponse
 import com.m57.hermescontrol.data.model.ManagedFileDelete
 import com.m57.hermescontrol.data.model.ManagedFileEntry
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.MediaResult
 import com.m57.hermescontrol.data.remote.NetworkError
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.mediaStore
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.data.remote.source.FilesSource
+import com.m57.hermescontrol.data.remote.source.FilesSourceOf
 import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.files_error_create_folder
 import com.m57.hermescontrol.generated.resources.files_error_delete
@@ -77,6 +79,7 @@ inline fun <T, R> NetworkResult<T>.map(transform: (T) -> R): NetworkResult<R> =
 
 class FilesViewModel(
     private val ioDispatcher: CoroutineDispatcher = AppEnvironment.current.io,
+    private val source: FilesSource = FilesSourceOf(GatewayConnection.hermesApi),
 ) :
     ViewModel(),
         ToastHost {
@@ -87,7 +90,7 @@ class FilesViewModel(
         safeLaunchLoad(
             ioDispatcher = ioDispatcher,
             apiCall = {
-                safeApiCall { ApiClient.hermesApi.listManagedFiles(path) }
+                safeApiCall { source.listManagedFiles(path) }
             },
             onStart = { _uiState.update { it.copy(isLoading = true, errorMessage = null) } },
             onSuccess = { data ->
@@ -155,7 +158,7 @@ class FilesViewModel(
             val result =
                 withContext(ioDispatcher) {
                     safeApiCall {
-                        ApiClient.hermesApi.createManagedDirectory(ManagedDirectoryCreate(target))
+                        source.createManagedDirectory(ManagedDirectoryCreate(target))
                     }
                 }
             handleActionResult(
@@ -179,7 +182,7 @@ class FilesViewModel(
             val result =
                 withContext(ioDispatcher) {
                     safeApiCall {
-                        ApiClient.hermesApi.uploadManagedFileStream(
+                        source.uploadManagedFileStream(
                             path = target,
                             overwrite = true,
                             fileName = fileName,
@@ -217,7 +220,7 @@ class FilesViewModel(
             val result =
                 withContext(ioDispatcher) {
                     safeApiCall {
-                        ApiClient.hermesApi.deleteManagedFile(
+                        source.deleteManagedFile(
                             ManagedFileDelete(target.path, recursive = target.isDirectory),
                         )
                     }

@@ -65,6 +65,7 @@ import com.m57.hermescontrol.generated.resources.profiles_label_path
 import com.m57.hermescontrol.generated.resources.profiles_label_provider
 import com.m57.hermescontrol.generated.resources.profiles_label_provider_input
 import com.m57.hermescontrol.generated.resources.profiles_label_skills
+import com.m57.hermescontrol.generated.resources.profiles_pending_note
 import com.m57.hermescontrol.generated.resources.profiles_title_clone
 import com.m57.hermescontrol.generated.resources.profiles_title_edit_description
 import com.m57.hermescontrol.generated.resources.profiles_title_edit_soul
@@ -199,6 +200,19 @@ fun ProfilesScreen(
                                 contentPadding = PaddingValues(16.dp),
                                 verticalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
+                                val pending = state.pendingProfileName
+                                val activated = state.activatedProfileName
+                                if (pending != null && activated != null) {
+                                    item(key = "pending-note") {
+                                        // Honest state: the app browses `pending`; the gateway
+                                        // process still serves `activated` (#208).
+                                        Text(
+                                            text = stringResource(Res.string.profiles_pending_note, pending, activated),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
                                 items(state.profiles, key = { it.name }) { profile ->
                                     val isActive = profile.name == state.activeProfileName
                                     Card(

@@ -255,7 +255,8 @@ private class KtorWsSocket(
         }
         scope.launch {
             // The peer may already have sent its close frame; echoing twice is
-            // not an error, so a refused close is not reported as a failure.
+            // not an error, so a refused close is not reported as a failure
+            // (inventory: intentional-ignore).
             runCatching { established.close(CloseReason(code.toShort(), reason)) }
         }
         return true

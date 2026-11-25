@@ -8,8 +8,10 @@ import com.m57.hermescontrol.data.model.MessagingPlatformUpdate
 import com.m57.hermescontrol.data.model.TelegramOnboardingApplyRequest
 import com.m57.hermescontrol.data.model.TelegramOnboardingStartRequest
 import com.m57.hermescontrol.data.model.TelegramOnboardingStartResponse
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.data.remote.source.Channels
+import com.m57.hermescontrol.data.remote.source.DefaultChannels
 import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.ui.common.safeLaunchLoad
 import com.m57.hermescontrol.util.nowMillis
@@ -59,6 +61,7 @@ data class ChannelsUiState(
 
 class ChannelsViewModel(
     private val ioDispatcher: CoroutineDispatcher = AppEnvironment.current.io,
+    private val source: Channels = DefaultChannels(GatewayConnection.hermesApi),
 ) :
     ViewModel(),
         ToastHost {
@@ -70,7 +73,7 @@ class ChannelsViewModel(
     fun loadPlatforms() {
         safeLaunchLoad(
             ioDispatcher = ioDispatcher,
-            apiCall = { safeApiCall { ApiClient.hermesApi.getMessagingPlatforms() } },
+            apiCall = { safeApiCall { source.getMessagingPlatforms() } },
             onStart = {
                 _uiState.update {
                     it.copy(isLoading = true, errorMessage = null)
@@ -107,7 +110,7 @@ class ChannelsViewModel(
             ioDispatcher = ioDispatcher,
             apiCall = {
                 safeApiCall {
-                    ApiClient.hermesApi.configurePlatform(
+                    source.configurePlatform(
                         platformId,
                         MessagingPlatformUpdate(enabled = enabled),
                     )
@@ -151,7 +154,7 @@ class ChannelsViewModel(
             ioDispatcher = ioDispatcher,
             apiCall = {
                 safeApiCall {
-                    ApiClient.hermesApi.removeMessagingPlatform(platformId)
+                    source.removeMessagingPlatform(platformId)
                 }
             },
             onStart = {},
@@ -184,7 +187,7 @@ class ChannelsViewModel(
             ioDispatcher = ioDispatcher,
             apiCall = {
                 safeApiCall {
-                    ApiClient.hermesApi.configurePlatform(platformId, update)
+                    source.configurePlatform(platformId, update)
                 }
             },
             onStart = {
@@ -227,7 +230,7 @@ class ChannelsViewModel(
         _uiState.update { it.copy(testingId = platformId) }
         safeLaunchLoad(
             ioDispatcher = ioDispatcher,
-            apiCall = { safeApiCall { ApiClient.hermesApi.testMessagingPlatform(platformId) } },
+            apiCall = { safeApiCall { source.testMessagingPlatform(platformId) } },
             onStart = {},
             onSuccess = { result ->
                 val msg = result.message
@@ -247,7 +250,7 @@ class ChannelsViewModel(
     fun restartGateway() {
         safeLaunchLoad(
             ioDispatcher = ioDispatcher,
-            apiCall = { safeApiCall { ApiClient.hermesApi.restartGateway() } },
+            apiCall = { safeApiCall { source.restartGateway() } },
             onStart = {
                 _uiState.update {
                     it.copy(isRestarting = true, errorMessage = null)
@@ -295,7 +298,7 @@ class ChannelsViewModel(
         viewModelScope.launch {
             val result =
                 safeApiCall {
-                    ApiClient.hermesApi.startTelegramOnboarding(
+                    source.startTelegramOnboarding(
                         TelegramOnboardingStartRequest(botName = "Hermes Agent"),
                     )
                 }
@@ -334,7 +337,7 @@ class ChannelsViewModel(
                     val pairingId = _uiState.value.onboardingSetup?.pairingId ?: break
                     val result =
                         safeApiCall {
-                            ApiClient.hermesApi.getTelegramOnboardingStatus(pairingId)
+                            source.getTelegramOnboardingStatus(pairingId)
                         }
                     when (result) {
                         is com.m57.hermescontrol.data.remote.NetworkResult.Success -> {
@@ -399,7 +402,7 @@ class ChannelsViewModel(
         if (pairingId != null) {
             viewModelScope.launch {
                 safeApiCall {
-                    ApiClient.hermesApi.cancelTelegramOnboarding(pairingId)
+                    source.cancelTelegramOnboarding(pairingId)
                 }
             }
         }
@@ -459,7 +462,7 @@ class ChannelsViewModel(
         viewModelScope.launch {
             val result =
                 safeApiCall {
-                    ApiClient.hermesApi.applyTelegramOnboarding(
+                    source.applyTelegramOnboarding(
                         setup.pairingId,
                         TelegramOnboardingApplyRequest(
                             allowedUserIds = allowedIds,

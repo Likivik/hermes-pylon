@@ -10,9 +10,11 @@ import com.m57.hermescontrol.data.model.McpOAuthFlowResponse
 import com.m57.hermescontrol.data.model.McpServer
 import com.m57.hermescontrol.data.model.McpServerTestResponse
 import com.m57.hermescontrol.data.model.McpServerToggleRequest
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.data.remote.source.DefaultMcpServers
+import com.m57.hermescontrol.data.remote.source.McpServers
 import com.m57.hermescontrol.data.remote.toJsonObject
 import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.ui.common.safeLaunchLoad
@@ -71,6 +73,7 @@ data class McpServersUiState(
 
 class McpServersViewModel(
     private val ioDispatcher: kotlinx.coroutines.CoroutineDispatcher = AppEnvironment.current.io,
+    private val source: McpServers = DefaultMcpServers(GatewayConnection.hermesApi),
 ) :
     ViewModel(),
         ToastHost {
@@ -87,7 +90,7 @@ class McpServersViewModel(
     fun loadServers() {
         safeLaunchLoad(
             ioDispatcher = ioDispatcher,
-            apiCall = { safeApiCall { ApiClient.hermesApi.getMcpServers() } },
+            apiCall = { safeApiCall { source.getMcpServers() } },
             onStart = { _uiState.update { it.copy(isLoading = true, errorMessage = null) } },
             onSuccess = { data ->
                 _uiState.update {
@@ -129,7 +132,7 @@ class McpServersViewModel(
             val result =
                 withContext(ioDispatcher) {
                     safeApiCall {
-                        ApiClient.hermesApi.toggleMcpServer(
+                        source.toggleMcpServer(
                             server.name,
                             McpServerToggleRequest(targetEnabled),
                         )
@@ -214,7 +217,7 @@ class McpServersViewModel(
                 val result =
                     serverTestConcurrencyLimiter.withPermit {
                         withContext(ioDispatcher) {
-                            safeApiCall { ApiClient.hermesApi.testMcpServer(name) }
+                            safeApiCall { source.testMcpServer(name) }
                         }
                     }
                 val response =
@@ -240,7 +243,7 @@ class McpServersViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.deleteMcpServer(name) }
+                    safeApiCall { source.deleteMcpServer(name) }
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -331,7 +334,7 @@ class McpServersViewModel(
                 )
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.addMcpServer(request) }
+                    safeApiCall { source.addMcpServer(request) }
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -395,7 +398,7 @@ class McpServersViewModel(
             val result =
                 withContext(ioDispatcher) {
                     safeApiCall {
-                        ApiClient.hermesApi.updateMcpServer(
+                        source.updateMcpServer(
                             serverName,
                             mapOf("env" to updatedEnv).toJsonObject(),
                         )
@@ -431,7 +434,7 @@ class McpServersViewModel(
             val result =
                 withContext(ioDispatcher) {
                     safeApiCall {
-                        ApiClient.hermesApi.updateMcpServer(
+                        source.updateMcpServer(
                             serverName,
                             mapOf("env" to updatedEnv).toJsonObject(),
                         )
@@ -457,7 +460,7 @@ class McpServersViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.getMcpCatalog() }
+                    safeApiCall { source.getMcpCatalog() }
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -496,7 +499,7 @@ class McpServersViewModel(
                 )
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.installMcpCatalogEntry(request) }
+                    safeApiCall { source.installMcpCatalogEntry(request) }
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -561,7 +564,7 @@ class McpServersViewModel(
                     val result =
                         withContext(ioDispatcher) {
                             safeApiCall {
-                                ApiClient.hermesApi.authMcpServer(server.name)
+                                source.authMcpServer(server.name)
                             }
                         }
                     if (oauthStartGeneration != startGeneration) return@launch
@@ -676,7 +679,7 @@ class McpServersViewModel(
                             delay(McpOAuthPolicy.POLL_INTERVAL_MS)
                             val result =
                                 withContext(ioDispatcher) {
-                                    safeApiCall { ApiClient.hermesApi.getMcpOAuthFlowStatus(flowId) }
+                                    safeApiCall { source.getMcpOAuthFlowStatus(flowId) }
                                 }
                             if (_uiState.value.activeOAuthFlow?.flowId != flowId) {
                                 return@withTimeoutOrNull true

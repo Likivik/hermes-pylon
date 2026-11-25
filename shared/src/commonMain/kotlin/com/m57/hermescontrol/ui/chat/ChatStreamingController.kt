@@ -117,7 +117,11 @@ class ChatStreamingController(
                 )
             }
         }
-        uiState.update { it.copy(isAgentTyping = true) }
+        uiState.update {
+            it.copy(
+                transcript = it.transcript.copy(isAgentTyping = true),
+            )
+        }
     }
 
     fun handleThinkingDelta(event: WsEvent.ThinkingDelta) {

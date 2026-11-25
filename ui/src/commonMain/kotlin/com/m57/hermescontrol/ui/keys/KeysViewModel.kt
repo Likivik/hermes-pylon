@@ -7,9 +7,11 @@ import com.m57.hermescontrol.data.model.EnvVarConfig
 import com.m57.hermescontrol.data.model.EnvVarDeleteRequest
 import com.m57.hermescontrol.data.model.EnvVarRevealRequest
 import com.m57.hermescontrol.data.model.EnvVarUpdate
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.data.remote.source.DefaultKeys
+import com.m57.hermescontrol.data.remote.source.Keys
 import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.ui.common.safeLaunchLoad
 import kotlinx.coroutines.CoroutineDispatcher
@@ -53,6 +55,7 @@ private val CATEGORY_ORDER =
 
 class KeysViewModel(
     private val ioDispatcher: CoroutineDispatcher = AppEnvironment.current.io,
+    private val source: Keys = DefaultKeys(GatewayConnection.hermesApi),
 ) :
     ViewModel(),
         ToastHost {
@@ -96,7 +99,7 @@ class KeysViewModel(
     fun loadKeys() {
         safeLaunchLoad(
             ioDispatcher = ioDispatcher,
-            apiCall = { safeApiCall { ApiClient.hermesApi.getEnvVars() } },
+            apiCall = { safeApiCall { source.getEnvVars() } },
             onStart = { _uiState.update { it.copy(isLoading = true, errorMessage = null) } },
             onSuccess = { data ->
                 val envVars = data.orEmpty()
@@ -173,7 +176,7 @@ class KeysViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.updateEnvVar(EnvVarUpdate(key, value)) }
+                    safeApiCall { source.updateEnvVar(EnvVarUpdate(key, value)) }
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -221,7 +224,7 @@ class KeysViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.deleteEnvVar(EnvVarDeleteRequest(key)) }
+                    safeApiCall { source.deleteEnvVar(EnvVarDeleteRequest(key)) }
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -252,7 +255,7 @@ class KeysViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.revealEnvVar(EnvVarRevealRequest(key)) }
+                    safeApiCall { source.revealEnvVar(EnvVarRevealRequest(key)) }
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -286,7 +289,7 @@ class KeysViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.updateEnvVar(EnvVarUpdate(key, value)) }
+                    safeApiCall { source.updateEnvVar(EnvVarUpdate(key, value)) }
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -316,7 +319,7 @@ class KeysViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.restartGateway() }
+                    safeApiCall { source.restartGateway() }
                 }
             when (result) {
                 is NetworkResult.Success -> {

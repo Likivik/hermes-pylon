@@ -1,7 +1,5 @@
 package com.m57.hermescontrol.data.ws
 
-import io.mockk.every
-import io.mockk.mockkStatic
 import io.mockk.unmockkAll
 import kotlinx.serialization.json.JsonObject
 import org.junit.After
@@ -32,8 +30,6 @@ private fun createJsonRpcResponse(
 class EventParserTest {
     @Before
     fun setUp() {
-        mockkStatic(android.util.Log::class)
-        every { android.util.Log.w(any<String>(), any<String>()) } returns 0
     }
 
     @After
@@ -859,8 +855,6 @@ private fun privilegedEvent(
 class EventParserPrivilegedTest {
     @Before
     fun setUp() {
-        mockkStatic(android.util.Log::class)
-        every { android.util.Log.w(any<String>(), any<String>()) } returns 0
     }
 
     @After

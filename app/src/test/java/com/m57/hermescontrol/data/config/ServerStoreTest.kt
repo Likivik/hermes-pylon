@@ -2,6 +2,9 @@ package com.m57.hermescontrol.data.config
 
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
+import okio.buffer
+import okio.sink
+import okio.source
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -20,7 +23,7 @@ class ServerStoreTest {
         assertTrue(state.autoReconnect)
         assertEquals("token", state.wsAuthParam)
         assertTrue(state.connectionProfiles.isEmpty())
-        assertNull(state.selectedProfileId)
+        assertNull(state.selectedGatewayId)
         assertEquals(1.0f, state.chatFontScale)
         assertFalse(state.useDynamicColors)
     }
@@ -29,9 +32,9 @@ class ServerStoreTest {
     fun `explicit dynamic color choice survives serialization`() =
         runTest {
             val output = ByteArrayOutputStream()
-            ServerStoreSerializer.writeTo(ServerStoreState(useDynamicColors = true), output)
+            output.sink().buffer().use { ServerStoreSerializer.writeTo(ServerStoreState(useDynamicColors = true), it) }
 
-            val restored = ServerStoreSerializer.readFrom(ByteArrayInputStream(output.toByteArray()))
+            val restored = ServerStoreSerializer.readFrom(ByteArrayInputStream(output.toByteArray()).source().buffer())
 
             assertTrue(restored.useDynamicColors)
         }
@@ -40,12 +43,12 @@ class ServerStoreTest {
     fun `chat font scale survives serialization round trip and defaults for legacy state`() =
         runTest {
             val output = ByteArrayOutputStream()
-            ServerStoreSerializer.writeTo(ServerStoreState(chatFontScale = 1.3f), output)
+            output.sink().buffer().use { ServerStoreSerializer.writeTo(ServerStoreState(chatFontScale = 1.3f), it) }
 
-            val restored = ServerStoreSerializer.readFrom(ByteArrayInputStream(output.toByteArray()))
+            val restored = ServerStoreSerializer.readFrom(ByteArrayInputStream(output.toByteArray()).source().buffer())
             val legacy =
                 ServerStoreSerializer.readFrom(
-                    ByteArrayInputStream("{\"host\":\"127.0.0.1\"}".toByteArray()),
+                    ByteArrayInputStream("{\"host\":\"127.0.0.1\"}".toByteArray()).source().buffer(),
                 )
 
             assertEquals(1.3f, restored.chatFontScale)
@@ -55,7 +58,7 @@ class ServerStoreTest {
     @Test
     fun testPureOps_addOrUpdate() {
         val state = ServerStoreState()
-        val profile = ConnectionProfile(id = "1", name = "Test", host = "10.0.0.1", port = 8080)
+        val profile = GatewayInstance(id = "1", name = "Test", host = "10.0.0.1", port = 8080)
 
         val newState = state.addOrUpdate(profile)
         assertEquals(1, newState.connectionProfiles.size)
@@ -74,28 +77,28 @@ class ServerStoreTest {
         val state =
             ServerStoreState(
                 connectionProfiles = emptyList(),
-                selectedProfileId = "orphaned-id",
+                selectedGatewayId = "orphaned-id",
             )
         val healed = state.selfHealed()
-        assertNull(healed.selectedProfileId)
+        assertNull(healed.selectedGatewayId)
     }
 
     @Test
     fun testResolvedHostAndPort() {
-        val profile = ConnectionProfile(id = "prof-1", name = "Custom", host = "10.0.0.5", port = 8000)
+        val profile = GatewayInstance(id = "prof-1", name = "Custom", host = "10.0.0.5", port = 8000)
         val state =
             ServerStoreState(
                 host = "127.0.0.1",
                 port = 9119,
                 connectionProfiles = listOf(profile),
-                selectedProfileId = "prof-1",
+                selectedGatewayId = "prof-1",
             )
 
         assertEquals("10.0.0.5", state.resolvedHost)
         assertEquals(8000, state.resolvedPort)
 
         // Unselected
-        val unselectedState = state.copy(selectedProfileId = null)
+        val unselectedState = state.copy(selectedGatewayId = null)
         assertEquals("127.0.0.1", unselectedState.resolvedHost)
         assertEquals(9119, unselectedState.resolvedPort)
     }
@@ -110,13 +113,15 @@ class ServerStoreTest {
                 )
             val output = ByteArrayOutputStream()
 
-            ServerStoreSerializer.writeTo(
-                ServerStoreState(pinnedSessionIdsByProfile = expected),
-                output,
-            )
+            output.sink().buffer().use {
+                ServerStoreSerializer.writeTo(
+                    ServerStoreState(pinnedSessionIdsByProfile = expected),
+                    it,
+                )
+            }
             val restored =
                 ServerStoreSerializer.readFrom(
-                    ByteArrayInputStream(output.toByteArray()),
+                    ByteArrayInputStream(output.toByteArray()).source().buffer(),
                 )
 
             assertEquals(expected, restored.pinnedSessionIdsByProfile)
@@ -127,7 +132,7 @@ class ServerStoreTest {
         runTest {
             val restored =
                 ServerStoreSerializer.readFrom(
-                    ByteArrayInputStream("{\"host\":\"127.0.0.1\"}".toByteArray()),
+                    ByteArrayInputStream("{\"host\":\"127.0.0.1\"}".toByteArray()).source().buffer(),
                 )
 
             assertTrue(restored.pinnedSessionIdsByProfile.isEmpty())

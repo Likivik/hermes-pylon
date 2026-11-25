@@ -19,7 +19,11 @@ class ChatWsEventReducerTest {
                 sourceProfileId = "profile-a",
                 connectionGeneration = 8,
             )
-        val state = ChatUiState(currentSessionId = "session-1", clarifyRequest = existing)
+        val state =
+            ChatUiState(
+                transcript = TranscriptState(currentSessionId = "session-1"),
+                overlays = OverlaysState(clarifyRequest = existing),
+            )
         val invalidEvents =
             listOf(
                 WsEvent.ClarifyRequest(
@@ -75,7 +79,11 @@ class ChatWsEventReducerTest {
             )
         val result =
             ChatWsEventReducer.reduce(
-                state = ChatUiState(currentSessionId = "session-1", clarifyRequest = clarify),
+                state =
+                    ChatUiState(
+                        transcript = TranscriptState(currentSessionId = "session-1"),
+                        overlays = OverlaysState(clarifyRequest = clarify),
+                    ),
                 streamingState = StreamingState(),
                 event = WsEvent.ClarifyExpire("reused-id", "session-1", "profile-a", 7),
                 currentSessionId = "session-1",
@@ -97,7 +105,11 @@ class ChatWsEventReducerTest {
             )
         val result =
             ChatWsEventReducer.reduce(
-                state = ChatUiState(currentSessionId = "session-1", clarifyRequest = clarify),
+                state =
+                    ChatUiState(
+                        transcript = TranscriptState(currentSessionId = "session-1"),
+                        overlays = OverlaysState(clarifyRequest = clarify),
+                    ),
                 streamingState = StreamingState(),
                 event = WsEvent.ClarifyExpire("clarify-1", "session-1", "profile-a", 8),
                 currentSessionId = "session-1",
@@ -110,8 +122,8 @@ class ChatWsEventReducerTest {
     fun testMessageComplete_clearsResolvedClarifyRequest() {
         val state =
             ChatUiState(
-                currentSessionId = "session-1",
-                clarifyRequest = ClarifyUi("Old question", emptyList(), "clarify-1"),
+                transcript = TranscriptState(currentSessionId = "session-1"),
+                overlays = OverlaysState(clarifyRequest = ClarifyUi("Old question", emptyList(), "clarify-1")),
             )
 
         val result =
@@ -135,10 +147,7 @@ class ChatWsEventReducerTest {
                 toolStatus = ToolStatus.RUNNING,
             )
         val state =
-            ChatUiState(
-                messages = listOf(initialMessage),
-                currentSessionId = "session-1",
-            )
+            ChatUiState(transcript = TranscriptState(messages = listOf(initialMessage), currentSessionId = "session-1"))
         val event =
             WsEvent.ToolProgress(
                 name = "web_search",
@@ -171,10 +180,7 @@ class ChatWsEventReducerTest {
                 progressPreview = "writing...",
             )
         val state =
-            ChatUiState(
-                messages = listOf(initialMessage),
-                currentSessionId = "session-1",
-            )
+            ChatUiState(transcript = TranscriptState(messages = listOf(initialMessage), currentSessionId = "session-1"))
         val event =
             WsEvent.ToolGenerating(
                 name = "code_writer",
@@ -207,7 +213,8 @@ class ChatWsEventReducerTest {
                 progressPreview = "first",
             )
         val second = first.copy(toolCallId = "b", progressPreview = "second")
-        val state = ChatUiState(messages = listOf(first, second), currentSessionId = "session-1")
+        val state =
+            ChatUiState(transcript = TranscriptState(messages = listOf(first, second), currentSessionId = "session-1"))
         val progress =
             ChatWsEventReducer.reduce(
                 state,
@@ -264,7 +271,10 @@ class ChatWsEventReducerTest {
         val running =
             ChatMessage(role = MessageRole.TOOL, content = "", toolName = "terminal", toolStatus = ToolStatus.RUNNING)
         val completed = running.copy(toolStatus = ToolStatus.COMPLETED)
-        val state = ChatUiState(messages = listOf(completed, running), currentSessionId = "session-1")
+        val state =
+            ChatUiState(
+                transcript = TranscriptState(messages = listOf(completed, running), currentSessionId = "session-1"),
+            )
         val result =
             ChatWsEventReducer.reduce(
                 state,
@@ -278,10 +288,7 @@ class ChatWsEventReducerTest {
     @Test
     fun testSubagentEvent_appendsToSubagentIndicators() {
         val state =
-            ChatUiState(
-                currentSessionId = "session-1",
-                subagentIndicators = emptyList(),
-            )
+            ChatUiState(transcript = TranscriptState(currentSessionId = "session-1", subagentIndicators = emptyList()))
         val event =
             WsEvent.SubagentEvent(
                 type = "subagent.start",
@@ -327,8 +334,11 @@ class ChatWsEventReducerTest {
             )
         val state =
             ChatUiState(
-                currentSessionId = "session-1",
-                subagentIndicators = listOf(initialIndicator),
+                transcript =
+                    TranscriptState(
+                        currentSessionId = "session-1",
+                        subagentIndicators = listOf(initialIndicator),
+                    ),
             )
         val event =
             WsEvent.SubagentEvent(
@@ -373,8 +383,11 @@ class ChatWsEventReducerTest {
             )
         val state =
             ChatUiState(
-                currentSessionId = "session-1",
-                subagentIndicators = listOf(initialIndicator),
+                transcript =
+                    TranscriptState(
+                        currentSessionId = "session-1",
+                        subagentIndicators = listOf(initialIndicator),
+                    ),
             )
         val event =
             WsEvent.SubagentEvent(
@@ -408,7 +421,7 @@ class ChatWsEventReducerTest {
     fun testMessageStart_preservesReasoningFromPrecedingDelta() {
         val result =
             ChatWsEventReducer.reduce(
-                state = ChatUiState(currentSessionId = "session-1"),
+                state = ChatUiState(transcript = TranscriptState(currentSessionId = "session-1")),
                 streamingState =
                     StreamingState(
                         isReasoning = true,
@@ -429,7 +442,7 @@ class ChatWsEventReducerTest {
     fun testMessageComplete_fallsBackToMessageReasoning() {
         val result =
             ChatWsEventReducer.reduce(
-                state = ChatUiState(currentSessionId = "session-1"),
+                state = ChatUiState(transcript = TranscriptState(currentSessionId = "session-1")),
                 streamingState =
                     StreamingState(
                         streamingMessage =
@@ -451,7 +464,7 @@ class ChatWsEventReducerTest {
     fun testMessageComplete_withMediaDefersPersistenceUntilAttachmentExtraction() {
         val result =
             ChatWsEventReducer.reduce(
-                state = ChatUiState(currentSessionId = "session-1"),
+                state = ChatUiState(transcript = TranscriptState(currentSessionId = "session-1")),
                 streamingState = StreamingState(),
                 event = WsEvent.MessageComplete("Image\nMEDIA:/tmp/image.png", "session-1"),
                 currentSessionId = "session-1",
@@ -473,7 +486,7 @@ class ChatWsEventReducerTest {
 
         val result =
             ChatWsEventReducer.reduce(
-                state = ChatUiState(currentSessionId = "session-1"),
+                state = ChatUiState(transcript = TranscriptState(currentSessionId = "session-1")),
                 streamingState = StreamingState(streamingMessage = streamingMessage),
                 event = WsEvent.MessageDone("session-1"),
                 currentSessionId = "session-1",
@@ -493,10 +506,7 @@ class ChatWsEventReducerTest {
                 toolStatus = ToolStatus.RUNNING,
             )
         val state =
-            ChatUiState(
-                messages = listOf(initialMessage),
-                currentSessionId = "session-1",
-            )
+            ChatUiState(transcript = TranscriptState(messages = listOf(initialMessage), currentSessionId = "session-1"))
         val event =
             WsEvent.ToolProgress(
                 name = "web_search",
@@ -521,10 +531,7 @@ class ChatWsEventReducerTest {
     @Test
     fun testSubagentEvent_accumulatesLiveTranscriptLogs() {
         val state =
-            ChatUiState(
-                currentSessionId = "session-1",
-                subagentIndicators = emptyList(),
-            )
+            ChatUiState(transcript = TranscriptState(currentSessionId = "session-1", subagentIndicators = emptyList()))
         val startEvent =
             WsEvent.SubagentEvent(
                 type = "subagent.start",
@@ -582,8 +589,11 @@ class ChatWsEventReducerTest {
             )
         val state =
             ChatUiState(
-                currentSessionId = "session-1",
-                subagentIndicators = listOf(completedSubagent),
+                transcript =
+                    TranscriptState(
+                        currentSessionId = "session-1",
+                        subagentIndicators = listOf(completedSubagent),
+                    ),
             )
         val startEvent = WsEvent.MessageStart(sessionId = "session-1")
 
@@ -600,7 +610,7 @@ class ChatWsEventReducerTest {
 
     @Test
     fun testToolComplete_matchesConcurrentSameNameToolByCallId() {
-        val initialState = ChatUiState(currentSessionId = "session-1")
+        val initialState = ChatUiState(transcript = TranscriptState(currentSessionId = "session-1"))
         val firstStart =
             WsEvent.ToolStart(
                 name = "terminal",
@@ -656,23 +666,26 @@ class ChatWsEventReducerTest {
     fun testToolComplete_unknownCallIdDoesNotUseSameNameFallback() {
         val state =
             ChatUiState(
-                currentSessionId = "session-1",
-                messages =
-                    listOf(
-                        ChatMessage(
-                            role = MessageRole.TOOL,
-                            content = "a",
-                            toolName = "terminal",
-                            toolCallId = "call-a",
-                            toolStatus = ToolStatus.RUNNING,
-                        ),
-                        ChatMessage(
-                            role = MessageRole.TOOL,
-                            content = "b",
-                            toolName = "terminal",
-                            toolCallId = "call-b",
-                            toolStatus = ToolStatus.RUNNING,
-                        ),
+                transcript =
+                    TranscriptState(
+                        currentSessionId = "session-1",
+                        messages =
+                            listOf(
+                                ChatMessage(
+                                    role = MessageRole.TOOL,
+                                    content = "a",
+                                    toolName = "terminal",
+                                    toolCallId = "call-a",
+                                    toolStatus = ToolStatus.RUNNING,
+                                ),
+                                ChatMessage(
+                                    role = MessageRole.TOOL,
+                                    content = "b",
+                                    toolName = "terminal",
+                                    toolCallId = "call-b",
+                                    toolStatus = ToolStatus.RUNNING,
+                                ),
+                            ),
                     ),
             )
 
@@ -696,23 +709,26 @@ class ChatWsEventReducerTest {
     fun testToolOutputRisk_unknownCallIdDoesNotUseSameNameFallback() {
         val state =
             ChatUiState(
-                currentSessionId = "session-1",
-                messages =
-                    listOf(
-                        ChatMessage(
-                            role = MessageRole.TOOL,
-                            content = "a",
-                            toolName = "terminal",
-                            toolCallId = "call-a",
-                            toolStatus = ToolStatus.COMPLETED,
-                        ),
-                        ChatMessage(
-                            role = MessageRole.TOOL,
-                            content = "b",
-                            toolName = "terminal",
-                            toolCallId = "call-b",
-                            toolStatus = ToolStatus.COMPLETED,
-                        ),
+                transcript =
+                    TranscriptState(
+                        currentSessionId = "session-1",
+                        messages =
+                            listOf(
+                                ChatMessage(
+                                    role = MessageRole.TOOL,
+                                    content = "a",
+                                    toolName = "terminal",
+                                    toolCallId = "call-a",
+                                    toolStatus = ToolStatus.COMPLETED,
+                                ),
+                                ChatMessage(
+                                    role = MessageRole.TOOL,
+                                    content = "b",
+                                    toolName = "terminal",
+                                    toolCallId = "call-b",
+                                    toolStatus = ToolStatus.COMPLETED,
+                                ),
+                            ),
                     ),
             )
 
@@ -737,7 +753,7 @@ class ChatWsEventReducerTest {
 
     @Test
     fun testToolStart_extractsAgentTodos() {
-        val state = ChatUiState(currentSessionId = "session-1")
+        val state = ChatUiState(transcript = TranscriptState(currentSessionId = "session-1"))
         val todoEvent =
             WsEvent.ToolStart(
                 name = "todo",
@@ -784,7 +800,7 @@ class ChatWsEventReducerTest {
 
     @Test
     fun testReviewSummary_addsSystemMessage() {
-        val state = ChatUiState(currentSessionId = "session-1")
+        val state = ChatUiState(transcript = TranscriptState(currentSessionId = "session-1"))
         val event =
             WsEvent.ReviewSummary(
                 text = "💾 Self-improvement review: Skill 'android-ci' patched",

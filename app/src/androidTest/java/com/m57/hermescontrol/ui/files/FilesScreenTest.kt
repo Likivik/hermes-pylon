@@ -37,7 +37,7 @@ class FilesScreenTest {
         val launched = mutableListOf<DownloadedFile>()
 
         composeRule.setContent {
-            FilesScreen(viewModel = viewModel, launchDownloadedFile = launched::add)
+            FilesRoute(viewModel = viewModel, launchDownloadedFile = launched::add)
         }
 
         composeRule.onNodeWithText("gateway-image.png").assertIsDisplayed().performClick()

@@ -4,9 +4,9 @@ import com.m57.hermescontrol.data.model.McpServer
 import com.m57.hermescontrol.data.model.McpServerTestResponse
 import com.m57.hermescontrol.data.model.McpServerToolInfo
 import com.m57.hermescontrol.data.model.McpServersResponse
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.GatewayResponse
-import com.m57.hermescontrol.data.remote.HermesGatewayApi
+import com.m57.hermescontrol.data.remote.HermesApi
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -31,14 +31,14 @@ import java.util.concurrent.atomic.AtomicInteger
 @OptIn(ExperimentalCoroutinesApi::class)
 class McpServersViewModelTest {
     private val dispatcher = StandardTestDispatcher()
-    private lateinit var api: HermesGatewayApi
+    private lateinit var api: HermesApi
 
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
-        mockkObject(ApiClient)
+        mockkObject(GatewayConnection)
         api = mockk()
-        every { ApiClient.hermesApi } returns api
+        every { GatewayConnection.hermesApi } returns api
     }
 
     @After

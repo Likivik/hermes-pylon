@@ -1,30 +1,39 @@
 package com.m57.hermescontrol
 
 import android.app.Application
-import android.os.Build
-import coil.ImageLoader
-import coil.ImageLoaderFactory
-import coil.decode.GifDecoder
-import coil.decode.ImageDecoderDecoder
+import android.content.pm.ApplicationInfo
+import coil3.ImageLoader
+import coil3.PlatformContext
+import coil3.SingletonImageLoader
+import coil3.gif.GifDecoder
+import coil3.network.ktor3.KtorNetworkFetcherFactory
 import com.m57.hermescontrol.data.local.AuthManager
+import com.m57.hermescontrol.data.local.init
 import com.m57.hermescontrol.data.remote.AndroidAttachmentReader
 import com.m57.hermescontrol.data.remote.AndroidNetworkMonitor
 import com.m57.hermescontrol.data.remote.DashboardSessionTokenRefresher
+import com.m57.hermescontrol.data.remote.GatewayClientKind
 import com.m57.hermescontrol.data.remote.HermesHttpConfig
-import com.m57.hermescontrol.data.remote.OkHttpProvider
-import com.m57.hermescontrol.data.remote.createHermesHttpClient
+import com.m57.hermescontrol.data.remote.createGatewayTransportClient
+import com.m57.hermescontrol.data.remote.createMediaTransportClient
 import com.m57.hermescontrol.data.remote.installAttachmentReader
 import com.m57.hermescontrol.data.ws.HermesWsClient
 import com.m57.hermescontrol.data.ws.KtorWsTransport
 import com.m57.hermescontrol.ui.analytics.AnalyticsPreloader
-import com.m57.hermescontrol.util.AndroidLogSink
 import com.m57.hermescontrol.util.HermesLog
 import io.kseongbin.stacktrace.CrashLogger
 import io.kseongbin.stacktrace.CrashLoggerConfig
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+
+/** Application-lifetime scope for fire-and-forget work started at start-up. */
+private val refreshScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
 class HermesControlApp :
     Application(),
-    ImageLoaderFactory {
+    SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
         // Likivik patch: capture crashes + ANRs to an app-scoped dir so they can
@@ -39,9 +48,11 @@ class HermesControlApp :
             ),
         )
         AuthManager.init(this)
-        // Shared code logs through the :shared HermesLog facade; install the
-        // android.util.Log-backed sink (and its BuildConfig.DEBUG flag) here.
-        HermesLog.install(AndroidLogSink)
+        // Shared code logs through the :shared HermesLog facade; that facade hands
+        // the record to Kermit, whose Android writer is logcat. The severity gate
+        // comes from the manifest's debuggable flag rather than BuildConfig, which
+        // this module does not generate.
+        HermesLog.setDebugLogging((applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0)
         // Only Android can read a content:// attachment; install the reader here so
         // shared chat code can request the bytes without holding a Context.
         installAttachmentReader(AndroidAttachmentReader(this))
@@ -56,28 +67,40 @@ class HermesControlApp :
         // authorised by the session cookie that client's jar carries, and a
         // credential-less client is rejected with 401 before any ticket is read.
         HermesWsClient.installTransport(
-            KtorWsTransport(createHermesHttpClient(OkHttpProvider.websocket, HermesHttpConfig.streaming())),
+            KtorWsTransport(
+                createGatewayTransportClient(
+                    GatewayClientKind.Session,
+                    config = HermesHttpConfig.streaming(),
+                ),
+            ),
         )
         HermesWsClient.installHttpClient(
-            createHermesHttpClient(OkHttpProvider.probe, HermesHttpConfig.Probe),
+            createGatewayTransportClient(GatewayClientKind.Session, config = HermesHttpConfig.Probe),
         )
-        HermesWsClient.installLoopbackTokenRefresher { DashboardSessionTokenRefresher.refresh() }
+        // The refresher is suspend now (wasmJs has no `runBlocking`), and the
+        // WS hook is fire-and-forget: hand it a scope instead of a blocking call.
+        HermesWsClient.installLoopbackTokenRefresher {
+            refreshScope.launch { DashboardSessionTokenRefresher.refresh() }
+        }
         // Issue #537 follow-up (A): preload analytics in the background after launch
         // so the tab renders instantly when opened (the usage endpoint is slow on a
         // cold backend). Fire-and-forget; never blocks UI startup.
         AnalyticsPreloader.preload(this)
     }
 
-    override fun newImageLoader(): ImageLoader =
+    override fun newImageLoader(context: PlatformContext): ImageLoader =
         ImageLoader
-            .Builder(this)
-            .okHttpClient(OkHttpProvider.publicMedia)
+            .Builder(context)
             .components {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    add(ImageDecoderDecoder.Factory())
-                } else {
-                    add(GifDecoder.Factory())
-                }
-            }.crossfade(true)
+                // Public image URLs only: this fetcher carries no credentials, so
+                // authenticated gateway media keeps going through GatewayFileClient.
+                add(KtorNetworkFetcherFactory(httpClient = { publicMediaClient }))
+                add(GifDecoder.Factory())
+            }
             .build()
+
+    /** Credential-less Ktor client for public images. */
+    private val publicMediaClient by lazy {
+        createMediaTransportClient(token = null, cookieHeader = null)
+    }
 }

@@ -1,9 +1,9 @@
 package com.m57.hermescontrol.ui.logs
 
 import com.m57.hermescontrol.data.model.LogResponse
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.GatewayResponse
-import com.m57.hermescontrol.data.remote.HermesGatewayApi
+import com.m57.hermescontrol.data.remote.HermesApi
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -28,13 +28,13 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class LogsViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()
-    private val mockApi = mockk<HermesGatewayApi>()
+    private val mockApi = mockk<HermesApi>()
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        mockkObject(ApiClient)
-        every { ApiClient.hermesApi } returns mockApi
+        mockkObject(GatewayConnection)
+        every { GatewayConnection.hermesApi } returns mockApi
     }
 
     @After

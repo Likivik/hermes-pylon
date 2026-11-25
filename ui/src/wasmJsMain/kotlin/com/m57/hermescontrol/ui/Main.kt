@@ -12,33 +12,42 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFontFamilyResolver
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.ComposeViewport
 import com.m57.hermescontrol.data.model.StatusResponse
 import com.m57.hermescontrol.data.remote.CleartextPolicy
-import com.m57.hermescontrol.data.remote.HermesGatewayApi
+import com.m57.hermescontrol.data.remote.HermesApi
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.data.remote.createHermesHttpClient
 import com.m57.hermescontrol.data.theme.ThemePreference
 import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.app_name
+import com.m57.hermescontrol.generated.resources.landing_action_auth_login
+import com.m57.hermescontrol.generated.resources.landing_subtitle
 import com.m57.hermescontrol.generated.resources.landing_title
 import com.m57.hermescontrol.theme.HermesControlTheme
 import com.m57.hermescontrol.ui.diagnostics.DiagnosticsScreen
 import com.m57.hermescontrol.ui.icons.MaterialSymbol
 import com.m57.hermescontrol.ui.icons.MaterialSymbolPickerSection
+import com.m57.hermescontrol.ui.icons.materialSymbolsSubsetFamily
 import com.m57.hermescontrol.ui.landing.LandingScreen
 import kotlinx.browser.document
 import kotlinx.browser.window
+import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.skiko.wasm.onWasmReady
+import kotlin.js.js
 
 /**
  * Minimal wasmJs/browser entry point that proves the `:ui` web target
@@ -97,13 +106,98 @@ fun main() {
     onWasmReady {
         // Console sink for DevTools; the ring is always on inside HermesLog, so
         // diagnostics work even if this install never runs.
-        com.m57.hermescontrol.util.HermesLog.install(com.m57.hermescontrol.util.ConsoleLogSink())
+        com.m57.hermescontrol.util.HermesLog.setDebugLogging(com.m57.hermescontrol.BuildFlags.isDebug)
+        // The app needs the manager before the first composition reads its
+        // flows; the browser platform persists profiles in `localStorage` and
+        // keeps secrets and cookies in memory for the life of the tab.
+        com.m57.hermescontrol.data.local.AuthManager.init(
+            com.m57.hermescontrol.data.local.WebAuthPlatform(),
+        )
+        adoptVerifiedSession()
+        // The browser entry must install the same WS seams the Android entry does.
+        // Without them every socket call throws "WsAuthConfig not installed" during
+        // the first composition and the app renders nothing at all.
+        com.m57.hermescontrol.data.ws.HermesWsClient.installAuth(
+            com.m57.hermescontrol.data.local.AuthManager,
+        )
+        com.m57.hermescontrol.data.ws.HermesWsClient.installTransport(
+            com.m57.hermescontrol.data.ws.KtorWsTransport(),
+        )
+        // The browser reloads constantly, and a failed earlier session leaves AUTH_EXPIRED
+        // behind; connect() refuses to run from it, so the app would sit on
+        // "Reconnecting..." while REST works. The session above is verified, so clear it.
+        com.m57.hermescontrol.data.ws.HermesWsClient.clearStaleAuthExpiry()
+        // The gated handshake mints its ticket through this client; without it
+        // refreshWsTicketIfNeeded() returns "temporarily unavailable" forever and
+        // the app sits on "Reconnecting..." while REST keeps working. Same client
+        // the Android entry installs (HermesControlApp.kt).
+        com.m57.hermescontrol.data.ws.HermesWsClient.installHttpClient(
+            com.m57.hermescontrol.data.remote.createGatewayTransportClient(
+                com.m57.hermescontrol.data.remote.GatewayClientKind.Session,
+                config = com.m57.hermescontrol.data.remote.HermesHttpConfig.Probe,
+            ),
+        )
+        com.m57.hermescontrol.data.ws.HermesWsClient.connect()
         ComposeViewport(viewportContainer = document.body!!) {
             HermesControlTheme(themePreference = ThemePreference.DARK) {
-                PylonWebEntry()
+                // Plan §1.5: publish status + handshake-failure word for the browser test
+                // and for devtools. Redaction-safe by construction (WsDiagnostics.kt).
+                LaunchedEffect(Unit) { publishWsState() }
+                // The browser shell draws a branded loading screen and removes it
+                // on this signal. Removing it when the container appears is too
+                // early: Compose has a container but has painted nothing, so the
+                // user sees the landing layout with blank labels for a moment.
+                // Two frames means composition is done *and* a frame was drawn.
+                val fontResolver = LocalFontFamilyResolver.current
+                // Created in composition (Font(...) is @Composable) so the ~200 KB
+                // subset starts fetching immediately; the gate below then waits
+                // for it, guaranteeing rail/drawer glyphs never paint as tofu
+                // after the overlay leaves. The full 10.7 MB font is deliberately
+                // NOT awaited — it is fetched on demand for out-of-subset glyphs.
+                val iconSubsetFamily = materialSymbolsSubsetFamily(filled = true)
+                LaunchedEffect(Unit) {
+                    withFrameNanos { }
+                    withFrameNanos { }
+                    // The overlay must not leave until there is something to read.
+                    // Two separate waits, in order of what the user notices:
+                    //   1. strings — a resource file fetched by the runtime; until
+                    //      it lands every `stringResource` is unresolved, so the
+                    //      hero renders as shapes with no labels at all;
+                    //   2. the default font — glyphs resolve asynchronously too.
+                    // Awaiting the font alone was not enough: the overlay left
+                    // ~0.8 s before any text existed.
+                    // Best-effort by design: these warm the resource and font caches so the
+                    // landing paints with real text. A failure costs a fallback font for one
+                    // frame, while blocking here would delay the shell — so they stay
+                    // unlogged on purpose (inventory: intentional-ignore).
+                    runCatching {
+                        getString(Res.string.landing_title)
+                        getString(Res.string.landing_subtitle)
+                        getString(Res.string.landing_action_auth_login)
+                    }
+                    runCatching { fontResolver.preload(FontFamily.Default) }
+                    runCatching { fontResolver.preload(iconSubsetFamily) }
+                    withFrameNanos { }
+                    notifyBrowserShellReady()
+                }
+                // `?icons` still renders the icon-picker proof surface; every
+                // other URL is the real app.
+                if (window.location.search.contains("icons")) {
+                    PylonWebEntry()
+                } else {
+                    com.m57.hermescontrol.MainNavigation()
+                }
             }
         }
     }
+}
+
+// Tells index.html that the first frame is on screen, so its loading overlay can
+// go away at the right moment instead of on container creation. No-op when the
+// shell is not the stock one (native builds never call this).
+@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)
+private fun notifyBrowserShellReady() {
+    js("typeof window.__pylonReady === 'function' && window.__pylonReady()")
 }
 
 private sealed interface GatewayStatusUi {
@@ -122,6 +216,17 @@ private sealed interface GatewayStatusUi {
 
 @Composable
 private fun PylonWebEntry() {
+    // A 401 anywhere in the app means the session is gone. On the web that must
+    // leave for the HTML sign-in page rather than fall through to the Compose
+    // one, which no password manager can fill.
+    val sessionExpired by com.m57.hermescontrol.data.local.AuthSessionState.signInRequired.collectAsState()
+    LaunchedEffect(sessionExpired) {
+        if (sessionExpired) {
+            com.m57.hermescontrol.ui.authlogin.handleSignOut(
+                com.m57.hermescontrol.ui.authlogin.SignOutReason.SESSION_EXPIRED,
+            )
+        }
+    }
     // Icon-picker proof surface: `?icons` renders the Material Symbols picker
     // instead of the landing page. Same component the rail would host, so the
     // screenshot is of production code rather than a mock.
@@ -310,7 +415,7 @@ private suspend fun fetchGatewayStatus(): GatewayStatusUi {
             return GatewayStatusUi.Failed("bad endpoint: ${e.message}")
         }
 
-    val api = HermesGatewayApi(createHermesHttpClient(), endpoint.baseUrl)
+    val api = HermesApi(createHermesHttpClient(), endpoint.baseUrl)
 
     return try {
         val response = api.getStatus()
@@ -333,4 +438,83 @@ private suspend fun fetchGatewayStatus(): GatewayStatusUi {
     } catch (e: Throwable) {
         GatewayStatusUi.Failed(e.message ?: e::class.simpleName ?: "unknown error")
     }
+}
+
+/**
+ * Kotlin/Wasm only allows `js(...)` as a single expression in a top-level
+ * function body, so the interop read lives here rather than inline.
+ */
+@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)
+private fun pylonSessionState(): String = js("window.__pylonSession || 'unknown'")
+
+/**
+ * Adopt the session that `index.html` verified, and only that.
+ *
+ * The gate probes `api/profiles` before it loads this module and records the
+ * answer on `window.__pylonSession`. Three outcomes matter here:
+ *
+ * - `ok` — the server confirmed a session a moment ago, so the app adopts it
+ *   instead of asking for the password a second time.
+ * - `error` — the server could not be asked. Nothing may be assumed: adopting
+ *   here would invent a session, and every later request would 401 anyway.
+ * - anything else — no adoption; the app's own auth handling takes over.
+ *
+ * This is the same three steps `connectBasicAuth` performs after a successful
+ * POST, minus the POST: point the profile at the page origin, switch the
+ * WebSocket to a handshake ticket (cookie auth, not a bearer token), and mark
+ * the session authenticated. The cookie stays in the browser, so a reload
+ * re-adopts it the same way.
+ */
+private fun adoptVerifiedSession() {
+    if (pylonSessionState() != "ok") return
+    runCatching {
+        val manager = com.m57.hermescontrol.data.local.AuthManager
+        val origin = window.location.origin
+        // Only when unset: a profile pointed at another server keeps it.
+        if (manager.getBaseUrl().isBlank()) manager.setBaseUrl(origin)
+        manager.setWsAuthParam("ticket")
+
+        // The sign-in page authenticates the browser, so it cannot register the
+        // connection the way the Compose sign-in did — and Settings would open on
+        // an empty Connections list. Naming the page origin as a profile is the
+        // app-side half of adoption, and it lives here rather than on the HTML
+        // page because only the app knows what a profile is.
+        seedProfileForThisOrigin(manager, origin)
+
+        com.m57.hermescontrol.data.local.AuthSessionState.markAuthenticated()
+        com.m57.hermescontrol.data.remote.GatewayConnection.rebuild()
+        com.m57.hermescontrol.data.ws.HermesWsClient.connect()
+    }.onFailure {
+        // Never silent: a failure here can leave the profile on token auth (or with no
+        // base URL), which is the shape of the "Reconnecting..." banner this campaign
+        // spent an evening on. The exception summary is enough to tell which step broke.
+        com.m57.hermescontrol.util.HermesLog.w(
+            "WebSession",
+            "session adoption failed: ${it.message ?: it::class.simpleName}",
+        )
+    }
+}
+
+/**
+ * Make the page origin visible in Settings → Connections.
+ *
+ * Idempotent: an existing profile for this origin is left exactly as it is, and
+ * an existing selection is kept. Only the "signed in to this web build and the
+ * list is empty" case adds anything, which is every first visit through
+ * `login.html`.
+ */
+private fun seedProfileForThisOrigin(
+    manager: com.m57.hermescontrol.data.local.AuthManager,
+    origin: String,
+) {
+    val seeding =
+        com.m57.hermescontrol.data.local.profileSeedingFor(
+            profiles = manager.getGatewayInstances(),
+            selectedId = manager.getSelectedProfileId(),
+            origin = origin,
+            displayName = window.location.hostname.ifBlank { "Pylon" },
+            defaultProfileId = com.m57.hermescontrol.data.local.AuthManager.DEFAULT_PROFILE_ID,
+            defaultBaseUrl = com.m57.hermescontrol.data.remote.ServerEndpoint.DEFAULT_BASE_URL,
+        ) ?: return
+    manager.saveGatewayInstancesAndSelect(seeding.profiles, seeding.selectedId, null)
 }

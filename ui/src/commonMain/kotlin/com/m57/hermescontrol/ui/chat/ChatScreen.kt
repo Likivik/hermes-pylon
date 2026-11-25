@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Snackbar
@@ -62,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.m57.hermescontrol.HistoryScreen
 import com.m57.hermescontrol.NavigationController
+import com.m57.hermescontrol.data.local.AuthSessionState
 import com.m57.hermescontrol.data.local.rememberPreferencesStore
 import com.m57.hermescontrol.data.model.capabilitiesFor
 import com.m57.hermescontrol.data.ws.ConnectionStatus
@@ -451,6 +453,7 @@ fun ChatScreen(
                         order = homeOrder,
                         archiveOpen = archiveOpen,
                         reordering = reordering,
+                        status = state.railStatus,
                     ),
                 onEvent = { event ->
                     when (event) {
@@ -465,6 +468,10 @@ fun ChatScreen(
                         is RailEvent.Reorder -> viewModel.setRailOrder(event.order)
                         is RailEvent.ToggleReorder -> reordering = !reordering
                         is RailEvent.ArchiveToggle -> archiveOpen = event.open
+                        // The rail only emits these when it has no rows: retry the
+                        // listing, or go to sign-in when the session expired.
+                        is RailEvent.Retry -> viewModel.refreshSessions()
+                        is RailEvent.SignIn -> AuthSessionState.requireSignIn()
                     }
                 },
             )
@@ -577,6 +584,32 @@ fun ChatScreen(
                             }
                         }
                     }
+                    // A failed refresh keeps the transcript and says so. Never blank, never silent.
+                    state.staleSince?.let {
+                        Surface(
+                            modifier = Modifier.align(Alignment.TopCenter).padding(top = Spacing.xs),
+                            shape = RoundedCornerShape(50),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
+                            tonalElevation = 1.dp,
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(start = 12.dp, end = 4.dp),
+                            ) {
+                                Text(
+                                    text = "Out of date",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                TextButton(onClick = { viewModel.retryHistory() }) {
+                                    Text(
+                                        text = "Retry",
+                                        style = MaterialTheme.typography.labelSmall,
+                                    )
+                                }
+                            }
+                        }
+                    }
                     ChatMessageList(
                         messages = state.messages,
                         streamingMessage = streamingState.streamingMessage,
@@ -604,8 +637,20 @@ fun ChatScreen(
                         onImageClick = { viewingImage = it },
                     )
 
-                    // Loading overlay
-                    ChatLoadingOverlay(isLoading = state.isLoading)
+                    // The blocking overlay means "not connected yet". A history load on a live
+                    // socket is not a connection problem: it gets a hairline bar instead of a
+                    // full-screen card, so switching sessions no longer blanks the screen.
+                    ChatLoadingOverlay(isLoading = !state.isConnected && !state.hasConnectedOnce)
+                    if (state.isLoading && state.isConnected) {
+                        LinearProgressIndicator(
+                            modifier =
+                                Modifier
+                                    .align(Alignment.TopCenter)
+                                    .fillMaxWidth()
+                                    .height(2.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
 
                     // Scroll-to-bottom FAB (issue #682): shows while follow is
                     // paused and renders the unseen-message badge.

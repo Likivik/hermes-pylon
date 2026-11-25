@@ -1,6 +1,6 @@
 package com.m57.hermescontrol.data.model
 
-import com.m57.hermescontrol.data.remote.OkHttpProvider
+import com.m57.hermescontrol.data.remote.HermesJson
 import kotlinx.serialization.decodeFromString
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -9,7 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ProfileBotsTest {
-    private val json = OkHttpProvider.json
+    private val json = HermesJson.instance
 
     @Test
     fun `legacy profile response remains compatible`() {

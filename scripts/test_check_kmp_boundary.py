@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from check_kmp_boundary import scan, strip_comments  # noqa: E402
+from check_kmp_boundary import scan, scan_constructs, strip_comments  # noqa: E402
 
 
 def write(base: Path, relative: str, text: str) -> None:
@@ -59,6 +59,20 @@ class ScanTest(unittest.TestCase):
             self.assertEqual(1, len(missing))
             self.assertIn("androidMain", missing[0])
 
+    def test_desktop_web_actual_satisfies_both_targets(self) -> None:
+        """An actual in the jvm+wasm intermediate set counts for both targets.
+
+        Same rule as `jvmAndroidMain`: the intermediate directory is compiled
+        into every target that depends on it, so one file there satisfies the
+        expect for both.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp) / "src"
+            write(base, "commonMain/Toast.kt", "expect fun toast(): Unit\n")
+            write(base, "desktopWebMain/Toast.desktopWeb.kt", "actual fun toast(): Unit = Unit\n")
+            _, missing = scan(base)
+            self.assertEqual([], missing)
+
     def test_untargeted_source_set_is_ignored(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp) / "src"
@@ -88,6 +102,76 @@ class ScanTest(unittest.TestCase):
             _, missing = scan(base)
             self.assertEqual(1, len(missing))
             self.assertIn("removeIfValue", missing[0])
+
+
+class UiPolicyTest(unittest.TestCase):
+    """`:ui` is Compose Multiplatform: KMP androidx is fine, Android-only is not."""
+
+    def _scan_ui(self, imports: str) -> list[str]:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp) / "ui" / "src"
+            write(base, "commonMain/A.kt", imports)
+            violations, _ = scan(base)
+            return violations
+
+    def test_compose_multiplatform_imports_are_allowed(self) -> None:
+        violations = self._scan_ui(
+            "import androidx.compose.runtime.getValue\n"
+            "import androidx.compose.runtime.mutableStateOf\n"
+            "import androidx.lifecycle.ViewModel\n",
+        )
+        self.assertEqual([], violations)
+
+    def test_android_platform_import_is_rejected(self) -> None:
+        violations = self._scan_ui("import android.content.Context\n")
+        self.assertEqual(1, len(violations))
+        self.assertIn("android.content.Context", violations[0])
+
+    def test_non_kmp_androidx_artifact_is_rejected(self) -> None:
+        violations = self._scan_ui("import androidx.room.Room\n")
+        self.assertEqual(1, len(violations))
+        self.assertIn("androidx.room.Room", violations[0])
+
+    def test_shared_still_forbids_androidx(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp) / "shared" / "src"
+            write(base, "commonMain/A.kt", "import androidx.compose.runtime.getValue\n")
+            violations, _ = scan(base)
+            self.assertEqual(1, len(violations))
+
+
+class ConstructScanTest(unittest.TestCase):
+    """The import scan cannot see a symbol; these constructs need their own check."""
+
+    def scan_text(self, text: str) -> list[str]:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp) / "ui" / "src"
+            write(base, "commonMain/A.kt", text)
+            return scan_constructs(module_dir=base)
+
+    def test_system_clock_is_reported(self) -> None:
+        hits = self.scan_text("fun a(): Long = System.currentTimeMillis()\n")
+        self.assertEqual(len(hits), 1)
+        self.assertIn("System", hits[0])
+
+    def test_run_blocking_is_reported(self) -> None:
+        hits = self.scan_text("fun a() { runBlocking { } }\n")
+        self.assertEqual(len(hits), 1)
+        self.assertIn("runBlocking", hits[0])
+
+    def test_synchronized_needs_an_excuse(self) -> None:
+        self.assertEqual(len(self.scan_text("fun a() { synchronized(Any()) { } }\n")), 1)
+
+    def test_atomicfu_import_excuses_synchronized(self) -> None:
+        text = "import kotlinx.atomicfu.locks.synchronized\nfun a() { synchronized(Any()) { } }\n"
+        self.assertEqual(self.scan_text(text), [])
+
+    def test_comment_mentions_do_not_count(self) -> None:
+        text = "/** Was System.currentTimeMillis(). */\nfun a(): Long = 0L\n"
+        self.assertEqual(self.scan_text(text), [])
+
+    def test_clean_common_code_reports_nothing(self) -> None:
+        self.assertEqual(self.scan_text("fun a(): Long = nowMillis()\n"), [])
 
 
 if __name__ == "__main__":

@@ -12,9 +12,11 @@ import com.m57.hermescontrol.data.model.Skill
 import com.m57.hermescontrol.data.model.UpdateProfileDescriptionRequest
 import com.m57.hermescontrol.data.model.UpdateProfileModelRequest
 import com.m57.hermescontrol.data.model.UpdateProfileSoulRequest
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.data.remote.source.DefaultProfiles
+import com.m57.hermescontrol.data.remote.source.Profiles
 import com.m57.hermescontrol.ui.common.ToastHost
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.async
@@ -31,6 +33,10 @@ data class ProfilesUiState(
     val isLoading: Boolean = false,
     val profiles: List<ProfileInfo> = emptyList(),
     val activeProfileName: String? = null,
+    /** What the gateway process actually serves (`current`); may lag the selection. */
+    val activatedProfileName: String? = null,
+    /** Set while the selection has not been activated by the gateway. */
+    val pendingProfileName: String? = null,
     val selectedSoulContent: String? = null,
     val isLoadingSoul: Boolean = false,
     val errorMessage: String? = null,
@@ -45,6 +51,7 @@ data class ProfilesUiState(
 
 class ProfilesViewModel(
     private val ioDispatcher: CoroutineDispatcher = AppEnvironment.current.io,
+    private val source: Profiles = DefaultProfiles(GatewayConnection.hermesApi),
 ) :
     ViewModel(),
         ToastHost {
@@ -56,9 +63,9 @@ class ProfilesViewModel(
         viewModelScope.launch {
             try {
                 coroutineScope {
-                    val profilesDeferred = async(ioDispatcher) { safeApiCall { ApiClient.hermesApi.getProfiles() } }
+                    val profilesDeferred = async(ioDispatcher) { safeApiCall { source.getProfiles() } }
                     val activeDeferred =
-                        async(ioDispatcher) { safeApiCall { ApiClient.hermesApi.getActiveProfile() } }
+                        async(ioDispatcher) { safeApiCall { source.getActiveProfile() } }
 
                     val profilesResult = profilesDeferred.await()
                     val activeResult = activeDeferred.await()
@@ -69,6 +76,14 @@ class ProfilesViewModel(
                                 isLoading = false,
                                 profiles = profilesResult.data.profiles.orEmpty(),
                                 activeProfileName = activeResult.data.active,
+                                activatedProfileName = activeResult.data.current,
+                            )
+                        }
+                        // First sight of the gateway: adopt the serving profile as the
+                        // selection, so requests are scoped before the user picks anything.
+                        if (GatewayConnection.selectedProfileId == null) {
+                            GatewayConnection.setSelectedProfile(
+                                activeResult.data.current ?: activeResult.data.active,
                             )
                         }
                     } else {
@@ -92,26 +107,55 @@ class ProfilesViewModel(
         }
     }
 
+    /**
+     * Select a profile and scope the app to it.
+     *
+     * Success means the *app* now reads that profile's data — the client is rebuilt with
+     * `profile=<name>`, so every request follows. It does **not** mean the gateway process
+     * switched: `POST /api/profiles/active` only writes a preference, and `current` does not
+     * follow it (measured; see #208). When the two differ the UI says so instead of claiming
+     * a switch that did not happen.
+     */
     fun selectActiveProfile(name: String) {
-        val originalActive = _uiState.value.activeProfileName
-        // Optimistically update active profile name
-        _uiState.update { it.copy(activeProfileName = name) }
+        val previous = _uiState.value.activeProfileName
+        ProfileScope.repository.select(name)
+        _uiState.update { it.copy(activeProfileName = name, pendingProfileName = name) }
 
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.setActiveProfile(SetActiveProfileRequest(name)) }
+                    safeApiCall { source.setActiveProfile(SetActiveProfileRequest(name)) }
                 }
             when (result) {
                 is NetworkResult.Success -> {
-                    _uiState.update { it.copy(toastMessage = "Switched to profile $name") }
+                    val pair =
+                        withContext(ioDispatcher) {
+                            safeApiCall { source.getActiveProfile() }
+                        }
+                    val activated = (pair as? NetworkResult.Success)?.data?.current
+                    val outcome = profileSwitchOutcome(name, activated)
+                    _uiState.update {
+                        it.copy(
+                            activatedProfileName = activated,
+                            pendingProfileName = (outcome as? ProfileSwitch.Pending)?.selected,
+                            toastMessage =
+                                when (outcome) {
+                                    is ProfileSwitch.Activated -> "Switched to profile $name"
+                                    is ProfileSwitch.Pending ->
+                                        "Browsing $name — the gateway still serves ${outcome.serving ?: "another profile"}"
+                                },
+                        )
+                    }
                     loadProfiles()
                 }
 
                 is NetworkResult.Failure -> {
+                    // The request never landed: put the app back where the user was.
+                    GatewayConnection.setSelectedProfile(previous)
                     _uiState.update {
                         it.copy(
-                            activeProfileName = originalActive,
+                            activeProfileName = previous,
+                            pendingProfileName = null,
                             toastMessage = "Failed to switch profile: ${result.error.message}",
                         )
                     }
@@ -125,7 +169,7 @@ class ProfilesViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.getProfileSoul(profileName) }
+                    safeApiCall { source.getProfileSoul(profileName) }
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -157,7 +201,7 @@ class ProfilesViewModel(
             val result =
                 withContext(ioDispatcher) {
                     safeApiCall {
-                        ApiClient.hermesApi.updateProfileSoul(
+                        source.updateProfileSoul(
                             profileName,
                             UpdateProfileSoulRequest(content),
                         )
@@ -194,7 +238,7 @@ class ProfilesViewModel(
             val result =
                 withContext(ioDispatcher) {
                     safeApiCall {
-                        ApiClient.hermesApi.updateProfileModel(
+                        source.updateProfileModel(
                             profileName,
                             UpdateProfileModelRequest(provider, model),
                         )
@@ -234,7 +278,7 @@ class ProfilesViewModel(
             val result =
                 withContext(ioDispatcher) {
                     safeApiCall {
-                        ApiClient.hermesApi.createProfile(
+                        source.createProfile(
                             CreateProfileRequest(
                                 name = newProfileName,
                                 clone_from = sourceProfileName,
@@ -273,7 +317,7 @@ class ProfilesViewModel(
             val result =
                 withContext(ioDispatcher) {
                     safeApiCall {
-                        ApiClient.hermesApi.updateProfileDescription(
+                        source.updateProfileDescription(
                             profileName,
                             UpdateProfileDescriptionRequest(description),
                         )
@@ -306,8 +350,8 @@ class ProfilesViewModel(
         viewModelScope.launch {
             try {
                 coroutineScope {
-                    val modelsDeferred = async(ioDispatcher) { safeApiCall { ApiClient.hermesApi.getModelOptions() } }
-                    val skillsDeferred = async(ioDispatcher) { safeApiCall { ApiClient.hermesApi.getSkills() } }
+                    val modelsDeferred = async(ioDispatcher) { safeApiCall { source.getModelOptions() } }
+                    val skillsDeferred = async(ioDispatcher) { safeApiCall { source.getSkills() } }
 
                     val modelsResult = modelsDeferred.await()
                     val skillsResult = skillsDeferred.await()
@@ -350,7 +394,7 @@ class ProfilesViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.searchSkillsHub(query) }
+                    safeApiCall { source.searchSkillsHub(query) }
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -382,7 +426,7 @@ class ProfilesViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.createProfile(request) }
+                    safeApiCall { source.createProfile(request) }
                 }
             when (result) {
                 is NetworkResult.Success -> {

@@ -41,8 +41,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.m57.hermescontrol.GatewayScreen
 import com.m57.hermescontrol.NavigationController
-import com.m57.hermescontrol.SettingsConnection
 import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.content_desc_active_model
 import com.m57.hermescontrol.generated.resources.content_desc_pinned_section_toggle
@@ -123,7 +123,7 @@ fun ModelScreen(
                     title = stringResource(Res.string.model_empty_title),
                     subtitle = stringResource(Res.string.model_empty_desc),
                     actionLabel = stringResource(Res.string.empty_action_configure_model),
-                    onAction = { NavigationController.navigateTo(SettingsConnection) },
+                    onAction = { NavigationController.navigateTo(GatewayScreen) },
                     modifier = Modifier.padding(paddingValues),
                 )
             }

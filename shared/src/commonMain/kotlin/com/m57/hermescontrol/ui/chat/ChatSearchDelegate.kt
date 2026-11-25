@@ -34,7 +34,11 @@ class ChatSearchDelegate(
         if (current.isSearchActive) {
             clearSearch()
         } else {
-            uiState.update { it.copy(isSearchActive = true, searchQuery = "") }
+            uiState.update {
+                it.copy(
+                    overlays = it.overlays.copy(isSearchActive = true, searchQuery = ""),
+                )
+            }
         }
     }
 
@@ -44,9 +48,12 @@ class ChatSearchDelegate(
         if (query.isBlank()) {
             uiState.update {
                 it.copy(
-                    searchQuery = query,
-                    searchMatchIndices = emptyList(),
-                    currentSearchMatchIndex = -1,
+                    overlays =
+                        it.overlays.copy(
+                            searchQuery = query,
+                            searchMatchIndices = emptyList(),
+                            currentSearchMatchIndex = -1,
+                        ),
                 )
             }
             return
@@ -54,7 +61,9 @@ class ChatSearchDelegate(
 
         // Keep local state in sync immediately so UI feels responsive.
         uiState.update {
-            it.copy(searchQuery = query)
+            it.copy(
+                overlays = it.overlays.copy(searchQuery = query),
+            )
         }
 
         searchJob =
@@ -72,8 +81,11 @@ class ChatSearchDelegate(
             // Only update indices if the search query hasn't changed in the meantime
             if (it.searchQuery == query) {
                 it.copy(
-                    searchMatchIndices = indices,
-                    currentSearchMatchIndex = if (indices.isNotEmpty()) 0 else -1,
+                    overlays =
+                        it.overlays.copy(
+                            searchMatchIndices = indices,
+                            currentSearchMatchIndex = if (indices.isNotEmpty()) 0 else -1,
+                        ),
                 )
             } else {
                 it
@@ -91,7 +103,9 @@ class ChatSearchDelegate(
                     matchCount = indices.size,
                     direction = direction,
                 )
-            state.copy(currentSearchMatchIndex = newIdx)
+            state.copy(
+                overlays = state.overlays.copy(currentSearchMatchIndex = newIdx),
+            )
         }
     }
 
@@ -99,10 +113,13 @@ class ChatSearchDelegate(
         searchJob?.cancel()
         uiState.update {
             it.copy(
-                isSearchActive = false,
-                searchQuery = "",
-                searchMatchIndices = emptyList(),
-                currentSearchMatchIndex = -1,
+                overlays =
+                    it.overlays.copy(
+                        isSearchActive = false,
+                        searchQuery = "",
+                        searchMatchIndices = emptyList(),
+                        currentSearchMatchIndex = -1,
+                    ),
             )
         }
     }

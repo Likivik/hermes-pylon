@@ -5,10 +5,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -40,6 +43,10 @@ fun TelegramOnboardingDialog(
     onApply: () -> Unit,
 ) {
     AlertDialog(
+        // The app is edge-to-edge, so adjustResize no longer moves anything: insets must be
+        // applied by hand. A dialog is its own window, so the screen-level imePadding() in
+        // ChatScreen cannot help here (same pattern as ModelPickerDialog).
+        modifier = Modifier.windowInsetsPadding(WindowInsets.ime),
         onDismissRequest = onDismiss,
         title = {
             Text(

@@ -6,15 +6,15 @@ import android.app.Application
 import android.content.ContentResolver
 import android.content.Intent
 import android.net.Uri
-import android.util.Log
 import androidx.core.content.FileProvider
+import androidx.lifecycle.viewModelScope
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.local.ChatMessageEntity
 import com.m57.hermescontrol.data.local.HermesDatabase
 import com.m57.hermescontrol.data.model.Attachment
 import com.m57.hermescontrol.data.model.AttachmentSource
 import com.m57.hermescontrol.data.remote.AndroidAttachmentReader
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.GatewayFile
 import com.m57.hermescontrol.data.remote.GatewayFileClient
 import com.m57.hermescontrol.data.remote.GatewayFileResult
@@ -37,6 +37,7 @@ import com.m57.hermescontrol.ui.chat.fakes.FakeChatMessageDao
 import com.m57.hermescontrol.ui.chat.fakes.FakeChatPersistenceRepository
 import com.m57.hermescontrol.ui.chat.fakes.FakeSlashUsageStore
 import com.m57.hermescontrol.ui.chat.fakes.testChatEnvironment
+import com.m57.hermescontrol.ui.chat.rail.RailLoadStatus
 import com.m57.hermescontrol.ui.common.FakeStringResolver
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -52,6 +53,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -91,7 +93,7 @@ class ChatViewModelTest {
     private lateinit var resolver: FakeStringResolver
     private lateinit var fakeRepo: FakeChatPersistenceRepository
     private lateinit var fakeSlashUsageStore: FakeSlashUsageStore
-    private lateinit var mockApi: com.m57.hermescontrol.data.remote.HermesGatewayApi
+    private lateinit var mockApi: com.m57.hermescontrol.data.remote.HermesApi
 
     /** Counter used to generate unique WS request IDs. */
     private var reqCount = 0
@@ -107,11 +109,6 @@ class ChatViewModelTest {
         // 383ms per test (measured), but the alternative - letting android.jar
         // stubs return defaults via isReturnDefaultValues - changes Uri/TextUtils
         // semantics globally and destabilised 31 ViewModel tests. Costly, correct.
-        mockkStatic(Log::class)
-        every { Log.d(any(), any()) } returns 0
-        every { Log.i(any(), any()) } returns 0
-        every { Log.w(any(), any<String>()) } returns 0
-        every { Log.e(any(), any()) } returns 0
 
         mockkStatic(Dispatchers::class)
         every { Dispatchers.IO } returns testDispatcher
@@ -120,7 +117,7 @@ class ChatViewModelTest {
         mockkObject(AuthManager)
         every { AuthManager.getPinnedModels() } returns emptyList()
         mockkObject(HermesWsClient)
-        mockkObject(ApiClient)
+        mockkObject(GatewayConnection)
         mockkObject(HermesDatabase)
 
         app = mockk(relaxed = true)
@@ -181,7 +178,7 @@ class ChatViewModelTest {
 
         // Stub model-options so preloadModelOptions() (fired at GatewayReady) is safe.
         mockApi = mockk(relaxed = true)
-        every { ApiClient.hermesApi } returns mockApi
+        every { GatewayConnection.hermesApi } returns mockApi
         coEvery { mockApi.getModelInfo() } returns
             GatewayResponse.success(
                 com.m57.hermescontrol.data.model.ModelInfoResponse(
@@ -214,12 +211,24 @@ class ChatViewModelTest {
 
     @After
     fun tearDown() {
+        createdViewModels.forEach { it.viewModelScope.cancel() }
+        createdViewModels.clear()
         Dispatchers.resetMain()
         installAttachmentReader(null)
         unmockkAll()
+        // Clears reconnect/timeout jobs the production client left behind.
+        HermesWsClient.cancelBackgroundWorkForTest()
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
+
+    private val createdViewModels = mutableListOf<ChatViewModel>()
+
+    /** Registers a ViewModel so `tearDown` can cancel its scope. */
+    private fun track(vm: ChatViewModel): ChatViewModel {
+        createdViewModels += vm
+        return vm
+    }
 
     private fun cachedEntity(
         sessionId: String,
@@ -257,14 +266,16 @@ class ChatViewModelTest {
 
     /** Create a ViewModel with the fake repo injected directly. */
     private fun createViewModel(startCleanup: Boolean = false): ChatViewModel =
-        ChatViewModel(
-            testChatEnvironment(fakeSlashUsageStore),
-            resolver,
-            startCleanup,
-            fakeRepo,
-            fakeSlashUsageStore,
-            testDispatcher,
-            io = testDispatcher,
+        track(
+            ChatViewModel(
+                testChatEnvironment(fakeSlashUsageStore),
+                resolver,
+                startCleanup,
+                fakeRepo,
+                fakeSlashUsageStore,
+                testDispatcher,
+                io = testDispatcher,
+            ),
         )
 
     /**
@@ -779,16 +790,18 @@ class ChatViewModelTest {
             val selectedProfile = MutableStateFlow("profile-a")
             every { AuthManager.getSelectedProfileId() } answers { selectedProfile.value }
             val viewModel =
-                ChatViewModel(
-                    testChatEnvironment(fakeSlashUsageStore),
-                    resolver,
-                    false,
-                    fakeRepo,
-                    fakeSlashUsageStore,
-                    testDispatcher,
-                    io = testDispatcher,
-                    selectedProfileId = { selectedProfile.value },
-                    selectedProfileIds = selectedProfile,
+                track(
+                    ChatViewModel(
+                        testChatEnvironment(fakeSlashUsageStore),
+                        resolver,
+                        false,
+                        fakeRepo,
+                        fakeSlashUsageStore,
+                        testDispatcher,
+                        io = testDispatcher,
+                        selectedGatewayId = { selectedProfile.value },
+                        selectedProfileIds = selectedProfile,
+                    ),
                 )
             fakeSlashUsageStore.recordUse("profile-a", "/help")
             fakeSlashUsageStore.recordUse("profile-b", "/resume")
@@ -1696,7 +1709,7 @@ class ChatViewModelTest {
         }
 
     @Test
-    fun testSessionListRpcResult() =
+    fun testSessionListRpcResult_doesNotPopulateTheRail() =
         runTest {
             val viewModel = createViewModel()
             advanceUntilIdle()
@@ -1724,21 +1737,12 @@ class ChatViewModelTest {
             )
             advanceUntilIdle()
 
-            assertEquals(1, viewModel.uiState.value.sessions.size)
-            assertEquals(
-                "session-123",
-                viewModel.uiState.value.sessions[0]
-                    .id,
-            )
-            assertEquals(
-                "My Session Title",
-                viewModel.uiState.value.sessions[0]
-                    .title,
-            )
-            assertEquals(
-                12,
-                viewModel.uiState.value.sessions[0]
-                    .messageCount,
+            // The rail reads REST, which carries `last_active`; this reply is a signal to
+            // re-read, never the rows themselves. Populating from it would resurrect the
+            // creation-time stale fold this change removed.
+            assertTrue(
+                "session.list rows must not become rail rows",
+                viewModel.uiState.value.sessions.isEmpty(),
             )
         }
 
@@ -2900,7 +2904,7 @@ class ChatViewModelTest {
             val (viewModel, _) = createViewModelWithSession()
             val resumeRequestId = "resume-history"
             coEvery {
-                ApiClient.hermesApi.getSessionMessages(
+                GatewayConnection.hermesApi.getSessionMessages(
                     any(),
                     any(),
                     any(),
@@ -3121,18 +3125,18 @@ class ChatViewModelTest {
             advanceUntilIdle()
             assertEquals("storage-tip", viewModel.uiState.value.currentSessionId)
             assertEquals("runtime-tip", ActiveSessionHolder.activeSessionId.value)
-            assertEquals(1, viewModel.uiState.value.messages.count { it.content == "Session resumed" })
+            assertEquals(0, viewModel.uiState.value.messages.count { it.content == "Session resumed" })
 
             mockEventsFlow.emit(WsEvent.RpcResult(resumeId, result))
             advanceUntilIdle()
-            assertEquals(1, viewModel.uiState.value.messages.count { it.content == "Session resumed" })
+            assertEquals(0, viewModel.uiState.value.messages.count { it.content == "Session resumed" })
         }
 
     @Test
     fun testResumePayload_doesNotBreakRestPagination() =
         runTest {
             val (viewModel, _) = createViewModelWithSession()
-            val api = ApiClient.hermesApi
+            val api = GatewayConnection.hermesApi
             coEvery { api.getSessions(any(), any(), any()) } returns
                 GatewayResponse.success(
                     com.m57.hermescontrol.data.model.SessionListResponse(
@@ -3463,7 +3467,71 @@ class ChatViewModelTest {
 
             assertEquals(listOf("cached history"), recreated.uiState.value.messages.map { it.content })
             assertFalse(recreated.uiState.value.isLoading)
-            assertTrue(recreated.uiState.value.errorMessage?.contains("Failed to load messages") == true)
+            // Retargeted 2026-11-19: a failed refresh with content on screen is no longer an error
+            // banner. The transcript stays usable and is marked out of date instead, so the user is
+            // never made to choose between "blank" and "wrong".
+            assertNull(recreated.uiState.value.errorMessage)
+            assertNotNull(recreated.uiState.value.staleSince)
+        }
+
+    @Test
+    fun retryHistoryClearsTheStaleMarkerWhenTheRefreshSucceeds() =
+        runTest {
+            fakeRepo.dao.addMessageDirect(cachedEntity("retry-session", "cached history"))
+            coEvery { mockApi.getSessionMessages(any(), any(), any(), true, any()) } throws
+                java.io.IOException("offline")
+
+            val viewModel = createViewModel()
+            viewModel.switchSession("retry-session")
+            advanceUntilIdle()
+            assertNotNull(viewModel.uiState.value.staleSince)
+
+            coEvery { mockApi.getSessionMessages(any(), any(), any(), true, any()) } returns serverMessages("fresh")
+            viewModel.retryHistory()
+            advanceUntilIdle()
+
+            assertNull(viewModel.uiState.value.staleSince)
+            assertTrue(viewModel.uiState.value.messages.any { it.content == "fresh" })
+        }
+
+    /**
+     * A -> B -> A with the first refresh still in flight.
+     *
+     * The first load is held, two more switches happen, then the held response arrives. It is the
+     * exact shape the "answers cross" case describes: same session, so a session fence alone would
+     * let it through — the monotonic owner counter is what has to reject it.
+     */
+    @Test
+    fun lateRefreshForTheSameSessionCannotOverwriteANewerOne() =
+        runTest {
+            val releaseFirst = CompletableDeferred<Unit>()
+            var calls = 0
+            coEvery { mockApi.getSessionMessages(any(), any(), any(), true, any()) } coAnswers {
+                calls += 1
+                if (calls == 1) {
+                    withContext(NonCancellable) { releaseFirst.await() }
+                    serverMessages("first")
+                } else {
+                    serverMessages("second")
+                }
+            }
+            val viewModel = createViewModel()
+
+            viewModel.switchSession("session-a")
+            runCurrent()
+            viewModel.switchSession("session-b")
+            advanceUntilIdle()
+            viewModel.switchSession("session-a")
+            advanceUntilIdle()
+            assertTrue(viewModel.uiState.value.messages.any { it.content == "second" })
+
+            releaseFirst.complete(Unit)
+            advanceUntilIdle()
+
+            assertFalse(
+                "a response from an older generation overwrote a newer one",
+                viewModel.uiState.value.messages.any { it.content == "first" },
+            )
         }
 
     @Test
@@ -3479,14 +3547,16 @@ class ChatViewModelTest {
                 }
             coEvery { mockApi.getSessionMessages(any(), any(), any(), true, any()) } returns serverMessages("server")
             val viewModel =
-                ChatViewModel(
-                    testChatEnvironment(fakeSlashUsageStore),
-                    resolver,
-                    false,
-                    delayedRepo,
-                    fakeSlashUsageStore,
-                    testDispatcher,
-                    io = testDispatcher,
+                track(
+                    ChatViewModel(
+                        testChatEnvironment(fakeSlashUsageStore),
+                        resolver,
+                        false,
+                        delayedRepo,
+                        fakeSlashUsageStore,
+                        testDispatcher,
+                        io = testDispatcher,
+                    ),
                 )
 
             viewModel.switchSession("session-a")
@@ -3520,16 +3590,18 @@ class ChatViewModelTest {
             coEvery { mockApi.getSessionMessages(any(), any(), any(), true, any()) } throws
                 java.io.IOException("offline")
             val viewModel =
-                ChatViewModel(
-                    testChatEnvironment(fakeSlashUsageStore),
-                    resolver,
-                    false,
-                    delayedRepo,
-                    fakeSlashUsageStore,
-                    testDispatcher,
-                    io = testDispatcher,
-                    selectedProfileId = { selectedProfile.value },
-                    selectedProfileIds = selectedProfile,
+                track(
+                    ChatViewModel(
+                        testChatEnvironment(fakeSlashUsageStore),
+                        resolver,
+                        false,
+                        delayedRepo,
+                        fakeSlashUsageStore,
+                        testDispatcher,
+                        io = testDispatcher,
+                        selectedGatewayId = { selectedProfile.value },
+                        selectedProfileIds = selectedProfile,
+                    ),
                 )
 
             viewModel.switchSession("session-a")
@@ -3606,7 +3678,7 @@ class ChatViewModelTest {
     fun testCompactedHistory_usesLatestOrderAndPagesBackward() =
         runTest {
             val (viewModel, _) = createViewModelWithSession()
-            val api = ApiClient.hermesApi
+            val api = GatewayConnection.hermesApi
             coEvery { api.getSessions(any(), any(), any()) } returns
                 GatewayResponse.success(
                     com.m57.hermescontrol.data.model.SessionListResponse(
@@ -3703,9 +3775,12 @@ class ChatViewModelTest {
                 listOf("Archived turn", "Recent turn", "Recent reply"),
                 viewModel.uiState.value.messages.map { it.content },
             )
+            // Identity is content-derived, never the rowid: this fixture carries no `message_uid`, so the
+            // id must be the row's own fingerprint rather than `rest-session-root-<rowid>`, which moves.
+            val first = viewModel.uiState.value.messages.first()
             assertEquals(
-                "rest-session-root-2686",
-                viewModel.uiState.value.messages.first().id,
+                messageRowFingerprint("session-root", first.role, first.timestamp, first.content),
+                first.id,
             )
             assertFalse(viewModel.uiState.value.hasOlderMessages)
         }
@@ -3714,19 +3789,16 @@ class ChatViewModelTest {
     fun testEmptyInitialRestPage_disablesOlderPagination() =
         runTest {
             val (viewModel, _) = createViewModelWithSession()
-            val api = ApiClient.hermesApi
+            val api = GatewayConnection.hermesApi
             var countRequested = false
-            coEvery { api.getSessions(any(), any(), any()) } answers {
+            // The server count comes from the one row, not from a 500-row listing: the
+            // listing route caps `limit` at 100, so that call never succeeded.
+            coEvery { api.getSession("session-root") } answers {
                 countRequested = true
                 GatewayResponse.success(
-                    com.m57.hermescontrol.data.model.SessionListResponse(
-                        sessions =
-                            listOf(
-                                com.m57.hermescontrol.data.model.SessionInfo(
-                                    id = "session-root",
-                                    message_count = 200,
-                                ),
-                            ),
+                    com.m57.hermescontrol.data.model.SessionInfo(
+                        id = "session-root",
+                        message_count = 200,
                     ),
                 )
             }
@@ -5254,7 +5326,9 @@ class ChatViewModelTest {
             advanceUntilIdle()
 
             assertTrue(results.isEmpty())
-            verify(exactly = 0) { Log.w(any(), "Image attachment request failed") }
+            // Removed: asserted on android.util.Log, which production never calls.
+            // The site logs through HermesLog (ChatViewModel.kt:796), so the
+            // check could never fail. A real one needs a HermesLog sink.
             verify(exactly = 1) {
                 HermesWsClient.sendMessageForConnection(any(), sessionId, "hello", any())
             }
@@ -5324,7 +5398,7 @@ class ChatViewModelTest {
             )
         val after = before.copy(reasoningText = "Restored reasoning")
 
-        assertFalse(viewModel.sameMessages(listOf(before), listOf(after)))
+        assertFalse(sameTranscript(listOf(before), listOf(after)))
     }
 
     @Test
@@ -5333,7 +5407,7 @@ class ChatViewModelTest {
         val before = ChatMessage(role = MessageRole.USER, content = "marker")
         val after = before.copy(displayKind = "internal_notification")
 
-        assertFalse(viewModel.sameMessages(listOf(before), listOf(after)))
+        assertFalse(sameTranscript(listOf(before), listOf(after)))
     }
 
     @Test
@@ -5373,18 +5447,20 @@ class ChatViewModelTest {
             every { app.startActivity(capture(intentSlot)) } returns Unit
 
             val viewModel =
-                ChatViewModel(
-                    testChatEnvironment(
-                        slashUsageStore = fakeSlashUsageStore,
-                        attachmentOpener =
-                            AndroidAttachmentOpener(app, resolver, cacheDir.absolutePath),
+                track(
+                    ChatViewModel(
+                        testChatEnvironment(
+                            slashUsageStore = fakeSlashUsageStore,
+                            attachmentOpener =
+                                AndroidAttachmentOpener(app, resolver, cacheDir.absolutePath),
+                        ),
+                        resolver,
+                        false,
+                        fakeRepo,
+                        fakeSlashUsageStore,
+                        testDispatcher,
+                        io = testDispatcher,
                     ),
-                    resolver,
-                    false,
-                    fakeRepo,
-                    fakeSlashUsageStore,
-                    testDispatcher,
-                    io = testDispatcher,
                 )
             val attachment =
                 Attachment(
@@ -5424,18 +5500,20 @@ class ChatViewModelTest {
             resolver.stub(Res.string.attachment_error_not_found, "File not found on gateway: missing.pdf")
 
             val viewModel =
-                ChatViewModel(
-                    testChatEnvironment(
-                        slashUsageStore = fakeSlashUsageStore,
-                        attachmentOpener =
-                            AndroidAttachmentOpener(app, resolver, cacheDir.absolutePath),
+                track(
+                    ChatViewModel(
+                        testChatEnvironment(
+                            slashUsageStore = fakeSlashUsageStore,
+                            attachmentOpener =
+                                AndroidAttachmentOpener(app, resolver, cacheDir.absolutePath),
+                        ),
+                        resolver,
+                        false,
+                        fakeRepo,
+                        fakeSlashUsageStore,
+                        testDispatcher,
+                        io = testDispatcher,
                     ),
-                    resolver,
-                    false,
-                    fakeRepo,
-                    fakeSlashUsageStore,
-                    testDispatcher,
-                    io = testDispatcher,
                 )
             val attachment =
                 Attachment(
@@ -5469,15 +5547,17 @@ class ChatViewModelTest {
     private val createMaxAttempts = 3
 
     private fun createViewModelWithCreateRetry(): ChatViewModel =
-        ChatViewModel(
-            testChatEnvironment(fakeSlashUsageStore),
-            resolver,
-            false,
-            fakeRepo,
-            fakeSlashUsageStore,
-            testDispatcher,
-            createRetryDelayMs,
-            io = testDispatcher,
+        track(
+            ChatViewModel(
+                testChatEnvironment(fakeSlashUsageStore),
+                resolver,
+                false,
+                fakeRepo,
+                fakeSlashUsageStore,
+                testDispatcher,
+                createRetryDelayMs,
+                io = testDispatcher,
+            ),
         )
 
     @Test
@@ -5588,5 +5668,68 @@ class ChatViewModelTest {
             advanceUntilIdle()
 
             assertEquals("session-456", viewModel.uiState.value.currentSessionId)
+        }
+
+    @Test
+    fun railFailureKeepsLastGoodRowsAndSaysWhy() =
+        runTest {
+            val (viewModel, sessionId) = createViewModelWithSession()
+            coEvery { GatewayConnection.hermesApi.getSessions(any(), any(), any(), any(), any(), null) } returns
+                GatewayResponse.success(
+                    com.m57.hermescontrol.data.model.SessionListResponse(
+                        sessions =
+                            listOf(
+                                com.m57.hermescontrol.data.model.SessionInfo(id = sessionId, message_count = 1),
+                            ),
+                        total = 1,
+                    ),
+                )
+            viewModel.refreshSessions()
+            advanceUntilIdle()
+            assertEquals(1, viewModel.uiState.value.sessions.size)
+
+            coEvery {
+                GatewayConnection.hermesApi.getSessions(any(), any(), any(), any(), any(), any())
+            } returns GatewayResponse.error(500, "boom")
+            viewModel.refreshSessions()
+            advanceUntilIdle()
+
+            // Last-good rows survive, and the reason is recorded instead of the
+            // rail silently rendering nothing.
+            assertEquals("last-good rows survive", 1, viewModel.uiState.value.sessions.size)
+            val status = viewModel.uiState.value.railStatus
+            assertTrue("failure must be visible, got $status", status is RailLoadStatus.Unavailable)
+            assertEquals("HTTP 500", (status as RailLoadStatus.Unavailable).reason)
+        }
+
+    @Test
+    fun railUnauthorizedAsksForSignIn() =
+        runTest {
+            val (viewModel, _) = createViewModelWithSession()
+            coEvery {
+                GatewayConnection.hermesApi.getSessions(any(), any(), any(), any(), any(), any())
+            } returns GatewayResponse.error(401, "no_cookie")
+
+            viewModel.refreshSessions()
+            advanceUntilIdle()
+
+            val status = viewModel.uiState.value.railStatus
+            assertTrue("401 must be visible, got $status", status is RailLoadStatus.Unavailable)
+            assertTrue("401 must ask for sign-in", (status as RailLoadStatus.Unavailable).needsSignIn)
+        }
+
+    @Test
+    fun railEmptySuccessIsEmptyNotAFailure() =
+        runTest {
+            val (viewModel, _) = createViewModelWithSession()
+            coEvery { GatewayConnection.hermesApi.getSessions(any(), any(), any(), any(), any(), null) } returns
+                GatewayResponse.success(
+                    com.m57.hermescontrol.data.model.SessionListResponse(sessions = emptyList()),
+                )
+
+            viewModel.refreshSessions()
+            advanceUntilIdle()
+
+            assertEquals(RailLoadStatus.Empty, viewModel.uiState.value.railStatus)
         }
 }

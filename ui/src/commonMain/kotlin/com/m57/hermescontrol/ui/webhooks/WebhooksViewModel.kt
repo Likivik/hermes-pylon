@@ -6,9 +6,11 @@ import com.m57.hermescontrol.data.model.CreateWebhookRequest
 import com.m57.hermescontrol.data.model.WebhookSubscription
 import com.m57.hermescontrol.data.model.WebhookToggleSubscriptionRequest
 import com.m57.hermescontrol.data.model.WebhooksToggleRequest
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.data.remote.source.DefaultWebhooks
+import com.m57.hermescontrol.data.remote.source.Webhooks
 import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.ui.common.safeLaunchLoad
 import com.m57.hermescontrol.util.ioDispatcher
@@ -42,15 +44,17 @@ data class WebhooksUiState(
     val togglingName: String? = null,
 )
 
-class WebhooksViewModel :
+class WebhooksViewModel(
+    private val source: Webhooks = DefaultWebhooks(GatewayConnection.hermesApi),
+) :
     ViewModel(),
-    ToastHost {
+        ToastHost {
     private val _uiState = MutableStateFlow(WebhooksUiState())
     val uiState: StateFlow<WebhooksUiState> = _uiState.asStateFlow()
 
     fun loadWebhooks() {
         safeLaunchLoad(
-            apiCall = { safeApiCall { ApiClient.hermesApi.getWebhooks() } },
+            apiCall = { safeApiCall { source.getWebhooks() } },
             onStart = { _uiState.update { it.copy(isLoading = true, errorMessage = null) } },
             onSuccess = { data ->
                 val body = data
@@ -81,7 +85,7 @@ class WebhooksViewModel :
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.toggleWebhooks(WebhooksToggleRequest(targetEnabled)) }
+                    safeApiCall { source.toggleWebhooks(WebhooksToggleRequest(targetEnabled)) }
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -165,7 +169,7 @@ class WebhooksViewModel :
             val result =
                 withContext(ioDispatcher) {
                     safeApiCall {
-                        ApiClient.hermesApi.createWebhook(
+                        source.createWebhook(
                             CreateWebhookRequest(
                                 name = name,
                                 description = state.createFormDescription.trim().ifEmpty { null },
@@ -212,7 +216,7 @@ class WebhooksViewModel :
             val result =
                 withContext(ioDispatcher) {
                     safeApiCall {
-                        ApiClient.hermesApi.setWebhookEnabled(
+                        source.setWebhookEnabled(
                             name = name,
                             body = WebhookToggleSubscriptionRequest(enabled = enabled),
                         )
@@ -255,7 +259,7 @@ class WebhooksViewModel :
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.deleteWebhook(target.name) }
+                    safeApiCall { source.deleteWebhook(target.name) }
                 }
             _uiState.update { it.copy(isDeleting = false, deleteTarget = null) }
             when (result) {

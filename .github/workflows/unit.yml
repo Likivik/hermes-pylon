@@ -59,6 +59,14 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # The shared UI module. Its tests have lived in `ui/src/commonTest` for a
+      # while but nothing ran them: every refactor that touched commonMain UI
+      # shipped with compile-and-ktlint as its only gate. The screen graph is
+      # assembled from commonMain, so this is where a definition that only
+      # constructs on one platform shows up.
+      - name: Run :ui JVM tests
+        run: ./gradlew :shared:jvmTest :ui:jvmTest --no-daemon -Dorg.gradle.workers.max=2
+
       # The multiplatform boundary: no platform API imports in :shared/commonMain,
       # and every `expect` declaration has an `actual` in each declared target
       # source set. Sub-second and needs no JDK, so it runs first to fail fast.
@@ -66,6 +74,39 @@ jobs:
         run: |
           python3 scripts/check_kmp_boundary.py
           python3 scripts/test_check_kmp_boundary.py
+
+      # A platform entry that forgets a WS seam degrades into a permanent
+      # "Reconnecting..." banner with no error, so the wiring is checked statically.
+      - name: Check the WS entry seams
+        run: |
+          python3 scripts/check_entry_seams.py
+          cd scripts && python3 -m unittest test_check_entry_seams
+
+      # An `actual` can be empty, a TODO, or a capability that always answers the same
+      # constant and still compile green — silently disabling a feature on one platform.
+      - name: Check the actual implementations
+        run: |
+          python3 scripts/check_actuals.py
+          cd scripts && python3 -m unittest test_check_actuals
+
+      # A new silent catch fails here; the existing tail is a budget that may only shrink.
+      - name: Check swallowed exceptions
+        run: |
+          python3 scripts/check_swallowed_exceptions.py
+          cd scripts && python3 -m unittest test_check_swallowed_exceptions
+
+      # A client path the measured inventory does not know fails here: every route the app calls
+      # must have been classified (query / body / none) against the gateway's own routers.
+      - name: Check route scope classification
+        run: |
+          python3 scripts/check_route_scope.py
+          cd scripts && python3 -m unittest test_check_route_scope
+
+      - name: Icon subset guard
+        run: |
+          # An icon literal outside the subset font pulls a 10.7 MB download for one glyph.
+          python3 scripts/check_icon_literals.py
+          python3 scripts/check_icon_literals.py --self-test
 
       # The shared data/logic layer: ChatViewModel reducers, rail grouping + order
       # persistence, rename fast-path. JUnit + Robolectric, ~7 min.
@@ -87,6 +128,13 @@ jobs:
 
       - name: Run :shared wasmJs tests
         run: ./gradlew :shared:wasmJsBrowserTest --no-daemon -Dorg.gradle.workers.max=2
+
+      # :ui compiles for wasm but its tests were JVM-only, so nothing checked how the
+      # shared UI behaves in a browser. Two assertions cannot run here yet — compose
+      # resource loading and a semantics-tree difference — and they guard themselves
+      # with isWebTestTarget() rather than being deleted: the rest of the suite runs.
+      - name: Run :ui wasmJs tests
+        run: ./gradlew :ui:wasmJsBrowserTest --no-daemon -Dorg.gradle.workers.max=2
 
       - name: Upload unit test reports
         if: failure()

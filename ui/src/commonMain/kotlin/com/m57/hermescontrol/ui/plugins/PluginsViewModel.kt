@@ -6,9 +6,11 @@ import com.m57.hermescontrol.AppEnvironment
 import com.m57.hermescontrol.data.model.PluginInfo
 import com.m57.hermescontrol.data.model.PluginProvidersPutRequest
 import com.m57.hermescontrol.data.model.ProviderOption
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.data.remote.source.DefaultPlugins
+import com.m57.hermescontrol.data.remote.source.Plugins
 import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.ui.common.safeLaunchLoad
 import kotlinx.coroutines.CoroutineDispatcher
@@ -55,6 +57,7 @@ data class PluginsUiState(
 
 class PluginsViewModel(
     private val ioDispatcher: CoroutineDispatcher = AppEnvironment.current.io,
+    private val source: Plugins = DefaultPlugins(GatewayConnection.hermesApi),
 ) :
     ViewModel(),
         ToastHost {
@@ -64,7 +67,7 @@ class PluginsViewModel(
     fun loadPlugins() {
         safeLaunchLoad(
             ioDispatcher = ioDispatcher,
-            apiCall = { safeApiCall { ApiClient.hermesApi.getPlugins() } },
+            apiCall = { safeApiCall { source.getPlugins() } },
             onStart = { _uiState.update { it.copy(isLoading = true, errorMessage = null) } },
             onSuccess = { data ->
                 val plugins = data.plugins.orEmpty()
@@ -124,7 +127,7 @@ class PluginsViewModel(
             val result =
                 withContext(ioDispatcher) {
                     safeApiCall {
-                        ApiClient.hermesApi.installPlugin(
+                        source.installPlugin(
                             com.m57.hermescontrol.data.model.AgentPluginInstallBody(
                                 identifier = url,
                                 force = _uiState.value.installForce,
@@ -172,7 +175,7 @@ class PluginsViewModel(
             val result =
                 withContext(ioDispatcher) {
                     safeApiCall {
-                        ApiClient.hermesApi.savePluginProviders(
+                        source.savePluginProviders(
                             PluginProvidersPutRequest(
                                 memoryProvider = if (state.isMemoryBuiltin) "" else state.memoryProvider,
                                 contextEngine = state.contextEngine,
@@ -203,7 +206,7 @@ class PluginsViewModel(
             _uiState.update { it.copy(rescanBusy = true) }
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.rescanPlugins() }
+                    safeApiCall { source.rescanPlugins() }
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -245,9 +248,9 @@ class PluginsViewModel(
             val result =
                 withContext(ioDispatcher) {
                     if (targetEnabled) {
-                        safeApiCall { ApiClient.hermesApi.enablePlugin(plugin.name) }
+                        safeApiCall { source.enablePlugin(plugin.name) }
                     } else {
-                        safeApiCall { ApiClient.hermesApi.disablePlugin(plugin.name) }
+                        safeApiCall { source.disablePlugin(plugin.name) }
                     }
                 }
             if (result is NetworkResult.Failure) {
@@ -260,7 +263,7 @@ class PluginsViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.enablePlugin(plugin.name) }
+                    safeApiCall { source.enablePlugin(plugin.name) }
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -292,7 +295,7 @@ class PluginsViewModel(
             setRowBusy(name)
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.uninstallPlugin(name) }
+                    safeApiCall { source.uninstallPlugin(name) }
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -314,7 +317,7 @@ class PluginsViewModel(
             setRowBusy(name)
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.updatePlugin(name) }
+                    safeApiCall { source.updatePlugin(name) }
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -338,7 +341,7 @@ class PluginsViewModel(
             val result =
                 withContext(ioDispatcher) {
                     safeApiCall {
-                        ApiClient.hermesApi.setPluginVisibility(
+                        source.setPluginVisibility(
                             plugin.name,
                             mapOf("hidden" to targetHidden),
                         )

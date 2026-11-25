@@ -3,9 +3,9 @@ package com.m57.hermescontrol.ui.cron
 import com.m57.hermescontrol.data.model.CreateCronJobRequest
 import com.m57.hermescontrol.data.model.CronJob
 import com.m57.hermescontrol.data.model.UpdateCronJobRequest
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.GatewayResponse
-import com.m57.hermescontrol.data.remote.HermesGatewayApi
+import com.m57.hermescontrol.data.remote.HermesApi
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -33,13 +33,13 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class CronJobsViewModelTest {
     private val dispatcher = StandardTestDispatcher()
-    private val api = mockk<HermesGatewayApi>(relaxed = true)
+    private val api = mockk<HermesApi>(relaxed = true)
 
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
-        mockkObject(ApiClient)
-        every { ApiClient.hermesApi } returns api
+        mockkObject(GatewayConnection)
+        every { GatewayConnection.hermesApi } returns api
     }
 
     @After

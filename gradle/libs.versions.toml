@@ -1,4 +1,6 @@
 [versions]
+# KMP logging engine behind the HermesLog facade.
+kermit = "2.0.8"
 androidGradlePlugin = "9.1.1"
 androidxBrowser = "1.8.0"
 androidxCore = "1.18.0"
@@ -21,16 +23,19 @@ roborazzi-plugin = "1.72.0"
 # to miss during Kotlin upgrades since it no longer tracks the Kotlin version.
 ksp = "2.3.12"
 nav3Core = "1.0.1"
+# JetBrains' KMP build of Navigation 3 — same packages as Google's artifact,
+# but published for jvm/wasmJs as well. Version tracks what CMP 1.12.2 resolves.
+nav3Jetbrains = "1.1.0"
 lifecycleViewmodelNav3 = "2.10.0"
 leakcanary = "2.14"
 okhttp = "5.5.0"
 securityCrypto = "1.0.0"
 mockk = "1.14.11"
 turbine = "1.2.1"
-coil = "2.7.0"
+coil = "3.3.0"
 room = "2.7.1"
 sqlcipher = "4.18.0"
-datastore = "1.1.2"
+datastore = "1.3.0"
 latex = "1.5.5"
 reorderable = "3.1.0"
 roborazzi = "1.72.0"
@@ -66,6 +71,8 @@ composeAdaptive = "1.3.0"
 skiko = "0.150.2"
 
 [libraries]
+kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }
+kermit-test = { module = "co.touchlab:kermit-test", version.ref = "kermit" }
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidxCore" }
 androidx-browser = { module = "androidx.browser:browser", version.ref = "androidxBrowser" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidxActivity" }
@@ -109,6 +116,7 @@ mockk-android = { module = "io.mockk:mockk-android", version.ref = "mockk" }
 turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
 androidx-navigation3-runtime = { module = "androidx.navigation3:navigation3-runtime", version.ref = "nav3Core" }
 androidx-navigation3-ui = { module = "androidx.navigation3:navigation3-ui", version.ref = "nav3Core" }
+jetbrains-navigation3-ui = { module = "org.jetbrains.androidx.navigation3:navigation3-ui", version.ref = "nav3Jetbrains" }
 androidx-lifecycle-viewmodel-navigation3 = { module = "androidx.lifecycle:lifecycle-viewmodel-navigation3", version.ref = "lifecycleViewmodelNav3" }
 
 # Networking
@@ -124,6 +132,8 @@ screenshot-validation-api = { group = "com.android.tools.screenshot", name = "sc
 # Security
 androidx-security-crypto = { module = "androidx.security:security-crypto", version.ref = "securityCrypto" }
 androidx-datastore = { module = "androidx.datastore:datastore", version.ref = "datastore" }
+androidx-datastore-core = { module = "androidx.datastore:datastore-core", version.ref = "datastore" }
+androidx-datastore-core-okio = { module = "androidx.datastore:datastore-core-okio", version.ref = "datastore" }
 
 # Database (Room)
 androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
@@ -138,8 +148,9 @@ latex-parser = { module = "io.github.huarangmeng:latex-parser", version.ref = "l
 latex-renderer = { module = "io.github.huarangmeng:latex-renderer", version.ref = "latex" }
 
 # Image loading
-coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coil" }
-coil-gif = { module = "io.coil-kt:coil-gif", version.ref = "coil" }
+coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
+coil-gif = { module = "io.coil-kt.coil3:coil-gif", version.ref = "coil" }
+coil-network-ktor3 = { module = "io.coil-kt.coil3:coil-network-ktor3", version.ref = "coil" }
 reorderable = { module = "sh.calvin.reorderable:reorderable", version.ref = "reorderable" }
 roborazzi-core = { module = "io.github.takahirom.roborazzi:roborazzi", version.ref = "roborazzi" }
 roborazzi-rule = { module = "io.github.takahirom.roborazzi:roborazzi-compose", version.ref = "roborazzi" }
