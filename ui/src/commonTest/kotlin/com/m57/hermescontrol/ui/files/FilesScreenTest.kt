@@ -24,7 +24,7 @@ class FilesScreenTest {
             ManagedFileEntry(name = "diagram.png", path = "/opt/data/seed/diagram.png", size = 40960),
         )
 
-    private object NoopActions : FilesActions {
+    internal object NoopActions : FilesActions {
         override fun refresh() = Unit
 
         override fun navigateTo(entry: ManagedFileEntry) = Unit
