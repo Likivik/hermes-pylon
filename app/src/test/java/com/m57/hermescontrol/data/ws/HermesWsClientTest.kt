@@ -87,7 +87,6 @@ class HermesWsClientTest {
 
     @Before
     fun setUp() {
-
         mockWebServer = sharedServer
         // Fresh queue per test: a leftover response from a previous test would
         // otherwise be handed to this one's connection.
