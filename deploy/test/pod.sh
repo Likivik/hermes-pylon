@@ -15,6 +15,11 @@
 # and an internal network plus one loopback port already gives what we want.
 set -euo pipefail
 
+# The fixture password is generated per run and never stored. pod.sh exports it so
+# the server registers it and seed.py/verify.py sign in with the same value.
+PYLON_TEST_PASSWORD="${PYLON_TEST_PASSWORD:-$(od -An -tx1 -N16 /dev/urandom | tr -d ' \n')}"
+export PYLON_TEST_PASSWORD
+
 POD="${PYLON_TEST_POD:-pylon-test}"
 NET="${PYLON_TEST_NET:-pylon-test-net}"
 VOL="${PYLON_TEST_VOL:-pylon-test-data}"
@@ -123,7 +128,10 @@ configure() {
     # Live finding: the dashboard refuses a 0.0.0.0 bind with no auth provider registered.
     # The fixture password hashes via the gateway's own helper, so nothing is guessed.
     local HASH
-    HASH=$(podman exec "${POD}-gateway" python3 -c "from plugins.dashboard_auth.basic import hash_password; print(hash_password('test-password'))" 2>/dev/null)
+    # The password arrives on stdin, never on the command line: `ps` would expose it
+    # and so would shell history. It is generated per run, so nothing here is a secret.
+    HASH=$(printf '%s' "$PYLON_TEST_PASSWORD" | podman exec -i "${POD}-gateway" python3 -c \
+        "import sys; from plugins.dashboard_auth.basic import hash_password; print(hash_password(sys.stdin.read()))" 2>/dev/null)
     [ -n "$HASH" ] || { say "could not hash the fixture password"; return 1; }
     cfg dashboard.basic_auth.username seed
     cfg "dashboard.basic_auth.password_hash" "$HASH"

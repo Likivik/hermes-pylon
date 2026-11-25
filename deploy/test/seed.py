@@ -31,12 +31,16 @@ TIMEOUT = 15
 # The harness signs in the way a human would: the fixture password against the
 # registered `basic` provider. No token extraction, no manual step.
 LOGIN_USER = os.environ.get("PYLON_TEST_USER", "seed")
-LOGIN_PASSWORD = os.environ.get("PYLON_TEST_PASSWORD", "test-password")
+# No default on purpose: pod.sh generates a password per run and exports it.
+# A fallback here would quietly ship a known credential.
+LOGIN_PASSWORD = os.environ.get("PYLON_TEST_PASSWORD")
 JAR = http.cookiejar.CookieJar()
 OPENER = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(JAR))
 
 
 def login() -> None:
+    if not LOGIN_PASSWORD:
+        raise SystemExit("PYLON_TEST_PASSWORD is not set; pod.sh generates it per run")
     body = json.dumps({"provider": "basic", "username": LOGIN_USER, "password": LOGIN_PASSWORD}).encode()
     request = urllib.request.Request(f"{BASE}/auth/password-login", data=body, method="POST")
     request.add_header("content-type", "application/json")
