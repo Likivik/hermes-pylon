@@ -13,15 +13,24 @@ class ChatMessageSyncTest {
             )
         val incoming =
             listOf(
-                completedTool(id = "rest-session-10", callId = "call-b", content = "same-content"),
-                completedTool(id = "rest-session-11", callId = "call-a", content = "same-content"),
+                completedTool(
+                    id = "rest-session-10",
+                    origin = MessageOrigin.Rest(10),
+                    callId = "call-b",
+                    content = "same-content",
+                ),
+                completedTool(
+                    id = "rest-session-11",
+                    origin = MessageOrigin.Rest(11),
+                    callId = "call-a",
+                    content = "same-content",
+                ),
             )
 
         val merged =
             mergeSyncedMessages(
                 current = current,
                 incoming = incoming,
-                isServerMessage = { it.startsWith("rest-session-") },
             )
 
         assertEquals(listOf("call-a", "call-b"), merged.map { it.toolCallId })
@@ -35,13 +44,12 @@ class ChatMessageSyncTest {
                 runningTool(id = "local-a", callId = null),
                 runningTool(id = "local-b", callId = null),
             )
-        val incoming = listOf(completedTool(id = "rest-session-10", callId = null))
+        val incoming = listOf(completedTool(id = "rest-session-10", origin = MessageOrigin.Rest(10), callId = null))
 
         val merged =
             mergeSyncedMessages(
                 current = current,
                 incoming = incoming,
-                isServerMessage = { it.startsWith("rest-session-") },
             )
 
         assertEquals(listOf("local-a", "local-b", "rest-session-10"), merged.map { it.id })
@@ -53,6 +61,7 @@ class ChatMessageSyncTest {
             listOf(
                 ChatMessage(
                     id = "rest-session-1",
+                    origin = MessageOrigin.Rest(1),
                     role = MessageRole.USER,
                     content = "model changed",
                 ),
@@ -63,7 +72,6 @@ class ChatMessageSyncTest {
             mergeSyncedMessages(
                 current = current,
                 incoming = incoming,
-                isServerMessage = { it.startsWith("rest-session-") },
             )
 
         assertEquals("model_switch", merged.single().displayKind)
@@ -82,6 +90,7 @@ class ChatMessageSyncTest {
             listOf(
                 userMessage(
                     id = "rest-session-1",
+                    origin = MessageOrigin.Rest(1),
                     content =
                         "@file:report.pdf\n\n" +
                             "summarize this document",
@@ -100,6 +109,7 @@ class ChatMessageSyncTest {
             listOf(
                 userMessage(
                     id = "rest-session-1",
+                    origin = MessageOrigin.Rest(1),
                     content = "@image:/tmp/a.jpg\n[screenshot]\n\nsecond",
                 ),
             )
@@ -126,6 +136,7 @@ class ChatMessageSyncTest {
             listOf(
                 ChatMessage(
                     id = "rest-session-1",
+                    origin = MessageOrigin.Rest(1),
                     role = MessageRole.ASSISTANT,
                     content = "@file:report.pdf\ncaption",
                 ),
@@ -148,8 +159,8 @@ class ChatMessageSyncTest {
             )
         val incoming =
             listOf(
-                userMessage(id = "rest-session-1", content = "@file:a.pdf"),
-                userMessage(id = "rest-session-2", content = "@file:b.pdf"),
+                userMessage(id = "rest-session-1", origin = MessageOrigin.Rest(1), content = "@file:a.pdf"),
+                userMessage(id = "rest-session-2", origin = MessageOrigin.Rest(2), content = "@file:b.pdf"),
             )
 
         val merged = merge(current, incoming)
@@ -167,14 +178,15 @@ class ChatMessageSyncTest {
         mergeSyncedMessages(
             current = current,
             incoming = incoming,
-            isServerMessage = { it.startsWith("rest-session-") },
         )
 
     private fun userMessage(
         id: String,
         content: String,
+        origin: MessageOrigin = MessageOrigin.Local,
     ) = ChatMessage(
         id = id,
+        origin = origin,
         role = MessageRole.USER,
         content = content,
     )
@@ -183,8 +195,10 @@ class ChatMessageSyncTest {
         id: String,
         callId: String?,
         content: String = "starting $id",
+        origin: MessageOrigin = MessageOrigin.Local,
     ) = ChatMessage(
         id = id,
+        origin = origin,
         role = MessageRole.TOOL,
         content = content,
         toolName = "terminal",
@@ -196,8 +210,10 @@ class ChatMessageSyncTest {
         id: String,
         callId: String?,
         content: String = "finished $id",
+        origin: MessageOrigin = MessageOrigin.Local,
     ) = ChatMessage(
         id = id,
+        origin = origin,
         role = MessageRole.TOOL,
         content = content,
         toolName = "terminal",

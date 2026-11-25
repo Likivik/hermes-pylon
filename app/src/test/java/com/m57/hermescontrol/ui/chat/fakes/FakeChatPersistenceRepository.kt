@@ -1,11 +1,11 @@
 package com.m57.hermescontrol.ui.chat.fakes
 
-import com.m57.hermescontrol.ui.chat.ChatPersistenceRepository
+import com.m57.hermescontrol.ui.chat.ChatPersistenceStore
 import com.m57.hermescontrol.ui.chat.OperationRegistrationHook
 import com.m57.hermescontrol.ui.chat.RoomChatMessageStore
 
 /**
- * In-memory [ChatPersistenceRepository] for tests.
+ * In-memory [ChatPersistenceStore] for tests.
  *
  * Wraps [FakeChatMessageDao] so tests can read/write messages
  * without Room or SQLCipher. Pass to [ChatViewModel]'s `repo`
@@ -20,7 +20,7 @@ import com.m57.hermescontrol.ui.chat.RoomChatMessageStore
 internal open class FakeChatPersistenceRepository(
     val dao: FakeChatMessageDao = FakeChatMessageDao(),
     operationRegistrationHook: OperationRegistrationHook = OperationRegistrationHook {},
-) : ChatPersistenceRepository(RoomChatMessageStore(dao), operationRegistrationHook) {
+) : ChatPersistenceStore(RoomChatMessageStore(dao), operationRegistrationHook) {
     /** Clear all stored messages. */
     fun clear() = dao.clear()
 }

@@ -90,7 +90,7 @@
     <string name="screen_settings">Settings</string>
     <string name="screen_profiles">Profiles</string>
     <string name="screen_webhooks">Webhooks</string>
-    <string name="screen_gateway">Gateway</string>
+    <string name="screen_gateway">Gateways</string>
     <string name="screen_toolsets">Toolsets</string>
     <string name="screen_plugins">Plugins</string>
     <string name="screen_config">Config</string>
@@ -228,8 +228,8 @@
     <string name="settings_summary_theme_light">Light</string>
     <string name="settings_summary_theme_dark">Dark</string>
     <string name="action_save">Save</string>
-    <string name="settings_action_add_profile">Add Profile</string>
-    <string name="settings_action_edit_profile">Edit Profile</string>
+    <string name="settings_action_add_profile">Add gateway</string>
+    <string name="settings_action_edit_profile">Edit gateway</string>
     <string name="settings_title_add_profile">Add Connection Profile</string>
     <string name="settings_title_edit_profile">Edit Connection Profile</string>
     <string name="settings_field_profile_name">Profile Name</string>
@@ -623,7 +623,7 @@
 
     <!-- Profiles Screen -->
     <string name="profiles_empty_title">No profiles available</string>
-    <string name="profiles_empty_desc">Connection profiles from Hermes will appear here.</string>
+    <string name="profiles_empty_desc">Profiles from this Hermes gateway will appear here.</string>
     <string name="profiles_label_model">Model: %1$s</string>
     <string name="profiles_label_provider">Provider: %1$s</string>
     <string name="profiles_label_skills">%1$d skills</string>
@@ -958,12 +958,12 @@
     <string name="channels_restart_banner">Changes saved. Restart the gateway for them to take effect.</string>
 
     <!-- Settings -->
-    <string name="settings_saved_profiles">Saved Profiles (%1$d)</string>
+    <string name="settings_saved_profiles">Saved gateways (%1$d)</string>
     <string name="settings_logout">Logout</string>
 
     <!-- Auth Login Screen -->
-    <string name="auth_login_title">Auth Login</string>
-    <string name="auth_login_desc">Connect to your Hermes dashboard</string>
+    <string name="auth_login_title">Login</string>
+    <string name="auth_login_desc">Connect to your Hermes gateway</string>
     <string name="auth_login_base_url_label">Server URL</string>
     <string name="auth_login_token_label">Session Token</string>
     <string name="auth_login_username_label">Username</string>
@@ -975,6 +975,7 @@
     <string name="auth_login_error_username_required">Username is required</string>
     <string name="auth_login_error_password_required">Password is required</string>
     <string name="auth_login_error_unreachable">Dashboard unreachable — check IP and port</string>
+    <string name="auth_login_error_cross_origin">This browser build can only reach its own origin. Use %1$s.</string>
     <string name="auth_login_error_oauth_unsupported">OAuth login (Nous Portal) is not supported in this app version yet. Switch the dashboard to basic auth or token mode. (issue #639)</string>
     <string name="auth_login_oauth_coming_soon">This dashboard uses OAuth (Nous Portal) login, which is coming soon to Hermes Mobile.</string>
     <string name="auth_login_existing_profiles_title">Use existing logged-in profile:</string>
@@ -983,7 +984,7 @@
     <!-- Landing Screen -->
     <string name="landing_title">Pylon for Hermes</string>
     <string name="landing_subtitle">Control panel for Hermes Agent</string>
-    <string name="landing_action_auth_login">Auth Login</string>
+    <string name="landing_action_auth_login">Login</string>
 
     <!-- Loading State -->
 
@@ -1078,4 +1079,8 @@
     <string name="subagent_status_completed">Completed</string>
     <string name="subagent_status_cancelled">Cancelled</string>
     <string name="subagent_status_failed">Failed</string>
+    <!-- Profile switching: the app browses the selected profile; the gateway process may serve another. -->
+    <string name="profiles_pending_note">Browsing %1$s — the gateway still serves %2$s</string>
+    <!-- Files is the gateway process's own home; a profile switch cannot move it. -->
+    <string name="files_scope_note">This folder belongs to the gateway process, not to a profile.</string>
 </resources>

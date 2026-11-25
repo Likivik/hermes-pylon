@@ -40,6 +40,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.m57.hermescontrol.theme.Spacing
+import com.m57.hermescontrol.ui.icons.MaterialSymbol
 import org.kodein.emoji.*
 import org.kodein.emoji.compose.NotoAnimatedEmoji
 import sh.calvin.reorderable.ReorderableCollectionItemScope
@@ -67,7 +68,17 @@ fun SessionRail(
     onEvent: (RailEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    if (state.sessions.isEmpty()) return
+    // A failed refresh must not look like "you have no chats": when the rail has
+    // no rows because the request failed, render a retry affordance instead of
+    // returning nothing (the old behaviour made the whole rail disappear).
+    if (state.sessions.isEmpty()) {
+        state.status
+            .takeIf { it is RailLoadStatus.Unavailable }
+            ?.let { status ->
+                RailUnavailablePill(status as RailLoadStatus.Unavailable, onEvent, modifier)
+            }
+        return
+    }
 
     val groups =
         remember(state.sessions, state.pinnedSessionIds, state.order) {
@@ -92,6 +103,57 @@ fun SessionRail(
                 .clip(RailShape),
     ) {
         RailBody(groups = groups, state = state, onEvent = onEvent)
+    }
+}
+
+/**
+ * The rail with nothing to show but a reason: one tappable pill that retries the
+ * REST listing (or opens sign-in when the session expired).
+ *
+ * This is the fix for "the rail disappeared": previously an empty list returned
+ * before anything was composed, so a failed request and an empty account looked
+ * identical — both invisible.
+ */
+@Composable
+private fun RailUnavailablePill(
+    status: RailLoadStatus.Unavailable,
+    onEvent: (RailEvent) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val label = if (status.needsSignIn) "Sign in" else status.reason
+    Box(
+        modifier =
+            modifier
+                .padding(start = 6.dp)
+                .width(RailWidth)
+                .clip(RailShape)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .combinedClickable(
+                    onClick = { onEvent(if (status.needsSignIn) RailEvent.SignIn else RailEvent.Retry) },
+                )
+                .padding(vertical = Spacing.sm, horizontal = Spacing.xs)
+                .testTag("rail_unavailable"),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            MaterialSymbol(
+                name = if (status.needsSignIn) "login" else "refresh",
+                size = 22.dp,
+                tint = MaterialTheme.colorScheme.error,
+                contentDescription = if (status.needsSignIn) "Sign in" else "Reload sessions",
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 

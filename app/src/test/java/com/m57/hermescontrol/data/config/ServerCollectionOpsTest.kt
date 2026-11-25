@@ -11,10 +11,10 @@ class ServerCollectionOpsTest {
             ServerStoreState(
                 connectionProfiles =
                     listOf(
-                        ConnectionProfile(id = "1", name = "Profile 1", baseUrl = "http://192.168.1.1:9119"),
+                        GatewayInstance(id = "1", name = "Profile 1", baseUrl = "http://192.168.1.1:9119"),
                     ),
             )
-        val newProfile = ConnectionProfile(id = "2", name = "Profile 2", baseUrl = "http://192.168.1.2:9119")
+        val newProfile = GatewayInstance(id = "2", name = "Profile 2", baseUrl = "http://192.168.1.2:9119")
 
         val result = initialState.addOrUpdate(newProfile)
 
@@ -28,12 +28,12 @@ class ServerCollectionOpsTest {
             ServerStoreState(
                 connectionProfiles =
                     listOf(
-                        ConnectionProfile(id = "1", name = "Profile 1", baseUrl = "http://192.168.1.1:9119"),
-                        ConnectionProfile(id = "2", name = "Profile 2", baseUrl = "http://192.168.1.2:9119"),
+                        GatewayInstance(id = "1", name = "Profile 1", baseUrl = "http://192.168.1.1:9119"),
+                        GatewayInstance(id = "2", name = "Profile 2", baseUrl = "http://192.168.1.2:9119"),
                     ),
             )
         val updatedProfile =
-            ConnectionProfile(id = "1", name = "Updated Profile 1", baseUrl = "http://192.168.1.100:9119")
+            GatewayInstance(id = "1", name = "Updated Profile 1", baseUrl = "http://192.168.1.100:9119")
 
         val result = initialState.addOrUpdate(updatedProfile)
 
@@ -50,15 +50,15 @@ class ServerCollectionOpsTest {
             ServerStoreState(
                 connectionProfiles =
                     listOf(
-                        ConnectionProfile(id = "1", name = "Profile 1", baseUrl = "http://192.168.1.1:9119"),
-                        ConnectionProfile(id = "2", name = "Profile 2", baseUrl = "http://192.168.1.2:9119"),
+                        GatewayInstance(id = "1", name = "Profile 1", baseUrl = "http://192.168.1.1:9119"),
+                        GatewayInstance(id = "2", name = "Profile 2", baseUrl = "http://192.168.1.2:9119"),
                     ),
-                selectedProfileId = "2",
+                selectedGatewayId = "2",
             )
 
         val result = initialState.selfHealed()
 
-        assertEquals("2", result.selectedProfileId)
+        assertEquals("2", result.selectedGatewayId)
     }
 
     @Test
@@ -67,14 +67,14 @@ class ServerCollectionOpsTest {
             ServerStoreState(
                 connectionProfiles =
                     listOf(
-                        ConnectionProfile(id = "1", name = "Profile 1", baseUrl = "http://192.168.1.1:9119"),
+                        GatewayInstance(id = "1", name = "Profile 1", baseUrl = "http://192.168.1.1:9119"),
                     ),
-                selectedProfileId = "3",
+                selectedGatewayId = "3",
             )
 
         val result = initialState.selfHealed()
 
-        assertNull(result.selectedProfileId)
+        assertNull(result.selectedGatewayId)
     }
 
     @Test
@@ -83,14 +83,14 @@ class ServerCollectionOpsTest {
             ServerStoreState(
                 connectionProfiles =
                     listOf(
-                        ConnectionProfile(id = "1", name = "Profile 1", baseUrl = "http://192.168.1.1:9119"),
+                        GatewayInstance(id = "1", name = "Profile 1", baseUrl = "http://192.168.1.1:9119"),
                     ),
-                selectedProfileId = null,
+                selectedGatewayId = null,
             )
 
         val result = initialState.selfHealed()
 
-        assertNull(result.selectedProfileId)
+        assertNull(result.selectedGatewayId)
     }
 
     @Test
@@ -99,9 +99,9 @@ class ServerCollectionOpsTest {
             ServerStoreState(
                 connectionProfiles =
                     listOf(
-                        ConnectionProfile(id = "1", name = "Profile 1", baseUrl = "http://192.168.1.1:9119"),
+                        GatewayInstance(id = "1", name = "Profile 1", baseUrl = "http://192.168.1.1:9119"),
                     ),
-                selectedProfileId = "1",
+                selectedGatewayId = "1",
                 baseUrl = "http://top.level.base.url:9119", // Should be ignored
             )
 
@@ -116,9 +116,9 @@ class ServerCollectionOpsTest {
             ServerStoreState(
                 connectionProfiles =
                     listOf(
-                        ConnectionProfile(id = "1", name = "Profile 1", baseUrl = null), // Selected but no baseUrl
+                        GatewayInstance(id = "1", name = "Profile 1", baseUrl = null), // Selected but no baseUrl
                     ),
-                selectedProfileId = "1",
+                selectedGatewayId = "1",
                 baseUrl = "http://top.level.base.url:9119", // Should be used as fallback
             )
 
@@ -132,7 +132,7 @@ class ServerCollectionOpsTest {
         val state =
             ServerStoreState(
                 connectionProfiles = emptyList(), // No selected profile
-                selectedProfileId = null,
+                selectedGatewayId = null,
                 baseUrl = null, // No top-level baseUrl
                 host = "127.0.0.1",
                 port = 9119,
@@ -149,9 +149,9 @@ class ServerCollectionOpsTest {
             ServerStoreState(
                 connectionProfiles =
                     listOf(
-                        ConnectionProfile(id = "1", name = "Profile 1", baseUrl = "https://my.server.local:443"),
+                        GatewayInstance(id = "1", name = "Profile 1", baseUrl = "https://my.server.local:443"),
                     ),
-                selectedProfileId = "1",
+                selectedGatewayId = "1",
             )
 
         val result = state.resolvedHost
@@ -165,9 +165,9 @@ class ServerCollectionOpsTest {
             ServerStoreState(
                 connectionProfiles =
                     listOf(
-                        ConnectionProfile(id = "1", name = "Profile 1", baseUrl = "https://my.server.local:8443"),
+                        GatewayInstance(id = "1", name = "Profile 1", baseUrl = "https://my.server.local:8443"),
                     ),
-                selectedProfileId = "1",
+                selectedGatewayId = "1",
             )
 
         val result = state.resolvedPort

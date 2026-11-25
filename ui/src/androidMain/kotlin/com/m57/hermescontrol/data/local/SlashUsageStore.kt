@@ -5,7 +5,7 @@ import androidx.datastore.core.CorruptionException
 import androidx.datastore.core.DataStore
 import androidx.datastore.core.Serializer
 import androidx.datastore.dataStore
-import com.m57.hermescontrol.data.remote.OkHttpProvider
+import com.m57.hermescontrol.data.remote.HermesJson
 import com.m57.hermescontrol.util.ioDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -26,7 +26,7 @@ object SlashUsageSerializer : Serializer<SlashUsageState> {
 
     override suspend fun readFrom(input: InputStream): SlashUsageState =
         try {
-            OkHttpProvider.json.decodeFromString(SlashUsageState.serializer(), input.readBytes().decodeToString())
+            HermesJson.instance.decodeFromString(SlashUsageState.serializer(), input.readBytes().decodeToString())
         } catch (exception: kotlinx.serialization.SerializationException) {
             throw CorruptionException("Cannot read slash usage state", exception)
         }
@@ -35,7 +35,7 @@ object SlashUsageSerializer : Serializer<SlashUsageState> {
         t: SlashUsageState,
         output: OutputStream,
     ) {
-        output.write(OkHttpProvider.json.encodeToString(SlashUsageState.serializer(), t).encodeToByteArray())
+        output.write(HermesJson.instance.encodeToString(SlashUsageState.serializer(), t).encodeToByteArray())
     }
 }
 

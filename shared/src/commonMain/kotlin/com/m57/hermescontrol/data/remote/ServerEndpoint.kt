@@ -137,6 +137,7 @@ class ServerEndpoint internal constructor(
     fun webSocketUrl(
         authParameter: String,
         credential: String,
+        profile: String? = null,
     ): String {
         require(authParameter == "token" || authParameter == "ticket") {
             "Unsupported WebSocket authentication parameter"
@@ -156,6 +157,12 @@ class ServerEndpoint internal constructor(
             append(authParameter)
             append('=')
             append(percentEncodeRfc3986(credential))
+            // The gateway scopes a socket at handshake time (chat_ws.py:249,499), so the
+            // profile must be on the URL or the socket reads the process's own profile.
+            profile?.takeIf { it.isNotBlank() }?.let {
+                append("&profile=")
+                append(percentEncodeRfc3986(it))
+            }
         }
     }
 

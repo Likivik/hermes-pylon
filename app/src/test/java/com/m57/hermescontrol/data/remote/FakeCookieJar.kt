@@ -1,7 +1,5 @@
 package com.m57.hermescontrol.data.remote
 
-import okhttp3.Cookie
-
 /**
  * In-memory [CookieStore] for unit tests — no Android Keystore /
  * [EncryptedSharedPreferences] required. Mirrors the production
@@ -13,15 +11,12 @@ class FakeEncryptedCookieStore : CookieStore {
 
     override suspend fun save(
         serverId: String,
-        cookies: List<Cookie>,
+        cookies: List<CookieHolder>,
     ) {
-        data[serverId] = cookies.map { it.serialize() }.toMutableList()
+        data[serverId] = cookies.toMutableList()
     }
 
-    override suspend fun load(serverId: String): List<Cookie> =
-        data[serverId]
-            ?.mapNotNull { it.toCookie() }
-            .orEmpty()
+    override suspend fun load(serverId: String): List<CookieHolder> = data[serverId].orEmpty()
 
     override suspend fun clear(serverId: String) {
         data.remove(serverId)

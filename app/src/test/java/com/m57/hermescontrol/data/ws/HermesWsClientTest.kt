@@ -2,20 +2,18 @@
 
 package com.m57.hermescontrol.data.ws
 
-import android.util.Log
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.remote.CleartextPolicy
 import com.m57.hermescontrol.data.remote.CookieManager
+import com.m57.hermescontrol.data.remote.GatewayClientKind
 import com.m57.hermescontrol.data.remote.HermesHttpConfig
-import com.m57.hermescontrol.data.remote.OkHttpProvider
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.data.remote.buildFakePersistentCookieJar
-import com.m57.hermescontrol.data.remote.createHermesHttpClient
+import com.m57.hermescontrol.data.remote.createGatewayTransportClient
 import com.m57.hermescontrol.data.session.ActiveSessionHolder
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
-import io.mockk.mockkStatic
 import io.mockk.unmockkAll
 import io.mockk.verify
 import kotlinx.coroutines.CompletableDeferred
@@ -89,13 +87,6 @@ class HermesWsClientTest {
 
     @Before
     fun setUp() {
-        mockkStatic(Log::class)
-        every { Log.d(any<String>(), any<String>()) } returns 0
-        every { Log.i(any<String>(), any<String>()) } returns 0
-        every { Log.w(any<String>(), any<String>()) } returns 0
-        every { Log.e(any<String>(), any<String>()) } returns 0
-        every { Log.isLoggable(any<String>(), any<Int>()) } returns false
-
         mockWebServer = sharedServer
         // Fresh queue per test: a leftover response from a previous test would
         // otherwise be handed to this one's connection.
@@ -132,7 +123,9 @@ class HermesWsClientTest {
         // The same OkHttp-backed Ktor client the app installs: the socket handshake
         // is authorised by the session cookie its jar carries.
         HermesWsClient.installTransport(
-            KtorWsTransport(createHermesHttpClient(OkHttpProvider.websocket, HermesHttpConfig.streaming())),
+            KtorWsTransport(
+                createGatewayTransportClient(GatewayClientKind.Session, config = HermesHttpConfig.streaming()),
+            ),
         )
         // The ticket-mint client is process-global and installed by the app at
         // startup. Without this, `refreshWsTicketIfNeeded()` sees a null client
@@ -140,7 +133,7 @@ class HermesWsClientTest {
         // is what happened when this class ran alone (a full suite only passed
         // because AuthenticatedDisposableFixtureTest installs it first).
         HermesWsClient.installHttpClient(
-            createHermesHttpClient(OkHttpProvider.probe, HermesHttpConfig.Probe),
+            createGatewayTransportClient(GatewayClientKind.Session, config = HermesHttpConfig.Probe),
         )
 
         // Reset state. The singleton's outbound queue survives a plain

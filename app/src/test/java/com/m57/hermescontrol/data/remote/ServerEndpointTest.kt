@@ -82,7 +82,7 @@ class ServerEndpointTest {
         assertEquals("2001:db8::1", endpoint.baseUrl.host)
         assertEquals(
             "https://[2001:db8::1]:9119/root/api/status",
-            endpoint.resolve("api/status").toString(),
+            endpoint.baseUrl.resolve("api/status").toString(),
         )
     }
 
@@ -95,7 +95,7 @@ class ServerEndpointTest {
 
         assertEquals(
             "https://hermes.example.com:9119/prefix/api/auth/ws-ticket",
-            endpoint.resolve("/api/auth/ws-ticket").toString(),
+            endpoint.baseUrl.resolve("/api/auth/ws-ticket").toString(),
         )
     }
 

@@ -2,9 +2,9 @@ package com.m57.hermescontrol.ui.gateway
 
 import com.m57.hermescontrol.data.model.MemoryPressureStatus
 import com.m57.hermescontrol.data.model.StatusResponse
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.GatewayResponse
-import com.m57.hermescontrol.data.remote.HermesGatewayApi
+import com.m57.hermescontrol.data.remote.HermesApi
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -30,15 +30,15 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class GatewayViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
-    private lateinit var mockApi: HermesGatewayApi
+    private lateinit var mockApi: HermesApi
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
 
         mockApi = mockk()
-        mockkObject(ApiClient)
-        every { ApiClient.hermesApi } returns mockApi
+        mockkObject(GatewayConnection)
+        every { GatewayConnection.hermesApi } returns mockApi
     }
 
     @After
@@ -174,11 +174,11 @@ class GatewayViewModelTest {
     fun `profile change fences old action transport and completion`() =
         runTest {
             val oldApi = mockApi
-            val newApi = mockk<HermesGatewayApi>()
+            val newApi = mockk<HermesApi>()
             val oldActionStarted = CompletableDeferred<Unit>()
             val oldActionResult = CompletableDeferred<GatewayResponse<Unit>>()
             var currentApi = oldApi
-            every { ApiClient.hermesApi } answers { currentApi }
+            every { GatewayConnection.hermesApi } answers { currentApi }
             coEvery { oldApi.getStatus() } returns GatewayResponse.success(StatusResponse())
             coEvery { oldApi.startGateway() } coAnswers {
                 oldActionStarted.complete(Unit)

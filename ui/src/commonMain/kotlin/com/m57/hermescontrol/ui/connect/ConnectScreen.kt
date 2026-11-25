@@ -168,7 +168,7 @@ fun ConnectScreen(
                             DropdownMenuItem(
                                 text = { Text(profile.name) },
                                 onClick = {
-                                    viewModel.selectProfile(profile)
+                                    viewModel.selectGateway(profile)
                                     profilesExpanded = false
                                 },
                             )

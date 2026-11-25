@@ -82,7 +82,12 @@ fun mapHttpError(
     return NetworkError.Http(code, message)
 }
 
-/** Whether an [IOException] is worth retrying. Platform-specific: see the actuals. */
+/**
+ * Contract: consulted **only** from the `IOException` branch of [safeApiCall]. HTTP status
+ * codes never reach it — 4xx returns a typed failure, 5xx/429 have their own retry rule.
+ * `true` means another attempt is worthwhile; `false` means the failure is structural
+ * (DNS, TLS) and retrying cannot help.
+ */
 expect fun isRetryable(e: IOException): Boolean
 
 fun jitteredBackoff(baseMs: Long): Long {
@@ -90,6 +95,13 @@ fun jitteredBackoff(baseMs: Long): Long {
     return baseMs + jitter
 }
 
+/**
+ * The outcome of an attempt, after policy.
+ *
+ * `GatewayResponse` says what the server answered; this says what should happen next: success, a typed failure,
+ * whether another attempt is worth making, and whether the session is gone. Keeping the two apart is what lets
+ * retry and auth-expiry be tested without a network — do not collapse them into one type.
+ */
 suspend inline fun <reified T> safeApiCall(
     retries: Int = 2,
     reportAuthExpiry: Boolean = true,

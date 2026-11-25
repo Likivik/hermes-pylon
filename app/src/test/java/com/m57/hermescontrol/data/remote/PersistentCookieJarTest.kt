@@ -1,12 +1,8 @@
 package com.m57.hermescontrol.data.remote
 
+import io.ktor.http.Url
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
-import okhttp3.Cookie
-import okhttp3.HttpUrl.Companion.toHttpUrl
-import okhttp3.mockwebserver.MockResponse
-import okhttp3.mockwebserver.MockWebServer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -33,26 +29,27 @@ class PersistentCookieJarTest {
         host: String,
         value: String,
         name: String = SESSION_COOKIE_NAME,
-    ): Cookie =
-        Cookie
-            .Builder()
-            .name(name)
-            .value(value)
-            .expiresAt(System.currentTimeMillis() + 10L * 365 * 24 * 60 * 60 * 1000)
-            .hostOnlyDomain(host)
-            .path("/")
-            .httpOnly()
-            .build()
+    ): CookieHolder =
+        CookieHolder(
+            name = name,
+            value = value,
+            expiresAt = System.currentTimeMillis() + 10L * 365 * 24 * 60 * 60 * 1000,
+            domain = host,
+            path = "/",
+            secure = false,
+            httpOnly = true,
+            hostOnly = true,
+        )
 
     @Test
     fun saveFromResponse_thenLoadForRequest_attachesCookie() =
         runTest {
             val jar = makeJar()
             jar.useStore("server-a")
-            val url = "http://dashboard.local/".toHttpUrl()
+            val url = Url("http://dashboard.local/")
             jar.saveFromResponse(url, listOf(sessionCookie("dashboard.local", "abc123")))
 
-            val loaded = jar.loadForRequest("http://dashboard.local/api/status".toHttpUrl())
+            val loaded = jar.loadForRequest(Url("http://dashboard.local/api/status"))
             assertEquals(1, loaded.size)
             assertEquals("abc123", loaded[0].value)
             assertEquals(SESSION_COOKIE_NAME, loaded[0].name)
@@ -64,11 +61,11 @@ class PersistentCookieJarTest {
             val jar = makeJar()
             jar.useStore("server-a")
             jar.saveFromResponse(
-                "http://dashboard.local/".toHttpUrl(),
+                Url("http://dashboard.local/"),
                 listOf(sessionCookie("dashboard.local", "abc123")),
             )
 
-            val loaded = jar.loadForRequest("http://evil.local/".toHttpUrl())
+            val loaded = jar.loadForRequest(Url("http://evil.local/"))
             assertTrue(loaded.isEmpty())
         }
 
@@ -78,22 +75,22 @@ class PersistentCookieJarTest {
             val jar = makeJar()
             jar.useStore("server-a")
             jar.saveFromResponse(
-                "http://a.local/".toHttpUrl(),
+                Url("http://a.local/"),
                 listOf(sessionCookie("a.local", "cookie-a")),
             )
             jar.useStore("server-b")
             jar.saveFromResponse(
-                "http://b.local/".toHttpUrl(),
+                Url("http://b.local/"),
                 listOf(sessionCookie("b.local", "cookie-b")),
             )
 
             // Active scope is server-b now — only b's cookie should load.
-            val fromB = jar.loadForRequest("http://b.local/x".toHttpUrl())
+            val fromB = jar.loadForRequest(Url("http://b.local/x"))
             assertEquals("cookie-b", fromB.firstOrNull()?.value)
 
             // Switch back to server-a.
             jar.useStore("server-a")
-            val fromA = jar.loadForRequest("http://a.local/x".toHttpUrl())
+            val fromA = jar.loadForRequest(Url("http://a.local/x"))
             assertEquals("cookie-a", fromA.firstOrNull()?.value)
         }
 
@@ -108,7 +105,7 @@ class PersistentCookieJarTest {
                 )
             jar.useStore("persist-scope")
             jar.saveFromResponse(
-                "http://p.local/".toHttpUrl(),
+                Url("http://p.local/"),
                 listOf(sessionCookie("p.local", "persisted-value")),
             )
 
@@ -122,7 +119,7 @@ class PersistentCookieJarTest {
                     storeScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined),
                 )
             jar2.useStore("persist-scope")
-            val reloaded = jar2.loadForRequest("http://p.local/".toHttpUrl())
+            val reloaded = jar2.loadForRequest(Url("http://p.local/"))
             assertEquals("persisted-value", reloaded.firstOrNull()?.value)
         }
 
@@ -131,16 +128,18 @@ class PersistentCookieJarTest {
         runTest {
             val jar = makeJar()
             jar.useStore("prune-scope")
-            val url = "http://p.local/".toHttpUrl()
+            val url = Url("http://p.local/")
             val expired =
-                Cookie
-                    .Builder()
-                    .name("expired_cookie")
-                    .value("x")
-                    .expiresAt(System.currentTimeMillis() - 1000)
-                    .hostOnlyDomain("p.local")
-                    .path("/")
-                    .build()
+                CookieHolder(
+                    name = "expired_cookie",
+                    value = "x",
+                    expiresAt = System.currentTimeMillis() - 1000,
+                    domain = "p.local",
+                    path = "/",
+                    secure = false,
+                    httpOnly = false,
+                    hostOnly = true,
+                )
             jar.saveFromResponse(url, listOf(expired, sessionCookie("p.local", "live")))
 
             jar.pruneServerCache()
@@ -155,7 +154,7 @@ class PersistentCookieJarTest {
         runTest {
             val jar = makeJar()
             jar.useStore("dup-scope")
-            val url = "http://d.local/".toHttpUrl()
+            val url = Url("http://d.local/")
             jar.saveFromResponse(url, listOf(sessionCookie("d.local", "v1")))
             jar.saveFromResponse(url, listOf(sessionCookie("d.local", "v2")))
 
@@ -170,12 +169,12 @@ class PersistentCookieJarTest {
             val jar = makeJar()
             jar.useStore("clear-scope")
             jar.saveFromResponse(
-                "http://c.local/".toHttpUrl(),
+                Url("http://c.local/"),
                 listOf(sessionCookie("c.local", "bye")),
             )
             jar.clearActive()
 
-            assertTrue(jar.loadForRequest("http://c.local/".toHttpUrl()).isEmpty())
+            assertTrue(jar.loadForRequest(Url("http://c.local/")).isEmpty())
         }
 
     @Test
@@ -186,18 +185,18 @@ class PersistentCookieJarTest {
             val clearFinished = CompletableDeferred<Unit>()
             val store =
                 object : CookieStore {
-                    val values = mutableMapOf<String, List<Cookie>>()
+                    val values = mutableMapOf<String, List<CookieHolder>>()
 
                     override suspend fun save(
                         serverId: String,
-                        cookies: List<Cookie>,
+                        cookies: List<CookieHolder>,
                     ) {
                         saveStarted.complete(Unit)
                         releaseSave.await()
                         values[serverId] = cookies
                     }
 
-                    override suspend fun load(serverId: String): List<Cookie> = values[serverId].orEmpty()
+                    override suspend fun load(serverId: String): List<CookieHolder> = values[serverId].orEmpty()
 
                     override suspend fun clear(serverId: String) {
                         values.remove(serverId)
@@ -212,7 +211,7 @@ class PersistentCookieJarTest {
             val jar = PersistentCookieJar(store = store, storeScope = scope)
             jar.useStore("ordered-scope")
             jar.saveFromResponse(
-                "http://ordered.local/".toHttpUrl(),
+                Url("http://ordered.local/"),
                 listOf(sessionCookie("ordered.local", "old")),
             )
             saveStarted.await()
@@ -234,10 +233,10 @@ class PersistentCookieJarTest {
                 object : CookieStore {
                     override suspend fun save(
                         serverId: String,
-                        cookies: List<Cookie>,
+                        cookies: List<CookieHolder>,
                     ) = Unit
 
-                    override suspend fun load(serverId: String): List<Cookie> = listOf(persisted)
+                    override suspend fun load(serverId: String): List<CookieHolder> = listOf(persisted)
 
                     override suspend fun clear(serverId: String) {
                         clearStarted.complete(Unit)
@@ -258,7 +257,7 @@ class PersistentCookieJarTest {
             clearStarted.await()
 
             assertNull(jar.getSessionCookieValue())
-            assertTrue(jar.loadForRequest("http://clear.local/".toHttpUrl()).isEmpty())
+            assertTrue(jar.loadForRequest(Url("http://clear.local/")).isEmpty())
             releaseClear.complete(Unit)
         }
 
@@ -295,18 +294,20 @@ class PersistentCookieJarTest {
     fun expiredSessionCookieDeletesStoredCredential() =
         runTest {
             val jar = makeJar()
-            val url = "https://dashboard.local/".toHttpUrl()
+            val url = Url("https://dashboard.local/")
             jar.useStore("server-a")
             jar.saveFromResponse(url, listOf(sessionCookie("dashboard.local", "active")))
             val deletion =
-                Cookie
-                    .Builder()
-                    .name(SESSION_COOKIE_NAME)
-                    .value("")
-                    .expiresAt(0)
-                    .hostOnlyDomain("dashboard.local")
-                    .path("/")
-                    .build()
+                CookieHolder(
+                    name = SESSION_COOKIE_NAME,
+                    value = "",
+                    expiresAt = 0,
+                    domain = "dashboard.local",
+                    path = "/",
+                    secure = false,
+                    httpOnly = false,
+                    hostOnly = true,
+                )
 
             jar.saveFromResponse(url, listOf(deletion))
 
@@ -323,24 +324,30 @@ class PersistentCookieJarTest {
                     store = store,
                     storeScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined),
                 )
-            val origin = "https://auth.example.com/".toHttpUrl()
+            val origin = Url("https://auth.example.com/")
             jar.useStore("server-a")
             val hostOnly =
-                Cookie
-                    .Builder()
-                    .name(SESSION_COOKIE_NAME)
-                    .value("host-only")
-                    .hostOnlyDomain("auth.example.com")
-                    .path("/")
-                    .build()
+                CookieHolder(
+                    name = SESSION_COOKIE_NAME,
+                    value = "host-only",
+                    expiresAt = COOKIE_MAX_DATE_MILLIS,
+                    domain = "auth.example.com",
+                    path = "/",
+                    secure = false,
+                    httpOnly = false,
+                    hostOnly = true,
+                )
             val parentDomain =
-                Cookie
-                    .Builder()
-                    .name(SESSION_COOKIE_NAME)
-                    .value("parent-domain")
-                    .domain("example.com")
-                    .path("/")
-                    .build()
+                CookieHolder(
+                    name = SESSION_COOKIE_NAME,
+                    value = "parent-domain",
+                    expiresAt = COOKIE_MAX_DATE_MILLIS,
+                    domain = "example.com",
+                    path = "/",
+                    secure = false,
+                    httpOnly = false,
+                    hostOnly = false,
+                )
 
             jar.saveFromResponse(origin, listOf(hostOnly, parentDomain))
 
@@ -350,7 +357,7 @@ class PersistentCookieJarTest {
             )
             assertEquals(
                 listOf("parent-domain"),
-                jar.loadForRequest("https://other.example.com/".toHttpUrl()).map { it.value },
+                jar.loadForRequest(Url("https://other.example.com/")).map { it.value },
             )
 
             val reloaded =
@@ -370,7 +377,7 @@ class PersistentCookieJarTest {
         runTest {
             val jar = makeJar()
             val legacy = requireNotNull(wrapSessionCookie("legacy-value"))
-            val origin = "https://dashboard.example.com/".toHttpUrl()
+            val origin = Url("https://dashboard.example.com/")
             jar.useStore(PersistentCookieJar.DEFAULT_SERVER_ID)
 
             jar.saveFromResponse(origin, listOf(legacy))
@@ -380,65 +387,6 @@ class PersistentCookieJarTest {
                 jar.loadForRequest(origin).map { it.value },
             )
         }
-
-    @Test
-    fun staleHttpResponseCannotRestoreCookieAfterClear() {
-        val server = MockWebServer()
-        val responseStarted = CompletableDeferred<Unit>()
-        val releaseResponse = CompletableDeferred<Unit>()
-        val store = FakeEncryptedCookieStore()
-        val jar =
-            PersistentCookieJar(
-                store = store,
-                storeScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined),
-            )
-        CookieManager.setJarForTest(jar)
-        val client =
-            okhttp3.OkHttpClient
-                .Builder()
-                .cookieJar(jar)
-                .addInterceptor { chain ->
-                    val boundary = jar.captureCredentialBoundary()
-                    val request =
-                        chain.request().newBuilder().tag(CookieCredentialBoundary::class.java, boundary).build()
-                    chain.proceed(request)
-                }.addNetworkInterceptor { chain ->
-                    responseStarted.complete(Unit)
-                    kotlinx.coroutines.runBlocking { releaseResponse.await() }
-                    val response = chain.proceed(chain.request())
-                    val boundary = chain.request().tag(CookieCredentialBoundary::class.java)
-                    if (boundary != null) {
-                        jar.saveFromResponse(
-                            boundary,
-                            chain.request().url,
-                            okhttp3.Cookie.parseAll(chain.request().url, response.headers),
-                        )
-                    }
-                    response.newBuilder().removeHeader("Set-Cookie").build()
-                }.build()
-        server.enqueue(
-            MockResponse()
-                .setHeader("Set-Cookie", "hermes_session_at=stale; Path=/; HttpOnly")
-                .setBody("ok"),
-        )
-        server.start()
-        val call =
-            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-                client.newCall(okhttp3.Request.Builder().url(server.url("/")).build()).execute().use { response ->
-                    response.body.string()
-                }
-            }
-        kotlinx.coroutines.runBlocking {
-            responseStarted.await()
-            jar.clearActive()
-            jar.beginAuthentication()
-            releaseResponse.complete(Unit)
-            call.join()
-        }
-
-        assertNull(jar.getSessionCookieValue())
-        server.shutdown()
-    }
 
     @Test
     fun getSessionCookieValue_acceptsServerCookieNameVariants() =
@@ -456,7 +404,7 @@ class PersistentCookieJarTest {
                 val host = "variant-$index.local"
                 jar.useStore(serverId)
                 jar.saveFromResponse(
-                    "https://$host/".toHttpUrl(),
+                    Url("https://$host/"),
                     listOf(
                         sessionCookie(
                             host = host,
@@ -473,7 +421,7 @@ class PersistentCookieJarTest {
     @Test
     fun loadForRequest_returnsEmptyWhenNoCookies() {
         val jar = makeJar()
-        assertTrue(jar.loadForRequest("http://empty.local/".toHttpUrl()).isEmpty())
+        assertTrue(jar.loadForRequest(Url("http://empty.local/")).isEmpty())
         assertNull(jar.getSessionCookieValue())
     }
 
@@ -482,18 +430,18 @@ class PersistentCookieJarTest {
         runTest {
             val jar = makeJar()
             jar.useStore("prefixed-scope")
-            val url = "https://dash.local/".toHttpUrl()
+            val url = Url("https://dash.local/")
             val prefixed =
-                Cookie
-                    .Builder()
-                    .name("__Host-hermes_session_at")
-                    .value("host-prefixed-value")
-                    .expiresAt(System.currentTimeMillis() + 10L * 365 * 24 * 60 * 60 * 1000)
-                    .hostOnlyDomain("dash.local")
-                    .path("/")
-                    .secure()
-                    .httpOnly()
-                    .build()
+                CookieHolder(
+                    name = "__Host-hermes_session_at",
+                    value = "host-prefixed-value",
+                    expiresAt = System.currentTimeMillis() + 10L * 365 * 24 * 60 * 60 * 1000,
+                    domain = "dash.local",
+                    path = "/",
+                    secure = true,
+                    httpOnly = true,
+                    hostOnly = true,
+                )
             jar.saveFromResponse(url, listOf(prefixed))
 
             assertEquals("host-prefixed-value", jar.getSessionCookieValue())
@@ -504,30 +452,31 @@ class PersistentCookieJarTest {
         runTest {
             val jar = makeJar()
             jar.useStore("multi-scope")
-            val url = "https://dash.local/".toHttpUrl()
+            val url = Url("https://dash.local/")
             // Both a bare and a __Secure- prefixed cookie present; the strictest
             // (__Host- / __Secure- first in SESSION_COOKIE_NAMES) must win.
             val bare =
-                Cookie
-                    .Builder()
-                    .name(SESSION_COOKIE_NAME)
-                    .value("bare-value")
-                    .expiresAt(System.currentTimeMillis() + 10L * 365 * 24 * 60 * 60 * 1000)
-                    .hostOnlyDomain("dash.local")
-                    .path("/")
-                    .httpOnly()
-                    .build()
+                CookieHolder(
+                    name = SESSION_COOKIE_NAME,
+                    value = "bare-value",
+                    expiresAt = System.currentTimeMillis() + 10L * 365 * 24 * 60 * 60 * 1000,
+                    domain = "dash.local",
+                    path = "/",
+                    secure = false,
+                    httpOnly = true,
+                    hostOnly = true,
+                )
             val secure =
-                Cookie
-                    .Builder()
-                    .name("__Secure-hermes_session_at")
-                    .value("secure-value")
-                    .expiresAt(System.currentTimeMillis() + 10L * 365 * 24 * 60 * 60 * 1000)
-                    .hostOnlyDomain("dash.local")
-                    .path("/")
-                    .secure()
-                    .httpOnly()
-                    .build()
+                CookieHolder(
+                    name = "__Secure-hermes_session_at",
+                    value = "secure-value",
+                    expiresAt = System.currentTimeMillis() + 10L * 365 * 24 * 60 * 60 * 1000,
+                    domain = "dash.local",
+                    path = "/",
+                    secure = true,
+                    httpOnly = true,
+                    hostOnly = true,
+                )
             jar.saveFromResponse(url, listOf(bare, secure))
 
             assertEquals("secure-value", jar.getSessionCookieValue())

@@ -24,6 +24,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -268,6 +269,8 @@ object HermesWsClient {
 
     @Volatile
     var lastPongTimestamp: Long = 0L
+
+    private var _lastHandshakeFailure: String? = null
         private set
 
     val isHealthy: Boolean
@@ -283,6 +286,8 @@ object HermesWsClient {
                 while (connected.get()) {
                     delay(HEARTBEAT_INTERVAL_MS)
                     if (!connected.get()) break
+                    // Intentional: a failed probe IS the signal. Logging every silent
+                    // heartbeat would bury real failures (inventory: intentional-ignore).
                     val alive = runCatching { ping(LIVENESS_PROBE_TIMEOUT_MS) }.isSuccess
                     if (!alive && monotonicTimeMs() - lastPongTimestamp > STALE_THRESHOLD_MS) {
                         synchronized(connectionLock) {
@@ -335,6 +340,14 @@ object HermesWsClient {
     /** Observable connection status */
     val connectionStatus: StateFlow<ConnectionStatus> = _connectionStatus.asStateFlow()
 
+    /**
+     * Why the last handshake did not proceed, in one word: `auth`, `missing-http-client`,
+     * `transient`, `ready`. Carries no URL, no query string and no ticket — it exists so a
+     * browser test (and a human in devtools) can tell a wiring bug from a transient failure.
+     */
+    val lastHandshakeFailure: String?
+        get() = _lastHandshakeFailure
+
     // ── Credential warning (issue #534) ─────────────────────────────────
     // Backend surfaces `credential_warning` in `gateway.ready` / `session.info`
     // WS payloads (desktop `requestDesktopOnboarding`). Mobile has no equivalent
@@ -355,6 +368,12 @@ object HermesWsClient {
             isNetworkAvailable.collect { connected ->
                 val autoReconnect =
                     runCatching { auth.isAutoReconnect() }
+                        .onFailure {
+                            HermesLog.w(
+                                TAG,
+                                "auth.isAutoReconnect() failed; treating auto-reconnect as off: ${it.message}",
+                            )
+                        }
                         .getOrDefault(false)
                 if (connected && shouldReconnectAfterNetworkRestore(autoReconnect)) {
                     HermesLog.d(TAG, "Network restored — triggering immediate reconnect")
@@ -480,6 +499,34 @@ object HermesWsClient {
         _connectionStatus.value = ConnectionStatus.DISCONNECTED
     }
 
+    /**
+     * Drop a stale AUTH_EXPIRED so the next connect() is allowed.
+     *
+     * connect() deliberately refuses to run from AUTH_EXPIRED, on the assumption
+     * that only a sign-in can clear it. A browser reload that adopts a verified
+     * session is exactly that case: the session is proven live, yet the persisted
+     * status still says otherwise, so the app hangs on "Reconnecting..." while REST
+     * keeps working. Call this only once a session has actually been verified.
+     */
+    fun clearStaleAuthExpiry() {
+        synchronized(connectionLock) {
+            val status = _connectionStatus.value
+            val stuck =
+                status == ConnectionStatus.AUTH_EXPIRED ||
+                    (
+                        webSocket == null &&
+                            (
+                                status == ConnectionStatus.CONNECTING ||
+                                    status == ConnectionStatus.RECONNECTING
+                            )
+                    )
+            if (stuck) {
+                _connectionStatus.value = ConnectionStatus.DISCONNECTED
+                HermesLog.d(TAG, "cleared stale $status after a verified session")
+            }
+        }
+    }
+
     @VisibleForTesting
     fun shouldReconnectAfterNetworkRestore(autoReconnect: Boolean): Boolean =
         !isConnected &&
@@ -517,6 +564,10 @@ object HermesWsClient {
                     HermesLog.d(TAG, "Already connected — skipping")
                     return
                 }
+                // Permanent diagnostic: a hung "Reconnecting" banner with no
+                // socket dial in the access log is impossible to tell apart from
+                // a rejected upgrade. This line says which one it is.
+                HermesLog.d(TAG, "connect() called; status=${_connectionStatus.value}")
                 // Guard against re-entrant connect() while a connection is
                 // already in flight. Only start from a terminal state.
                 if (_connectionStatus.value == ConnectionStatus.CONNECTING ||
@@ -591,7 +642,15 @@ object HermesWsClient {
         try {
             val client =
                 httpClient
-                    ?: return TicketRefreshResult(TicketRefreshStatus.TRANSIENT_FAILURE)
+                    ?: run {
+                        HermesLog.e(
+                            TAG,
+                            "WS client has no HTTP client: the platform entry must call " +
+                                "HermesWsClient.installHttpClient(...). No socket can be " +
+                                "dialled until it does.",
+                        )
+                        return TicketRefreshResult(TicketRefreshStatus.MISSING_HTTP_CLIENT)
+                    }
             val url = auth.endpointForBuild().baseUrl.resolve("api/auth/ws-ticket").toString()
 
             return withContext(ioDispatcher) {
@@ -636,6 +695,14 @@ object HermesWsClient {
         READY,
         AUTHENTICATION_FAILED,
         TRANSIENT_FAILURE,
+
+        /**
+         * The platform entry never called [installHttpClient]. This is a wiring bug, not a
+         * network condition: retrying cannot fix it, and silently degrading to
+         * [TRANSIENT_FAILURE] hides it behind a permanent "Reconnecting..." banner. The web
+         * entry shipped without this seam once and the failure took an evening to find.
+         */
+        MISSING_HTTP_CLIENT,
     }
 
     /**
@@ -1381,9 +1448,10 @@ object HermesWsClient {
             return
         }
         when (ticketResult.status) {
-            TicketRefreshStatus.READY -> Unit
+            TicketRefreshStatus.READY -> _lastHandshakeFailure = "ready"
 
             TicketRefreshStatus.AUTHENTICATION_FAILED -> {
+                _lastHandshakeFailure = "auth"
                 HermesLog.w(TAG, "Aborting openSocket: dashboard authentication rejected")
                 synchronized(connectionLock) {
                     if (generation != connectionGeneration.get()) return
@@ -1393,7 +1461,19 @@ object HermesWsClient {
                 return
             }
 
+            TicketRefreshStatus.MISSING_HTTP_CLIENT -> {
+                _lastHandshakeFailure = "missing-http-client"
+                // Not a transient condition, so no reconnect is scheduled: the entry is
+                // mis-wired and only a new install can change that.
+                synchronized(connectionLock) {
+                    if (generation != connectionGeneration.get()) return
+                    _connectionStatus.value = ConnectionStatus.DISCONNECTED
+                }
+                return
+            }
+
             TicketRefreshStatus.TRANSIENT_FAILURE -> {
+                _lastHandshakeFailure = "transient"
                 HermesLog.w(TAG, "Deferring openSocket: WS ticket refresh temporarily unavailable")
                 synchronized(connectionLock) {
                     if (generation != connectionGeneration.get()) return
@@ -1520,6 +1600,14 @@ object HermesWsClient {
             val isGated =
                 runCatching {
                     auth.isGatedMode()
+                }.onFailure {
+                    // The dangerous default: treating a gated deployment as token auth is
+                    // how a session ends up reconnecting forever against a cookie-only
+                    // dashboard. Loud on purpose.
+                    HermesLog.w(
+                        TAG,
+                        "auth.isGatedMode() failed; falling back to token auth, which may be wrong: ${it.message}",
+                    )
                 }.getOrDefault(false)
             if (isGated && !intentionalClose.get() &&
                 ticketAuthRetryUsed.compareAndSet(false, true)
@@ -1601,6 +1689,24 @@ object HermesWsClient {
         pendingPromptSessions.clear()
         pendingReplayResponses.clear()
         pendingReply = false
+    }
+
+    /**
+     * Cancels work the client started and left running.
+     *
+     * Separate from [resetForTest] on purpose: that one is also used as *setup*
+     * by tests that need a live reconnect job, so cancelling there would break
+     * them. This is for teardown only — a reconnect or request-timeout job that
+     * outlives its test surfaces as `UncaughtExceptionsBeforeTest` on whichever
+     * test runs next.
+     */
+    @VisibleForTesting
+    fun cancelBackgroundWorkForTest() {
+        reconnectJob?.cancel()
+        reconnectJob = null
+        pendingCalls.values.forEach { it.timeoutJob?.cancel() }
+        pendingCalls.clear()
+        wsScope.coroutineContext[Job]?.cancelChildren()
     }
 
     /** The live outbound queue: tests read it and seed frames into it. */

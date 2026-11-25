@@ -50,78 +50,83 @@ object ServerMessageMapper {
                 }.groupingBy { it }
                 .eachCount()
 
-        return messages.mapIndexedNotNull { index, msg ->
-            if (!isDisplayableServerMessage(msg)) {
-                return@mapIndexedNotNull null
-            }
-            val role =
-                when (msg.role?.lowercase()) {
-                    "user" -> MessageRole.USER
-                    "system" -> MessageRole.SYSTEM
-                    "tool" -> MessageRole.TOOL
-                    else -> MessageRole.ASSISTANT
+        return collapseDuplicateRows(
+            sessionId,
+            messages.mapIndexedNotNull { index, msg ->
+                if (!isDisplayableServerMessage(msg)) {
+                    return@mapIndexedNotNull null
                 }
-            val globalIndex = offset + index
-            val id =
-                if (useLatestPaging) {
-                    msg.id?.let { "rest-$sessionId-$it" }
-                        ?: "rest-$sessionId-$globalIndex"
-                } else {
-                    "rest-$sessionId-$globalIndex"
-                }
-            val content = msg.contentText
-            val roleAndContent = role to content
-            val preservedReasoning =
-                existingReasoningById[id]
-                    ?.takeIf { existing ->
-                        existing.role == role && existing.content == content
+                val role =
+                    when (msg.role?.lowercase()) {
+                        "user" -> MessageRole.USER
+                        "system" -> MessageRole.SYSTEM
+                        "tool" -> MessageRole.TOOL
+                        else -> MessageRole.ASSISTANT
                     }
-                    ?: uniqueReasoningByContent[roleAndContent]
-                        ?.takeIf { incomingRoleAndContentCounts[roleAndContent] == 1 }
-            val reasoning =
-                msg.reasoningText.ifBlank {
-                    preservedReasoning?.reasoningText.orEmpty()
+                val globalIndex = offset + index
+                // The handle this row carries in the source's own ordering. It is deliberately not the identity:
+                // with `useLatestPaging` off it is a list offset, which shifts the moment an older page prepends.
+                val serverIndex = if (useLatestPaging) msg.id ?: globalIndex else globalIndex
+                val content = msg.contentText
+                val timestamp =
+                    msg.timestampText
+                        ?.toDoubleOrNull()
+                        ?.times(1000)
+                        ?.toLong()
+                        ?: nowMillis
+                // Identity is the store's own `message_uid`, which compaction carries forward, so it does not
+                // move across reads. Without one the fallback is the content fingerprint — never a rowid and
+                // never a list offset, both of which move. The standing rule for this store is that a
+                // `messages_read` id is not a cross-read identifier; content hash or scope is.
+                val id = msg.messageUid ?: messageRowFingerprint(sessionId, role, timestamp, content)
+                val roleAndContent = role to content
+                val preservedReasoning =
+                    existingReasoningById[id]
+                        ?.takeIf { existing ->
+                            existing.role == role && existing.content == content
+                        }
+                        ?: uniqueReasoningByContent[roleAndContent]
+                            ?.takeIf { incomingRoleAndContentCounts[roleAndContent] == 1 }
+                val reasoning =
+                    msg.reasoningText.ifBlank {
+                        preservedReasoning?.reasoningText.orEmpty()
+                    }
+                var finalContent = content
+                var attachments: List<Attachment>? = null
+                if (role == MessageRole.ASSISTANT && content.contains("MEDIA:")) {
+                    val items = HostMediaExtractor.extract(content)
+                    if (items.isNotEmpty()) {
+                        finalContent = HostMediaExtractor.strip(content)
+                        attachments =
+                            items
+                                .mapNotNull { item ->
+                                    val path = GatewayPath.normalizePath(item.path) ?: return@mapNotNull null
+                                    Attachment(
+                                        uri = path,
+                                        name = mediaNameFromPath(item.path),
+                                        mimeType = mediaMimeForPath(item.path),
+                                        size = 0,
+                                        gatewayPath = path,
+                                        source = AttachmentSource.GATEWAY,
+                                    )
+                                }.takeIf { it.isNotEmpty() }
+                    }
                 }
-            val timestamp =
-                msg.timestampText
-                    ?.toDoubleOrNull()
-                    ?.times(1000)
-                    ?.toLong()
-                    ?: nowMillis
-            var finalContent = content
-            var attachments: List<Attachment>? = null
-            if (role == MessageRole.ASSISTANT && content.contains("MEDIA:")) {
-                val items = HostMediaExtractor.extract(content)
-                if (items.isNotEmpty()) {
-                    finalContent = HostMediaExtractor.strip(content)
-                    attachments =
-                        items
-                            .mapNotNull { item ->
-                                val path = GatewayPath.normalizePath(item.path) ?: return@mapNotNull null
-                                Attachment(
-                                    uri = path,
-                                    name = mediaNameFromPath(item.path),
-                                    mimeType = mediaMimeForPath(item.path),
-                                    size = 0,
-                                    gatewayPath = path,
-                                    source = AttachmentSource.GATEWAY,
-                                )
-                            }.takeIf { it.isNotEmpty() }
-                }
-            }
-            ChatMessage(
-                id = id,
-                role = role,
-                content = finalContent,
-                reasoningText = reasoning,
-                attachments = attachments,
-                timestamp = timestamp,
-                isStreaming = false,
-                toolName = msg.toolName,
-                toolCallId = msg.toolCallId,
-                toolStatus = if (role == MessageRole.TOOL) ToolStatus.COMPLETED else null,
-                displayKind = msg.displayKind,
-            )
-        }
+                ChatMessage(
+                    id = id,
+                    origin = MessageOrigin.Rest(serverIndex),
+                    role = role,
+                    content = finalContent,
+                    reasoningText = reasoning,
+                    attachments = attachments,
+                    timestamp = timestamp,
+                    isStreaming = false,
+                    toolName = msg.toolName,
+                    toolCallId = msg.toolCallId,
+                    toolStatus = if (role == MessageRole.TOOL) ToolStatus.COMPLETED else null,
+                    displayKind = msg.displayKind,
+                )
+            },
+        )
     }
 }
