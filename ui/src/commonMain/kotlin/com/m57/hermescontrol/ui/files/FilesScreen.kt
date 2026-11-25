@@ -38,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -232,11 +233,11 @@ fun FilesScreen(
     modifier: Modifier = Modifier,
     onOpenDrawer: (() -> Unit)? = null,
     launchDownloadedFile: ((DownloadedFile) -> Unit)? = null,
+    filesPlatform: FilesPlatform = rememberFilesPlatform(),
 ) {
     val scope = rememberCoroutineScope()
     var mediaPlayerRequest by remember { mutableStateOf<SecureGatewayMediaRequest?>(null) }
 
-    val filesPlatform = rememberFilesPlatform()
     val uploadFile: () -> Unit = {
         filesPlatform.pickFile(
             mimeType = "*/*",
@@ -341,7 +342,10 @@ fun FilesScreen(
             val uploadLabel = stringResource(Res.string.files_action_upload)
             IconButton(
                 onClick = uploadFile,
-                modifier = Modifier.semantics { contentDescription = uploadLabel },
+                modifier =
+                    Modifier
+                        .semantics { contentDescription = uploadLabel }
+                        .testTag("files-upload"),
             ) {
                 HermesSymbol(
                     icon = HermesIcon.Upload,
