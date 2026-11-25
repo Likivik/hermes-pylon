@@ -6,10 +6,12 @@ import com.m57.hermescontrol.data.model.OAuthPollResponse
 import com.m57.hermescontrol.data.model.OAuthProvider
 import com.m57.hermescontrol.data.model.OAuthStartResponse
 import com.m57.hermescontrol.data.model.OAuthSubmitRequest
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.NetworkError
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.data.remote.source.DefaultProviders
+import com.m57.hermescontrol.data.remote.source.Providers
 import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.ui.common.safeLaunchLoad
 import kotlinx.coroutines.Job
@@ -59,9 +61,11 @@ data class ProvidersUiState(
     val flowExpiresIn: String = "",
 )
 
-class ProvidersViewModel :
+class ProvidersViewModel(
+    private val source: Providers = DefaultProviders(GatewayConnection.hermesApi),
+) :
     ViewModel(),
-    ToastHost {
+        ToastHost {
     private val _uiState = MutableStateFlow(ProvidersUiState())
     val uiState: StateFlow<ProvidersUiState> = _uiState.asStateFlow()
 
@@ -69,7 +73,7 @@ class ProvidersViewModel :
 
     fun load() {
         safeLaunchLoad(
-            apiCall = { safeApiCall { ApiClient.hermesApi.getOAuthProviders() } },
+            apiCall = { safeApiCall { source.getOAuthProviders() } },
             onStart = {
                 _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             },
@@ -96,7 +100,7 @@ class ProvidersViewModel :
     fun disconnectProvider(providerId: String) {
         _uiState.update { it.copy(actingId = providerId) }
         safeLaunchLoad(
-            apiCall = { safeApiCall { ApiClient.hermesApi.disconnectOAuthProvider(providerId) } },
+            apiCall = { safeApiCall { source.disconnectOAuthProvider(providerId) } },
             onStart = {},
             onSuccess = {
                 _uiState.update {
@@ -158,7 +162,7 @@ class ProvidersViewModel :
             )
         }
         viewModelScope.launch {
-            val result = safeApiCall { ApiClient.hermesApi.startOAuthLogin(provider.id) }
+            val result = safeApiCall { source.startOAuthLogin(provider.id) }
             when (result) {
                 is NetworkResult.Success -> {
                     val start = result.data
@@ -207,7 +211,7 @@ class ProvidersViewModel :
         viewModelScope.launch {
             val result =
                 safeApiCall {
-                    ApiClient.hermesApi.submitOAuthCode(
+                    source.submitOAuthCode(
                         state.flowProviderId,
                         OAuthSubmitRequest(sessionId = state.flowSessionId, code = code),
                     )
@@ -250,7 +254,7 @@ class ProvidersViewModel :
                     delay((_uiState.value.flowStart?.pollInterval ?: 5).toLong() * 1000)
                     val result =
                         safeApiCall {
-                            ApiClient.hermesApi.pollOAuthSession(providerId, sessionId)
+                            source.pollOAuthSession(providerId, sessionId)
                         }
                     when (result) {
                         is NetworkResult.Success -> {
@@ -346,7 +350,7 @@ class ProvidersViewModel :
         }
         if (sessionId.isNotEmpty()) {
             viewModelScope.launch {
-                safeApiCall { ApiClient.hermesApi.cancelOAuthSession(sessionId) }
+                safeApiCall { source.cancelOAuthSession(sessionId) }
             }
         }
     }

@@ -1,9 +1,9 @@
 /**
- * The two platform seams behind [ApiClient].
+ * The two platform seams behind [GatewayConnection].
  *
  * Everything else about the gateway REST surface is shared code; these two
  * declarations are the only per-target knowledge. Keeping them this small is
- * the point of the tranche: a target cannot drift into its own ApiClient, and
+ * the point of the tranche: a target cannot drift into its own GatewayConnection, and
  * the auth rule itself ([gatewayBearerValue]) lives in shared code.
  */
 package com.m57.hermescontrol.data.remote
@@ -16,7 +16,7 @@ internal sealed interface GatewayClientAuth {
     data object SessionCredentials : GatewayClientAuth
 
     /**
-     * A fixed bearer for a throwaway client ([ApiClient.tempService]).
+     * A fixed bearer for a throwaway client ([GatewayConnection.tempService]).
      * A blank [token] means "attach no Authorization header".
      */
     data class FixedBearer(
@@ -43,10 +43,13 @@ internal expect object GatewayPlatform {
  *
  * Android overrides this with Ktor-over-OkHttp (`preconfigured` on the shared
  * `OkHttpProvider` client), keeping the persistent cookie jar, the
- * credential-boundary interceptors, `TokenRefreshAuthenticator` and debug-only
+ * credential-boundary interceptors and debug-only
  * HTTP logging. Desktop/wasm return a plain Ktor client.
  */
-internal expect fun createGatewayHttpClient(auth: GatewayClientAuth): HttpClient
+internal expect fun createGatewayHttpClient(
+    auth: GatewayClientAuth,
+    profile: String? = null,
+): HttpClient
 
 /**
  * The one bearer-header rule, shared so no target can get it wrong.

@@ -4,6 +4,37 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Pylon</title>
+    <meta name="theme-color" content="#7C5CFF" />
+    <meta name="description" content="Control panel for Hermes Agent" />
+    <!-- App icons. The mark is "spire"; favicon.svg is the vector source of the
+         PNG set (docs/design/chosen-spire-template.svg holds the geometry). -->
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="icon-192.png" sizes="192x192" type="image/png" />
+    <link rel="apple-touch-icon" href="apple-touch-icon-180.png" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <!--
+      Compose resolves web resources through Fetch *after* the runtime boots, so
+      `strings.commonMain.cvr` otherwise lands seconds after the wasm and every
+      `stringResource` waits on it — that is the blank-label frame, not the fonts.
+      These paths are stable (no content hash), which is what makes preloading
+      them possible from the shell at all.
+
+      `crossorigin` is required on `as="fetch"`: without it the preload is stored
+      under a different credentials mode than the resource runtime requests, and
+      the browser fetches the file twice.
+    -->
+    <link rel="preload" as="fetch" crossorigin
+          href="/composeResources/com.m57.hermescontrol.generated.resources/values/strings.commonMain.cvr" />
+    <link rel="preload" as="fetch" crossorigin
+          href="/composeResources/com.m57.hermescontrol.generated.resources/files/material_symbols.codepoints" />
+    <!-- Fonts too: without these the bytes land ~500 ms after the overlay is
+         allowed to leave, and the landing can flash shapes with no glyphs.
+         preload() in Kotlin cannot await font bytes on web, so the shell does
+         it. Both paths are stable (no content hash). -->
+    <link rel="preload" as="fetch" crossorigin
+          href="/composeResources/com.m57.hermescontrol.generated.resources/font/onest_variable.ttf" />
+    <link rel="preload" as="fetch" crossorigin
+          href="/composeResources/com.m57.hermescontrol.generated.resources/font/material_symbols_subset.ttf" />
     <style>
         /* Compose injects no CSS of its own and ComposeViewport sizes its canvas to
            the container (document.body here), so html/body must have a size or the
@@ -14,43 +45,427 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background: #101418;
+            background: #0c0b11;
         }
+
+        /* Overlay, not a layout child: making body a flex/grid container would
+           size Compose's canvas to its content instead of the viewport. */
+        #boot {
+            position: fixed;
+            inset: 0;
+            display: grid;
+            place-content: center;
+            justify-items: center;
+            padding: 24px;
+            text-align: center;
+            background: #0c0b11;
+            color: #ffffff;
+            font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+            z-index: 10;
+        }
+
+        /* Status-line-only overlay: no logo, no wordmark. The app's own landing
+           is half a second away and identical branding there would just flash;
+           the boot screen keeps only the phase text. The .mark/.name/.sub
+           markup stays in the DOM so the failure path and any future branding
+           don't need HTML edits. */
+        #boot .mark,
+        #boot .name,
+        #boot .sub {
+            display: none;
+        }
+
+        #boot .hint {
+            margin-top: 0;
+            min-height: 20px;
+            font-size: 13px;
+            color: #e65f5a;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* NixOS-style boot lines: one line per resource, completed stages stay
+           with a green check, the active line breathes. Lines fade+slide in so
+           appearing one after another doesn't look jerky. */
+        #boot-lines {
+            margin-top: 0;
+            font: 12px/2 ui-monospace, SFMono-Regular, Menlo, monospace;
+            color: #9a94a8;
+            text-align: left;
+            /* Fixed width in px: the block is centred as a whole, so letting it
+               size to content would re-centre it every time a progress line
+               changed length and the column would wobble horizontally. px, not
+               ch — ch re-evaluates while fonts settle and wobbles anyway. */
+            width: 280px;
+            max-width: 100%;
+        }
+        .boot-line {
+            white-space: pre;
+            opacity: 0;
+            transform: translateY(3px);
+            transition: opacity 220ms ease-out, transform 220ms ease-out;
+        }
+        .boot-line.shown { opacity: 1; transform: none; }
+        .boot-line .st { display: inline-block; width: 2.5ch; }
+        .boot-line.pending { color: #4d4860; }
+        .boot-line.pending .st { color: #4d4860; }
+        .boot-line.active { color: #e65f5a; }
+        .boot-line.active .st { animation: hint-breathe 900ms ease-in-out infinite; }
+        .boot-line.done { color: #6b6578; transition: opacity 220ms ease-out, color 300ms ease-out; }
+        .boot-line.done .st { color: #58b368; }
+        .boot-line.broken { color: #e65f5a; }
+        .boot-line.broken .st { color: #e65f5a; }
+        @keyframes hint-breathe {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.35; }
+        }
+
+        /* Fade out rather than cut: the app's first frame is on screen when the
+           signal arrives, and a hard disappearance reads as a flicker. */
+        #boot.leaving {
+            opacity: 0;
+            transition: opacity 180ms ease-out;
+            pointer-events: none;
+        }
+
+        #boot.failed .name {
+            color: #e65f5a;
+        }
+
+        #boot.failed .hint {
+            max-width: 34ch;
+            color: #cfc9d6;
+            margin-top: 10px;
+        }
+
     </style>
 </head>
 <body>
     <!--
-      TEMPORARY diagnostic surface - remove once the web target is known good.
-      Renders immediately (before the 34 MB wasm loads) so a screenshot taken at any
-      point is informative: it shows any JS error / unhandled rejection, whether the
-      module script executed, and the canvas's real pixel size once ComposeViewport
-      appends it. A 0x0 canvas means the container had no area; a missing "module
-      executed" line means the script tag itself is wrong.
+      Shown until Compose mounts, which replaces the body content. It exists for
+      two cases: the seconds while the ~10 MB wasm loads (with real byte counts,
+      not a spinner), and the one that otherwise looks like a dead page — the
+      bundle failing to load or boot.
     -->
-    <pre id="bootlog" style="color:#8fd6a0;font:12px/1.5 monospace;padding:8px;margin:0;white-space:pre-wrap;position:relative;z-index:10;">booting…
-</pre>
+    <div id="boot">
+        <div class="mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="34" height="34" role="presentation">
+                <path d="M12 1.2 L15.6 7.8 L12 21.6 L8.4 7.8 Z" fill="#ffffff" /><path d="M3.2 8.4 L8.8 12.2 L9.4 17.8 Z" fill="#d9ccff" /><path d="M20.8 8.4 L15.2 12.2 L14.6 17.8 Z" fill="#d9ccff" />
+            </svg>
+        </div>
+        <div class="name">Pylon for Hermes</div>
+        <div class="sub">Control panel for Hermes Agent</div>
+        <div id="boot-lines"></div>
+        <div class="hint" id="boot-hint"></div>
+    </div>
     <script>
       (function () {
-        var log = document.getElementById('bootlog');
-        function show(msg) { log.textContent += '\n' + msg; }
+        var boot = document.getElementById('boot');
+        var hint = document.getElementById('boot-hint');
+        var linesEl = document.getElementById('boot-lines');
+
+        function setLine(text) {
+          if (hint) hint.textContent = text;
+        }
+
+        // ── Boot stages, NixOS-style ────────────────────────────────────────
+        // One line per resource. A line is created when its resource starts
+        // loading, breathes while active, and stays on screen with a green
+        // check once done. Built with createElement/textContent only — the
+        // labels are constant, but the rule against innerHTML holds anyway.
+        var MB = 1024 * 1024;
+        function mb(bytes) {
+          return (bytes / MB).toFixed(1) + ' MB';
+        }
+        var stages = {};
+        // Fixed display order: lines slot into their rank instead of the order
+        // events happen to fire in (instantiateStreaming starts before the
+        // wasm lines appear, which scattered the list).
+        var STAGE_RANK = { shell: 1, fonts: 10, interface: 90 };
+        function stage(key, label, rank, startActive) {
+          if (stages[key]) {
+            if (startActive !== false) stages[key].activate(label);
+            return stages[key];
+          }
+          if (!linesEl) return null;
+          if (rank === undefined) rank = STAGE_RANK[key] !== undefined ? STAGE_RANK[key] : 50;
+          var el = document.createElement('div');
+          el.className = 'boot-line pending';
+          el._rank = rank;
+          var st = document.createElement('span');
+          st.className = 'st';
+          st.textContent = '·';
+          var tx = document.createElement('span');
+          tx.className = 'tx';
+          tx.textContent = label;
+          el.appendChild(st);
+          el.appendChild(tx);
+          var before = null;
+          for (var other of linesEl.children) {
+            var orank = other._rank === undefined ? 50 : other._rank;
+            if (orank > rank) { before = other; break; }
+          }
+          linesEl.insertBefore(el, before);
+          var s = {
+            el: el, st: st, tx: tx, label: label,
+            activate: function (l) {
+              el.classList.remove('pending');
+              el.classList.add('active');
+              st.textContent = '⟳';
+              if (l) tx.textContent = l;
+            },
+            // Percent from decoded bytes (the stream's true position), MB from
+            // the compressed total — same rule as the old aggregate line: the
+            // decoded number would report 19.3 MB for a 4.6 MB download.
+            // The label is padded to a fixed width and the percent to 3 digits,
+            // so in the monospace font the number columns start at the same x
+            // and the line never grows as the values change.
+            progress: function (seen, total, wire, wireTotal) {
+              if (el.classList.contains('pending')) s.activate();
+              st.textContent = '⟳';
+              var pct = total > 0 ? String(Math.floor((seen * 100) / total)) : '';
+              var rest = total > 0
+                ? String(pct).padStart(3) + '% · ' + mb(wireTotal > 0 ? (seen / total) * wire : seen) + ' of ' + mb(wire || seen)
+                : mb(seen);
+              tx.textContent = label.padEnd(10, ' ') + '· ' + rest;
+            },
+            done: function () {
+              el.classList.remove('pending', 'active');
+              el.classList.add('done');
+              st.textContent = '✓';
+            },
+            broken: function () {
+              el.classList.remove('pending', 'active');
+              el.classList.add('broken');
+              st.textContent = '✗';
+            },
+          };
+          var l0 = function (l) { return l || s.label; };
+          if (startActive !== false) s.activate();
+          // Fade+slide in: appended hidden, then flip to .shown on the next
+          // frame so the transition actually runs.
+          requestAnimationFrame(function () {
+            requestAnimationFrame(function () { el.classList.add('shown'); });
+          });
+          stages[key] = s;
+          return s;
+        }
+
+        // Every stage is reserved up front as a dim '·' placeholder row, so the
+        // block is laid out once and later lines never push the others around.
+        // The real events then light their row up in place.
+        stage('shell', 'shell', 1);
+        stage('fonts', 'fonts', 10);
+        stage('wasm1', 'engine 1', 21, false);
+        stage('wasm2', 'engine 2', 22, false);
+        stage('interface', 'starting interface', 90, false);
+
+        // The shell is loading from the very first moment (ui.js is executing
+        // right now), so create its stage before anything else can appear
+        // above it; DOMContentLoaded marks it done.
+        stage('shell', 'shell');
+
+        function fail(detail) {
+          if (!boot) return;
+          boot.className = 'failed';
+          // textContent, not innerHTML: the detail is an arbitrary error message.
+          boot.textContent = '';
+          function line(className, text) {
+            var node = document.createElement('div');
+            node.className = className;
+            node.textContent = text;
+            boot.appendChild(node);
+          }
+          line('name', 'Pylon for Hermes');
+          line('hint', String(detail || 'unknown error'));
+          line('hint', 'Reload the page. If it keeps happening, check the dashboard URL and its logs.');
+        }
+        window.__bootFail = fail;
+
         window.addEventListener('error', function (e) {
-          show('ERROR: ' + (e.message || e.type) + (e.filename ? ' @ ' + e.filename + ':' + e.lineno : ''));
+          fail((e.message || e.type) + (e.filename ? ' (' + e.filename + ':' + e.lineno + ')' : ''));
         });
         window.addEventListener('unhandledrejection', function (e) {
-          show('REJECTION: ' + (e.reason && e.reason.message ? e.reason.message : e.reason));
+          var reason = e.reason;
+          fail(reason && reason.message ? reason.message : reason);
         });
-        window.__bootlog = show;
+
+        // ── Real progress, no second download ───────────────────────────────
+        // The loader fetches the .wasm itself; wrapping fetch lets us count the
+        // bytes of that same response instead of guessing with a spinner.
+        // Each .wasm response gets its own boot line — the dev bundle ships
+        // two (the app plus a runtime payload), and a shared counter made the
+        // percentage jump backwards when the second total arrived.
+        var wasmCount = 0;
+        var sawWasm = false;
+        var originalFetch = window.fetch;
+        if (originalFetch) {
+          window.fetch = function (input) {
+            var url = typeof input === 'string' ? input : (input && input.url) || '';
+            return originalFetch.apply(this, arguments).then(function (response) {
+              if (!/\.wasm(\?|$)/.test(url) || !response.ok || !response.body) return response;
+              sawWasm = true;
+              wasmCount++;
+              var stageRef = stage('wasm' + wasmCount, 'engine ' + wasmCount, 20 + wasmCount);
+              // The preview server gzips the wasm, so Content-Length is the
+              // compressed size and the stream yields decompressed bytes: a
+              // percentage computed from it would run past 100%. It sends the
+              // real size as X-Uncompressed-Length for exactly this.
+              var total =
+                parseInt(response.headers.get('x-uncompressed-length') || '0', 10) ||
+                (response.headers.get('content-encoding') ? 0 : parseInt(response.headers.get('content-length') || '0', 10));
+              var reader = response.body.getReader();
+              var seen = 0;
+              // Content-Length is the compressed size (the wire); the stream
+              // yields decoded bytes — hence the seen/total × wire mapping.
+              var wire = parseInt(response.headers.get('content-length') || '0', 10);
+              var stream = new ReadableStream({
+                start: function (controller) {
+                  function pump() {
+                    reader.read().then(function (chunk) {
+                      if (chunk.done) {
+                        if (stageRef) { stageRef.progress(total, total, wire, wire); stageRef.done(); }
+                        controller.close();
+                        return;
+                      }
+                      seen += chunk.value.byteLength;
+                      if (stageRef) stageRef.progress(seen, total, wire, wire);
+                      controller.enqueue(chunk.value);
+                      pump();
+                    }).catch(function (error) {
+                      if (stageRef) stageRef.broken();
+                      controller.error(error);
+                    });
+                  }
+                  pump();
+                }
+              });
+              return new Response(stream, {
+                status: response.status,
+                statusText: response.statusText,
+                headers: response.headers
+              });
+            });
+          };
+        }
+
+        // Instantiating the wasm has no byte progress; give it its own stage so
+        // the wait is a line, not silence.
+        var originalInstantiateStreaming = WebAssembly.instantiateStreaming;
+        if (originalInstantiateStreaming) {
+          WebAssembly.instantiateStreaming = function (source, imports) {
+            stage('interface', 'starting interface');
+            return originalInstantiateStreaming.call(WebAssembly, source, imports);
+          };
+        }
+        var originalInstantiate = WebAssembly.instantiate;
+        WebAssembly.instantiate = function () {
+          stage('interface', 'starting interface');
+          return originalInstantiate.apply(WebAssembly, arguments);
+        };
+
+        // Nothing measurable yet after a few seconds means the loader is not
+        // going through fetch (or the file is already cached): say something
+        // true rather than leaving an empty line list on screen for a minute.
+        // Re-checked every second and self-clearing — a one-shot setTimeout
+        // left "Waiting for the app bundle…" stuck on screen forever when the
+        // first engine began at second 5 on a slow connection.
+        var bundleTimer = setInterval(function () {
+          if (!boot || !boot.parentNode) { clearInterval(bundleTimer); return; }
+          if (sawWasm) {
+            if (hint && hint.textContent === 'Waiting for the app bundle…') hint.textContent = '';
+            clearInterval(bundleTimer);
+          } else {
+            setLine('Waiting for the app bundle…');
+          }
+        }, 1000);
+
+        // ── Ready signal ───────────────────────────────────────────────────
+        // The app calls this from its first drawn frames (`notifyBrowserShellReady`
+        // in Main.kt). Watching the DOM instead fires when Compose creates its
+        // container — before anything is painted — which showed the landing layout
+        // with blank labels.
+        //
+        // But the app's ready signal still cannot wait for font BYTES on web
+        // (`preload()` resolves without the bytes), so on a slow connection the
+        // overlay could leave before Onest / the icon subset arrived — landing
+        // shapes with no glyphs. The shell fetches both fonts itself (same URLs
+        // the <link rel=preload> hints, served from cache on repeat visits) and
+        // dismisses only when the app is ready AND the fonts are in.
+        var dismissed = false;
+        var appReady = false;
+        var fontsPending = 2;
+        var fontStage = stage('fonts', 'fonts');
+        function maybeDismiss() {
+          if (appReady && fontsPending === 0) dismiss();
+        }
+        function dismiss() {
+          if (dismissed || !boot) return;
+          dismissed = true;
+          boot.className = 'leaving';
+          setTimeout(function () {
+            if (boot) boot.remove();
+          }, 200);
+        }
+        window.__pylonReady = function () {
+          appReady = true;
+          var s = stages['interface'];
+          if (s) s.done();
+          if (fontsPending > 0 && boot) setLine('Finishing up…');
+          maybeDismiss();
+        };
+        ["/composeResources/com.m57.hermescontrol.generated.resources/font/onest_variable.ttf",
+         "/composeResources/com.m57.hermescontrol.generated.resources/font/material_symbols_subset.ttf"
+        ].forEach(function (url) {
+          fetch(url).then(function () {
+            fontsPending--;
+            if (fontsPending === 0 && fontStage) fontStage.done();
+            maybeDismiss();
+          }).catch(function () {
+            // A font that cannot be fetched must not trap the app behind the
+            // overlay: the app degrades to the automatic fallback instead.
+            fontsPending--;
+            if (fontStage) fontStage.broken();
+            maybeDismiss();
+          });
+        });
+
+        // ui.js has executed by DOMContentLoaded; the shell stage was created
+        // at boot script start, only flip it to done here.
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', function () {
+            var s = stages['shell'];
+            if (s) s.done();
+          });
+        } else {
+          var s0 = stages['shell'];
+          if (s0) s0.done();
+        }
+
+        // Safety net: a shell must never trap a working app behind its own
+        // overlay, so anything mounted-but-unannounced is dismissed anyway.
+        // "Mounted" means a real app child: canvas or any element that is not
+        // a script and not the boot overlay itself. Counting body.children
+        // raw was a bug — the boot div and the script tags already make
+        // children.length > 2, so the watchdog dismissed the overlay after
+        // 8 s mid-download on slow connections (blank screen at ~5%).
+        function appMounted() {
+          if (document.querySelector('canvas')) return true;
+          for (var el of document.body.children) {
+            if (el.tagName !== 'SCRIPT' && el.id !== 'boot') return true;
+          }
+          return false;
+        }
         var ticks = 0;
-        var t = setInterval(function () {
-          var c = document.querySelector('canvas');
-          if (c) {
-            show('canvas ' + c.width + 'x' + c.height + ' css=' + c.style.width + 'x' + c.style.height);
-            clearInterval(t);
-          } else if (++ticks > 240) {
-            show('no canvas after 120s - wasm never reached ComposeViewport');
-            clearInterval(t);
+        var timer = setInterval(function () {
+          ticks++;
+          if (appMounted()) {
+            if (ticks > 16) dismiss();
+          } else if (ticks > 240) {
+            clearInterval(timer);
+            fail('the app did not start within 120 s');
           }
         }, 500);
+
       })();
     </script>
     <!-- The dev server serves the webpack bundle, not the raw Kotlin loader.
@@ -59,7 +474,119 @@
          .mjs directly skips webpack, so bare npm specifiers like
          "@js-joda/core" never resolve and the page dies at boot. Plain script,
          no type="module": the output libraryTarget is umd. -->
-    <script src="ui.js" onerror="window.__bootlog && window.__bootlog('MODULE SCRIPT FAILED TO LOAD: ui.js')"></script>
+    <!-- Session gate, then the bundle.
+         Compose's login screen cannot host a password manager, so authentication
+         lives on login.html and this page only ever boots with a session. The
+         probe is api/profiles because api/status is public (200 with no cookie)
+         and would never report "not signed in".
+
+         The outcome is left on `window.__pylonSession` because the app has to
+         know how it got here: 'ok' means the session was verified a moment ago
+         and can be adopted, 'error' means the server could not be asked at all
+         and no session may be assumed. The app never infers auth from the fact
+         that this file was served. -->
+    <script>
+      (function () {
+        var PROBE = 'api/profiles';
+        window.__pylonSession = 'unknown';
+
+        function loadApp() {
+          var s = document.createElement('script');
+          s.src = 'ui.js';
+          s.onerror = function () {
+            window.__bootlog && window.__bootlog('MODULE SCRIPT FAILED TO LOAD: ui.js');
+          };
+          document.body.appendChild(s);
+        }
+
+        function gate() {
+          fetch(PROBE, { credentials: 'include', cache: 'no-store' })
+            .then(function (res) {
+              if (res.status === 401 || res.status === 403) {
+                window.__pylonSession = 'none';
+                location.replace('login.html');
+                return;
+              }
+              if (!res.ok) {
+                // 404/500: no answer about the session. Boot without adopting.
+                window.__pylonSession = 'error';
+                loadApp();
+                return;
+              }
+              window.__pylonSession = 'ok';
+              loadApp();
+            })
+            .catch(function () {
+              window.__pylonSession = 'error';
+              loadApp();
+            });
+        }
+
+        // A page restored from the back/forward cache resumes with its old JS and
+        // its old idea of the session. Chrome evicts such pages when a secure
+        // cookie changes, but that is a heuristic, not a guarantee: re-ask.
+        window.addEventListener('pageshow', function (event) {
+          if (event.persisted) gate();
+        });
+
+        // Another tab signed out. Nothing to do but re-ask, which the gate does.
+        try {
+          var channel = new BroadcastChannel('pylon-auth');
+          channel.addEventListener('message', function (event) {
+            if (event.data === 'signed-out') gate();
+          });
+        } catch (e) { /* older browsers: pageshow still covers the reload path */ }
+
+        gate();
+      })();
+    </script>
     <script>window.__bootlog && window.__bootlog('module script tag executed (module graph may still be loading)');</script>
+<script>
+        /* A mobile keyboard shrinks the *visual* viewport but not a 100%-height body, and
+           `overflow: hidden` means nothing scrolls either — so a focused field ends up
+           behind the keyboard with no way to reach it. Sizing the body to the visual
+           viewport makes Compose lay out in the space that is actually visible, which
+           moves dialogs and the composer up instead of hiding them. */
+        (function () {
+            var vv = window.visualViewport;
+            if (!vv) return;
+            var current = -1;
+            /** The element the IME would target: Compose Web drives a real DOM input. */
+            function activeTextElement() {
+                var el = document.activeElement;
+                if (!el) return null;
+                var tag = (el.tagName || "").toLowerCase();
+                if (tag === "input" || tag === "textarea") return el;
+                return el.isContentEditable ? el : null;
+            }
+            function sync() {
+                var h = Math.round(vv.height);
+                if (h === current) return;
+                // 120px is the "keyboard is up" threshold: browser chrome collapsing moves
+                // the viewport by tens of px, a soft keyboard by hundreds.
+                var keyboardOpen = h < window.innerHeight - 120;
+                var keyboardWasOpen = current >= 0 && current < window.innerHeight - 120;
+                current = h;
+                if (keyboardWasOpen && !keyboardOpen) {
+                    // The keyboard was dismissed by its own hide key, so focus never moved
+                    // and the DOM input is still active — a tap on the same field then
+                    // fires no focus event and the IME stays shut until the user focuses
+                    // something else first. Blur it here so the next tap refocuses.
+                    var el = activeTextElement();
+                    if (el) el.blur();
+                }
+                document.body.style.height = h + "px";
+                // Compose Web sizes its canvas from a *window* resize signal. Changing the
+                // container height alone fires nothing, so the layout kept its old size and
+                // the keyboard still covered the field. Bubbling a synthetic resize makes
+                // Compose lay out again inside the space that is actually visible.
+                window.dispatchEvent(new Event("resize"));
+            }
+            vv.addEventListener("resize", sync);
+            vv.addEventListener("scroll", sync);
+            window.addEventListener("orientationchange", sync);
+            sync();
+        })();
+    </script>
 </body>
 </html>

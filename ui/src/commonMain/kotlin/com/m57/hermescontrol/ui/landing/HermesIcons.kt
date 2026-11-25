@@ -18,36 +18,116 @@ import androidx.compose.ui.unit.dp
  * icons a project actually uses as local `ImageVector`s rather than pull a
  * 1.7.3 klib into a 1.12.x graph.
  *
- * [Bolt] is a byte-for-byte copy of `Icons.Filled.Bolt` from
- * material-icons-extended 1.7.8 — same 24x24 viewport, same path commands,
- * same non-mirrored orientation — reconstructed from the artifact's compiled
- * `PathBuilder` calls so the glyph matches Android exactly.
+ * The app mark is "spire": a crystal spike flanked by two shards. It ships in
+ * two tiers of the same silhouette, because faceting stops reading below about
+ * 32 px — the same two-tier pattern Ethereum and most faceted brand marks use.
+ *
+ *  - [Spire]        hero tier, 6 paths, faceted. Use at 48 dp and above.
+ *  - [SpireCompact] compact tier, 3 paths, flat. Use below 48 dp.
+ *
+ * Both carry baked-in colours, so draw them with `Image(...)`, never with
+ * `Icon(tint = ...)` — a tint flattens the facets into one colour.
+ *
+ * Source of truth: `docs/design/chosen-spire-template.svg`
+ * (`spire-hero-on-primary` and `spire-compact-on-primary`). The geometry is
+ * approved: the spike is 7.2 units wide at y = 7.8 with its apex at y = 1.2.
+ * Do not retune it; an earlier 6-unit-wide spike with quad shards was rejected
+ * as a different mark.
  */
 object HermesIcons {
-    /** Material "bolt" (filled) — the landing screen hero glyph. */
-    val Bolt: ImageVector by lazy {
+    private val SpikeLit = Color(0xFFFFFFFF)
+    private val SpikeShade = Color(0xFFC9B8FF)
+    private val ShardLit = Color(0xFFEFE9FF)
+    private val ShardShade = Color(0xFFC0AAFF)
+    private val ShardCompact = Color(0xFFD9CCFF)
+
+    /**
+     * "spire", hero tier: the spike splits into two planes and each shard folds
+     * into a lit face and a shaded face. Six filled paths, no strokes.
+     */
+    val Spire: ImageVector by lazy {
         ImageVector
             .Builder(
-                name = "HermesIcons.Bolt",
+                name = "HermesIcons.Spire",
                 defaultWidth = 24.dp,
                 defaultHeight = 24.dp,
                 viewportWidth = 24f,
                 viewportHeight = 24f,
             ).apply {
-                path(fill = SolidColor(Color.Black)) {
-                    moveTo(11f, 21f)
-                    horizontalLineToRelative(-1f)
-                    lineToRelative(1f, -7f)
-                    horizontalLineTo(7.5f)
-                    curveToRelative(-0.58f, 0f, -0.57f, -0.32f, -0.38f, -0.66f)
-                    curveToRelative(0.19f, -0.34f, 0.05f, -0.08f, 0.07f, -0.12f)
-                    curveTo(8.48f, 10.94f, 10.42f, 7.54f, 13f, 3f)
-                    horizontalLineToRelative(1f)
-                    lineToRelative(-1f, 7f)
-                    horizontalLineToRelative(3.5f)
-                    curveToRelative(0.49f, 0f, 0.56f, 0.33f, 0.47f, 0.51f)
-                    lineToRelative(-0.07f, 0.15f)
-                    curveTo(12.96f, 17.55f, 11f, 21f, 11f, 21f)
+                // Spike, split on the vertical axis.
+                path(fill = SolidColor(SpikeLit)) {
+                    moveTo(12f, 1.2f)
+                    lineTo(15.6f, 7.8f)
+                    lineTo(12f, 21.6f)
+                    close()
+                }
+                path(fill = SolidColor(SpikeShade)) {
+                    moveTo(12f, 1.2f)
+                    lineTo(8.4f, 7.8f)
+                    lineTo(12f, 21.6f)
+                    close()
+                }
+                // Left shard, folded along its own axis.
+                path(fill = SolidColor(ShardLit)) {
+                    moveTo(3.2f, 8.4f)
+                    lineTo(8.8f, 12.2f)
+                    lineTo(6.3f, 13.1f)
+                    close()
+                }
+                path(fill = SolidColor(ShardShade)) {
+                    moveTo(6.3f, 13.1f)
+                    lineTo(8.8f, 12.2f)
+                    lineTo(9.4f, 17.8f)
+                    close()
+                }
+                // Right shard, mirrored.
+                path(fill = SolidColor(ShardLit)) {
+                    moveTo(20.8f, 8.4f)
+                    lineTo(15.2f, 12.2f)
+                    lineTo(17.7f, 13.1f)
+                    close()
+                }
+                path(fill = SolidColor(ShardShade)) {
+                    moveTo(17.7f, 13.1f)
+                    lineTo(15.2f, 12.2f)
+                    lineTo(14.6f, 17.8f)
+                    close()
+                }
+            }.build()
+    }
+
+    /**
+     * "spire", compact tier: the same silhouette with no inner facets.
+     *
+     * Use below 48 dp — list rows, tabs, the web boot overlay, any badge under
+     * 48 dp. Above ~32 px the hero facets turn to noise; below it they are gone.
+     */
+    val SpireCompact: ImageVector by lazy {
+        ImageVector
+            .Builder(
+                name = "HermesIcons.SpireCompact",
+                defaultWidth = 24.dp,
+                defaultHeight = 24.dp,
+                viewportWidth = 24f,
+                viewportHeight = 24f,
+            ).apply {
+                path(fill = SolidColor(SpikeLit)) {
+                    moveTo(12f, 1.2f)
+                    lineTo(15.6f, 7.8f)
+                    lineTo(12f, 21.6f)
+                    lineTo(8.4f, 7.8f)
+                    close()
+                }
+                path(fill = SolidColor(ShardCompact)) {
+                    moveTo(3.2f, 8.4f)
+                    lineTo(8.8f, 12.2f)
+                    lineTo(9.4f, 17.8f)
+                    close()
+                }
+                path(fill = SolidColor(ShardCompact)) {
+                    moveTo(20.8f, 8.4f)
+                    lineTo(15.2f, 12.2f)
+                    lineTo(14.6f, 17.8f)
                     close()
                 }
             }.build()

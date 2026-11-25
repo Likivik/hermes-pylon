@@ -70,6 +70,7 @@ enum class HermesIcon(val symbol: String) {
     History("history"),
     HistoryEdu("history_edu"),
     Image("image"),
+    Inbox("inbox"),
     Info("info"),
     InsertDriveFile("insert_drive_file"),
     InstallDesktop("install_desktop"),

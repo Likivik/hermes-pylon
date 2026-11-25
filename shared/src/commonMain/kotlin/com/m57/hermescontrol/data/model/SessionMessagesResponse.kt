@@ -47,6 +47,15 @@ data class SessionMessage(
     val legacyReasoningText: String? = null,
     @SerialName("display_kind")
     val displayKind: String? = null,
+    /**
+     * The store's stable message identity, minted at insert (`message_uid` on the wire).
+     *
+     * Deliberately kept apart from [id]: [id] is the SQLite rowid and is load-bearing as an integer
+     * (`serverMessageIndex` parses it for paging), while this is the one thing that does not move when
+     * compaction writes the same logical message to a new row.
+     */
+    @SerialName("message_uid")
+    val messageUid: String? = null,
 ) {
     val timestampText: String?
         get() = (timestamp as? JsonPrimitive)?.content

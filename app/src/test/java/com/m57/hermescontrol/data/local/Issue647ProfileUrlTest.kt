@@ -2,14 +2,13 @@ package com.m57.hermescontrol.data.local
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.m57.hermescontrol.data.config.ConnectionProfile
+import com.m57.hermescontrol.data.config.GatewayInstance
 import com.m57.hermescontrol.data.config.ServerStoreState
 import com.m57.hermescontrol.data.config.resolveBaseUrl
 import com.m57.hermescontrol.data.config.resolvedBaseUrl
 import com.m57.hermescontrol.data.security.SecretStore
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.mockkStatic
 import io.mockk.unmockkAll
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -55,13 +54,6 @@ class Issue647ProfileUrlTest {
         every { mockEditor.putBoolean(any(), any()) } returns mockEditor
         every { mockPrefs.getBoolean("migrated_to_datastore", any()) } returns true
 
-        mockkStatic(android.util.Log::class)
-        every { android.util.Log.d(any(), any()) } returns 0
-        every { android.util.Log.e(any(), any()) } returns 0
-        every { android.util.Log.e(any(), any(), any()) } returns 0
-        every { android.util.Log.w(any(), any<String>()) } returns 0
-        every { android.util.Log.i(any(), any()) } returns 0
-
         val tempDir = java.io.File(System.getProperty("java.io.tmpdir") ?: "/tmp")
         testContext = ReproContext(tempDir, mockContext)
 
@@ -86,9 +78,9 @@ class Issue647ProfileUrlTest {
                     values.keys.removeAll { it.startsWith(prefix) }
                 }
             }
-        AuthManager.secureStorageFactory = { testSecretStore }
+        AuthManager.secretStoreFactory = { testSecretStore }
         com.m57.hermescontrol.data.remote.CookieManager.resetForTest()
-        com.m57.hermescontrol.data.remote.CookieManager.secureStorageFactory = { testSecretStore }
+        com.m57.hermescontrol.data.remote.AndroidCookieStore.secureStorageFactory = { testSecretStore }
         AuthManager.init(testContext)
         AuthManager.serverStore.getLatestState()
     }
@@ -111,7 +103,7 @@ class Issue647ProfileUrlTest {
         AuthManager.setProfileToken(AuthManager.DEFAULT_PROFILE_ID, "tok")
 
         val default =
-            AuthManager.getConnectionProfiles().first {
+            AuthManager.getGatewayInstances().first {
                 it.id == AuthManager.DEFAULT_PROFILE_ID
             }
         assertEquals(customUrl, default.resolveBaseUrl(null))
@@ -134,7 +126,7 @@ class Issue647ProfileUrlTest {
         AuthManager.ensureDefaultProfile()
         // Confirm the initial seed really is the loopback default.
         val seeded =
-            AuthManager.getConnectionProfiles().first {
+            AuthManager.getGatewayInstances().first {
                 it.id == AuthManager.DEFAULT_PROFILE_ID
             }
         assertEquals(loopback, seeded.resolveBaseUrl(null))
@@ -145,7 +137,7 @@ class Issue647ProfileUrlTest {
         AuthManager.setToken("ws-cred")
 
         val default =
-            AuthManager.getConnectionProfiles().first {
+            AuthManager.getGatewayInstances().first {
                 it.id == AuthManager.DEFAULT_PROFILE_ID
             }
         assertEquals(loginUrl, default.resolveBaseUrl(null))
@@ -160,12 +152,12 @@ class Issue647ProfileUrlTest {
         // the top-level login URL, never the hardcoded loopback (issue #647).
         val customUrl = "http://192.1.1.190:9119/"
         val defaultNoUrl =
-            ConnectionProfile(
+            GatewayInstance(
                 id = AuthManager.DEFAULT_PROFILE_ID,
                 name = AuthManager.DEFAULT_PROFILE_NAME,
                 baseUrl = null,
             )
-        AuthManager.saveConnectionProfiles(listOf(defaultNoUrl))
+        AuthManager.saveGatewayInstances(listOf(defaultNoUrl))
         AuthManager.setSelectedProfileId(AuthManager.DEFAULT_PROFILE_ID)
         // Top-level login URL is set, but the profile's own baseUrl remains null.
         AuthManager.setBaseUrl(customUrl)
@@ -181,7 +173,7 @@ class Issue647ProfileUrlTest {
         val own = "http://10.0.0.5:9119/"
         val top = "http://192.1.1.190:9119/"
         val profile =
-            ConnectionProfile(
+            GatewayInstance(
                 id = "prof-x",
                 name = "X",
                 baseUrl = own,
@@ -197,7 +189,7 @@ class Issue647ProfileUrlTest {
         // profile is seeded from the top-level https default, but the pure
         // fallback must remain loopback.
         val fresh =
-            ConnectionProfile(
+            GatewayInstance(
                 id = AuthManager.DEFAULT_PROFILE_ID,
                 name = AuthManager.DEFAULT_PROFILE_NAME,
                 baseUrl = null,
@@ -218,13 +210,13 @@ class Issue647ProfileUrlTest {
                 baseUrl = customUrl,
                 connectionProfiles =
                     listOf(
-                        ConnectionProfile(
+                        GatewayInstance(
                             id = AuthManager.DEFAULT_PROFILE_ID,
                             name = AuthManager.DEFAULT_PROFILE_NAME,
                             baseUrl = null,
                         ),
                     ),
-                selectedProfileId = AuthManager.DEFAULT_PROFILE_ID,
+                selectedGatewayId = AuthManager.DEFAULT_PROFILE_ID,
             )
         assertEquals(customUrl, state.resolvedBaseUrl)
     }

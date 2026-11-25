@@ -5,19 +5,19 @@ import android.net.Uri
 import com.m57.hermescontrol.data.remote.GatewayFileClient
 import com.m57.hermescontrol.data.remote.GatewayFileResult
 import com.m57.hermescontrol.data.remote.MAX_IN_MEMORY_MEDIA_BYTES
-import com.m57.hermescontrol.data.remote.OkHttpProvider
+import com.m57.hermescontrol.data.remote.createMediaTransportClient
 import com.m57.hermescontrol.data.remote.readBytesLimited
 import com.m57.hermescontrol.util.ioDispatcher
+import io.ktor.client.HttpClient
+import io.ktor.client.request.get
+import io.ktor.client.statement.bodyAsChannel
+import io.ktor.http.HttpHeaders
+import io.ktor.http.isSuccess
+import io.ktor.utils.io.readRemaining
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import okhttp3.Call
-import okhttp3.Callback
-import okhttp3.Request
-import okhttp3.Response
-import java.io.IOException
+import kotlinx.io.readByteArray
 import java.util.Base64
-import kotlin.coroutines.resume
 
 private const val MAX_DATA_URL_METADATA_CHARS = 1024
 
@@ -144,58 +144,31 @@ object ImageBytesResolver {
     suspend fun fetchHttp(
         model: String,
         fallbackMime: String,
-        callFactory: Call.Factory = OkHttpProvider.publicMedia,
+        client: HttpClient = publicMediaClient,
     ): Result =
-        suspendCancellableCoroutine { continuation ->
-            val request =
-                Request
-                    .Builder()
-                    .url(model)
-                    .build()
-            val call = callFactory.newCall(request)
-            continuation.invokeOnCancellation { call.cancel() }
-            call.enqueue(
-                object : Callback {
-                    override fun onFailure(
-                        call: Call,
-                        e: IOException,
-                    ) {
-                        if (continuation.isActive) {
-                            continuation.resume(Result.Error(e.message ?: "Could not download image"))
-                        }
-                    }
+        runCatching {
+            val response = client.get(model)
+            if (!response.status.isSuccess()) {
+                return Result.Error("Download failed (HTTP ${response.status.value})")
+            }
+            val bytes =
+                response.bodyAsChannel()
+                    .readRemaining(MAX_IN_MEMORY_MEDIA_BYTES)
+                    .readByteArray()
+                    .takeIf { it.isNotEmpty() }
+                    ?: return Result.Error("Image is too large")
+            val mime =
+                response.headers[HttpHeaders.ContentType]
+                    ?.substringBefore(";")
+                    ?.ifBlank { fallbackMime }
+                    ?: fallbackMime
+            Result.Bytes(bytes, mime, extensionForMime(mime))
+        }.getOrElse { e -> Result.Error(e.message ?: "Could not download image") }
 
-                    override fun onResponse(
-                        call: Call,
-                        response: Response,
-                    ) {
-                        val result =
-                            runCatching {
-                                response.use { resp ->
-                                    if (!resp.isSuccessful) {
-                                        return@use Result.Error("Download failed (HTTP ${resp.code})")
-                                    }
-                                    val bytes =
-                                        resp.body.readBytesLimited()
-                                            ?: return@use Result.Error("Image is too large")
-                                    val mime =
-                                        resp
-                                            .header("Content-Type")
-                                            ?.substringBefore(";")
-                                            ?.ifBlank { fallbackMime }
-                                            ?: fallbackMime
-                                    Result.Bytes(bytes, mime, extensionForMime(mime))
-                                }
-                            }.getOrElse { e ->
-                                Result.Error(e.message ?: "Could not download image")
-                            }
-                        if (continuation.isActive) {
-                            continuation.resume(result)
-                        }
-                    }
-                },
-            )
-        }
+    /** Media client with no credentials: public image URLs only. */
+    private val publicMediaClient: HttpClient by lazy {
+        createMediaTransportClient(token = null, cookieHeader = null)
+    }
 
     fun extensionForMime(mime: String): String =
         when (mime.lowercase()) {

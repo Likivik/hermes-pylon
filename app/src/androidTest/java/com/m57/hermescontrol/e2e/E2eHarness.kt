@@ -5,13 +5,19 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import com.m57.hermescontrol.data.config.ConnectionProfile
+import com.m57.hermescontrol.data.config.GatewayInstance
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.remote.AuthPayloads
-import com.m57.hermescontrol.data.remote.OkHttpProvider
+import com.m57.hermescontrol.data.remote.GatewayClientKind
+import com.m57.hermescontrol.data.remote.HermesHttpConfig
+import com.m57.hermescontrol.data.remote.createGatewayTransportClient
 import com.m57.hermescontrol.data.ws.HermesWsClient
+import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.http.HttpHeaders
+import kotlinx.coroutines.runBlocking
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 
 /**
@@ -75,7 +81,7 @@ object E2eHarness {
         // 9119 caused a doomed first connect (e2e-37 log: ConnectException to
         // ws://127.0.0.1:9119/ws before the real socket opened).
         val profile =
-            ConnectionProfile(
+            GatewayInstance(
                 id = AuthManager.DEFAULT_PROFILE_ID,
                 name = "E2E",
                 baseUrl = baseUrl,
@@ -85,7 +91,7 @@ object E2eHarness {
                 // override is never reached. "token" takes the non-gated path where
                 // the offline refresh is best-effort, so the override URL wins.
             )
-        AuthManager.saveConnectionProfilesAndSelect(
+        AuthManager.saveGatewayInstancesAndSelect(
             profiles = listOf(profile),
             profileId = AuthManager.DEFAULT_PROFILE_ID,
             token = "e2e-token",
@@ -130,7 +136,7 @@ object E2eHarness {
      *  1. POST `/auth/password-login` with `{provider:"basic", username, password, next:""}`
      *     via the shared `OkHttpProvider.probe` client. The probe carries the
      *     `PersistentCookieJar`, so the Set-Cookie response lands in the
-     *     active serverId scope (set by `saveConnectionProfilesAndSelect`).
+     *     active serverId scope (set by `saveGatewayInstancesAndSelect`).
      *  2. Save the profile with `baseUrl="http://127.0.0.1:8642/"` and set
      *     `wsAuthParam="ticket"` on the SELECTED profile, putting
      *     `AuthManager.isGatedMode()` into true. Subsequent
@@ -150,7 +156,7 @@ object E2eHarness {
         }
         // Pin the cookie scope to the default profile id BEFORE the login so
         // the Set-Cookie response lands in the same scope the selected profile
-        // will own after saveConnectionProfilesAndSelect(). Without this, a
+        // will own after saveGatewayInstancesAndSelect(). Without this, a
         // previous real-gateway test that switched the scope elsewhere would
         // leave the cookies stranded in that other scope and the ticket mint
         // would miss them.
@@ -165,18 +171,26 @@ object E2eHarness {
         // We pinned the cookie scope to DEFAULT_PROFILE_ID and called
         // beginAuthentication() above, mirroring AuthLoginViewModel — the
         // pinned scope means the cookies land in the same scope the selected
-        // profile will own after saveConnectionProfilesAndSelect().
-        val loginRequest =
-            Request
-                .Builder()
-                .url(baseUrl.trimEnd('/') + "/auth/password-login")
-                .header("Content-Type", "application/json")
-                .post(loginBody)
-                .build()
-
-        val loginResponse =
+        // profile will own after saveGatewayInstancesAndSelect().
+        // Ktor on the app's own transport: the cookie jar is still open from
+        // beginAuthentication() above, so the Set-Cookie on this response lands
+        // in the pinned DEFAULT_PROFILE_ID scope.
+        val loginStatus =
             try {
-                OkHttpProvider.probe.newCall(loginRequest).execute()
+                runBlocking {
+                    val client =
+                        createGatewayTransportClient(GatewayClientKind.Session, config = HermesHttpConfig.Probe)
+                    try {
+                        client
+                            .post(baseUrl.trimEnd('/') + "/auth/password-login") {
+                                header(HttpHeaders.ContentType, "application/json")
+                                setBody(loginBody)
+                            }.status
+                            .value
+                    } finally {
+                        client.close()
+                    }
+                }
             } catch (t: Throwable) {
                 throw IllegalStateException(
                     "seedRealGatewayProfile: password-login HTTP call failed against $baseUrl — " +
@@ -184,29 +198,23 @@ object E2eHarness {
                     t,
                 )
             }
-        loginResponse.use { resp ->
-            if (!resp.isSuccessful) {
-                throw IllegalStateException(
-                    "seedRealGatewayProfile: password-login returned HTTP ${resp.code} for " +
-                        "admin@$baseUrl. Wrong username/password? Wrong provider? " +
-                        "Expected {provider:\"basic\", username:\"admin\", password, next:\"\"}.",
-                )
-            }
-            // The session cookies (hermes_session_at / hermes_session_rt) are
-            // persisted by PersistentCookieJar.saveAll() — OkHttp calls it on
-            // every response, including ours. They live in the active serverId
-            // scope (the "default" profile, set in saveConnectionProfilesAndSelect).
+        if (loginStatus !in 200..299) {
+            throw IllegalStateException(
+                "seedRealGatewayProfile: password-login returned HTTP $loginStatus for " +
+                    "admin@$baseUrl. Wrong username/password? Wrong provider? " +
+                    "Expected {provider:\"basic\", username:\"admin\", password, next:\"\"}.",
+            )
         }
 
         val profile =
-            ConnectionProfile(
+            GatewayInstance(
                 id = AuthManager.DEFAULT_PROFILE_ID,
                 name = "E2E-REAL",
                 baseUrl = baseUrl,
                 // ticket mode: real ws-ticket flow against the real gateway.
                 wsAuthParam = "ticket",
             )
-        AuthManager.saveConnectionProfilesAndSelect(
+        AuthManager.saveGatewayInstancesAndSelect(
             profiles = listOf(profile),
             profileId = AuthManager.DEFAULT_PROFILE_ID,
             token = "e2e-token", // placeholder; real auth via ticket

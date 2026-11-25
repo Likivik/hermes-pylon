@@ -4,10 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.m57.hermescontrol.AppEnvironment
 import com.m57.hermescontrol.data.model.StatusResponse
-import com.m57.hermescontrol.data.remote.ApiClient
-import com.m57.hermescontrol.data.remote.HermesGatewayApi
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.data.remote.source.DefaultGateways
+import com.m57.hermescontrol.data.remote.source.Gateways
 import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.ui.common.reconcilePressureStatus
 import com.m57.hermescontrol.ui.common.safeLaunchLoad
@@ -30,6 +31,7 @@ data class GatewayUiState(
 
 class GatewayViewModel(
     private val ioDispatcher: CoroutineDispatcher = AppEnvironment.current.io,
+    private val source: Gateways = DefaultGateways(GatewayConnection.hermesApi),
 ) :
     ViewModel(),
         ToastHost {
@@ -54,7 +56,7 @@ class GatewayViewModel(
         val requestedProfileId = profileId
         safeLaunchLoad(
             ioDispatcher = ioDispatcher,
-            apiCall = { safeApiCall { ApiClient.hermesApi.getStatus() } },
+            apiCall = { safeApiCall { source.getStatus() } },
             onStart = { _uiState.update { it.copy(isLoading = true, errorMessage = null) } },
             onSuccess = { data ->
                 if (profileId == requestedProfileId && generation == statusGeneration) {
@@ -86,29 +88,36 @@ class GatewayViewModel(
     }
 
     fun startGateway() {
-        runGatewayAction("start") { api -> safeApiCall { api.startGateway() } }
+        runGatewayAction("start") { gateway -> safeApiCall { gateway.startGateway() } }
     }
 
     fun stopGateway() {
-        runGatewayAction("stop") { api -> safeApiCall { api.stopGateway() } }
+        runGatewayAction("stop") { gateway -> safeApiCall { gateway.stopGateway() } }
     }
 
     fun restartGateway() {
-        runGatewayAction("restart") { api -> safeApiCall { api.restartGateway() } }
+        runGatewayAction("restart") { gateway -> safeApiCall { gateway.restartGateway() } }
     }
 
     private fun runGatewayAction(
         actionName: String,
-        apiCall: suspend (HermesGatewayApi) -> NetworkResult<Unit>,
+        apiCall: suspend (Gateways) -> NetworkResult<Unit>,
     ) {
         if (_uiState.value.isActionRunning) return
         val requestedProfileId = profileId
-        val requestedApi = ApiClient.hermesApi
+        // Re-read per action: a profile or endpoint change rebuilds the client, and this action must travel the
+        // current one. The generation number is the fence — the object itself is not compared.
+        val startedAt = GatewayConnection.generation
+        val gateway = DefaultGateways(GatewayConnection.hermesApi)
         val generation = ++actionGeneration
         _uiState.update { it.copy(isActionRunning = true) }
         viewModelScope.launch {
-            val result = withContext(ioDispatcher) { apiCall(requestedApi) }
-            if (profileId != requestedProfileId || generation != actionGeneration) return@launch
+            val result = withContext(ioDispatcher) { apiCall(gateway) }
+            val stale =
+                profileId != requestedProfileId ||
+                    generation != actionGeneration ||
+                    startedAt != GatewayConnection.generation
+            if (stale) return@launch
             when (result) {
                 is NetworkResult.Success -> {
                     _uiState.update {

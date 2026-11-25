@@ -3,8 +3,10 @@ package com.m57.hermescontrol.ui.achievements
 import androidx.lifecycle.ViewModel
 import com.m57.hermescontrol.data.model.Achievement
 import com.m57.hermescontrol.data.model.RecentUnlock
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.data.remote.source.Achievements
+import com.m57.hermescontrol.data.remote.source.DefaultAchievements
 import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.ui.common.safeLaunchLoad
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,15 +41,15 @@ data class AchievementsUiState(
     val toastMessage: String? = null,
 )
 
-class AchievementsViewModel : ViewModel(), ToastHost {
+class AchievementsViewModel(
+    private val source: Achievements = DefaultAchievements(GatewayConnection.hermesApi),
+) : ViewModel(), ToastHost {
     private val _uiState = MutableStateFlow(AchievementsUiState())
     val uiState: StateFlow<AchievementsUiState> = _uiState.asStateFlow()
 
-    private val api get() = ApiClient.hermesApi
-
     fun loadAchievements() {
         safeLaunchLoad(
-            apiCall = { safeApiCall { api.getAchievements() } },
+            apiCall = { safeApiCall { source.getAchievements() } },
             onStart = {
                 _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             },
@@ -88,7 +90,7 @@ class AchievementsViewModel : ViewModel(), ToastHost {
 
     fun loadRecentUnlocks() {
         safeLaunchLoad(
-            apiCall = { safeApiCall { api.getRecentUnlocks() } },
+            apiCall = { safeApiCall { source.getRecentUnlocks() } },
             onStart = { /* silent background refresh */ },
             onSuccess = { unlocks ->
                 _uiState.update { it.copy(recentUnlocks = unlocks) }
@@ -99,7 +101,7 @@ class AchievementsViewModel : ViewModel(), ToastHost {
 
     fun rescan() {
         safeLaunchLoad(
-            apiCall = { safeApiCall { api.rescanAchievements() } },
+            apiCall = { safeApiCall { source.rescanAchievements() } },
             onStart = {
                 _uiState.update { it.copy(isRescanning = true) }
             },
@@ -141,7 +143,7 @@ class AchievementsViewModel : ViewModel(), ToastHost {
 
     fun resetState() {
         safeLaunchLoad(
-            apiCall = { safeApiCall { api.resetAchievementState() } },
+            apiCall = { safeApiCall { source.resetAchievementState() } },
             onStart = {
                 _uiState.update { it.copy(isResetting = true) }
             },

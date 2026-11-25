@@ -1,8 +1,11 @@
 package com.m57.hermescontrol.ui.skills.components
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -157,6 +160,10 @@ fun SkillEditorDialog(
 
     if (showDiscardConfirm) {
         AlertDialog(
+            // The app is edge-to-edge, so adjustResize no longer moves anything: insets must be
+            // applied by hand. A dialog is its own window, so the screen-level imePadding() in
+            // ChatScreen cannot help here (same pattern as ModelPickerDialog).
+            modifier = Modifier.windowInsetsPadding(WindowInsets.ime),
             onDismissRequest = { showDiscardConfirm = false },
             title = { Text(stringResource(Res.string.skills_discard_title)) },
             text = { Text(stringResource(Res.string.skills_discard_message)) },

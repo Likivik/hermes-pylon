@@ -191,8 +191,38 @@ kotlin {
         getByName("androidMain").dependsOn(jvmAndroidMain)
         getByName("jvmMain").dependsOn(jvmAndroidMain)
 
+        // Intermediate source set for code that is byte-identical on the two
+        // targets with no OS services to reach for: the JVM console build and
+        // the browser. Both are "memory + files allowed, no platform SDK", so
+        // one copy serves them, and a second copy is never the right answer.
+        //
+        // This makes `jvmMain` inherit from two intermediate sets at once — a
+        // diamond. The default hierarchy template builds trees, not diamonds,
+        // and the template's own group API is broken with
+        // `com.android.kotlin.multiplatform.library`, so the edges are declared
+        // by hand here. Proven to compile on both targets.
+        val desktopWebMain = create("desktopWebMain")
+        desktopWebMain.dependsOn(getByName("commonMain"))
+        getByName("jvmMain").dependsOn(desktopWebMain)
+        getByName("wasmJsMain").dependsOn(desktopWebMain)
+
         commonMain {
             dependencies {
+                // DataStore 1.3.0 is the first version with wasmJs storage
+                // backends (WebLocalStorage / WebOpfsStorage).
+                api(libs.androidx.datastore.core)
+                api(libs.androidx.datastore.core.okio)
+                // Navigation 3 on every target: the JetBrains KMP build. Google's
+                // `androidx.navigation3` artifacts are Android-only and carry the
+                // same packages, so both cannot be on the classpath at once.
+                // Google's runtime is published for every target; only its `-ui`
+                // artifact is Android-only, and JetBrains publishes that one.
+                api(libs.androidx.navigation3.runtime)
+                api(libs.jetbrains.navigation3.ui)
+                api(libs.jetbrains.lifecycle.viewmodel.navigation3)
+                // Ported AuthManager: `synchronized` has no common-Kotlin
+                // equivalent, so its 16 locks run on atomicfu monitors.
+                api(libs.kotlinx.atomicfu)
                 // Compose Multiplatform runtime — Phase 2 of the CMP plan. The
                 // minimal set that the proof composable needs: runtime + ui +
                 // foundation(/-layout) + material3. The :ui androidMain source
@@ -309,8 +339,6 @@ kotlin {
                 api(libs.androidx.compose.material.icons.extended)
 
                 // Networking
-                api(libs.okhttp)
-                api(libs.okhttp.logging)
                 api(libs.ktor.client.core)
                 api(libs.kotlinx.serialization.json)
                 api(libs.crashwatcher)
@@ -320,6 +348,7 @@ kotlin {
                 // Image loading
                 api(libs.coil.compose)
                 api(libs.coil.gif)
+                api(libs.coil.network.ktor3)
 
                 // Encrypted storage
                 api(libs.androidx.security.crypto)
@@ -331,9 +360,6 @@ kotlin {
                 api(libs.sqlcipher)
 
                 // Navigation
-                api(libs.androidx.navigation3.ui)
-                api(libs.androidx.navigation3.runtime)
-                api(libs.androidx.lifecycle.viewmodel.navigation3)
 
                 // Phase 1: depends on the multiplatform data model + HTTP primitives
                 // that already live in :shared.
@@ -403,4 +429,13 @@ compose.resources {
     // dependency; `always` is explicit and survives refactors of how the
     // dependency arrives.
     generateResClass = always
+}
+
+// Dev bundle only: webpack's default devtool is `eval`, which the dashboard's
+// CSP (`script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob:`) blocks.
+// Source maps keep the dev build debuggable without `unsafe-eval`.
+tasks.withType<org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpack>().configureEach {
+    if (name.contains("Development", ignoreCase = true)) {
+        devtool = "source-map"
+    }
 }

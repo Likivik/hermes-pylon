@@ -8,35 +8,6 @@ import com.m57.hermescontrol.util.ioDispatcher
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import okhttp3.Cookie
-
-/**
- * Persistence contract for server-scoped cookies.
- *
- * Implementations store cookies per logical server id (not the raw host) so
- * that switching [PersistentCookieJar] scopes never lets cookies from one
- * gateway leak into another (issue #470 — multi-server isolation).
- *
- * Splitting this into an interface lets unit tests inject an in-memory fake
- * ([com.m57.hermescontrol.data.remote.FakeEncryptedCookieStore]) instead of
- * spinning up Android Keystore-backed storage.
- */
-interface CookieStore {
-    /** Persist [cookies] for [serverId]. Replaces the previous set atomically. */
-    suspend fun save(
-        serverId: String,
-        cookies: List<Cookie>,
-    )
-
-    /** Load the persisted cookie set for [serverId] (may be empty). */
-    suspend fun load(serverId: String): List<Cookie>
-
-    /** Drop all persisted cookies for [serverId] (e.g. on logout). */
-    suspend fun clear(serverId: String)
-
-    /** Drop everything across all servers. */
-    suspend fun clearAll()
-}
 
 /**
  * Encrypted, per-server cookie persistence backed by independent atomic
@@ -65,13 +36,12 @@ class EncryptedCookieStore constructor(
 
     override suspend fun save(
         serverId: String,
-        cookies: List<Cookie>,
+        cookies: List<CookieHolder>,
     ) = withContext(ioDispatcher) {
-        val serialized = cookies.map { it.serialize() }
-        storage.putString(SecureStorage.cookieKey(keyFor(serverId)), json.encodeToString(serialized))
+        storage.putString(SecureStorage.cookieKey(keyFor(serverId)), json.encodeToString(cookies))
     }
 
-    override suspend fun load(serverId: String): List<Cookie> =
+    override suspend fun load(serverId: String): List<CookieHolder> =
         withContext(ioDispatcher) {
             val scopedKey = SecureStorage.cookieKey(keyFor(serverId))
             var raw = storage.getString(scopedKey)
@@ -86,7 +56,7 @@ class EncryptedCookieStore constructor(
                             ?.takeIf { it.isNotBlank() }
                             ?.let(::wrapSessionCookie)
                     if (migrated != null) {
-                        raw = json.encodeToString(listOf(migrated.serialize()))
+                        raw = json.encodeToString(listOf(migrated))
                         storage.putString(scopedKey, raw)
                     }
                 }
@@ -94,9 +64,7 @@ class EncryptedCookieStore constructor(
             }
             raw ?: return@withContext emptyList()
             try {
-                json
-                    .decodeFromString<List<CookieHolder>>(raw)
-                    .mapNotNull { it.toCookie() }
+                json.decodeFromString<List<CookieHolder>>(raw)
             } catch (error: Exception) {
                 throw SecureBlobException(error)
             }
