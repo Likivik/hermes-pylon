@@ -6,9 +6,11 @@ import com.m57.hermescontrol.AppEnvironment
 import com.m57.hermescontrol.data.model.KanbanBoard
 import com.m57.hermescontrol.data.model.KanbanColumn
 import com.m57.hermescontrol.data.model.KanbanTask
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.data.remote.source.DefaultKanban
+import com.m57.hermescontrol.data.remote.source.Kanban
 import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.ui.common.safeLaunchLoad
 import kotlinx.coroutines.CoroutineDispatcher
@@ -32,6 +34,7 @@ data class KanbanUiState(
 
 class KanbanViewModel(
     private val ioDispatcher: CoroutineDispatcher = AppEnvironment.current.io,
+    private val source: Kanban = DefaultKanban(GatewayConnection.hermesApi),
 ) :
     ViewModel(),
         ToastHost {
@@ -43,7 +46,7 @@ class KanbanViewModel(
         val generation = ++boardLoadGeneration
         safeLaunchLoad(
             ioDispatcher = ioDispatcher,
-            apiCall = { safeApiCall { ApiClient.hermesApi.getKanbanBoards() } },
+            apiCall = { safeApiCall { source.getKanbanBoards() } },
             onStart = { _uiState.update { it.copy(isLoading = true, errorMessage = null) } },
             onSuccess = { data ->
                 if (generation != boardLoadGeneration) return@safeLaunchLoad
@@ -80,7 +83,7 @@ class KanbanViewModel(
         viewModelScope.launch {
             val switchResult =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.switchKanbanBoard(board.id) }
+                    safeApiCall { source.switchKanbanBoard(board.id) }
                 }
             if (switchResult is NetworkResult.Failure) {
                 if (isCurrentBoardLoad(board.id, generation)) {
@@ -108,7 +111,7 @@ class KanbanViewModel(
         boardId: String,
         generation: Long,
     ) {
-        when (val result = withContext(ioDispatcher) { safeApiCall { ApiClient.hermesApi.getKanbanBoard() } }) {
+        when (val result = withContext(ioDispatcher) { safeApiCall { source.getKanbanBoard() } }) {
             is NetworkResult.Success -> {
                 if (!isCurrentBoardLoad(boardId, generation)) return
                 val columns = result.data.columns
@@ -145,7 +148,7 @@ class KanbanViewModel(
             val result =
                 withContext(ioDispatcher) {
                     safeApiCall {
-                        ApiClient.hermesApi.createKanbanTask(
+                        source.createKanbanTask(
                             board = board.id,
                             task =
                                 com.m57.hermescontrol.data.model.CreateTaskBody(
@@ -190,7 +193,7 @@ class KanbanViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.updateKanbanTask(task.id, mapOf("status" to newStatus)) }
+                    safeApiCall { source.updateKanbanTask(task.id, mapOf("status" to newStatus)) }
                 }
             if (result is NetworkResult.Failure) {
                 revertTaskMove(task.id, originalStatus, "Failed to move task: ${result.error.message}")

@@ -101,17 +101,18 @@ object ChatWsEventReducer {
             is WsEvent.ClarifyExpire ->
                 ReducerResult(
                     state =
-                        if (state.clarifyRequest?.let { clarify ->
-                                clarify.clarifyId == event.clarifyId &&
-                                    clarify.sessionId == event.sessionId &&
-                                    clarify.sourceProfileId == event.sourceProfileId &&
-                                    clarify.connectionGeneration == event.connectionGeneration
-                            } == true
-                        ) {
-                            state.copy(clarifyRequest = null)
-                        } else {
-                            state
-                        },
+                        state.copy(
+                            overlays =
+                                OverlaysReducer.reduce(
+                                    state.overlays,
+                                    OverlaysIntent.ClarifyExpired(
+                                        clarifyId = event.clarifyId,
+                                        sessionId = event.sessionId,
+                                        sourceProfileId = event.sourceProfileId,
+                                        connectionGeneration = event.connectionGeneration,
+                                    ),
+                                ),
+                        ),
                     streamingState = streamingState,
                 )
 
@@ -201,14 +202,16 @@ object ChatWsEventReducer {
                 val finalized = requireNotNull(streamingState.streamingMessage).copy(isStreaming = false)
                 orphan = finalized
                 state.copy(
-                    messages = state.messages + finalized,
-                    isAgentTyping = true,
-                    subagentIndicators = cleanedSubagents,
+                    transcript =
+                        state.transcript.copy(
+                            messages = state.messages + finalized,
+                            isAgentTyping = true,
+                            subagentIndicators = cleanedSubagents,
+                        ),
                 )
             } else {
                 state.copy(
-                    isAgentTyping = true,
-                    subagentIndicators = cleanedSubagents,
+                    transcript = state.transcript.copy(isAgentTyping = true, subagentIndicators = cleanedSubagents),
                 )
             }
         val newStreamingState =
@@ -324,9 +327,8 @@ object ChatWsEventReducer {
         return ReducerResult(
             state =
                 state.copy(
-                    messages = state.messages + msg,
-                    isAgentTyping = false,
-                    clarifyRequest = null,
+                    transcript = state.transcript.copy(messages = state.messages + msg, isAgentTyping = false),
+                    overlays = OverlaysReducer.reduce(state.overlays, OverlaysIntent.ClarifyCleared),
                 ),
             effects = effects,
         )
@@ -363,8 +365,7 @@ object ChatWsEventReducer {
         return ReducerResult(
             state =
                 state.copy(
-                    messages = state.messages + msg,
-                    isAgentTyping = false,
+                    transcript = state.transcript.copy(messages = state.messages + msg, isAgentTyping = false),
                 ),
             effects = effects,
         )
@@ -405,7 +406,7 @@ object ChatWsEventReducer {
                     )
                 orphanToPersist = finalized
                 state.copy(
-                    messages = state.messages + finalized,
+                    transcript = state.transcript.copy(messages = state.messages + finalized),
                 )
             } else {
                 state
@@ -423,7 +424,14 @@ object ChatWsEventReducer {
         val nextTodos = parsedTodos ?: newState.todos
 
         return ReducerResult(
-            state = newState.copy(messages = newState.messages + toolMessage, todos = nextTodos),
+            state =
+                newState.copy(
+                    transcript =
+                        newState.transcript.copy(
+                            messages = newState.messages + toolMessage,
+                            todos = nextTodos,
+                        ),
+                ),
             effects = effects,
         )
     }
@@ -474,7 +482,10 @@ object ChatWsEventReducer {
         val nextTodos = parsedTodos ?: state.todos
 
         return ReducerResult(
-            state = state.copy(messages = messages, todos = nextTodos),
+            state =
+                state.copy(
+                    transcript = state.transcript.copy(messages = messages, todos = nextTodos),
+                ),
             streamingState = streamingState,
             effects = effects,
         )
@@ -544,7 +555,10 @@ object ChatWsEventReducer {
 
         // No persist — risk data is transient (not stored in SQLite)
         return ReducerResult(
-            state = state.copy(messages = messages),
+            state =
+                state.copy(
+                    transcript = state.transcript.copy(messages = messages),
+                ),
             streamingState = streamingState,
         )
     }
@@ -559,42 +573,45 @@ object ChatWsEventReducer {
         ReducerResult(
             state =
                 state.copy(
-                    clarifyRequest =
-                        ClarifyUi(
-                            text = event.text.orEmpty(),
-                            options = event.options.orEmpty(),
-                            clarifyId = event.clarifyId,
-                            questionId = event.questionId,
-                            multiSelect = event.multiSelect,
-                            questions =
-                                event.questions.map {
-                                    ClarifyQuestionUi(it.qid, it.question, it.choices, it.multiSelect)
-                                },
-                            sessionId = event.sessionId,
-                            sourceProfileId = event.sourceProfileId,
-                            connectionGeneration = event.connectionGeneration,
-                            serverRequestBinding =
-                                run {
-                                    val srvReqId = event.serverRequestId
-                                    val sessId = event.sessionId
-                                    val srcProfId = event.sourceProfileId
-                                    val connGen = event.connectionGeneration
-                                    if (srvReqId != null && sessId != null &&
-                                        srcProfId != null && connGen != null
-                                    ) {
-                                        com.m57.hermescontrol.data.ws.ServerRequestBinding(
-                                            srvReqId,
-                                            sessId,
-                                            srcProfId,
-                                            connGen,
-                                        )
-                                    } else {
-                                        null
-                                    }
-                                },
-                            lockedAnswers = event.lockedAnswers,
+                    transcript = state.transcript.copy(isAgentTyping = false),
+                    overlays =
+                        state.overlays.copy(
+                            clarifyRequest =
+                                ClarifyUi(
+                                    text = event.text.orEmpty(),
+                                    options = event.options.orEmpty(),
+                                    clarifyId = event.clarifyId,
+                                    questionId = event.questionId,
+                                    multiSelect = event.multiSelect,
+                                    questions =
+                                        event.questions.map {
+                                            ClarifyQuestionUi(it.qid, it.question, it.choices, it.multiSelect)
+                                        },
+                                    sessionId = event.sessionId,
+                                    sourceProfileId = event.sourceProfileId,
+                                    connectionGeneration = event.connectionGeneration,
+                                    serverRequestBinding =
+                                        run {
+                                            val srvReqId = event.serverRequestId
+                                            val sessId = event.sessionId
+                                            val srcProfId = event.sourceProfileId
+                                            val connGen = event.connectionGeneration
+                                            if (srvReqId != null && sessId != null &&
+                                                srcProfId != null && connGen != null
+                                            ) {
+                                                com.m57.hermescontrol.data.ws.ServerRequestBinding(
+                                                    srvReqId,
+                                                    sessId,
+                                                    srcProfId,
+                                                    connGen,
+                                                )
+                                            } else {
+                                                null
+                                            }
+                                        },
+                                    lockedAnswers = event.lockedAnswers,
+                                ),
                         ),
-                    isAgentTyping = false,
                 ),
         )
 
@@ -612,7 +629,10 @@ object ChatWsEventReducer {
                 content = event.text,
             )
         return ReducerResult(
-            state = state.copy(messages = state.messages + systemMessage),
+            state =
+                state.copy(
+                    transcript = state.transcript.copy(messages = state.messages + systemMessage),
+                ),
             streamingState = streamingState,
         )
     }
@@ -627,13 +647,16 @@ object ChatWsEventReducer {
         ReducerResult(
             state =
                 state.copy(
-                    isLoading = false,
-                    // Readable form. The raw data-class dump
-                    // ("JsonRpcError(code=4001, message=session not found,
-                    // data=null)") told the user nothing and hid which RPC failed.
-                    errorMessage =
-                        "Error: " +
-                            event.error.message.ifBlank { "code ${event.error.code}" },
+                    transcript =
+                        state.transcript.copy(
+                            isLoading = false,
+                            // Readable form. The raw data-class dump
+                            // ("JsonRpcError(code=4001, message=session not found,
+                            // data=null)") told the user nothing and hid which RPC failed.
+                            errorMessage =
+                                "Error: " +
+                                    event.error.message.ifBlank { "code ${event.error.code}" },
+                        ),
                 ),
             streamingState = streamingState,
         )
@@ -649,8 +672,11 @@ object ChatWsEventReducer {
         ReducerResult(
             state =
                 state.copy(
-                    isLoading = false,
-                    errorMessage = "Backend error: ${event.message ?: "Unknown gateway error"}",
+                    transcript =
+                        state.transcript.copy(
+                            isLoading = false,
+                            errorMessage = "Backend error: ${event.message ?: "Unknown gateway error"}",
+                        ),
                 ),
             streamingState = streamingState,
         )
@@ -671,7 +697,10 @@ object ChatWsEventReducer {
             }?.let { "Background job finished: $it" }
                 ?: "Background job finished"
         return ReducerResult(
-            state = state.copy(backgroundCompleteMessage = message),
+            state =
+                state.copy(
+                    overlays = state.overlays.copy(backgroundCompleteMessage = message),
+                ),
             streamingState = streamingState,
         )
     }
@@ -704,7 +733,10 @@ object ChatWsEventReducer {
 
         messages[toolIdx] = messages[toolIdx].copy(progressPreview = event.preview ?: "")
         return ReducerResult(
-            state = state.copy(messages = messages),
+            state =
+                state.copy(
+                    transcript = state.transcript.copy(messages = messages),
+                ),
             streamingState = streamingState,
         )
     }
@@ -720,7 +752,10 @@ object ChatWsEventReducer {
 
         messages[toolIdx] = messages[toolIdx].copy(progressPreview = "")
         return ReducerResult(
-            state = state.copy(messages = messages),
+            state =
+                state.copy(
+                    transcript = state.transcript.copy(messages = messages),
+                ),
             streamingState = streamingState,
         )
     }
@@ -813,7 +848,10 @@ object ChatWsEventReducer {
         }
 
         return ReducerResult(
-            state = state.copy(subagentIndicators = indicators),
+            state =
+                state.copy(
+                    transcript = state.transcript.copy(subagentIndicators = indicators),
+                ),
             streamingState = streamingState,
         )
     }

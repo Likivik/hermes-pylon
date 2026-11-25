@@ -51,20 +51,43 @@ class ServerMessageMapperTest {
     }
 
     @Test
-    fun `ids come from the offset when not latest paging`() {
-        val out = map(listOf(SessionMessage(id = 9, role = "user", content = "a")), offset = 5)
-        assertEquals("rest-s1-5", out.single().id)
+    fun `the identity follows the store's own message uid`() {
+        val out = map(listOf(SessionMessage(id = 9, role = "user", content = "a", messageUid = "mu-7")))
+        assertEquals("mu-7", out.single().id)
     }
 
     @Test
-    fun `ids prefer the server id when latest paging`() {
+    fun `a payload with no message uid falls back to the content fingerprint`() {
+        val out = map(listOf(SessionMessage(id = 9, role = "user", content = "a")), offset = 5)
+        assertEquals(
+            messageRowFingerprint("s1", MessageRole.USER, out.single().timestamp, "a"),
+            out.single().id,
+            "never a rowid and never an offset: both move, and a cross-read identity may not",
+        )
+    }
+
+    @Test
+    fun `the same message under a moved rowid keeps its identity`() {
+        val first = map(listOf(SessionMessage(id = 9, role = "user", content = "a")), offset = 5)
+        val reread = map(listOf(SessionMessage(id = 2686, role = "user", content = "a")), offset = 400)
+        assertEquals(first.single().id, reread.single().id, "the rowid moved; the message did not")
+    }
+
+    @Test
+    fun `the server index is the offset when not latest paging`() {
+        val out = map(listOf(SessionMessage(id = 9, role = "user", content = "a")), offset = 5)
+        assertEquals(MessageOrigin.Rest(5), out.single().origin)
+    }
+
+    @Test
+    fun `the server index prefers the server id when latest paging`() {
         val out =
             map(
                 listOf(SessionMessage(id = 9, role = "user", content = "a")),
                 offset = 5,
                 useLatestPaging = true,
             )
-        assertEquals("rest-s1-9", out.single().id)
+        assertEquals(MessageOrigin.Rest(9), out.single().origin)
     }
 
     @Test

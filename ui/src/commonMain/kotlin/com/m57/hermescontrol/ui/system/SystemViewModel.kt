@@ -21,9 +21,11 @@ import com.m57.hermescontrol.data.model.PortalResponse
 import com.m57.hermescontrol.data.model.StatusResponse
 import com.m57.hermescontrol.data.model.SystemStatsResponse
 import com.m57.hermescontrol.data.model.UpdateCheckResponse
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.data.remote.source.DefaultHost
+import com.m57.hermescontrol.data.remote.source.Host
 import com.m57.hermescontrol.data.remote.toJsonObject
 import com.m57.hermescontrol.ui.common.ToastHost
 import com.m57.hermescontrol.util.HermesLog
@@ -87,6 +89,7 @@ data class SystemUiState(
 
 class SystemViewModel(
     private val ioDispatcher: CoroutineDispatcher = AppEnvironment.current.io,
+    private val source: Host = DefaultHost(GatewayConnection.hermesApi),
 ) :
     ViewModel(),
         ToastHost {
@@ -106,18 +109,18 @@ class SystemViewModel(
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
             coroutineScope {
-                val statsDeferred = async(ioDispatcher) { safeApiCall { ApiClient.hermesApi.getSystemStats() } }
-                val statusDeferred = async(ioDispatcher) { safeApiCall { ApiClient.hermesApi.getStatus() } }
-                val portalDeferred = async(ioDispatcher) { safeApiCall { ApiClient.hermesApi.getPortal() } }
-                val curatorDeferred = async(ioDispatcher) { safeApiCall { ApiClient.hermesApi.getCurator() } }
-                val memoryDeferred = async(ioDispatcher) { safeApiCall { ApiClient.hermesApi.getMemory() } }
-                val learningDeferred = async(ioDispatcher) { safeApiCall { ApiClient.hermesApi.getLearningGraph() } }
-                val credDeferred = async(ioDispatcher) { safeApiCall { ApiClient.hermesApi.getCredentialPool() } }
-                val checkpointsDeferred = async(ioDispatcher) { safeApiCall { ApiClient.hermesApi.getCheckpoints() } }
-                val hooksDeferred = async(ioDispatcher) { safeApiCall { ApiClient.hermesApi.getHooks() } }
+                val statsDeferred = async(ioDispatcher) { safeApiCall { source.getSystemStats() } }
+                val statusDeferred = async(ioDispatcher) { safeApiCall { source.getStatus() } }
+                val portalDeferred = async(ioDispatcher) { safeApiCall { source.getPortal() } }
+                val curatorDeferred = async(ioDispatcher) { safeApiCall { source.getCurator() } }
+                val memoryDeferred = async(ioDispatcher) { safeApiCall { source.getMemory() } }
+                val learningDeferred = async(ioDispatcher) { safeApiCall { source.getLearningGraph() } }
+                val credDeferred = async(ioDispatcher) { safeApiCall { source.getCredentialPool() } }
+                val checkpointsDeferred = async(ioDispatcher) { safeApiCall { source.getCheckpoints() } }
+                val hooksDeferred = async(ioDispatcher) { safeApiCall { source.getHooks() } }
                 val updateDeferred =
-                    async(ioDispatcher) { safeApiCall { ApiClient.hermesApi.checkHermesUpdate(false) } }
-                val doctorDeferred = async(ioDispatcher) { safeApiCall { ApiClient.hermesApi.runDoctor() } }
+                    async(ioDispatcher) { safeApiCall { source.checkHermesUpdate(false) } }
+                val doctorDeferred = async(ioDispatcher) { safeApiCall { source.runDoctor() } }
 
                 val statsResult = statsDeferred.await()
                 val statusResult = statusDeferred.await()
@@ -180,7 +183,7 @@ class SystemViewModel(
 
     fun loadCredentials() {
         viewModelScope.launch {
-            val result = withContext(ioDispatcher) { safeApiCall { ApiClient.hermesApi.getCredentialPool() } }
+            val result = withContext(ioDispatcher) { safeApiCall { source.getCredentialPool() } }
             if (result is NetworkResult.Success) {
                 _uiState.update { it.copy(credentials = result.data.providers ?: emptyList()) }
             }
@@ -189,7 +192,7 @@ class SystemViewModel(
 
     fun loadHooks() {
         viewModelScope.launch {
-            val result = withContext(ioDispatcher) { safeApiCall { ApiClient.hermesApi.getHooks() } }
+            val result = withContext(ioDispatcher) { safeApiCall { source.getHooks() } }
             if (result is NetworkResult.Success) {
                 _uiState.update { it.copy(hooks = result.data) }
             }
@@ -198,7 +201,7 @@ class SystemViewModel(
 
     fun loadCurator() {
         viewModelScope.launch {
-            val result = withContext(ioDispatcher) { safeApiCall { ApiClient.hermesApi.getCurator() } }
+            val result = withContext(ioDispatcher) { safeApiCall { source.getCurator() } }
             if (result is NetworkResult.Success) {
                 _uiState.update { it.copy(curator = result.data) }
             }
@@ -207,7 +210,7 @@ class SystemViewModel(
 
     fun loadMemory() {
         viewModelScope.launch {
-            val result = withContext(ioDispatcher) { safeApiCall { ApiClient.hermesApi.getMemory() } }
+            val result = withContext(ioDispatcher) { safeApiCall { source.getMemory() } }
             if (result is NetworkResult.Success) {
                 _uiState.update { it.copy(memory = result.data) }
             }
@@ -216,7 +219,7 @@ class SystemViewModel(
 
     fun loadStatus() {
         viewModelScope.launch {
-            val result = withContext(ioDispatcher) { safeApiCall { ApiClient.hermesApi.getStatus() } }
+            val result = withContext(ioDispatcher) { safeApiCall { source.getStatus() } }
             if (result is NetworkResult.Success) {
                 _uiState.update { it.copy(status = result.data) }
             }
@@ -226,15 +229,15 @@ class SystemViewModel(
     // ── Gateway actions ────────────────────────────────────────────────
 
     fun startGateway() {
-        runGatewayAction("start") { safeApiCall { ApiClient.hermesApi.startGateway() } }
+        runGatewayAction("start") { safeApiCall { source.startGateway() } }
     }
 
     fun stopGateway() {
-        runGatewayAction("stop") { safeApiCall { ApiClient.hermesApi.stopGateway() } }
+        runGatewayAction("stop") { safeApiCall { source.stopGateway() } }
     }
 
     fun restartGateway() {
-        runGatewayAction("restart") { safeApiCall { ApiClient.hermesApi.restartGateway() } }
+        runGatewayAction("restart") { safeApiCall { source.restartGateway() } }
     }
 
     private fun runGatewayAction(
@@ -263,7 +266,7 @@ class SystemViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.checkHermesUpdate(force) }
+                    safeApiCall { source.checkHermesUpdate(force) }
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -284,7 +287,7 @@ class SystemViewModel(
 
     fun applyUpdate() {
         runOperation(
-            apiCall = { safeApiCall { ApiClient.hermesApi.updateHermes() } },
+            apiCall = { safeApiCall { source.updateHermes() } },
             label = "Update",
         )
     }
@@ -305,7 +308,7 @@ class SystemViewModel(
             val result =
                 withContext(ioDispatcher) {
                     safeApiCall {
-                        ApiClient.hermesApi.setCuratorPaused(
+                        source.setCuratorPaused(
                             mapOf("paused" to !currentlyPaused).toJsonObject(),
                         )
                     }
@@ -329,7 +332,7 @@ class SystemViewModel(
 
     fun runCuratorNow() {
         runOperation(
-            apiCall = { safeApiCall { ApiClient.hermesApi.runCurator() } },
+            apiCall = { safeApiCall { source.runCurator() } },
             label = "Curator run",
         )
     }
@@ -340,7 +343,7 @@ class SystemViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.resetMemory(MemoryResetRequest(target = target)) }
+                    safeApiCall { source.resetMemory(MemoryResetRequest(target = target)) }
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -385,7 +388,7 @@ class SystemViewModel(
                 }
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.addCredentialPoolEntry(body) }
+                    safeApiCall { source.addCredentialPoolEntry(body) }
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -416,7 +419,7 @@ class SystemViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.removeCredentialPoolEntry(provider, index) }
+                    safeApiCall { source.removeCredentialPoolEntry(provider, index) }
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -435,35 +438,35 @@ class SystemViewModel(
 
     fun runSecurityAudit() {
         runOperation(
-            apiCall = { safeApiCall { ApiClient.hermesApi.runSecurityAudit() } },
+            apiCall = { safeApiCall { source.runSecurityAudit() } },
             label = "Security audit",
         )
     }
 
     fun runPromptSize() {
         runOperation(
-            apiCall = { safeApiCall { ApiClient.hermesApi.runPromptSize() } },
+            apiCall = { safeApiCall { source.runPromptSize() } },
             label = "Prompt size check",
         )
     }
 
     fun runDump() {
         runOperation(
-            apiCall = { safeApiCall { ApiClient.hermesApi.runDump() } },
+            apiCall = { safeApiCall { source.runDump() } },
             label = "Dump",
         )
     }
 
     fun runConfigMigrate() {
         runOperation(
-            apiCall = { safeApiCall { ApiClient.hermesApi.runConfigMigrate() } },
+            apiCall = { safeApiCall { source.runConfigMigrate() } },
             label = "Config migrate",
         )
     }
 
     fun runUpdateSkills() {
         runOperation(
-            apiCall = { safeApiCall { ApiClient.hermesApi.updateSkillsFromHub() } },
+            apiCall = { safeApiCall { source.updateSkillsFromHub() } },
             label = "Skills update",
         )
     }
@@ -472,7 +475,7 @@ class SystemViewModel(
 
     fun triggerBackup() {
         viewModelScope.launch {
-            val result = withContext(ioDispatcher) { safeApiCall { ApiClient.hermesApi.triggerBackup() } }
+            val result = withContext(ioDispatcher) { safeApiCall { source.triggerBackup() } }
             when (result) {
                 is NetworkResult.Success -> {
                     _uiState.update {
@@ -500,7 +503,7 @@ class SystemViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.downloadBackup(archive) }
+                    safeApiCall { source.downloadBackup(archive) }
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -520,7 +523,7 @@ class SystemViewModel(
 
     fun runImport(path: String) {
         runOperation(
-            apiCall = { safeApiCall { ApiClient.hermesApi.runImport(mapOf("path" to path).toJsonObject()) } },
+            apiCall = { safeApiCall { source.runImport(mapOf("path" to path).toJsonObject()) } },
             label = "Import",
         )
     }
@@ -537,7 +540,7 @@ class SystemViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.runDebugShare(mapOf("redact" to shareRedact).toJsonObject()) }
+                    safeApiCall { source.runDebugShare(mapOf("redact" to shareRedact).toJsonObject()) }
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -566,7 +569,7 @@ class SystemViewModel(
 
     fun pruneCheckpoints() {
         runOperation(
-            apiCall = { safeApiCall { ApiClient.hermesApi.pruneCheckpoints() } },
+            apiCall = { safeApiCall { source.pruneCheckpoints() } },
             label = "Checkpoint prune",
         )
     }
@@ -615,7 +618,7 @@ class SystemViewModel(
                 }
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.createHook(body.toJsonObject()) }
+                    safeApiCall { source.createHook(body.toJsonObject()) }
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -651,7 +654,7 @@ class SystemViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.deleteHook(mapOf("event" to event, "command" to command)) }
+                    safeApiCall { source.deleteHook(mapOf("event" to event, "command" to command)) }
                 }
             when (result) {
                 is NetworkResult.Success -> {
@@ -683,7 +686,7 @@ class SystemViewModel(
                     delay(1200)
                     val result =
                         withContext(ioDispatcher) {
-                            safeApiCall { ApiClient.hermesApi.getActionStatus(name) }
+                            safeApiCall { source.getActionStatus(name) }
                         }
                     if (result is NetworkResult.Success) {
                         _uiState.update { it.copy(actionLog = result.data) }
@@ -713,7 +716,7 @@ class SystemViewModel(
     private suspend fun loadUpdateReceipt() {
         val result =
             withContext(ioDispatcher) {
-                safeApiCall { ApiClient.hermesApi.getUpdateReceipt() }
+                safeApiCall { source.getUpdateReceipt() }
             }
         if (result !is NetworkResult.Success) return
         val display = summarizeUpdateReceipt(result.data) ?: return

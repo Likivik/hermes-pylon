@@ -5,10 +5,8 @@ import androidx.compose.runtime.Composable
 /**
  * Small key-value store for UI preferences that are not worth a database.
  *
- * Android binds this to `SharedPreferences`; desktop and web keep an in-memory map,
- * so preferences reset when the app restarts. That is the honest behaviour until a
- * multiplatform settings backend exists — silently pretending to persist would be
- * worse.
+ * Android binds this to `SharedPreferences`, the browser to `localStorage` (so
+ * preferences survive a reload), and the desktop to `java.util.prefs`.
  *
  * The surface mirrors what the rail already uses: sets, single strings, removal, and
  * a full read used to enumerate per-session icons.

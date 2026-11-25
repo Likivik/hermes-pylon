@@ -6,7 +6,7 @@ import io.ktor.http.HttpHeaders
 import kotlinx.browser.window
 
 /**
- * Web side of the [ApiClient] seam.
+ * Web side of the [GatewayConnection] seam.
  *
  * The page's own origin is the gateway: requests must stay same-origin, because
  * the dev server is plain HTTP on loopback while a tailnet origin is HTTPS, and
@@ -21,13 +21,16 @@ internal actual object GatewayPlatform {
     }
 }
 
-internal actual fun createGatewayHttpClient(auth: GatewayClientAuth): HttpClient =
+internal actual fun createGatewayHttpClient(
+    auth: GatewayClientAuth,
+    profile: String?,
+): HttpClient =
     when (auth) {
         // Same-origin browser session: cookies travel with the request.
-        GatewayClientAuth.SessionCredentials -> createHermesHttpClient()
+        GatewayClientAuth.SessionCredentials -> createHermesHttpClient(HermesHttpConfig.Default.copy(profile = profile))
         is GatewayClientAuth.FixedBearer -> {
             val token = auth.token
-            createHermesHttpClient().config {
+            createHermesHttpClient(HermesHttpConfig.Default.copy(profile = profile)).config {
                 if (token.isNotBlank()) {
                     defaultRequest {
                         headers.append(HttpHeaders.Authorization, "Bearer $token")

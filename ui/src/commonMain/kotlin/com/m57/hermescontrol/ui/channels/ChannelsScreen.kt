@@ -1,6 +1,8 @@
 package com.m57.hermescontrol.ui.channels
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -29,11 +32,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.m57.hermescontrol.ChannelDetailScreenKey
+import com.m57.hermescontrol.NavigationController
 import com.m57.hermescontrol.data.model.EnvVarField
 import com.m57.hermescontrol.data.model.MessagingPlatform
 import com.m57.hermescontrol.data.model.MessagingPlatformUpdate
@@ -49,10 +57,11 @@ import com.m57.hermescontrol.generated.resources.empty_action_connect_telegram
 import com.m57.hermescontrol.generated.resources.screen_channels
 import com.m57.hermescontrol.theme.LocalHermesStatusColors
 import com.m57.hermescontrol.theme.Spacing
-import com.m57.hermescontrol.ui.channels.components.PlatformCard
 import com.m57.hermescontrol.ui.channels.components.TelegramOnboardingDialog
 import com.m57.hermescontrol.ui.common.EmptyState
 import com.m57.hermescontrol.ui.common.ErrorState
+import com.m57.hermescontrol.ui.common.HermesListDefaults
+import com.m57.hermescontrol.ui.common.HermesListItem
 import com.m57.hermescontrol.ui.common.HermesScaffold
 import com.m57.hermescontrol.ui.common.NavIcon
 import com.m57.hermescontrol.ui.common.SearchBar
@@ -62,6 +71,7 @@ import com.m57.hermescontrol.ui.common.listContentPadding
 import com.m57.hermescontrol.ui.common.listItemSpacing
 import com.m57.hermescontrol.ui.icons.HermesIcon
 import com.m57.hermescontrol.ui.icons.HermesSymbol
+import com.m57.hermescontrol.ui.icons.MaterialSymbol
 import com.m57.hermescontrol.util.formatIsoTimestamp
 import org.jetbrains.compose.resources.stringResource
 
@@ -96,15 +106,97 @@ private fun validateEnvField(
 
 // ── State → badge colour / label  ──────────────────────────────────────
 
+internal enum class StatusRole { SUCCESS, WARNING, ERROR, NEUTRAL }
+
+internal data class StateStyle(
+    val label: String,
+    val color: Color,
+    val icon: String,
+)
+
+/** The one mapping from the backend's state strings to a label, colour and glyph. */
+@Composable
+internal fun platformStateStyle(state: String): StateStyle {
+    val statusColors = LocalHermesStatusColors.current
+    val (label, role, icon) =
+        when (state) {
+            "connected" -> Triple("Connected", StatusRole.SUCCESS, "check_circle")
+            "pending_restart" -> Triple("Restart to apply", StatusRole.WARNING, "refresh")
+            "gateway_stopped" -> Triple("Gateway stopped", StatusRole.WARNING, "radio_button_checked")
+            "startup_failed" -> Triple("Start failed", StatusRole.ERROR, "warning")
+            "disconnected" -> Triple("Disconnected", StatusRole.WARNING, "radio_button_checked")
+            "not_configured" -> Triple("Not configured", StatusRole.NEUTRAL, "radio_button_checked")
+            "disabled" -> Triple("Disabled", StatusRole.NEUTRAL, "radio_button_checked")
+            "fatal" -> Triple("Error", StatusRole.ERROR, "warning")
+            else -> Triple(state, StatusRole.NEUTRAL, "radio_button_checked")
+        }
+    val color =
+        when (role) {
+            StatusRole.SUCCESS -> statusColors.success
+            StatusRole.WARNING -> statusColors.warning
+            StatusRole.ERROR -> statusColors.error
+            StatusRole.NEUTRAL -> statusColors.neutral
+        }
+    return StateStyle(label, color, icon)
+}
+
 // ── Main screen  ──────────────────────────────────────────────────────
 
+/**
+ * Route: the only part that knows the ViewModel. Kept separate from [ChannelsScreen] so
+ * the screen can be rendered from state alone and captured as pixels.
+ */
 @Composable
-fun ChannelsScreen(
+fun ChannelsRoute(
     modifier: Modifier = Modifier,
     onOpenDrawer: (() -> Unit)? = null,
+    onOpen: (String) -> Unit = { id -> NavigationController.navigateTo(ChannelDetailScreenKey(id)) },
     viewModel: ChannelsViewModel = viewModel { ChannelsViewModel() },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) {
+        viewModel.loadPlatforms()
+    }
+
+    ToastEffect(toastMessage = state.toastMessage, onClearToast = viewModel::clearToast)
+
+    ChannelsScreen(
+        state = state,
+        modifier = modifier,
+        onOpenDrawer = onOpenDrawer,
+        onRefresh = viewModel::loadPlatforms,
+        onRetry = viewModel::loadPlatforms,
+        onToggle = viewModel::togglePlatform,
+        onOpen = onOpen,
+        onStartOnboarding = viewModel::startTelegramOnboarding,
+        onRestartGateway = viewModel::restartGateway,
+        onDismissOnboarding = viewModel::cancelTelegramOnboarding,
+        onAddAllowedId = viewModel::addOnboardingAllowedId,
+        onRemoveAllowedId = viewModel::removeOnboardingAllowedId,
+        onNewAllowedIdChange = viewModel::setOnboardingNewAllowedId,
+        onApplyOnboarding = viewModel::applyTelegramOnboarding,
+    )
+}
+
+/** Screen: rendering only. Search text is the one piece of local UI state it owns. */
+@Composable
+fun ChannelsScreen(
+    state: ChannelsUiState,
+    onRefresh: () -> Unit,
+    onRetry: () -> Unit,
+    onToggle: (String, Boolean) -> Unit,
+    onOpen: (String) -> Unit,
+    onStartOnboarding: () -> Unit,
+    onRestartGateway: () -> Unit,
+    onDismissOnboarding: () -> Unit,
+    onAddAllowedId: () -> Unit,
+    onRemoveAllowedId: (String) -> Unit,
+    onNewAllowedIdChange: (String) -> Unit,
+    onApplyOnboarding: () -> Unit,
+    modifier: Modifier = Modifier,
+    onOpenDrawer: (() -> Unit)? = null,
+) {
     var query by remember { mutableStateOf("") }
 
     val filteredPlatforms =
@@ -114,21 +206,14 @@ fun ChannelsScreen(
             }
         }
 
-    LaunchedEffect(Unit) {
-        viewModel.loadPlatforms()
-    }
-
-    ToastEffect(toastMessage = state.toastMessage, onClearToast = viewModel::clearToast)
-
-    // ── Telegram onboarding dialog ────────────────────────────────
     if (state.onboardingPhase != OnboardingPhase.IDLE) {
         TelegramOnboardingDialog(
             state = state,
-            onDismiss = { viewModel.cancelTelegramOnboarding() },
-            onAddAllowedId = { viewModel.addOnboardingAllowedId() },
-            onRemoveAllowedId = { viewModel.removeOnboardingAllowedId(it) },
-            onNewAllowedIdChange = { viewModel.setOnboardingNewAllowedId(it) },
-            onApply = { viewModel.applyTelegramOnboarding() },
+            onDismiss = onDismissOnboarding,
+            onAddAllowedId = onAddAllowedId,
+            onRemoveAllowedId = onRemoveAllowedId,
+            onNewAllowedIdChange = onNewAllowedIdChange,
+            onApply = onApplyOnboarding,
         )
     }
 
@@ -136,7 +221,7 @@ fun ChannelsScreen(
         title = { Text(stringResource(Res.string.screen_channels)) },
         navigationIcon = onOpenDrawer?.let { NavIcon.Menu(it) },
         isRefreshing = state.isLoading,
-        onRefresh = { viewModel.loadPlatforms() },
+        onRefresh = onRefresh,
     ) { paddingValues ->
         when {
             state.isLoading && state.platforms.isEmpty() -> {
@@ -146,7 +231,7 @@ fun ChannelsScreen(
             state.errorMessage != null && state.platforms.isEmpty() -> {
                 ErrorState(
                     message = state.errorMessage ?: "",
-                    onRetry = { viewModel.loadPlatforms() },
+                    onRetry = onRetry,
                     modifier = Modifier.padding(paddingValues),
                 )
             }
@@ -156,7 +241,7 @@ fun ChannelsScreen(
                     title = stringResource(Res.string.channels_empty_title),
                     subtitle = stringResource(Res.string.channels_empty_desc),
                     actionLabel = stringResource(Res.string.empty_action_connect_telegram),
-                    onAction = { viewModel.startTelegramOnboarding() },
+                    onAction = onStartOnboarding,
                     modifier = Modifier.padding(paddingValues),
                 )
             }
@@ -164,29 +249,32 @@ fun ChannelsScreen(
             else -> {
                 val gatewayRunning = state.platforms.firstOrNull()?.gatewayRunning ?: false
 
+                val connected =
+                    filteredPlatforms.filter {
+                        it.state == "connected" || it.state == "pending_restart"
+                    }
+                val available = filteredPlatforms.filter { it !in connected }
+
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = listContentPadding,
                     verticalArrangement = listItemSpacing,
                 ) {
-                    // ── Restart banner ──
                     if (state.restartNeeded) {
                         item(key = "restart_banner") {
                             RestartBanner(
                                 isRestarting = state.isRestarting,
-                                onRestart = viewModel::restartGateway,
+                                onRestart = onRestartGateway,
                             )
                         }
                     }
 
-                    // ── Gateway-not-running hint ──
                     if (!gatewayRunning && !state.restartNeeded) {
                         item(key = "gateway_offline") {
                             GatewayOfflineBanner(gatewayCommand = state.gatewayStartCommand)
                         }
                     }
 
-                    // ── Search bar ──
                     item(key = "search") {
                         SearchBar(
                             query = query,
@@ -195,22 +283,32 @@ fun ChannelsScreen(
                         )
                     }
 
-                    // ── Channel cards ──
-                    items(filteredPlatforms, key = { it.id }) { platform ->
-                        PlatformCard(
-                            platform = platform,
-                            isToggling = state.togglingId == platform.id,
-                            isTesting = state.testingId == platform.id,
-                            isRemoving = state.removingId == platform.id,
-                            onToggle = { enabled -> viewModel.togglePlatform(platform.id, enabled) },
-                            onTest = { viewModel.testPlatform(platform.id) },
-                            onSave = { env -> viewModel.configurePlatform(platform.id, env) },
-                            onRemove = { viewModel.removePlatform(platform.id) },
-                            onStartOnboarding = { viewModel.startTelegramOnboarding() },
-                        )
+                    if (connected.isNotEmpty()) {
+                        item(key = "section_connected") {
+                            SectionHeaderLabel(title = "Connected")
+                        }
+                        items(connected, key = { it.id }) { platform ->
+                            ChannelRow(
+                                platform = platform,
+                                onToggle = { enabled -> onToggle(platform.id, enabled) },
+                                onOpen = { onOpen(platform.id) },
+                            )
+                        }
                     }
 
-                    // ── Admin section ──
+                    if (available.isNotEmpty()) {
+                        item(key = "section_available") {
+                            SectionHeaderLabel(title = "Available")
+                        }
+                        items(available, key = { it.id }) { platform ->
+                            ChannelRow(
+                                platform = platform,
+                                onToggle = { enabled -> onToggle(platform.id, enabled) },
+                                onOpen = { onOpen(platform.id) },
+                            )
+                        }
+                    }
+
                     item(key = "admin_section") {
                         AdminSection(
                             envPath = state.envPath,
@@ -222,7 +320,135 @@ fun ChannelsScreen(
     }
 }
 
-// ── Restart banner  ───────────────────────────────────────────────────
+// ── Channel row  ───────────────────────────────────────────────────────
+
+/**
+ * One channel in the list: brand tile, name with its state, description, and the
+ * switch-plus-chevron cluster. The row itself is not tappable — the chevron opens
+ * the detail page, the switch toggles the channel.
+ */
+@Composable
+private fun ChannelRow(
+    platform: MessagingPlatform,
+    onToggle: (Boolean) -> Unit,
+    onOpen: () -> Unit,
+) {
+    val style = platformStateStyle(platform.state)
+
+    HermesListItem(
+        leading = {
+            BrandTile(
+                platformId = platform.id,
+                fallbackIcon = style.icon,
+                fallbackTint = style.color,
+            )
+        },
+        headline = {
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    text = platform.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.alignByBaseline(),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = style.label,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = style.color,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.alignByBaseline(),
+                )
+            }
+        },
+        supporting = {
+            val description = platform.description
+            if (!description.isNullOrBlank()) {
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        },
+        trailing =
+            HermesListDefaults.toggleTrailing(
+                checked = platform.enabled,
+                onToggle = onToggle,
+                label = platform.name,
+            ),
+        // Tapping the row opens the page; the switch and the chevron are separate targets that
+        // consume their own taps, so a toggle never navigates and a chevron never toggles.
+        onClick = onOpen,
+        rowHeight = HermesListDefaults.RowHeight,
+        containerColor = Color.Transparent,
+    )
+}
+
+/** The brand tile of a channel: the mark on its brand colour, or a neutral fallback. */
+@Composable
+internal fun BrandTile(
+    platformId: String,
+    fallbackIcon: String,
+    fallbackTint: Color,
+    modifier: Modifier = Modifier,
+) {
+    val mark = brandMarkFor(platformId)
+    Box(
+        modifier =
+            modifier
+                .size(HermesListDefaults.BrandTileSize)
+                .clip(RoundedCornerShape(10.dp)),
+    ) {
+        if (mark != null) {
+            Box(
+                modifier =
+                    Modifier
+                        .matchParentSize()
+                        .background(mark.color),
+            )
+            androidx.compose.foundation.Image(
+                imageVector = mark.vector,
+                contentDescription = null,
+                modifier =
+                    Modifier
+                        .align(Alignment.Center)
+                        .size(HermesListDefaults.BrandMarkSize),
+            )
+        } else {
+            Box(
+                modifier =
+                    Modifier
+                        .matchParentSize()
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                contentAlignment = Alignment.Center,
+            ) {
+                MaterialSymbol(
+                    name = fallbackIcon,
+                    contentDescription = null,
+                    tint = fallbackTint,
+                    size = HermesListDefaults.BrandMarkSize,
+                )
+            }
+        }
+    }
+}
+
+// ── Section header  ────────────────────────────────────────────────────
+
+@Composable
+private fun SectionHeaderLabel(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 16.dp, top = 24.dp, bottom = 8.dp),
+    )
+}
 
 @Composable
 private fun RestartBanner(
@@ -307,8 +533,6 @@ private fun GatewayOfflineBanner(gatewayCommand: String) {
         }
     }
 }
-
-// ── Platform card  ────────────────────────────────────────────────────
 
 // ── Configure form  ───────────────────────────────────────────────────
 

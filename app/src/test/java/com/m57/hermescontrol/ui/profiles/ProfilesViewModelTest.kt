@@ -4,9 +4,9 @@ import com.m57.hermescontrol.data.model.ActiveProfileResponse
 import com.m57.hermescontrol.data.model.CreateProfileRequest
 import com.m57.hermescontrol.data.model.ProfileInfo
 import com.m57.hermescontrol.data.model.ProfilesResponse
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.GatewayResponse
-import com.m57.hermescontrol.data.remote.HermesGatewayApi
+import com.m57.hermescontrol.data.remote.HermesApi
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -27,14 +27,14 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class ProfilesViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
-    private lateinit var mockApi: HermesGatewayApi
+    private lateinit var mockApi: HermesApi
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        mockkObject(ApiClient)
+        mockkObject(GatewayConnection)
         mockApi = mockk(relaxed = true)
-        every { ApiClient.hermesApi } returns mockApi
+        every { GatewayConnection.hermesApi } returns mockApi
         coEvery { mockApi.getProfiles() } returns
             GatewayResponse.success(
                 ProfilesResponse(

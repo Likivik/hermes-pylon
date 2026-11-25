@@ -20,6 +20,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.m57.hermescontrol.data.remote.GatewayFileClient
 import com.m57.hermescontrol.ui.common.GatewayMediaDataSource
 import com.m57.hermescontrol.ui.common.SecureGatewayMediaRequest
+import com.m57.hermescontrol.util.HermesLog
 import com.m57.hermescontrol.util.ioDispatcher
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -78,7 +79,9 @@ actual fun rememberMediaPlayback(request: SecureGatewayMediaRequest): MediaPlayb
 }
 
 /** Body of the controller: one `MediaPlayer` per request. */
-private class AndroidMediaPlaybackController : MediaPlaybackController {
+private const val MEDIA_TAG = "MediaPlayback"
+
+class AndroidMediaPlaybackController : MediaPlaybackController {
     private val mutableState = mutableStateOf(MediaPlaybackState())
     override val state: MutableState<MediaPlaybackState> = mutableState
     private val current: MediaPlaybackState get() = mutableState.value
@@ -112,7 +115,10 @@ private class AndroidMediaPlaybackController : MediaPlaybackController {
                 prepareAsync()
             }
         player = created
-        pendingSurface?.let { runCatching { created.setDisplay(it) } }
+        pendingSurface?.let {
+            runCatching { created.setDisplay(it) }
+                .onFailure { e -> HermesLog.w(MEDIA_TAG, "setDisplay failed: ${e.message}") }
+        }
     }
 
     fun fail() {
@@ -123,12 +129,15 @@ private class AndroidMediaPlaybackController : MediaPlaybackController {
     fun playWhenReady() {
         val created = player ?: return
         runCatching { created.start() }
+            .onFailure { e -> HermesLog.w(MEDIA_TAG, "start failed: ${e.message}") }
         mutableState.value = current.copy(playing = true)
     }
 
     fun syncPosition() {
         val created = player ?: return
         if (!current.playing) return
+        // Polled on every position tick: logging here would flood the ring buffer, and a
+        // failed poll only means the next one is used (inventory: intentional-ignore).
         val position = runCatching { created.currentPosition }.getOrNull() ?: return
         mutableState.value = current.copy(positionMillis = position)
     }
@@ -137,6 +146,7 @@ private class AndroidMediaPlaybackController : MediaPlaybackController {
         pendingSurface = surface
         val created = player ?: return
         runCatching { created.setDisplay(surface) }
+            .onFailure { e -> HermesLog.w(MEDIA_TAG, "attach surface failed: ${e.message}") }
     }
 
     override fun play() {
@@ -146,25 +156,36 @@ private class AndroidMediaPlaybackController : MediaPlaybackController {
             created.seekTo(0)
         }
         runCatching { created.start() }
+            .onFailure { e -> HermesLog.w(MEDIA_TAG, "resume start failed: ${e.message}") }
         mutableState.value = current.copy(playing = true)
     }
 
     override fun pause() {
-        player?.let { runCatching { it.pause() } }
+        player?.let { p ->
+            runCatching { p.pause() }
+                .onFailure { e -> HermesLog.w(MEDIA_TAG, "pause failed: ${e.message}") }
+        }
         mutableState.value = current.copy(playing = false)
     }
 
     override fun seekTo(positionMillis: Int) {
-        player?.let { runCatching { it.seekTo(positionMillis) } }
+        player?.let { p ->
+            runCatching { p.seekTo(positionMillis) }
+                .onFailure { e -> HermesLog.w(MEDIA_TAG, "seekTo failed: ${e.message}") }
+        }
         mutableState.value = current.copy(positionMillis = positionMillis)
     }
 
     override fun release() {
         val created = player ?: return
         player = null
+        // Release-path failures leak a MediaPlayer and its surface; loud on purpose.
         runCatching { created.stop() }
+            .onFailure { e -> HermesLog.w(MEDIA_TAG, "stop failed during release: ${e.message}") }
         runCatching { created.reset() }
+            .onFailure { e -> HermesLog.w(MEDIA_TAG, "reset failed during release: ${e.message}") }
         runCatching { created.release() }
+            .onFailure { e -> HermesLog.w(MEDIA_TAG, "release failed: ${e.message}") }
         dataSource?.close()
         dataSource = null
     }

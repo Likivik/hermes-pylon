@@ -4,7 +4,8 @@ package com.m57.hermescontrol.data.local
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.m57.hermescontrol.data.config.ConnectionProfile
+import com.m57.hermescontrol.data.config.GatewayInstance
+import com.m57.hermescontrol.data.remote.AndroidCookieStore
 import com.m57.hermescontrol.data.remote.CookieManager
 import com.m57.hermescontrol.data.remote.GatewayFileClient
 import com.m57.hermescontrol.data.security.SecretStore
@@ -65,13 +66,6 @@ class AuthManagerTest {
         every { mockPrefs.getBoolean("migrated_to_datastore", any()) } returns true
 
         // Mock Log to prevent "Method d in android.util.Log not mocked"
-        mockkStatic(android.util.Log::class)
-        every { android.util.Log.d(any(), any()) } returns 0
-        every { android.util.Log.isLoggable(any(), any()) } returns false
-        every { android.util.Log.e(any(), any()) } returns 0
-        every { android.util.Log.e(any(), any(), any()) } returns 0
-        every { android.util.Log.w(any(), any<String>()) } returns 0
-        every { android.util.Log.i(any(), any()) } returns 0
         mockkStatic(android.util.Base64::class)
         every { android.util.Base64.encodeToString(any(), android.util.Base64.NO_WRAP) } answers {
             java.util.Base64.getEncoder().withoutPadding().encodeToString(firstArg())
@@ -110,9 +104,9 @@ class AuthManagerTest {
 
                 override fun deletePrefix(prefix: String) = Unit
             }
-        AuthManager.secureStorageFactory = { testSecretStore }
+        AuthManager.secretStoreFactory = { testSecretStore }
         CookieManager.resetForTest()
-        CookieManager.secureStorageFactory = { testSecretStore }
+        AndroidCookieStore.secureStorageFactory = { testSecretStore }
 
         // Initialise AuthManager
         AuthManager.init(testContext)
@@ -160,7 +154,7 @@ class AuthManagerTest {
     fun databasePasswordIsStableUnderConcurrentCreation() {
         val values = java.util.concurrent.ConcurrentHashMap<String, String?>()
         AuthManager.resetAuthStateForTest()
-        AuthManager.secureStorageFactory = {
+        AuthManager.secretStoreFactory = {
             object : SecretStore {
                 override fun getString(logicalKey: String): String? = values[logicalKey]
 
@@ -177,7 +171,9 @@ class AuthManagerTest {
             }
         }
         CookieManager.resetForTest()
-        CookieManager.secureStorageFactory = AuthManager.secureStorageFactory
+        AndroidCookieStore.secureStorageFactory = {
+            AuthManager.secretStoreFactory?.invoke() ?: error("secret store factory not set")
+        }
         AuthManager.init(testContext)
         val executor = java.util.concurrent.Executors.newFixedThreadPool(8)
 
@@ -207,20 +203,20 @@ class AuthManagerTest {
     @Test
     fun testGatedMode_isScopedToSelectedProfile() {
         val direct =
-            ConnectionProfile(
+            GatewayInstance(
                 id = "direct",
                 name = "Direct",
                 host = "direct.example.com",
                 wsAuthParam = "token",
             )
         val gated =
-            ConnectionProfile(
+            GatewayInstance(
                 id = "gated",
                 name = "Gated",
                 host = "gated.example.com",
                 wsAuthParam = "ticket",
             )
-        AuthManager.saveConnectionProfiles(listOf(direct, gated))
+        AuthManager.saveGatewayInstances(listOf(direct, gated))
 
         AuthManager.setSelectedProfileId("direct")
         assertEquals(false, AuthManager.isGatedMode())
@@ -231,22 +227,22 @@ class AuthManagerTest {
 
     @Test
     fun testSetWsAuthParam_updatesOnlySelectedProfile() {
-        val selected = ConnectionProfile("selected", "Selected", "selected.example.com")
-        val other = ConnectionProfile("other", "Other", "other.example.com")
-        AuthManager.saveConnectionProfiles(listOf(selected, other))
+        val selected = GatewayInstance("selected", "Selected", "selected.example.com")
+        val other = GatewayInstance("other", "Other", "other.example.com")
+        AuthManager.saveGatewayInstances(listOf(selected, other))
         AuthManager.setSelectedProfileId("selected")
 
         AuthManager.setWsAuthParam("ticket")
 
-        val profiles = AuthManager.getConnectionProfiles()
+        val profiles = AuthManager.getGatewayInstances()
         assertEquals("ticket", profiles.first { it.id == "selected" }.wsAuthParam)
         assertNull(profiles.first { it.id == "other" }.wsAuthParam)
     }
 
     @Test
     fun testLegacyProfile_fallsBackToPersistedGlobalMode() {
-        val legacy = ConnectionProfile("legacy", "Legacy", "legacy.example.com")
-        AuthManager.saveConnectionProfiles(listOf(legacy))
+        val legacy = GatewayInstance("legacy", "Legacy", "legacy.example.com")
+        AuthManager.saveGatewayInstances(listOf(legacy))
         AuthManager.setSelectedProfileId("legacy")
         AuthManager.serverStore.update { state ->
             state.copy(
@@ -339,8 +335,8 @@ class AuthManagerTest {
 
     @Test
     fun testGetToken_usesProfileTokenWhenSelected() {
-        val profile1 = ConnectionProfile("prof-1", "Profile 1", "127.0.0.1", 9119)
-        AuthManager.saveConnectionProfiles(listOf(profile1))
+        val profile1 = GatewayInstance("prof-1", "Profile 1", "127.0.0.1", 9119)
+        AuthManager.saveGatewayInstances(listOf(profile1))
         every { mockPrefs.getString("token_prof-1", null) } returns "profile-specific-token"
         AuthManager.setSelectedProfileId("prof-1")
         assertEquals("profile-specific-token", AuthManager.getToken())
@@ -348,8 +344,8 @@ class AuthManagerTest {
 
     @Test
     fun testGetToken_returnsNullWhenProfileHasNoToken() {
-        val profile1 = ConnectionProfile("prof-1", "Profile 1", "127.0.0.1", 9119)
-        AuthManager.saveConnectionProfiles(listOf(profile1))
+        val profile1 = GatewayInstance("prof-1", "Profile 1", "127.0.0.1", 9119)
+        AuthManager.saveGatewayInstances(listOf(profile1))
         every { mockPrefs.getString("token_prof-1", null) } returns null
         AuthManager.setSelectedProfileId("prof-1")
         assertNull(AuthManager.getToken())
@@ -357,8 +353,8 @@ class AuthManagerTest {
 
     @Test
     fun testSetToken_writesToProfileTokenWhenSelected() {
-        val profile1 = ConnectionProfile("prof-1", "Profile 1", "127.0.0.1", 9119)
-        AuthManager.saveConnectionProfiles(listOf(profile1))
+        val profile1 = GatewayInstance("prof-1", "Profile 1", "127.0.0.1", 9119)
+        AuthManager.saveGatewayInstances(listOf(profile1))
         AuthManager.setSelectedProfileId("prof-1")
 
         AuthManager.setToken("new-profile-token")
@@ -382,8 +378,8 @@ class AuthManagerTest {
 
     @Test
     fun testGetHost_usesProfileHostWhenSelected() {
-        val profile = ConnectionProfile("prof-1", "Work", "10.0.0.1", 9220)
-        AuthManager.saveConnectionProfiles(listOf(profile))
+        val profile = GatewayInstance("prof-1", "Work", "10.0.0.1", 9220)
+        AuthManager.saveGatewayInstances(listOf(profile))
         AuthManager.setSelectedProfileId("prof-1")
 
         assertEquals("10.0.0.1", AuthManager.getHost())
@@ -391,8 +387,8 @@ class AuthManagerTest {
 
     @Test
     fun testGetPort_usesProfilePortWhenSelected() {
-        val profile = ConnectionProfile("prof-1", "Work", "10.0.0.1", 9220)
-        AuthManager.saveConnectionProfiles(listOf(profile))
+        val profile = GatewayInstance("prof-1", "Work", "10.0.0.1", 9220)
+        AuthManager.saveGatewayInstances(listOf(profile))
         AuthManager.setSelectedProfileId("prof-1")
 
         assertEquals(9220, AuthManager.getPort())
@@ -402,7 +398,7 @@ class AuthManagerTest {
     fun testGetHost_fallsBackToDefaultWhenSelectedProfileIdNotFound() {
         AuthManager.ensureDefaultProfile()
         AuthManager.setSelectedProfileId("nonexistent")
-        AuthManager.saveConnectionProfiles(emptyList())
+        AuthManager.saveGatewayInstances(emptyList())
         AuthManager.setHost("192.168.1.1")
 
         assertEquals("192.168.1.1", AuthManager.getHost())
@@ -410,25 +406,25 @@ class AuthManagerTest {
 
     @Test
     fun testSetHost_updatesProfileWhenSelected() {
-        val profile = ConnectionProfile("prof-1", "Home", "10.0.0.1", 9119)
-        AuthManager.saveConnectionProfiles(listOf(profile))
+        val profile = GatewayInstance("prof-1", "Home", "10.0.0.1", 9119)
+        AuthManager.saveGatewayInstances(listOf(profile))
         AuthManager.setSelectedProfileId("prof-1")
 
         AuthManager.setHost("10.0.0.99")
 
-        val updated = AuthManager.getConnectionProfiles().first()
+        val updated = AuthManager.getGatewayInstances().first()
         assertEquals("http://10.0.0.99:9119/", updated.resolvedBaseUrl)
     }
 
     @Test
     fun testSetPort_updatesProfileWhenSelected() {
-        val profile = ConnectionProfile("prof-1", "Home", "10.0.0.1", 9119)
-        AuthManager.saveConnectionProfiles(listOf(profile))
+        val profile = GatewayInstance("prof-1", "Home", "10.0.0.1", 9119)
+        AuthManager.saveGatewayInstances(listOf(profile))
         AuthManager.setSelectedProfileId("prof-1")
 
         AuthManager.setPort(9999)
 
-        val updated = AuthManager.getConnectionProfiles().first()
+        val updated = AuthManager.getGatewayInstances().first()
         assertEquals("http://10.0.0.1:9999/", updated.resolvedBaseUrl)
     }
 
@@ -449,12 +445,12 @@ class AuthManagerTest {
     fun testConnectionProfiles_roundTrip() {
         val profiles =
             listOf(
-                ConnectionProfile("a", "A", "10.0.0.1", 9119),
-                ConnectionProfile("b", "B", "10.0.0.2", 9220),
+                GatewayInstance("a", "A", "10.0.0.1", 9119),
+                GatewayInstance("b", "B", "10.0.0.2", 9220),
             )
-        AuthManager.saveConnectionProfiles(profiles)
+        AuthManager.saveGatewayInstances(profiles)
 
-        val loaded = AuthManager.getConnectionProfiles()
+        val loaded = AuthManager.getGatewayInstances()
         assertEquals(2, loaded.size)
         assertEquals("A", loaded[0].name)
         assertEquals("10.0.0.2", loaded[1].host)
@@ -464,9 +460,9 @@ class AuthManagerTest {
 
     @Test
     fun testGetToken_switchesTokenWhenProfileChanges() {
-        val profileA = ConnectionProfile("prof-a", "Profile A", "127.0.0.1", 9119)
-        val profileB = ConnectionProfile("prof-b", "Profile B", "127.0.0.1", 9119)
-        AuthManager.saveConnectionProfiles(listOf(profileA, profileB))
+        val profileA = GatewayInstance("prof-a", "Profile A", "127.0.0.1", 9119)
+        val profileB = GatewayInstance("prof-b", "Profile B", "127.0.0.1", 9119)
+        AuthManager.saveGatewayInstances(listOf(profileA, profileB))
 
         // Profile A selected → returns token_a
         every { mockPrefs.getString("token_prof-a", null) } returns "token-for-a"
@@ -484,11 +480,25 @@ class AuthManagerTest {
         assertEquals("token-for-a", AuthManager.getToken())
     }
 
+    /** Waits for a thread to reach [state]; returns false if it never does. */
+    private fun awaitThreadState(
+        thread: Thread,
+        state: Thread.State,
+        timeoutMs: Long,
+    ): Boolean {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            if (thread.state == state) return true
+            Thread.sleep(5)
+        }
+        return thread.state == state
+    }
+
     @Test
     fun mediaCredentialSnapshotWaitsForCompleteProfileTransition() {
-        val profileA = ConnectionProfile("prof-a", "A", baseUrl = "https://same.example.test/", wsAuthParam = "token")
-        val profileB = ConnectionProfile("prof-b", "B", baseUrl = "https://same.example.test/", wsAuthParam = "token")
-        AuthManager.saveConnectionProfiles(listOf(profileA, profileB))
+        val profileA = GatewayInstance("prof-a", "A", baseUrl = "https://same.example.test/", wsAuthParam = "token")
+        val profileB = GatewayInstance("prof-b", "B", baseUrl = "https://same.example.test/", wsAuthParam = "token")
+        AuthManager.saveGatewayInstances(listOf(profileA, profileB))
         every { mockPrefs.getString("token_prof-a", null) } returns "token-a"
         val blockTokenB = AtomicBoolean(false)
         val tokenReadStarted = CountDownLatch(1)
@@ -513,13 +523,26 @@ class AuthManagerTest {
             assertTrue(tokenReadStarted.await(5, TimeUnit.SECONDS))
             var captured: com.m57.hermescontrol.data.remote.MediaCacheScope? = null
             val snapshotFinished = CountDownLatch(1)
-            Thread {
-                captured = GatewayFileClient.currentContext().scope
-                snapshotFinished.countDown()
-            }.start()
-            assertTrue(!snapshotFinished.await(100, TimeUnit.MILLISECONDS))
+            val snapshotThread =
+                Thread {
+                    captured = GatewayFileClient.currentContext().scope
+                    snapshotFinished.countDown()
+                }.apply { start() }
+            // Causal assertion, not a wall-clock one. `currentContext()` reaches
+            // `credentialBoundary()`, which synchronises on the same monitor the
+            // transition holds while it reads the token, so the snapshot thread
+            // must be BLOCKED. The previous form asserted it had not finished
+            // within 100 ms, which is a statement about scheduler latency: on a
+            // loaded runner the thread had simply not started yet, and the test
+            // failed without the code being wrong.
+            assertTrue(
+                "snapshot thread never blocked; state=${snapshotThread.state}",
+                awaitThreadState(snapshotThread, Thread.State.BLOCKED, 5_000),
+            )
+            assertFalse(snapshotFinished.await(0, TimeUnit.MILLISECONDS))
             releaseTokenRead.countDown()
             transition.join(5_000)
+            snapshotThread.join(5_000)
             assertTrue(snapshotFinished.await(5, TimeUnit.SECONDS))
 
             assertTrue(captured == expectedOld || captured == expectedNew)
@@ -533,9 +556,9 @@ class AuthManagerTest {
 
     @Test
     fun refreshedTokenStaysWithCapturedProfileAfterProfileSwitch() {
-        val profileA = ConnectionProfile("prof-a", "A", baseUrl = "https://same.example.test/", wsAuthParam = "token")
-        val profileB = ConnectionProfile("prof-b", "B", baseUrl = "https://same.example.test/", wsAuthParam = "token")
-        AuthManager.saveConnectionProfiles(listOf(profileA, profileB))
+        val profileA = GatewayInstance("prof-a", "A", baseUrl = "https://same.example.test/", wsAuthParam = "token")
+        val profileB = GatewayInstance("prof-b", "B", baseUrl = "https://same.example.test/", wsAuthParam = "token")
+        AuthManager.saveGatewayInstances(listOf(profileA, profileB))
         every { mockPrefs.getString("token_prof-a", null) } returns "token-a-old"
         every { mockPrefs.getString("token_prof-b", null) } returns "token-b"
         AuthManager.setSelectedProfileId("prof-a")
@@ -552,13 +575,13 @@ class AuthManagerTest {
 
     @Test
     fun refreshedTokenIsRejectedWhenCapturedProfileEndpointChanges() {
-        val original = ConnectionProfile("prof-a", "A", baseUrl = "https://old.example.test/", wsAuthParam = "token")
-        AuthManager.saveConnectionProfiles(listOf(original))
+        val original = GatewayInstance("prof-a", "A", baseUrl = "https://old.example.test/", wsAuthParam = "token")
+        AuthManager.saveGatewayInstances(listOf(original))
         every { mockPrefs.getString("token_prof-a", null) } returns "token-a-old"
         AuthManager.setSelectedProfileId("prof-a")
         val captured = AuthManager.credentialBoundary()
 
-        AuthManager.saveConnectionProfiles(
+        AuthManager.saveGatewayInstances(
             listOf(original.copy(baseUrl = "https://new.example.test/")),
         )
         val accepted = AuthManager.commitRefreshedToken(captured, "token-from-old-server")
@@ -571,12 +594,12 @@ class AuthManagerTest {
 
     @Test
     fun refreshedTokenIsRejectedWhenCapturedProfileAuthModeChanges() {
-        val original = ConnectionProfile("prof-a", "A", baseUrl = "https://same.example.test/", wsAuthParam = "token")
-        AuthManager.saveConnectionProfiles(listOf(original))
+        val original = GatewayInstance("prof-a", "A", baseUrl = "https://same.example.test/", wsAuthParam = "token")
+        AuthManager.saveGatewayInstances(listOf(original))
         AuthManager.setSelectedProfileId("prof-a")
         val captured = AuthManager.credentialBoundary()
 
-        AuthManager.saveConnectionProfiles(listOf(original.copy(wsAuthParam = "ticket")))
+        AuthManager.saveGatewayInstances(listOf(original.copy(wsAuthParam = "ticket")))
         val accepted = AuthManager.commitRefreshedToken(captured, "direct-token")
 
         assertFalse(accepted)
@@ -585,12 +608,12 @@ class AuthManagerTest {
 
     @Test
     fun refreshedTokenIsRejectedWhenCapturedProfileIsDeleted() {
-        val original = ConnectionProfile("prof-a", "A", baseUrl = "https://same.example.test/", wsAuthParam = "token")
-        AuthManager.saveConnectionProfiles(listOf(original))
+        val original = GatewayInstance("prof-a", "A", baseUrl = "https://same.example.test/", wsAuthParam = "token")
+        AuthManager.saveGatewayInstances(listOf(original))
         AuthManager.setSelectedProfileId("prof-a")
         val captured = AuthManager.credentialBoundary()
 
-        AuthManager.saveConnectionProfiles(emptyList())
+        AuthManager.saveGatewayInstances(emptyList())
         val accepted = AuthManager.commitRefreshedToken(captured, "orphaned-token")
 
         assertFalse(accepted)
@@ -600,19 +623,19 @@ class AuthManagerTest {
     @Test
     fun refreshedTokenIsRejectedWhenCapturedExplicitDefaultProfileIsDeleted() {
         val original =
-            ConnectionProfile(
+            GatewayInstance(
                 AuthManager.DEFAULT_PROFILE_ID,
                 "Default",
                 baseUrl = AuthManager.getBaseUrl(),
                 wsAuthParam = "token",
             )
-        AuthManager.saveConnectionProfiles(listOf(original))
+        AuthManager.saveGatewayInstances(listOf(original))
         every { mockPrefs.getString("token_${AuthManager.DEFAULT_PROFILE_ID}", null) } returns "default-token-old"
         AuthManager.setSelectedProfileId(AuthManager.DEFAULT_PROFILE_ID)
         val captured = AuthManager.credentialBoundary()
         assertTrue(captured.profileBacked)
 
-        AuthManager.saveConnectionProfiles(emptyList())
+        AuthManager.saveGatewayInstances(emptyList())
         val accepted = AuthManager.commitRefreshedToken(captured, "orphaned-default-token")
 
         assertFalse(accepted)
@@ -624,7 +647,7 @@ class AuthManagerTest {
 
     @Test
     fun refreshedTokenForLegacyDefaultBoundaryIsAcceptedWhileBoundaryIsUnchanged() {
-        AuthManager.saveConnectionProfiles(emptyList())
+        AuthManager.saveGatewayInstances(emptyList())
         val captured = AuthManager.credentialBoundary()
         assertFalse(captured.profileBacked)
 
@@ -639,12 +662,12 @@ class AuthManagerTest {
 
     @Test
     fun refreshedTokenForLegacyDefaultBoundaryIsRejectedWhenDefaultProfileAppears() {
-        AuthManager.saveConnectionProfiles(emptyList())
+        AuthManager.saveGatewayInstances(emptyList())
         val captured = AuthManager.credentialBoundary()
         assertFalse(captured.profileBacked)
-        AuthManager.saveConnectionProfiles(
+        AuthManager.saveGatewayInstances(
             listOf(
-                ConnectionProfile(
+                GatewayInstance(
                     AuthManager.DEFAULT_PROFILE_ID,
                     "Default",
                     baseUrl = captured.endpoint.baseUrl.toString(),
@@ -672,9 +695,9 @@ class AuthManagerTest {
     }
 
     private fun assertTokenFlowPublicationSerialized(refresh: Boolean) {
-        val profileA = ConnectionProfile("prof-a", "A", baseUrl = "https://same.example.test/", wsAuthParam = "token")
-        val profileB = ConnectionProfile("prof-b", "B", baseUrl = "https://same.example.test/", wsAuthParam = "token")
-        AuthManager.saveConnectionProfiles(listOf(profileA, profileB))
+        val profileA = GatewayInstance("prof-a", "A", baseUrl = "https://same.example.test/", wsAuthParam = "token")
+        val profileB = GatewayInstance("prof-b", "B", baseUrl = "https://same.example.test/", wsAuthParam = "token")
+        AuthManager.saveGatewayInstances(listOf(profileA, profileB))
         every { mockPrefs.getString("token_prof-a", null) } returns "token-a-old"
         every { mockPrefs.getString("token_prof-b", null) } returns "token-b"
         AuthManager.setSelectedProfileId("prof-a")
@@ -734,9 +757,9 @@ class AuthManagerTest {
     }
 
     private fun assertTokenMutationSerialized(mutate: () -> Unit) {
-        val profileA = ConnectionProfile("prof-a", "A", baseUrl = "https://same.example.test/", wsAuthParam = "token")
-        val profileB = ConnectionProfile("prof-b", "B", baseUrl = "https://same.example.test/", wsAuthParam = "token")
-        AuthManager.saveConnectionProfiles(listOf(profileA, profileB))
+        val profileA = GatewayInstance("prof-a", "A", baseUrl = "https://same.example.test/", wsAuthParam = "token")
+        val profileB = GatewayInstance("prof-b", "B", baseUrl = "https://same.example.test/", wsAuthParam = "token")
+        AuthManager.saveGatewayInstances(listOf(profileA, profileB))
         val stored = java.util.concurrent.ConcurrentHashMap<String, String>()
         stored["token_prof-a"] = "token-a-old"
         stored["token_prof-b"] = "token-b"
@@ -792,9 +815,9 @@ class AuthManagerTest {
 
     @Test
     fun testGetToken_profileWithNoTokenReturnsNull() {
-        val profileA = ConnectionProfile("prof-a", "Profile A", "127.0.0.1", 9119)
-        val profileB = ConnectionProfile("prof-b", "Profile B", "127.0.0.1", 9119)
-        AuthManager.saveConnectionProfiles(listOf(profileA, profileB))
+        val profileA = GatewayInstance("prof-a", "Profile A", "127.0.0.1", 9119)
+        val profileB = GatewayInstance("prof-b", "Profile B", "127.0.0.1", 9119)
+        AuthManager.saveGatewayInstances(listOf(profileA, profileB))
 
         // Profile A is selected but has no token → null (no global fallback)
         every { mockPrefs.getString("token_prof-a", null) } returns null
@@ -809,10 +832,10 @@ class AuthManagerTest {
 
     @Test
     fun testGetToken_selectiveProfileTokens_someNull() {
-        val profileA = ConnectionProfile("prof-a", "Profile A", "127.0.0.1", 9119)
-        val profileB = ConnectionProfile("prof-b", "Profile B", "127.0.0.1", 9119)
-        val profileC = ConnectionProfile("prof-c", "Profile C", "127.0.0.1", 9119)
-        AuthManager.saveConnectionProfiles(listOf(profileA, profileB, profileC))
+        val profileA = GatewayInstance("prof-a", "Profile A", "127.0.0.1", 9119)
+        val profileB = GatewayInstance("prof-b", "Profile B", "127.0.0.1", 9119)
+        val profileC = GatewayInstance("prof-c", "Profile C", "127.0.0.1", 9119)
+        AuthManager.saveGatewayInstances(listOf(profileA, profileB, profileC))
 
         // Profile A has a token
         every { mockPrefs.getString("token_prof-a", null) } returns "token-a"
@@ -832,9 +855,9 @@ class AuthManagerTest {
 
     @Test
     fun testSetToken_switchingProfiles_maintainsSeparateTokens() {
-        val profileA = ConnectionProfile("prof-a", "Profile A", "127.0.0.1", 9119)
-        val profileB = ConnectionProfile("prof-b", "Profile B", "127.0.0.1", 9119)
-        AuthManager.saveConnectionProfiles(listOf(profileA, profileB))
+        val profileA = GatewayInstance("prof-a", "Profile A", "127.0.0.1", 9119)
+        val profileB = GatewayInstance("prof-b", "Profile B", "127.0.0.1", 9119)
+        AuthManager.saveGatewayInstances(listOf(profileA, profileB))
 
         // Set a token while Profile A is selected
         AuthManager.setSelectedProfileId("prof-a")
@@ -853,8 +876,8 @@ class AuthManagerTest {
 
     @Test
     fun testSetToken_toNull_clearsProfileToken() {
-        val profileA = ConnectionProfile("prof-a", "Profile A", "127.0.0.1", 9119)
-        AuthManager.saveConnectionProfiles(listOf(profileA))
+        val profileA = GatewayInstance("prof-a", "Profile A", "127.0.0.1", 9119)
+        AuthManager.saveGatewayInstances(listOf(profileA))
 
         AuthManager.setSelectedProfileId("prof-a")
 
@@ -875,12 +898,12 @@ class AuthManagerTest {
 
     @Test
     fun testEnsureDefaultProfile_createsDefaultWhenMissing() {
-        AuthManager.saveConnectionProfiles(emptyList())
+        AuthManager.saveGatewayInstances(emptyList())
         AuthManager.setSelectedProfileId(null)
 
         AuthManager.ensureDefaultProfile()
 
-        val profiles = AuthManager.getConnectionProfiles()
+        val profiles = AuthManager.getGatewayInstances()
         assertEquals(1, profiles.size)
         assertEquals(AuthManager.DEFAULT_PROFILE_ID, profiles[0].id)
         assertEquals(AuthManager.DEFAULT_PROFILE_NAME, profiles[0].name)
@@ -889,13 +912,13 @@ class AuthManagerTest {
 
     @Test
     fun testEnsureDefaultProfile_doesNotDuplicateExisting() {
-        val existing = ConnectionProfile("prof-1", "Work", "10.0.0.1", 9119)
-        AuthManager.saveConnectionProfiles(listOf(existing))
+        val existing = GatewayInstance("prof-1", "Work", "10.0.0.1", 9119)
+        AuthManager.saveGatewayInstances(listOf(existing))
         AuthManager.setSelectedProfileId("prof-1")
 
         AuthManager.ensureDefaultProfile()
 
-        val profiles = AuthManager.getConnectionProfiles()
+        val profiles = AuthManager.getGatewayInstances()
         assertEquals(1, profiles.size)
         assertEquals("prof-1", AuthManager.getSelectedProfileId())
     }

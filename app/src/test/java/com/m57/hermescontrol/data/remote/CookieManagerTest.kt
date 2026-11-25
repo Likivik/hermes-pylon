@@ -2,8 +2,8 @@
 
 package com.m57.hermescontrol.data.remote
 
+import io.ktor.http.Url
 import kotlinx.coroutines.test.runTest
-import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -53,8 +53,7 @@ class CookieManagerTest {
 
             val onOrigin =
                 jar.loadForRequest(
-                    "https://hermes.example.com:9119/prefix/api/status"
-                        .toHttpUrl(),
+                    Url("https://hermes.example.com:9119/prefix/api/status"),
                 )
             assertEquals(1, onOrigin.size)
             assertEquals("sess-xyz", onOrigin[0].value)
@@ -62,13 +61,12 @@ class CookieManagerTest {
 
             val cleartext =
                 jar.loadForRequest(
-                    "http://hermes.example.com:9119/prefix/api/status"
-                        .toHttpUrl(),
+                    Url("http://hermes.example.com:9119/prefix/api/status"),
                 )
             assertTrue(cleartext.isEmpty())
 
             val offHost =
-                jar.loadForRequest("https://other.example.com/".toHttpUrl())
+                jar.loadForRequest(Url("https://other.example.com/"))
             assertTrue(offHost.isEmpty())
         }
 

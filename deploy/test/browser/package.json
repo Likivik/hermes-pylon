@@ -1,0 +1,11 @@
+{
+  "name": "pylon-browser-check",
+  "private": true,
+  "description": "Optional Playwright check for the Files transport. Not wired into required CI.",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}

@@ -1,9 +1,9 @@
 package com.m57.hermescontrol.ui.keys
 
 import com.m57.hermescontrol.data.model.EnvVarConfig
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.GatewayResponse
-import com.m57.hermescontrol.data.remote.HermesGatewayApi
+import com.m57.hermescontrol.data.remote.HermesApi
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -27,7 +27,7 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class KeysViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
-    private val mockApi = mockk<HermesGatewayApi>()
+    private val mockApi = mockk<HermesApi>()
 
     private fun createViewModel(): KeysViewModel {
         val vm = KeysViewModel(ioDispatcher = testDispatcher)
@@ -39,8 +39,8 @@ class KeysViewModelTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
 
-        mockkObject(ApiClient)
-        every { ApiClient.hermesApi } returns mockApi
+        mockkObject(GatewayConnection)
+        every { GatewayConnection.hermesApi } returns mockApi
         coEvery { mockApi.getEnvVars() } returns GatewayResponse.success(emptyMap())
     }
 

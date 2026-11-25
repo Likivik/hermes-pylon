@@ -2,10 +2,13 @@ package com.m57.hermescontrol.ui.analytics
 
 import android.content.Context
 import com.m57.hermescontrol.data.local.AnalyticsCacheStore
+import com.m57.hermescontrol.data.local.AndroidAnalyticsCacheStore
 import com.m57.hermescontrol.data.local.authStore
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.data.remote.source.Analytics
+import com.m57.hermescontrol.data.remote.source.DefaultAnalytics
 import com.m57.hermescontrol.util.ioDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -28,9 +31,12 @@ import kotlinx.coroutines.launch
 object AnalyticsPreloader {
     private val scope = CoroutineScope(SupervisorJob() + ioDispatcher)
 
-    fun preload(context: Context) {
+    fun preload(
+        context: Context,
+        source: Analytics = DefaultAnalytics(GatewayConnection.hermesApi),
+    ) {
         if (authStore.getToken().isNullOrBlank()) return
-        val store = AnalyticsCacheStore(context)
+        val store = AndroidAnalyticsCacheStore(context)
         val daysOptions = listOf(7, 30, 90)
         scope.launch {
             for (days in daysOptions) {
@@ -38,11 +44,11 @@ object AnalyticsPreloader {
                 if (store.load(days, null) != null) continue
                 val usage =
                     safeApiCall<com.m57.hermescontrol.data.model.AnalyticsResponse> {
-                        ApiClient.hermesApi.getAnalytics(days, null)
+                        source.getAnalytics(days, null)
                     }
                 val models =
                     safeApiCall<com.m57.hermescontrol.data.model.ModelsAnalyticsResponse> {
-                        ApiClient.hermesApi.getModelsAnalytics(days, null)
+                        source.getModelsAnalytics(days, null)
                     }
                 val usageData = (usage as? NetworkResult.Success)?.data ?: continue
                 val modelsData = (models as? NetworkResult.Success)?.data

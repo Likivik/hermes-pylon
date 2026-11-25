@@ -9,8 +9,6 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
-import okhttp3.ResponseBody
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
@@ -52,9 +50,7 @@ object GatewayFileClient {
             val endpoint = boundary.endpoint
             val cookieHeader =
                 if (gated && CookieManager.isInitialized()) {
-                    CookieManager.cookieJar.loadForRequest(
-                        endpoint.baseUrl.toString().toHttpUrlOrNull()!!,
-                    ).joinToString("; ") { "${it.name}=${it.value}" }
+                    CookieManager.cookieHeaderFor(endpoint.baseUrl.toString())
                 } else {
                     ""
                 }
@@ -74,11 +70,10 @@ object GatewayFileClient {
                     credential.takeUnless { gated },
                     cookieHeader.takeIf { gated },
                 ),
-                OkHttpGatewayRangeRequester(
+                KtorGatewayRangeRequester(
                     endpoint = endpoint,
                     client =
-                        AndroidMediaClient.createMediaClient(
-                            gated = gated,
+                        createMediaTransportClient(
                             token = credential.takeUnless { gated },
                             cookieHeader = cookieHeader.takeIf { gated },
                         ),
@@ -99,10 +94,7 @@ object GatewayFileClient {
                 credentialFingerprint =
                     fingerprint(
                         if (gated && CookieManager.isInitialized()) {
-                            CookieManager.cookieJar.loadForRequest(
-                                endpoint.baseUrl.toString().toHttpUrlOrNull()!!,
-                            )
-                                .joinToString("; ") { "${it.name}=${it.value}" }
+                            CookieManager.cookieHeaderFor(endpoint.baseUrl.toString())
                         } else {
                             boundary.token.orEmpty()
                         },
@@ -126,7 +118,7 @@ object GatewayFileClient {
 
     suspend fun fetch(
         path: String,
-        service: HermesGatewayApi,
+        service: HermesApi,
         cache: GatewayMediaCache,
         scope: MediaCacheScope,
         canPublish: () -> Boolean = { true },
@@ -157,7 +149,7 @@ object GatewayFileClient {
 
     private suspend fun fetchNetwork(
         path: String,
-        service: HermesGatewayApi,
+        service: HermesApi,
         cache: GatewayMediaCache,
         key: String,
         canPublish: () -> Boolean,
@@ -233,9 +225,9 @@ data class MediaCacheScope(
 data class MediaRequestContext(
     val scope: MediaCacheScope,
     /** JSON gateway for byte-array downloads. */
-    val service: HermesGatewayApi,
+    val service: HermesApi,
     /** Streaming transport for ranged media reads. */
-    val rangeRequester: OkHttpGatewayRangeRequester,
+    val rangeRequester: KtorGatewayRangeRequester,
     val currentScope: () -> MediaCacheScope,
 ) {
     fun isCurrent(): Boolean = currentScope() == scope
@@ -340,9 +332,6 @@ class GatewayMediaCache(
 data class GatewayFile(val name: String, val mimeType: String, val cacheFile: File)
 
 const val MAX_IN_MEMORY_MEDIA_BYTES = 25L * 1024L * 1024L
-
-fun ResponseBody.readBytesLimited(maxBytes: Long = MAX_IN_MEMORY_MEDIA_BYTES): ByteArray? =
-    byteStream().use { it.readBytesLimited(maxBytes) }
 
 fun InputStream.readBytesLimited(maxBytes: Long = MAX_IN_MEMORY_MEDIA_BYTES): ByteArray? {
     val output = java.io.ByteArrayOutputStream(DEFAULT_BUFFER_SIZE)

@@ -1,6 +1,6 @@
 package com.m57.hermescontrol.data.model
 
-import com.m57.hermescontrol.data.remote.OkHttpProvider
+import com.m57.hermescontrol.data.remote.HermesJson
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonElement
@@ -41,7 +41,7 @@ class ModelSerializationTest {
         assertEquals("ssh", session.terminal_backend)
     }
 
-    private val json = OkHttpProvider.json
+    private val json = HermesJson.instance
 
     @Test
     fun testSkillSerialization() {

@@ -10,7 +10,7 @@
 </div>
 
 <h1 align="center">Pylon for Hermes</h1>
-<p align="center"><strong>Native Android companion app for your Hermes AI agent.</strong></p>
+<p align="center"><strong>Compose Multiplatform companion app for your Hermes AI agent — Android today, desktop and web in progress.</strong></p>
 
 <p align="center">
   <a href="https://github.com/saralilyb/hermes-mobile/releases/latest"><img src="https://img.shields.io/github/v/release/saralilyb/hermes-mobile?color=6750A4&label=Latest%20Release&logo=github" alt="Latest Release"></a>
@@ -23,8 +23,13 @@
 
 ## Overview
 
-**Pylon for Hermes** is an unofficial native Android client for
-[Hermes Agent](https://hermes-agent.nousresearch.com). This security-focused
+**Pylon for Hermes** is an unofficial client for
+[Hermes Agent](https://hermes-agent.nousresearch.com), built as a Compose
+Multiplatform application: the screens and view models are shared, and Android,
+desktop (JVM) and browser (wasmJs) targets are compiled from the same code. The
+Android app is the shipped target; the others compile and run, and the
+platform-specific edges (secure storage, file access, local database) are still
+being filled in per target. This security-focused
 fork is based on [Hy4ri/hermes-mobile](https://github.com/Hy4ri/hermes-mobile),
 with a selectively reconciled `v1.19.2` baseline and compatible later fixes,
 most recently clarification cleanup from upstream commit `0db741e`. It retains
@@ -129,11 +134,13 @@ trying to connect to your gateway, such as Telegram or Discord sessions.
 ## Project Structure
 
 ```
-app/src/main/java/com/m57/hermescontrol/
-├── data/          # Local (Room, Keystore-backed atomic blobs) & Remote (Ktor, OkHttp WS)
-├── notification/  # Foreground service for message notifications
-├── theme/         # Material You design system, status colors, spacing, and typography
-└── ui/            # Compose screens (Chat, Settings, Profiles, Kanban, etc.) + Navigation
+app/  # Android application: HermesControlApp, MainActivity, notification service
+ui/   # The client itself, mostly commonMain
+├── commonMain/    # Every screen, view model and the data layer (Ktor, CIO WebSocket)
+├── androidMain/   # Context-bound wiring: Room, Keystore, media, notifications
+├── jvmMain/       # Desktop actuals
+└── wasmJsMain/    # Browser actuals
+shared/ # Pure multiplatform domain: gateway API, models, WebSocket client
 ```
 
 ---

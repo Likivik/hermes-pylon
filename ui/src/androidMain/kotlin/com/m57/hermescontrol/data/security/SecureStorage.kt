@@ -5,18 +5,6 @@ import android.content.SharedPreferences
 
 enum class MigrationState { NOT_STARTED, COPYING, VERIFIED, DUAL_WRITE }
 
-/** Coordinates resumable copy/verify and the one-release legacy dual-write window. */
-interface SecretStore {
-    fun getString(logicalKey: String): String?
-
-    fun putString(
-        logicalKey: String,
-        value: String?,
-    )
-
-    fun deletePrefix(prefix: String)
-}
-
 class SecureStorage(
     context: Context,
     private val migrationObserver: (Int) -> Unit = {},

@@ -2,9 +2,9 @@
 
 package com.m57.hermescontrol.ui.settings
 
-import com.m57.hermescontrol.data.config.ConnectionProfile
+import com.m57.hermescontrol.data.config.GatewayInstance
 import com.m57.hermescontrol.data.local.AuthManager
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.theme.ThemePreference
 import com.m57.hermescontrol.theme.ThemePreset
@@ -44,8 +44,8 @@ class SettingsViewModelTest {
 
     private val testProfiles =
         listOf(
-            ConnectionProfile("prof-1", "Work", "10.0.0.1", 9119),
-            ConnectionProfile("prof-2", "Home", "10.0.0.2", 9220),
+            GatewayInstance("prof-1", "Work", "10.0.0.1", 9119),
+            GatewayInstance("prof-2", "Home", "10.0.0.2", 9220),
         )
 
     private fun createViewModel(): SettingsViewModel {
@@ -64,7 +64,7 @@ class SettingsViewModelTest {
         Dispatchers.setMain(testDispatcher)
 
         mockkObject(AuthManager)
-        mockkObject(ApiClient)
+        mockkObject(GatewayConnection)
 
         // Default stubs
         storedSelectedProfileId = null
@@ -82,7 +82,7 @@ class SettingsViewModelTest {
         every { AuthManager.isTypingEffectEnabled() } returns true
         every { AuthManager.getTypingEffectDelayMs() } returns 30
         every { AuthManager.getAppLanguage() } returns "system"
-        every { AuthManager.getConnectionProfiles() } returns emptyList()
+        every { AuthManager.getGatewayInstances() } returns emptyList()
         every { AuthManager.getSelectedProfileId() } answers { storedSelectedProfileId }
         every { AuthManager.baseUrl() } returns "http://127.0.0.1:9119/"
         every { AuthManager.getBaseUrl() } returns "http://127.0.0.1:9119/"
@@ -98,8 +98,8 @@ class SettingsViewModelTest {
         every { AuthManager.setSelectedProfileId(any()) } answers {
             storedSelectedProfileId = firstArg()
         }
-        every { AuthManager.saveConnectionProfiles(any()) } returns Unit
-        every { AuthManager.saveConnectionProfilesAndToken(any(), any(), any()) } returns Unit
+        every { AuthManager.saveGatewayInstances(any()) } returns Unit
+        every { AuthManager.saveGatewayInstancesAndToken(any(), any(), any()) } returns Unit
         every { AuthManager.setProfileToken(any(), any()) } returns Unit
         every { AuthManager.clearPinnedSessionIds(any()) } returns Unit
         every { AuthManager.ensureDefaultProfile() } returns Unit
@@ -107,8 +107,8 @@ class SettingsViewModelTest {
         every { AuthManager.setSessionCookie(any()) } returns Unit
         every { AuthManager.setWsAuthParam(any()) } returns Unit
 
-        // Ensure ApiClient.rebuild() is stubbed (used by selectProfile)
-        every { ApiClient.rebuild() } returns Unit
+        // Ensure GatewayConnection.rebuild() is stubbed (used by selectGateway)
+        every { GatewayConnection.rebuild() } returns Unit
     }
 
     @After
@@ -119,14 +119,14 @@ class SettingsViewModelTest {
 
     @Test
     fun testLoadSettings_loadsProfiles() {
-        every { AuthManager.getConnectionProfiles() } returns testProfiles
+        every { AuthManager.getGatewayInstances() } returns testProfiles
         storedSelectedProfileId = "prof-1"
 
         val viewModel = createViewModel()
         val state = viewModel.uiState.value
 
         assertEquals(2, state.profiles.size)
-        assertEquals("prof-1", state.selectedProfileId)
+        assertEquals("prof-1", state.selectedGatewayId)
         assertEquals("Work", state.renameProfileName)
     }
 
@@ -144,7 +144,7 @@ class SettingsViewModelTest {
             every { AuthManager.getChatFontScale() } returns 1.3f
             every { AuthManager.isTypingEffectEnabled() } returns false
             every { AuthManager.getTypingEffectDelayMs() } returns 15
-            every { AuthManager.getConnectionProfiles() } returns testProfiles
+            every { AuthManager.getGatewayInstances() } returns testProfiles
             every { AuthManager.getAppLanguage() } returns "fr"
 
             val viewModel = SettingsViewModel(ioDispatcher = testDispatcher)
@@ -162,7 +162,7 @@ class SettingsViewModelTest {
             assertEquals(false, state.typingEffectEnabled)
             assertEquals(15, state.typingEffectDelayMs)
             assertEquals(testProfiles, state.profiles)
-            assertEquals("prof-2", state.selectedProfileId)
+            assertEquals("prof-2", state.selectedGatewayId)
             assertEquals("Home", state.renameProfileName)
             assertEquals("fr", state.appLanguage)
         }
@@ -179,7 +179,7 @@ class SettingsViewModelTest {
 
     @Test
     fun testLoadSettings_noSelectedProfile_renameEmpty() {
-        every { AuthManager.getConnectionProfiles() } returns testProfiles
+        every { AuthManager.getGatewayInstances() } returns testProfiles
 
         val viewModel = createViewModel()
         assertEquals("", viewModel.uiState.value.renameProfileName)
@@ -205,74 +205,74 @@ class SettingsViewModelTest {
 
     @Test
     fun testSelectProfile_updatesAndRebuildsApi() {
-        every { AuthManager.getConnectionProfiles() } returns testProfiles
+        every { AuthManager.getGatewayInstances() } returns testProfiles
 
         val viewModel = createViewModel()
 
-        viewModel.selectProfile("prof-2")
+        viewModel.selectGateway("prof-2")
         testDispatcher.scheduler.advanceUntilIdle()
 
         verify { AuthManager.setSelectedProfileId("prof-2") }
-        verify { ApiClient.rebuild() }
+        verify { GatewayConnection.rebuild() }
         verify { disconnectWebSocket() }
         verify { connectWebSocket() }
-        assertEquals("prof-2", viewModel.uiState.value.selectedProfileId)
+        assertEquals("prof-2", viewModel.uiState.value.selectedGatewayId)
         assertEquals("Home", viewModel.uiState.value.renameProfileName)
     }
 
     @Test
     fun testSelectProfile_nullFallsBackToDefault() {
-        every { AuthManager.getConnectionProfiles() } returns testProfiles
+        every { AuthManager.getGatewayInstances() } returns testProfiles
         storedSelectedProfileId = "prof-1"
 
         val viewModel = createViewModel()
 
-        viewModel.selectProfile(AuthManager.DEFAULT_PROFILE_ID)
+        viewModel.selectGateway(AuthManager.DEFAULT_PROFILE_ID)
         testDispatcher.scheduler.advanceUntilIdle()
 
         verify { AuthManager.setSelectedProfileId(AuthManager.DEFAULT_PROFILE_ID) }
-        verify { ApiClient.rebuild() }
-        assertEquals(AuthManager.DEFAULT_PROFILE_ID, viewModel.uiState.value.selectedProfileId)
+        verify { GatewayConnection.rebuild() }
+        assertEquals(AuthManager.DEFAULT_PROFILE_ID, viewModel.uiState.value.selectedGatewayId)
     }
 
     @Test
     fun testDeleteProfile_removesProfileAndToken() {
-        every { AuthManager.getConnectionProfiles() } returns testProfiles
+        every { AuthManager.getGatewayInstances() } returns testProfiles
         every { AuthManager.getSelectedProfileId() } returns "prof-1"
 
         val viewModel = createViewModel()
 
         viewModel.deleteProfile("prof-1")
 
-        verify { AuthManager.saveConnectionProfiles(any()) }
+        verify { AuthManager.saveGatewayInstances(any()) }
         verify { AuthManager.setProfileToken("prof-1", null) }
         verify { AuthManager.setSelectedProfileId(AuthManager.DEFAULT_PROFILE_ID) }
-        verify { ApiClient.rebuild() }
+        verify { GatewayConnection.rebuild() }
         verify { disconnectWebSocket() }
         verify { connectWebSocket() }
     }
 
     @Test
     fun testDeleteProfile_nonSelected_doesNotChangeSelectedId() {
-        every { AuthManager.getConnectionProfiles() } returns testProfiles
+        every { AuthManager.getGatewayInstances() } returns testProfiles
         every { AuthManager.getSelectedProfileId() } returns "prof-1"
 
         val viewModel = createViewModel()
 
         viewModel.deleteProfile("prof-2")
 
-        verify { AuthManager.saveConnectionProfiles(any()) }
+        verify { AuthManager.saveGatewayInstances(any()) }
         verify { AuthManager.setProfileToken("prof-2", null) }
         // Selected profile (prof-1) was NOT deleted — should NOT change selection
         verify(exactly = 0) { AuthManager.setSelectedProfileId(any()) }
-        verify { ApiClient.rebuild() }
+        verify { GatewayConnection.rebuild() }
         verify(exactly = 0) { disconnectWebSocket() }
         verify(exactly = 0) { connectWebSocket() }
     }
 
     @Test
     fun testSaveProfileFromDialog_addsNewProfileAndTriggersLoginRedirection() {
-        every { AuthManager.getConnectionProfiles() } returns emptyList()
+        every { AuthManager.getGatewayInstances() } returns emptyList()
         val viewModel = createViewModel()
 
         viewModel.openAddProfile()
@@ -282,7 +282,7 @@ class SettingsViewModelTest {
         viewModel.saveProfileFromDialog()
         testDispatcher.scheduler.advanceUntilIdle()
 
-        verify { AuthManager.saveConnectionProfiles(any()) }
+        verify { AuthManager.saveGatewayInstances(any()) }
         verify { AuthManager.setSelectedProfileId(any()) }
         verify { disconnectWebSocket() }
         verify(exactly = 0) { connectWebSocket() }
@@ -293,14 +293,14 @@ class SettingsViewModelTest {
     fun testSaveProfileFromDialog_renameOnly_doesNotDisconnectWebSocket() {
         val urlProfiles =
             listOf(
-                ConnectionProfile(
+                GatewayInstance(
                     id = "prof-1",
                     name = "Work",
                     host = "",
                     port = 0,
                     baseUrl = "https://10.0.0.1:9119/",
                 ),
-                ConnectionProfile(
+                GatewayInstance(
                     id = "prof-2",
                     name = "Home",
                     host = "",
@@ -308,7 +308,7 @@ class SettingsViewModelTest {
                     baseUrl = "https://10.0.0.2:9220/",
                 ),
             )
-        every { AuthManager.getConnectionProfiles() } returns urlProfiles
+        every { AuthManager.getGatewayInstances() } returns urlProfiles
         storedSelectedProfileId = "prof-1"
 
         val viewModel = createViewModel()
@@ -321,7 +321,7 @@ class SettingsViewModelTest {
         viewModel.saveProfileFromDialog()
         testDispatcher.scheduler.advanceUntilIdle()
 
-        verify { AuthManager.saveConnectionProfiles(any()) }
+        verify { AuthManager.saveGatewayInstances(any()) }
         verify(exactly = 0) { disconnectWebSocket() }
         verify(exactly = 0) { connectWebSocket() }
         assertFalse(viewModel.uiState.value.navigateToLogin)
@@ -331,7 +331,7 @@ class SettingsViewModelTest {
     fun testSaveProfileFromDialog_clearActiveToken_disconnectsWebSocket() {
         val urlProfiles =
             listOf(
-                ConnectionProfile(
+                GatewayInstance(
                     id = "prof-1",
                     name = "Work",
                     host = "",
@@ -339,7 +339,7 @@ class SettingsViewModelTest {
                     baseUrl = "https://10.0.0.1:9119/",
                 ),
             )
-        every { AuthManager.getConnectionProfiles() } returns urlProfiles
+        every { AuthManager.getGatewayInstances() } returns urlProfiles
         every { AuthManager.getProfileToken("prof-1") } returns "old-token"
         storedSelectedProfileId = "prof-1"
 
@@ -352,7 +352,7 @@ class SettingsViewModelTest {
 
         verifyOrder {
             disconnectWebSocket()
-            AuthManager.saveConnectionProfilesAndToken(
+            AuthManager.saveGatewayInstancesAndToken(
                 match { profiles ->
                     profiles.single().let { profile ->
                         profile.id == "prof-1" &&
@@ -363,7 +363,7 @@ class SettingsViewModelTest {
                 "prof-1",
                 "",
             )
-            ApiClient.rebuild()
+            GatewayConnection.rebuild()
             connectWebSocket()
         }
     }
@@ -372,7 +372,7 @@ class SettingsViewModelTest {
     fun testSaveProfileFromDialog_replaceActiveToken_reconnectsInOrder() {
         val urlProfiles =
             listOf(
-                ConnectionProfile(
+                GatewayInstance(
                     id = "prof-1",
                     name = "Work",
                     host = "",
@@ -380,7 +380,7 @@ class SettingsViewModelTest {
                     baseUrl = "https://10.0.0.1:9119/",
                 ),
             )
-        every { AuthManager.getConnectionProfiles() } returns urlProfiles
+        every { AuthManager.getGatewayInstances() } returns urlProfiles
         every { AuthManager.getProfileToken("prof-1") } returns "old-token"
         storedSelectedProfileId = "prof-1"
 
@@ -393,7 +393,7 @@ class SettingsViewModelTest {
 
         verifyOrder {
             disconnectWebSocket()
-            AuthManager.saveConnectionProfilesAndToken(
+            AuthManager.saveGatewayInstancesAndToken(
                 match { profiles ->
                     profiles.single().let { profile ->
                         profile.id == "prof-1" &&
@@ -404,7 +404,7 @@ class SettingsViewModelTest {
                 "prof-1",
                 "new-token",
             )
-            ApiClient.rebuild()
+            GatewayConnection.rebuild()
             connectWebSocket()
         }
     }
@@ -413,7 +413,7 @@ class SettingsViewModelTest {
     fun testSaveProfileFromDialog_changeActiveUrl_reconnects() {
         val urlProfiles =
             listOf(
-                ConnectionProfile(
+                GatewayInstance(
                     id = "prof-1",
                     name = "Work",
                     host = "",
@@ -421,7 +421,7 @@ class SettingsViewModelTest {
                     baseUrl = "https://10.0.0.1:9119/",
                 ),
             )
-        every { AuthManager.getConnectionProfiles() } returns urlProfiles
+        every { AuthManager.getGatewayInstances() } returns urlProfiles
         storedSelectedProfileId = "prof-1"
 
         val viewModel = createViewModel()
@@ -433,7 +433,7 @@ class SettingsViewModelTest {
 
         verifyOrder {
             disconnectWebSocket()
-            AuthManager.saveConnectionProfiles(any())
+            AuthManager.saveGatewayInstances(any())
             connectWebSocket()
         }
         verify(exactly = 0) { AuthManager.setProfileToken(any(), any()) }

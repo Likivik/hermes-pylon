@@ -7,9 +7,10 @@ import com.m57.hermescontrol.data.model.SessionLatestDescendantResponse
 import com.m57.hermescontrol.data.model.SessionListResponse
 import com.m57.hermescontrol.data.model.SessionSearchResponse
 import com.m57.hermescontrol.data.model.SessionSearchResult
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.GatewayResponse
-import com.m57.hermescontrol.data.remote.HermesGatewayApi
+import com.m57.hermescontrol.data.remote.HermesApi
+import com.m57.hermescontrol.ui.profiles.ProfileProvider
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -34,20 +35,22 @@ import kotlin.coroutines.suspendCoroutine
 @OptIn(ExperimentalCoroutinesApi::class)
 class SessionSearchCorrectnessTest {
     private val dispatcher = StandardTestDispatcher()
-    private val api = mockk<HermesGatewayApi>(relaxed = true)
+    private val api = mockk<HermesApi>(relaxed = true)
 
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
-        mockkObject(AuthManager, ApiClient)
+        mockkObject(AuthManager, GatewayConnection)
         every { AuthManager.getSelectedProfileId() } returns "profile-a"
-        every { ApiClient.hermesApi } returns api
+        every { GatewayConnection.hermesApi } returns api
         coEvery { api.getSessions(any(), any(), any(), any(), any()) } returns
             GatewayResponse.success(SessionListResponse(emptyList()))
         coEvery { api.getSessionStats() } returns
             GatewayResponse.success(com.m57.hermescontrol.data.model.SessionStatsResponse())
         coEvery { api.getSessionLatestDescendant(any()) } returns GatewayResponse.error(404, "missing")
-        coEvery { api.getSession(any()) } returns GatewayResponse.error(404, "missing")
+        // A detail read returns a fenced row; the fence only needs the revision fields.
+        coEvery { api.getSession(any()) } returns
+            GatewayResponse.success(SessionInfo(id = "resolved", runtimeRevision = 1, runtimeGeneration = 1))
     }
 
     @After
@@ -56,7 +59,12 @@ class SessionSearchCorrectnessTest {
         unmockkAll()
     }
 
-    private fun viewModel() = SessionsViewModel(pinStore = SearchReviewPinStore(), ioDispatcher = dispatcher)
+    private fun viewModel() =
+        SessionsViewModel(
+            profileProvider = ProfileProvider { "default" },
+            pinStore = SearchReviewPinStore(),
+            ioDispatcher = dispatcher,
+        )
 
     private class SearchReviewPinStore(private var pins: List<String> = emptyList()) : SessionPinStore {
         override fun load() = pins
@@ -85,7 +93,12 @@ class SessionSearchCorrectnessTest {
             coEvery { api.searchSessions(any(), any(), any(), any()) } returns hits("a", "b")
             coEvery { api.bulkDeleteSessions(any()) } returns GatewayResponse.success(response)
             val pins = SearchReviewPinStore(listOf("a", "b"))
-            val vm = SessionsViewModel(pinStore = pins, ioDispatcher = dispatcher)
+            val vm =
+                SessionsViewModel(
+                    profileProvider = ProfileProvider { "default" },
+                    pinStore = pins,
+                    ioDispatcher = dispatcher,
+                )
             vm.setSearchQuery("a")
             dispatcher.scheduler.advanceUntilIdle()
             vm.selectAll(setOf("a", "b"))
@@ -105,7 +118,7 @@ class SessionSearchCorrectnessTest {
         lateinit var first: Continuation<GatewayResponse<Unit>>
         lateinit var second: Continuation<GatewayResponse<Unit>>
         var calls = 0
-        coEvery { api.deleteSession("a") } coAnswers {
+        coEvery { api.deleteSession("a", any(), any()) } coAnswers {
             suspendCoroutine { if (calls++ == 0) first = it else second = it }
         }
         val vm = viewModel()
@@ -138,21 +151,21 @@ class SessionSearchCorrectnessTest {
         vm.selectAll(setOf("a"))
         vm.confirmBulkDelete()
         dispatcher.scheduler.advanceUntilIdle()
-        every { ApiClient.hermesApi } returns mockk(relaxed = true)
+        every { GatewayConnection.hermesApi } returns mockk(relaxed = true)
         every { AuthManager.getSelectedProfileId() } returns "profile-b"
-        every { ApiClient.hermesApi } returns api
+        every { GatewayConnection.hermesApi } returns api
         vm.confirmBulkDelete()
         dispatcher.scheduler.advanceUntilIdle()
         first.resume(GatewayResponse.success(BulkDeleteResponse(ok = true, deleted = 1)))
         dispatcher.scheduler.advanceUntilIdle()
         assertTrue(vm.uiState.value.isDeletingBulk)
-        every { ApiClient.hermesApi } returns mockk(relaxed = true)
+        every { GatewayConnection.hermesApi } returns mockk(relaxed = true)
         second.resume(GatewayResponse.success(BulkDeleteResponse(ok = true, deleted = 1)))
         dispatcher.scheduler.advanceUntilIdle()
         assertFalse(vm.uiState.value.isDeletingBulk)
         assertEquals(setOf("a"), vm.uiState.value.selectedIds)
         assertNull(vm.uiState.value.toastMessage)
-        every { ApiClient.hermesApi } returns api
+        every { GatewayConnection.hermesApi } returns api
         every { AuthManager.getSelectedProfileId() } returns "profile-a"
     }
 
@@ -164,7 +177,7 @@ class SessionSearchCorrectnessTest {
                 suspendCoroutine { pending = it }
             }
             coEvery { api.renameSession(any(), any()) } returns GatewayResponse.success(Unit)
-            coEvery { api.deleteSession(any()) } returns GatewayResponse.success(Unit)
+            coEvery { api.deleteSession(any(), any(), any()) } returns GatewayResponse.success(Unit)
             val vm = viewModel()
             vm.loadSessions()
             dispatcher.scheduler.advanceUntilIdle()
@@ -219,17 +232,18 @@ class SessionSearchCorrectnessTest {
         for (hydrate in listOf(false, true)) {
             coEvery { api.getSessions(any(), 0, any(), any(), any()) } returns
                 GatewayResponse.success(SessionListResponse(listOf(SessionInfo("base")), total = 2))
-            lateinit var page: Continuation<GatewayResponse<SessionListResponse>>
-            lateinit var pin: Continuation<GatewayResponse<SessionInfo>>
-            coEvery { api.getSessions(any(), 1, any(), any(), any()) } coAnswers {
+            var page: Continuation<GatewayResponse<SessionListResponse>>? = null
+            var pin: Continuation<GatewayResponse<SessionInfo>>? = null
+            coEvery { api.getSessions(any(), match { it > 0 }, any(), any(), any()) } coAnswers {
                 suspendCoroutine { page = it }
             }
             coEvery { api.getSessionLatestDescendant("a") } returns
                 GatewayResponse.success(SessionLatestDescendantResponse("a"))
             coEvery { api.getSession("a") } coAnswers { suspendCoroutine { pin = it } }
-            coEvery { api.deleteSession("a") } returns GatewayResponse.success(Unit)
+            coEvery { api.deleteSession("a", any(), any()) } returns GatewayResponse.success(Unit)
             val vm =
                 SessionsViewModel(
+                    profileProvider = ProfileProvider { "default" },
                     pinStore = SearchReviewPinStore(if (hydrate) listOf("a") else emptyList()),
                     ioDispatcher = dispatcher,
                 )
@@ -241,11 +255,24 @@ class SessionSearchCorrectnessTest {
             }
             vm.requestDeleteSession("a")
             vm.confirmDeleteSession()
+            // Run to the suspension WITHOUT advancing the clock: the fence read sits inside a
+            // 5 s bound, and virtual time would fire it while we hold the latch.
+            dispatcher.scheduler.runCurrent()
+            pin?.resume(
+                GatewayResponse.success(SessionInfo("a", runtimeRevision = 1, runtimeGeneration = 1)),
+            )
             dispatcher.scheduler.advanceUntilIdle()
             if (hydrate) {
-                pin.resume(GatewayResponse.success(SessionInfo("a")))
+                // pinned hydration's read was the same latch; the fence consumed it
             } else {
-                page.resume(GatewayResponse.success(SessionListResponse(listOf(SessionInfo("a")), total = 2)))
+                page?.resume(
+                    GatewayResponse.success(
+                        SessionListResponse(
+                            listOf(SessionInfo("a", runtimeRevision = 1, runtimeGeneration = 1)),
+                            total = 2,
+                        ),
+                    ),
+                )
             }
             dispatcher.scheduler.advanceUntilIdle()
             assertEquals(listOf("base"), vm.uiState.value.sessions.map { it.id })
@@ -309,7 +336,7 @@ class SessionSearchCorrectnessTest {
     @Test
     fun `response from changed service or profile is discarded`() {
         for (changeService in listOf(false, true)) {
-            every { ApiClient.hermesApi } returns api
+            every { GatewayConnection.hermesApi } returns api
             every { AuthManager.getSelectedProfileId() } returns "profile-a"
             lateinit var stale: Continuation<GatewayResponse<SessionSearchResponse>>
             coEvery { api.searchSessions(any(), any(), any(), any()) } coAnswers {
@@ -319,7 +346,7 @@ class SessionSearchCorrectnessTest {
             vm.setSearchQuery("a")
             dispatcher.scheduler.advanceUntilIdle()
             if (changeService) {
-                every { ApiClient.hermesApi } returns mockk(relaxed = true)
+                every { GatewayConnection.hermesApi } returns mockk(relaxed = true)
             } else {
                 every { AuthManager.getSelectedProfileId() } returns "profile-b"
             }
@@ -364,7 +391,7 @@ class SessionSearchCorrectnessTest {
     @Test
     fun `single and bulk delete remove already displayed hits`() {
         coEvery { api.searchSessions(any(), any(), any(), any()) } returns hits("a", "b", "c")
-        coEvery { api.deleteSession("b") } returns GatewayResponse.success(Unit)
+        coEvery { api.deleteSession("b", any(), any()) } returns GatewayResponse.success(Unit)
         coEvery {
             api.bulkDeleteSessions(
                 any(),
@@ -397,7 +424,7 @@ class SessionSearchCorrectnessTest {
         coEvery { api.searchSessions(any(), any(), any(), any()) } coAnswers { suspendCoroutine { pending = it } }
         vm.setSearchQuery("refresh")
         dispatcher.scheduler.advanceUntilIdle()
-        coEvery { api.deleteSession("b") } returns GatewayResponse.success(Unit)
+        coEvery { api.deleteSession("b", any(), any()) } returns GatewayResponse.success(Unit)
         coEvery {
             api.bulkDeleteSessions(
                 any(),

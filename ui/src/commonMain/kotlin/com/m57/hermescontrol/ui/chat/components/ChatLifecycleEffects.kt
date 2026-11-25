@@ -17,6 +17,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.m57.hermescontrol.NavigationController
 import com.m57.hermescontrol.data.local.AuthDefaults
 import com.m57.hermescontrol.data.local.authStore
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.ws.ConnectionStatus
 import com.m57.hermescontrol.idForProfile
 import com.m57.hermescontrol.ui.chat.ChatMessage
@@ -49,8 +50,8 @@ fun ChatLifecycleEffects(
     viewModel: ChatViewModel,
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
-    val activeProfileId: String by
-        authStore.selectedProfileIdFlow.collectAsStateWithLifecycle(AuthDefaults.PROFILE_ID)
+    val gatewayInstanceId: String by
+        authStore.selectedGatewayIdFlow.collectAsStateWithLifecycle(AuthDefaults.PROFILE_ID)
 
     // Publish the notification session ID to the ViewModel synchronously
     SideEffect {
@@ -63,10 +64,13 @@ fun ChatLifecycleEffects(
         sessionId,
         pendingSessionTarget,
         connectionStatus,
-        activeProfileId,
+        gatewayInstanceId,
+        GatewayConnection.selectedProfileId,
     ) {
+        // A session target carries the *profile* that owns it; comparing it to the
+        // gateway instance id (as this did) could never match on a multi-profile gateway.
         val pendingSessionId =
-            pendingSessionTarget?.idForProfile(activeProfileId)
+            pendingSessionTarget?.idForProfile(GatewayConnection.selectedProfileId)
         if (
             pendingSessionTarget != null &&
             pendingSessionId == null &&
@@ -106,6 +110,9 @@ fun ChatLifecycleEffects(
                     Lifecycle.Event.ON_START -> {
                         viewModel.refreshSettings()
                         viewModel.refreshCurrentSession()
+                        // Coming back to the app is the one moment the rail is guaranteed
+                        // stale: refresh quietly, without the pull-to-refresh spinner.
+                        viewModel.onAppForegrounded()
                     }
 
                     else -> {}

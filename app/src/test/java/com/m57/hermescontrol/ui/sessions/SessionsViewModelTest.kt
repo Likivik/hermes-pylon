@@ -3,9 +3,10 @@ package com.m57.hermescontrol.ui.sessions
 import com.m57.hermescontrol.data.local.AuthManager
 import com.m57.hermescontrol.data.model.SessionInfo
 import com.m57.hermescontrol.data.model.SessionListResponse
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.GatewayResponse
-import com.m57.hermescontrol.data.remote.HermesGatewayApi
+import com.m57.hermescontrol.data.remote.HermesApi
+import com.m57.hermescontrol.ui.profiles.ProfileProvider
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -31,10 +32,14 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class SessionsViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
-    private val mockApi = mockk<HermesGatewayApi>(relaxed = true)
+    private val mockApi = mockk<HermesApi>(relaxed = true)
 
     private fun createViewModel(): SessionsViewModel {
-        val vm = SessionsViewModel(ioDispatcher = testDispatcher)
+        val vm =
+            SessionsViewModel(
+                profileProvider = ProfileProvider { "default" },
+                ioDispatcher = testDispatcher,
+            )
         testDispatcher.scheduler.advanceUntilIdle()
         return vm
     }
@@ -43,10 +48,10 @@ class SessionsViewModelTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         mockkObject(AuthManager)
-        mockkObject(ApiClient)
+        mockkObject(GatewayConnection)
         every { AuthManager.getSelectedProfileId() } returns null
         every { AuthManager.getPinnedSessionIds(AuthManager.DEFAULT_PROFILE_ID) } returns emptyList()
-        every { ApiClient.hermesApi } returns mockApi
+        every { GatewayConnection.hermesApi } returns mockApi
     }
 
     @After
@@ -105,7 +110,12 @@ class SessionsViewModelTest {
     @Test
     fun `load more dedupes churn without advancing by hydrated pins`() {
         val pinStore = FakeSessionPinStore(listOf("lineage-pinned"))
-        val vm = SessionsViewModel(pinStore = pinStore, ioDispatcher = testDispatcher)
+        val vm =
+            SessionsViewModel(
+                profileProvider = ProfileProvider { "default" },
+                pinStore = pinStore,
+                ioDispatcher = testDispatcher,
+            )
         coEvery { mockApi.getSessions(50, 0, "recent", null, "cron") } returns
             GatewayResponse.success(
                 SessionListResponse(
@@ -143,6 +153,7 @@ class SessionsViewModelTest {
     fun `load more advances server offset across duplicate-only page`() {
         val vm =
             SessionsViewModel(
+                profileProvider = ProfileProvider { "default" },
                 pinStore = FakeSessionPinStore(emptyList()),
                 ioDispatcher = testDispatcher,
             )
@@ -178,6 +189,7 @@ class SessionsViewModelTest {
     fun `refresh cancels stale load more before it can mutate refreshed state`() {
         val vm =
             SessionsViewModel(
+                profileProvider = ProfileProvider { "default" },
                 pinStore = FakeSessionPinStore(emptyList()),
                 ioDispatcher = testDispatcher,
             )
@@ -232,6 +244,7 @@ class SessionsViewModelTest {
     fun `automation pagination advances on server rows not merged pin rows`() {
         val vm =
             SessionsViewModel(
+                profileProvider = ProfileProvider { "default" },
                 pinStore = FakeSessionPinStore(listOf("lineage-pinned")),
                 ioDispatcher = testDispatcher,
             )
@@ -313,6 +326,7 @@ class SessionsViewModelTest {
     fun `pins hydrate into their own section only`() {
         val vm =
             SessionsViewModel(
+                profileProvider = ProfileProvider { "default" },
                 pinStore = FakeSessionPinStore(listOf("chat-pin", "cron-pin")),
                 ioDispatcher = testDispatcher,
             )
@@ -417,19 +431,35 @@ class SessionsViewModelTest {
     @Test
     fun `deleting a pinned automation run drops its row and pin`() {
         val pinStore = FakeSessionPinStore(listOf("cron_job_20260905_100000"))
-        val vm = SessionsViewModel(pinStore = pinStore, ioDispatcher = testDispatcher)
+        val vm =
+            SessionsViewModel(
+                profileProvider = ProfileProvider { "default" },
+                pinStore = pinStore,
+                ioDispatcher = testDispatcher,
+            )
         coEvery { mockApi.getSessions(50, 0, "recent", "cron", null) } returns
             GatewayResponse.success(
                 SessionListResponse(
                     sessions =
                         listOf(
-                            SessionInfo("cron_job_20260905_100000", source = "cron"),
+                            SessionInfo(
+                                "cron_job_20260905_100000",
+                                source = "cron",
+                                runtimeRevision = 1,
+                                runtimeGeneration = 1,
+                            ),
                             SessionInfo("cron_job_20260905_110000", source = "cron"),
                         ),
                     total = 2,
                 ),
             )
-        coEvery { mockApi.deleteSession("cron_job_20260905_100000") } returns GatewayResponse.success(Unit)
+        coEvery {
+            mockApi.deleteSession(
+                "cron_job_20260905_100000",
+                any(),
+                any(),
+            )
+        } returns GatewayResponse.success(Unit)
 
         vm.selectSection(HistorySection.AUTOMATIONS)
         awaitState { vm.uiState.value.sessions.size == 2 }
@@ -451,8 +481,18 @@ class SessionsViewModelTest {
         every { AuthManager.getPinnedSessionIds("profile-b") } returns listOf("pin-b")
         every { AuthManager.savePinnedSessionIds(any(), any()) } returns Unit
 
-        val vmA = SessionsViewModel(AuthManagerSessionPinStore("profile-a"), testDispatcher)
-        val vmB = SessionsViewModel(AuthManagerSessionPinStore("profile-b"), testDispatcher)
+        val vmA =
+            SessionsViewModel(
+                profileProvider = ProfileProvider { "default" },
+                pinStore = AuthManagerSessionPinStore("profile-a"),
+                ioDispatcher = testDispatcher,
+            )
+        val vmB =
+            SessionsViewModel(
+                profileProvider = ProfileProvider { "default" },
+                pinStore = AuthManagerSessionPinStore("profile-b"),
+                ioDispatcher = testDispatcher,
+            )
 
         assertEquals(listOf("pin-a"), vmA.uiState.value.pinnedSessionIds)
         assertEquals(listOf("pin-b"), vmB.uiState.value.pinnedSessionIds)

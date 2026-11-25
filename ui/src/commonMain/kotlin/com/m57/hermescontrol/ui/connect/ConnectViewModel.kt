@@ -5,19 +5,22 @@ package com.m57.hermescontrol.ui.connect
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.m57.hermescontrol.AppEnvironment
-import com.m57.hermescontrol.data.config.ConnectionProfile
+import com.m57.hermescontrol.data.config.GatewayInstance
 import com.m57.hermescontrol.data.config.resolveBaseUrl
 import com.m57.hermescontrol.data.local.AuthDefaults
 import com.m57.hermescontrol.data.local.AuthSessionState
 import com.m57.hermescontrol.data.local.authStore
+import com.m57.hermescontrol.data.local.missingRequiredToken
 import com.m57.hermescontrol.data.model.StatusResponse
-import com.m57.hermescontrol.data.remote.ApiClient
 import com.m57.hermescontrol.data.remote.CleartextPolicy
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.NetworkError
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.data.remote.parseForBuild
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.data.remote.source.DefaultGatewayStatus
+import com.m57.hermescontrol.data.remote.source.GatewayStatus
 import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.connect_error_401
 import com.m57.hermescontrol.generated.resources.connect_error_403
@@ -48,8 +51,8 @@ data class ConnectUiState(
     val errorMessage: String? = null,
     val profileName: String = "",
     val saveProfile: Boolean = false,
-    val profiles: List<ConnectionProfile> = emptyList(),
-    val selectedProfile: ConnectionProfile? = null,
+    val profiles: List<GatewayInstance> = emptyList(),
+    val selectedProfile: GatewayInstance? = null,
     val authMode: String = "token",
     val status: StatusResponse? = null,
 )
@@ -68,6 +71,7 @@ data class ConnectUiState(
 class ConnectViewModel(
     private val resolver: StringResolver,
     private val ioDispatcher: CoroutineDispatcher = AppEnvironment.current.io,
+    private val source: GatewayStatus = DefaultGatewayStatus(GatewayConnection.hermesApi),
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ConnectUiState())
     val uiState: StateFlow<ConnectUiState> = _uiState.asStateFlow()
@@ -80,7 +84,7 @@ class ConnectViewModel(
     fun loadSavedValues() {
         val savedToken = authStore.getToken() ?: ""
         val savedBaseUrl = authStore.getBaseUrl()
-        val profiles = authStore.getConnectionProfiles()
+        val profiles = authStore.getGatewayInstances()
         val selectedId = authStore.getSelectedProfileId()
         val selectedProfile = profiles.firstOrNull { it.id == selectedId }
         val resolvedBaseUrl = selectedProfile?.resolveBaseUrl(savedBaseUrl) ?: savedBaseUrl
@@ -112,7 +116,7 @@ class ConnectViewModel(
         _uiState.update { it.copy(saveProfile = value) }
     }
 
-    fun selectProfile(profile: ConnectionProfile) {
+    fun selectGateway(profile: GatewayInstance) {
         authStore.setSelectedProfileId(profile.id)
         val token = authStore.getProfileToken(profile.id) ?: ""
         val endpoint =
@@ -131,7 +135,7 @@ class ConnectViewModel(
                 status = null,
             )
         }
-        ApiClient.rebuild()
+        GatewayConnection.rebuild()
         loadStatus()
     }
 
@@ -167,7 +171,7 @@ class ConnectViewModel(
         val fingerprint = listOf(profile.id, state.baseUrl, state.token, state.authMode)
         viewModelScope.launch {
             val result =
-                withContext(ioDispatcher) { safeApiCall(reportAuthExpiry = false) { ApiClient.hermesApi.getStatus() } }
+                withContext(ioDispatcher) { safeApiCall(reportAuthExpiry = false) { source.getStatus() } }
             val current = _uiState.value
             val currentFingerprint =
                 listOf(current.selectedProfile?.id.orEmpty(), current.baseUrl, current.token, current.authMode)
@@ -193,7 +197,10 @@ class ConnectViewModel(
 
     fun connect() {
         val state = _uiState.value
-        if (state.token.isBlank()) {
+        // A gated (cookie) session has no token by design — the dashboard set a
+        // session cookie and every request carries it. Requiring a token here
+        // rejected a login that had already succeeded.
+        if (missingRequiredToken(state.token, authStore.isGatedMode())) {
             // `resolver.get` is `suspend`; the early-return path is not
             // inside a coroutine, so we hoist into a one-shot launch
             // that captures the resolved text and then writes it into
@@ -227,7 +234,7 @@ class ConnectViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    val tempApi = ApiClient.tempService(endpoint.baseUrl.toString(), state.token)
+                    val tempApi = GatewayConnection.tempService(endpoint.baseUrl.toString(), state.token)
                     safeApiCall(reportAuthExpiry = false) { tempApi.getStatus() }
                 }
             val current = _uiState.value
@@ -249,11 +256,11 @@ class ConnectViewModel(
                     // endpoint before rebuilding the clients.
                     authStore.setSessionCookie(null)
                     authStore.setWsAuthParam("token")
-                    ApiClient.rebuild()
+                    GatewayConnection.rebuild()
                     AuthSessionState.markAuthenticated()
 
                     if (state.saveProfile) {
-                        val currentProfiles = authStore.getConnectionProfiles()
+                        val currentProfiles = authStore.getGatewayInstances()
                         val existingIndex =
                             currentProfiles.indexOfFirst {
                                 it.name.equals(
@@ -268,7 +275,7 @@ class ConnectViewModel(
                                     wsAuthParam = "token",
                                 )
                             } else {
-                                ConnectionProfile(
+                                GatewayInstance(
                                     name = state.profileName,
                                     baseUrl = state.baseUrl,
                                     wsAuthParam = "token",
@@ -280,7 +287,7 @@ class ConnectViewModel(
                             } else {
                                 currentProfiles + targetProfile
                             }
-                        authStore.saveConnectionProfilesAndSelect(
+                        authStore.saveGatewayInstancesAndSelect(
                             updatedProfiles,
                             targetProfile.id,
                             state.token,
@@ -291,7 +298,7 @@ class ConnectViewModel(
                         authStore.setSelectedProfileId(AuthDefaults.PROFILE_ID)
                         authStore.setProfileToken(AuthDefaults.PROFILE_ID, state.token)
                     }
-                    ApiClient.rebuild()
+                    GatewayConnection.rebuild()
                     _uiState.update {
                         it.copy(
                             isConnecting = false,

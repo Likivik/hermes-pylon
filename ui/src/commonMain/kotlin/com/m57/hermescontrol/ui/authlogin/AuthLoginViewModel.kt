@@ -6,11 +6,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
-import com.m57.hermescontrol.data.config.ConnectionProfile
+import com.m57.hermescontrol.data.config.GatewayInstance
 import com.m57.hermescontrol.data.local.AuthSessionState
 import com.m57.hermescontrol.data.local.authStore
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.local.defaultServerBaseUrl
+import com.m57.hermescontrol.data.local.serverBaseUrlIsPageOrigin
 import com.m57.hermescontrol.data.remote.AuthPayloads
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.HermesHttpConfig
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.data.remote.createHermesHttpClient
@@ -18,6 +20,7 @@ import com.m57.hermescontrol.data.remote.parseForBuild
 import com.m57.hermescontrol.data.remote.safeApiCall
 import com.m57.hermescontrol.data.ws.HermesWsClient
 import com.m57.hermescontrol.generated.resources.Res
+import com.m57.hermescontrol.generated.resources.auth_login_error_cross_origin
 import com.m57.hermescontrol.generated.resources.auth_login_error_password_required
 import com.m57.hermescontrol.generated.resources.auth_login_error_token_required
 import com.m57.hermescontrol.generated.resources.auth_login_error_unreachable
@@ -34,6 +37,7 @@ import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
 import io.ktor.http.isSuccess
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -67,7 +71,7 @@ data class AuthLoginUiState(
     val authMode: DashboardAuthMode? = null,
     val connectionSuccess: Boolean = false,
     val errorMessage: String? = null,
-    val loggedInProfiles: List<ConnectionProfile> = emptyList(),
+    val loggedInProfiles: List<GatewayInstance> = emptyList(),
 )
 
 /**
@@ -86,7 +90,7 @@ class AuthLoginViewModel(
     private val _uiState =
         MutableStateFlow(
             AuthLoginUiState(
-                baseUrl = authStore.getBaseUrl(),
+                baseUrl = initialBaseUrl(),
             ),
         )
     val uiState: StateFlow<AuthLoginUiState> = _uiState.asStateFlow()
@@ -96,7 +100,7 @@ class AuthLoginViewModel(
     }
 
     fun loadLoggedInProfiles() {
-        val allProfiles = authStore.getConnectionProfiles()
+        val allProfiles = authStore.getGatewayInstances()
         val loggedIn =
             allProfiles.filter { profile ->
                 val token = authStore.getProfileToken(profile.id)
@@ -113,7 +117,7 @@ class AuthLoginViewModel(
             HermesWsClient.disconnect(clearPendingMessages = true)
         }
         authStore.setSelectedProfileId(profileId)
-        ApiClient.rebuild()
+        GatewayConnection.rebuild()
         if (profileChanged) {
             HermesWsClient.connect()
         }
@@ -122,9 +126,44 @@ class AuthLoginViewModel(
 
     companion object {
         private const val TAG = "AuthLoginVM"
+
+        /** A blocked or hung probe must fail, not spin. */
+        private const val PROBE_TIMEOUT_MILLIS = 15_000L
+
+        /** Login POSTs, including basic-auth validation, get longer than a probe. */
+        private const val CONNECT_TIMEOUT_MILLIS = 25_000L
     }
 
     private val probeClient: HttpClient = dashboardProbeClient
+
+    /**
+     * A browser can only reach its own origin, so an edited URL in the web build
+     * is not a preference to honour silently — it is a request the browser will
+     * refuse. Say so at the field, not as "unreachable" after a failed fetch.
+     *
+     * Cross-origin would work if the dashboard sent `Access-Control-Allow-Origin`;
+     * that is tracked as a feature request, and this message is the gate.
+     */
+    private suspend fun crossOriginMessage(candidate: String): String? {
+        if (!serverBaseUrlIsPageOrigin || candidate.isBlank()) return null
+        val sameOrigin =
+            runCatching {
+                val parsed = ServerEndpoint.parseForBuild(candidate).baseUrl
+                val expected = ServerEndpoint.parseForBuild(defaultServerBaseUrl).baseUrl
+                parsed.protocol == expected.protocol &&
+                    parsed.host == expected.host &&
+                    parsed.port == expected.port
+            }.getOrDefault(false)
+        return if (sameOrigin) null else resolver.get(Res.string.auth_login_error_cross_origin, defaultServerBaseUrl)
+    }
+
+    /**
+     * A browser cannot reach any origin but its own, so a stored value is ignored
+     * there. Restoring it is what made the web login sit on a saved `:9119` URL
+     * that no phone can reach.
+     */
+    private fun initialBaseUrl(): String =
+        if (serverBaseUrlIsPageOrigin) defaultServerBaseUrl else authStore.getBaseUrl()
 
     fun onBaseUrlChange(value: String) {
         val warning =
@@ -138,6 +177,14 @@ class AuthLoginViewModel(
                 errorMessage = null,
                 authMode = null,
             )
+        }
+        if (serverBaseUrlIsPageOrigin) {
+            viewModelScope.launch {
+                val message = crossOriginMessage(value.trim())
+                _uiState.update { state ->
+                    if (state.baseUrl == value.trim()) state.copy(errorMessage = message) else state
+                }
+            }
         }
     }
 
@@ -187,11 +234,25 @@ class AuthLoginViewModel(
             )
         }
 
+        // The deadline is a watchdog, not `withTimeoutOrNull` around the call.
+        // A fetch stuck in a browser-level connect (cross-origin to a filtered
+        // port) never delivers cancellation, so a timeout wrapped around it
+        // never resumes and the button spins forever. The watchdog only touches
+        // UI state, so it fires whatever the request is doing.
         viewModelScope.launch {
-            val result =
-                withContext(ioDispatcher) {
-                    probeDashboardInternal(endpoint)
+            delay(PROBE_TIMEOUT_MILLIS)
+            val timedOut = resolver.get(Res.string.auth_login_error_unreachable)
+            _uiState.update { state ->
+                if (!state.probing) {
+                    state
+                } else {
+                    state.copy(probing = false, errorMessage = state.errorMessage ?: timedOut)
                 }
+            }
+        }
+
+        viewModelScope.launch {
+            val result = withContext(ioDispatcher) { probeDashboardInternal(endpoint) }
             val unreachableMsg =
                 if (result == null) {
                     resolver.get(Res.string.auth_login_error_unreachable)
@@ -289,6 +350,21 @@ class AuthLoginViewModel(
      * Step 2: Connect using the detected auth mode.
      */
     fun connect() {
+        if (serverBaseUrlIsPageOrigin) {
+            viewModelScope.launch {
+                val message = crossOriginMessage(_uiState.value.baseUrl)
+                if (message == null) {
+                    connectSameOrigin()
+                } else {
+                    _uiState.update { it.copy(isLoading = false, probing = false, errorMessage = message) }
+                }
+            }
+            return
+        }
+        connectSameOrigin()
+    }
+
+    private fun connectSameOrigin() {
         val state = _uiState.value
         val endpoint =
             try {
@@ -299,6 +375,23 @@ class AuthLoginViewModel(
             }
 
         _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+
+        // Same trap as the probe (see `probe`): a request stuck in a
+        // browser-level connect never delivers cancellation, so the deadline is
+        // a watchdog that only touches state. Without it a hung POST leaves the
+        // Connect button disabled forever, which on wasmJs is the visible
+        // difference between "bad password" and "this app is broken".
+        viewModelScope.launch {
+            delay(CONNECT_TIMEOUT_MILLIS)
+            val timedOut = resolver.get(Res.string.auth_login_error_unreachable)
+            _uiState.update { current ->
+                if (!current.isLoading) {
+                    current
+                } else {
+                    current.copy(isLoading = false, errorMessage = current.errorMessage ?: timedOut)
+                }
+            }
+        }
 
         viewModelScope.launch {
             val result =
@@ -343,7 +436,7 @@ class AuthLoginViewModel(
                     authStore.setToken(null)
                     authStore.setWsAuthParam("ticket")
                 }
-                ApiClient.rebuild()
+                GatewayConnection.rebuild()
                 // A previous failed session may have left the singleton in
                 // AUTH_EXPIRED, which connect() intentionally refuses to clear.
                 HermesWsClient.connect()
@@ -368,7 +461,7 @@ class AuthLoginViewModel(
         }
 
         val tempApi =
-            ApiClient.tempService(
+            GatewayConnection.tempService(
                 endpoint.baseUrl.toString(),
                 token,
             )

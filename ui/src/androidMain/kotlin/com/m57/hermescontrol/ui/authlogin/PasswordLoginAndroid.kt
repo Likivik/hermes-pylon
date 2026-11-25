@@ -1,39 +1,41 @@
 package com.m57.hermescontrol.ui.authlogin
 
 import com.m57.hermescontrol.data.remote.CookieManager
-import com.m57.hermescontrol.data.remote.OkHttpProvider
+import com.m57.hermescontrol.data.remote.GatewayClientKind
+import com.m57.hermescontrol.data.remote.HermesHttpConfig
 import com.m57.hermescontrol.data.remote.ServerEndpoint
-import com.m57.hermescontrol.data.remote.resolve
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import java.util.concurrent.TimeUnit
+import com.m57.hermescontrol.data.remote.createGatewayTransportClient
+import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.http.HttpHeaders
 
 /**
- * Android keeps the historical transport: the same probe client, the same 10 s
- * timeouts, and `CookieManager.beginAuthentication()` so the persistent jar
- * accepts the `Set-Cookie` this response carries. #470 depends on that; the
- * migration must not change it.
+ * The gated login POST.
+ *
+ * Same transport as every other gateway call now — Ktor on CIO with the probe
+ * timeouts — and `CookieManager.beginAuthentication()` still opens the window in
+ * which the persistent jar accepts the `Set-Cookie` this response carries
+ * (issue #470 depends on that).
  */
 internal actual suspend fun performPasswordLogin(
     endpoint: ServerEndpoint,
     jsonBody: String,
 ): Int {
-    val loginClient =
-        OkHttpProvider.probe
-            .newBuilder()
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(10, TimeUnit.SECONDS)
-            .build()
-
-    val request =
-        Request
-            .Builder()
-            .url(endpoint.resolve("auth/password-login"))
-            .header("Content-Type", "application/json")
-            .post(jsonBody.toRequestBody("application/json; charset=utf-8".toMediaType()))
-            .build()
-
-    CookieManager.beginAuthentication()
-    return loginClient.newCall(request).execute().use { response -> response.code }
+    val client =
+        createGatewayTransportClient(
+            GatewayClientKind.Session,
+            config = HermesHttpConfig.Probe,
+        )
+    return try {
+        CookieManager.beginAuthentication()
+        client
+            .post(endpoint.baseUrl.toString().trimEnd('/') + "/auth/password-login") {
+                header(HttpHeaders.ContentType, "application/json")
+                setBody(jsonBody)
+            }.status
+            .value
+    } finally {
+        client.close()
+    }
 }

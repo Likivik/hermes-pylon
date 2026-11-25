@@ -5,19 +5,25 @@ package com.m57.hermescontrol.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.m57.hermescontrol.AppEnvironment
-import com.m57.hermescontrol.data.config.ConnectionProfile
+import com.m57.hermescontrol.data.config.GatewayInstance
 import com.m57.hermescontrol.data.config.resolveBaseUrl
 import com.m57.hermescontrol.data.local.AuthDefaults
+import com.m57.hermescontrol.data.local.AuthSessionState
 import com.m57.hermescontrol.data.local.authStore
-import com.m57.hermescontrol.data.remote.ApiClient
+import com.m57.hermescontrol.data.local.missingRequiredToken
 import com.m57.hermescontrol.data.remote.CleartextPolicy
+import com.m57.hermescontrol.data.remote.GatewayConnection
 import com.m57.hermescontrol.data.remote.NetworkResult
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.data.remote.parseForBuild
 import com.m57.hermescontrol.data.remote.safeApiCall
+import com.m57.hermescontrol.data.remote.source.DefaultSettings
+import com.m57.hermescontrol.data.remote.source.Settings
 import com.m57.hermescontrol.data.theme.ThemePreference
 import com.m57.hermescontrol.data.theme.ThemePreset
 import com.m57.hermescontrol.data.ws.HermesWsClient
+import com.m57.hermescontrol.ui.authlogin.SignOutReason
+import com.m57.hermescontrol.ui.authlogin.handleSignOut
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -43,8 +49,8 @@ data class SettingsUiState(
     val isSaved: Boolean = false,
     val typingEffectEnabled: Boolean = false,
     val typingEffectDelayMs: Int = 30,
-    val profiles: List<ConnectionProfile> = emptyList(),
-    val selectedProfileId: String? = null,
+    val profiles: List<GatewayInstance> = emptyList(),
+    val selectedGatewayId: String? = null,
     val renameProfileName: String = "",
     val appLanguage: String = "system",
     // Profile add/edit dialog
@@ -70,6 +76,7 @@ class SettingsViewModel(
     private val connectWebSocket: () -> Unit = {
         HermesWsClient.connect()
     },
+    private val source: Settings = DefaultSettings(GatewayConnection.hermesApi),
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
@@ -93,7 +100,7 @@ class SettingsViewModel(
         val chatFontScale = authStore.getChatFontScale()
         val typingEffectEnabled = authStore.isTypingEffectEnabled()
         val typingEffectDelayMs = authStore.getTypingEffectDelayMs()
-        val profiles = authStore.getConnectionProfiles()
+        val profiles = authStore.getGatewayInstances()
         val appLanguage = authStore.getAppLanguage()
         val renameProfileName =
             profiles.firstOrNull { p -> p.id == selectedId }?.name ?: ""
@@ -112,21 +119,21 @@ class SettingsViewModel(
                 typingEffectEnabled = typingEffectEnabled,
                 typingEffectDelayMs = typingEffectDelayMs,
                 profiles = profiles,
-                selectedProfileId = selectedId,
+                selectedGatewayId = selectedId,
                 renameProfileName = renameProfileName,
                 appLanguage = appLanguage,
             )
         }
     }
 
-    fun selectProfile(profileId: String?) {
+    fun selectGateway(profileId: String?) {
         val profileChanged = profileId != authStore.getSelectedProfileId()
         if (profileChanged) {
             disconnectWebSocket()
         }
         authStore.setSelectedProfileId(profileId)
         viewModelScope.launch(ioDispatcher) { loadSettings() }
-        ApiClient.rebuild()
+        GatewayConnection.rebuild()
         if (profileChanged) {
             connectWebSocket()
         }
@@ -137,8 +144,8 @@ class SettingsViewModel(
         if (wasSelected) {
             disconnectWebSocket()
         }
-        val updatedProfiles = authStore.getConnectionProfiles().filter { it.id != profileId }
-        authStore.saveConnectionProfiles(updatedProfiles)
+        val updatedProfiles = authStore.getGatewayInstances().filter { it.id != profileId }
+        authStore.saveGatewayInstances(updatedProfiles)
         authStore.setProfileToken(profileId, null)
         authStore.clearPinnedSessionIds(profileId)
         // Never leave selection null (issue #478): if the deleted profile was selected,
@@ -150,7 +157,7 @@ class SettingsViewModel(
             authStore.setSelectedProfileId(AuthDefaults.PROFILE_ID)
         }
         viewModelScope.launch(ioDispatcher) { loadSettings() }
-        ApiClient.rebuild()
+        GatewayConnection.rebuild()
         if (wasSelected) {
             connectWebSocket()
         }
@@ -173,7 +180,7 @@ class SettingsViewModel(
     }
 
     fun openEditProfile(profileId: String) {
-        val profile = authStore.getConnectionProfiles().firstOrNull { it.id == profileId } ?: return
+        val profile = authStore.getGatewayInstances().firstOrNull { it.id == profileId } ?: return
         val token = authStore.getProfileToken(profileId) ?: ""
         _uiState.update {
             it.copy(
@@ -235,7 +242,7 @@ class SettingsViewModel(
 
         if (name.isBlank()) return
 
-        val profiles = authStore.getConnectionProfiles().toMutableList()
+        val profiles = authStore.getGatewayInstances().toMutableList()
         val editingId = state.editingProfileId
         var reconnectWebSocket = false
 
@@ -265,19 +272,19 @@ class SettingsViewModel(
                     baseUrl = endpoint.baseUrl.toString(),
                 )
             if (tokenChanged) {
-                authStore.saveConnectionProfilesAndToken(profiles, editingId, token)
+                authStore.saveGatewayInstancesAndToken(profiles, editingId, token)
             } else {
-                authStore.saveConnectionProfiles(profiles)
+                authStore.saveGatewayInstances(profiles)
             }
         } else {
             // Add new profile
             val newProfile =
-                ConnectionProfile(
+                GatewayInstance(
                     name = name,
                     baseUrl = endpoint.baseUrl.toString(),
                 )
             profiles.add(newProfile)
-            authStore.saveConnectionProfiles(profiles)
+            authStore.saveGatewayInstances(profiles)
             authStore.setProfileToken(newProfile.id, "")
             disconnectWebSocket()
             authStore.setSelectedProfileId(newProfile.id)
@@ -286,7 +293,7 @@ class SettingsViewModel(
 
         closeProfileDialog()
         viewModelScope.launch(ioDispatcher) { loadSettings() }
-        ApiClient.rebuild()
+        GatewayConnection.rebuild()
         if (reconnectWebSocket) {
             connectWebSocket()
         }
@@ -295,7 +302,7 @@ class SettingsViewModel(
     // ── Delete confirmation ──────────────────────────────────────────────
 
     fun requestDeleteProfile(profileId: String) {
-        val profile = authStore.getConnectionProfiles().firstOrNull { it.id == profileId }
+        val profile = authStore.getGatewayInstances().firstOrNull { it.id == profileId }
         _uiState.update {
             it.copy(
                 showDeleteConfirm = true,
@@ -408,15 +415,22 @@ class SettingsViewModel(
         authStore.setTypingEffectDelayMs(delayMs)
     }
 
-    /** Clear all auth credentials — logs out and returns to landing screen. */
+    /** Clear all auth credentials — logs out and returns to the sign-in page. */
     fun logout() {
         // Tear down the authenticated socket before discarding credentials;
         // a live socket must never outlive the identity it was opened with.
         disconnectWebSocket()
+        // Web: hand the browser to logout.html and stop there. Clearing the store
+        // first would recompose the app to its own sign-in screen for the frames
+        // the navigation takes to start — that flash is the canvas login the user
+        // used to see. The page ends the session and reloads into a clean state,
+        // so there is nothing left here to clear.
+        if (handleSignOut(SignOutReason.USER_INITIATED)) return
         authStore.setToken(null)
         authStore.setSessionCookie(null)
         authStore.setWsAuthParam("token")
-        // Don't rebuild ApiClient here — let the navigation complete first
+        AuthSessionState.requireSignIn()
+        // Don't rebuild GatewayConnection here — let the navigation complete first
     }
 
     fun save() {
@@ -439,7 +453,7 @@ class SettingsViewModel(
         authStore.setThemePreset(state.themePreset)
         authStore.setTypingEffectEnabled(state.typingEffectEnabled)
         authStore.setTypingEffectDelayMs(state.typingEffectDelayMs)
-        ApiClient.rebuild()
+        GatewayConnection.rebuild()
 
         viewModelScope.launch(ioDispatcher) {
             loadSettings()
@@ -449,12 +463,15 @@ class SettingsViewModel(
 
     fun testConnection() {
         val state = _uiState.value
-        if (state.token.isBlank()) {
+        // A cookie session has no token by design: the browser holds the session
+        // and every request carries it. Demanding one here reported "Token is
+        // required" on a connection that was working perfectly well.
+        if (missingRequiredToken(state.token, authStore.isGatedMode())) {
             _uiState.update { it.copy(testResult = "❌ Token is required") }
             return
         }
 
-        // Save first so ApiClient uses updated settings
+        // Save first so GatewayConnection uses updated settings
         save()
 
         _uiState.update { it.copy(isTesting = true, testResult = null) }
@@ -462,7 +479,7 @@ class SettingsViewModel(
         viewModelScope.launch {
             val result =
                 withContext(ioDispatcher) {
-                    safeApiCall { ApiClient.hermesApi.getStatus() }
+                    safeApiCall { source.getStatus() }
                 }
             when (result) {
                 is NetworkResult.Success -> {

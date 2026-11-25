@@ -8,6 +8,7 @@ import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.plugins.HttpRequestRetry
 import io.ktor.client.plugins.HttpSend
 import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.api.createClientPlugin
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logging
@@ -35,6 +36,20 @@ data class HermesHttpConfig(
      */
     val maxRetries: Int = 2,
     val logLevel: LogLevel = LogLevel.NONE,
+    /**
+     * Follow HTTP redirects. Probes keep this off so a 302 to `/login` is seen
+     * as "this is the web UI, not the gateway" instead of being followed into a
+     * 200 HTML page (the pre-CIO OkHttp probe clients had `followRedirects(false)`).
+     */
+    val followRedirects: Boolean = true,
+    /**
+     * Profile every request of this client is scoped to.
+     *
+     * Part of the client configuration on purpose: the parameter is appended by the
+     * client, so no call site can forget it. `null` leaves the gateway on its own
+     * profile (the state before the app has learned one).
+     */
+    val profile: String? = null,
 ) {
     companion object {
         val Default = HermesHttpConfig()
@@ -45,6 +60,7 @@ data class HermesHttpConfig(
                 connectTimeoutMillis = 5_000,
                 requestTimeoutMillis = 5_000,
                 socketTimeoutMillis = 5_000,
+                followRedirects = false,
             )
 
         /** Streaming client (WebSocket, long poll): no request timeout. */
@@ -63,6 +79,7 @@ data class HermesHttpConfig(
  * Android transport, and its tests pin Retrofit's types. This is the floor the
  * console target and future platforms consume.
  */
+
 fun createHermesHttpClient(config: HermesHttpConfig = HermesHttpConfig.Default): HttpClient =
     HttpClient { installHermesPlugins(config) }.withNetworkLog()
 
@@ -124,6 +141,21 @@ fun HttpClientConfig<*>.installHermesPlugins(config: HermesHttpConfig) {
     // Callers inspect status codes themselves (the Retrofit side returns
     // Response<T> and never throws), so a 4xx/5xx is a value, not an exception.
     expectSuccess = false
+
+    followRedirects = config.followRedirects
+
+    // Appended here, on the request that actually goes out.
+    //
+    // `DefaultRequest` is not enough: the app builds absolute URLs, and a default-request
+    // URL is only merged into *relative* request paths — the parameter silently vanished
+    // (proved by ProfileScopeTest). An onRequest hook edits the real URL.
+    config.profile?.takeIf { it.isNotBlank() }?.let { profile ->
+        install(
+            createClientPlugin("ProfileScope") {
+                onRequest { request, _ -> request.url.parameters.append("profile", profile) }
+            },
+        )
+    }
 
     install(HttpRequestRetry) {
         retryOnException(maxRetries = config.maxRetries)

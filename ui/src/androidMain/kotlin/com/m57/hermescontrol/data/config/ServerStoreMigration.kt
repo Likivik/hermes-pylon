@@ -5,7 +5,7 @@ package com.m57.hermescontrol.data.config
 import android.content.Context
 import androidx.datastore.core.DataMigration
 import com.m57.hermescontrol.data.model.PinnedModel
-import com.m57.hermescontrol.data.remote.OkHttpProvider
+import com.m57.hermescontrol.data.remote.HermesJson
 import com.m57.hermescontrol.data.remote.ServerEndpoint
 import com.m57.hermescontrol.data.security.LegacySecurePreferences
 import com.m57.hermescontrol.data.theme.ThemePreference
@@ -66,7 +66,7 @@ class ServerStoreMigration(
         val connectionProfiles =
             if (connectionProfilesRaw != null) {
                 try {
-                    OkHttpProvider.json.decodeFromString<List<ConnectionProfile>>(connectionProfilesRaw)
+                    HermesJson.instance.decodeFromString<List<GatewayInstance>>(connectionProfilesRaw)
                 } catch (e: Exception) {
                     emptyList()
                 }
@@ -74,13 +74,13 @@ class ServerStoreMigration(
                 emptyList()
             }
 
-        val selectedProfileId = prefs.getString("selected_profile_id", null)?.takeIf { it.isNotBlank() }
+        val selectedGatewayId = prefs.getString("selected_profile_id", null)?.takeIf { it.isNotBlank() }
 
         val pinnedModelsRaw = prefs.getString("pinned_models", null)
         val pinnedModels =
             if (pinnedModelsRaw != null) {
                 try {
-                    OkHttpProvider.json.decodeFromString<List<PinnedModel>>(pinnedModelsRaw)
+                    HermesJson.instance.decodeFromString<List<PinnedModel>>(pinnedModelsRaw)
                 } catch (e: Exception) {
                     emptyList()
                 }
@@ -111,7 +111,7 @@ class ServerStoreMigration(
                                 ).baseUrl.toString(),
                     )
                 },
-            selectedProfileId = selectedProfileId,
+            selectedGatewayId = selectedGatewayId,
             pinnedModels = pinnedModels,
             wsAuthParam = wsAuthParam,
             typingEffectEnabled = typingEffectEnabled,
