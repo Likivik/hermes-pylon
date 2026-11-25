@@ -59,6 +59,20 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # Robolectric does not resolve its Android runtime through Gradle. Its
+      # MavenArtifactFetcher downloads `android-all-instrumented` from Maven Central into
+      # ~/.m2/repository at test time, so setup-gradle's cache does not cover it and every
+      # run re-fetches it. When that fetch fails every Roborazzi test fails at once, on
+      # branches that touch nothing visual — a red that says nothing about the diff.
+      # Keyed on the Robolectric version, since a bump means a different artifact.
+      - name: Cache Robolectric's Android runtime
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-${{ runner.os }}-${{ hashFiles('gradle/libs.versions.toml') }}
+          restore-keys: |
+            robolectric-${{ runner.os }}-
+
       # The shared UI module. Its tests have lived in `ui/src/commonTest` for a
       # while but nothing ran them: every refactor that touched commonMain UI
       # shipped with compile-and-ktlint as its only gate. The screen graph is
