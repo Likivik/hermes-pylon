@@ -6,7 +6,6 @@ import android.app.Application
 import android.content.ContentResolver
 import android.content.Intent
 import android.net.Uri
-import android.util.Log
 import androidx.core.content.FileProvider
 import androidx.lifecycle.viewModelScope
 import com.m57.hermescontrol.data.local.AuthManager
@@ -110,11 +109,6 @@ class ChatViewModelTest {
         // 383ms per test (measured), but the alternative - letting android.jar
         // stubs return defaults via isReturnDefaultValues - changes Uri/TextUtils
         // semantics globally and destabilised 31 ViewModel tests. Costly, correct.
-        mockkStatic(Log::class)
-        every { Log.d(any(), any()) } returns 0
-        every { Log.i(any(), any()) } returns 0
-        every { Log.w(any(), any<String>()) } returns 0
-        every { Log.e(any(), any()) } returns 0
 
         mockkStatic(Dispatchers::class)
         every { Dispatchers.IO } returns testDispatcher
@@ -3781,9 +3775,12 @@ class ChatViewModelTest {
                 listOf("Archived turn", "Recent turn", "Recent reply"),
                 viewModel.uiState.value.messages.map { it.content },
             )
+            // Identity is content-derived, never the rowid: this fixture carries no `message_uid`, so the
+            // id must be the row's own fingerprint rather than `rest-session-root-<rowid>`, which moves.
+            val first = viewModel.uiState.value.messages.first()
             assertEquals(
-                "rest-session-root-2686",
-                viewModel.uiState.value.messages.first().id,
+                messageRowFingerprint("session-root", first.role, first.timestamp, first.content),
+                first.id,
             )
             assertFalse(viewModel.uiState.value.hasOlderMessages)
         }
@@ -5329,7 +5326,9 @@ class ChatViewModelTest {
             advanceUntilIdle()
 
             assertTrue(results.isEmpty())
-            verify(exactly = 0) { Log.w(any(), "Image attachment request failed") }
+            // Removed: asserted on android.util.Log, which production never calls.
+            // The site logs through HermesLog (ChatViewModel.kt:796), so the
+            // check could never fail. A real one needs a HermesLog sink.
             verify(exactly = 1) {
                 HermesWsClient.sendMessageForConnection(any(), sessionId, "hello", any())
             }

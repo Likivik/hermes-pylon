@@ -1024,6 +1024,7 @@ class ChatViewModel(
                 repo.persistMessagesIfCurrent(messages, sessionId, revision, stillCurrent)
             },
             captureFence = ::captureHistoryLoadFence,
+            readMessages = { uiStateMutable.value.messages },
             write = ::applyHistoryUpdate,
         )
     }
@@ -2477,6 +2478,7 @@ class ChatViewModel(
             latestPaging = latestPaging,
             loadedOffset = loadedMessageOffset,
             pageSize = MESSAGE_PAGE_SIZE,
+            seamOverlap = 0, // seam verification is not on the production path yet
         )
     }
 

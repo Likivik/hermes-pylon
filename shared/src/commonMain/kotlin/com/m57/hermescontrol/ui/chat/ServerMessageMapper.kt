@@ -51,6 +51,7 @@ object ServerMessageMapper {
                 .eachCount()
 
         return collapseDuplicateRows(
+            sessionId,
             messages.mapIndexedNotNull { index, msg ->
                 if (!isDisplayableServerMessage(msg)) {
                     return@mapIndexedNotNull null
@@ -66,13 +67,18 @@ object ServerMessageMapper {
                 // The handle this row carries in the source's own ordering. It is deliberately not the identity:
                 // with `useLatestPaging` off it is a list offset, which shifts the moment an older page prepends.
                 val serverIndex = if (useLatestPaging) msg.id ?: globalIndex else globalIndex
-                // Identity is the store's own `message_uid`, which does not move across reads. Without one we degrade
-                // to the best handle that is left: the rowid, then the offset as an absolute last resort. The offset is
-                // the worst of the three — it shifts the moment an older page prepends.
-                val id =
-                    msg.messageUid
-                        ?: "rest-$sessionId-${msg.id ?: globalIndex}"
                 val content = msg.contentText
+                val timestamp =
+                    msg.timestampText
+                        ?.toDoubleOrNull()
+                        ?.times(1000)
+                        ?.toLong()
+                        ?: nowMillis
+                // Identity is the store's own `message_uid`, which compaction carries forward, so it does not
+                // move across reads. Without one the fallback is the content fingerprint — never a rowid and
+                // never a list offset, both of which move. The standing rule for this store is that a
+                // `messages_read` id is not a cross-read identifier; content hash or scope is.
+                val id = msg.messageUid ?: messageRowFingerprint(sessionId, role, timestamp, content)
                 val roleAndContent = role to content
                 val preservedReasoning =
                     existingReasoningById[id]
@@ -85,12 +91,6 @@ object ServerMessageMapper {
                     msg.reasoningText.ifBlank {
                         preservedReasoning?.reasoningText.orEmpty()
                     }
-                val timestamp =
-                    msg.timestampText
-                        ?.toDoubleOrNull()
-                        ?.times(1000)
-                        ?.toLong()
-                        ?: nowMillis
                 var finalContent = content
                 var attachments: List<Attachment>? = null
                 if (role == MessageRole.ASSISTANT && content.contains("MEDIA:")) {

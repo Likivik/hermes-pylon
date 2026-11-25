@@ -15,6 +15,11 @@
 # and an internal network plus one loopback port already gives what we want.
 set -euo pipefail
 
+# The fixture password is generated per run and never stored. pod.sh exports it so
+# the server registers it and seed.py/verify.py sign in with the same value.
+PYLON_TEST_PASSWORD="${PYLON_TEST_PASSWORD:-$(od -An -tx1 -N16 /dev/urandom | tr -d ' \n')}"
+export PYLON_TEST_PASSWORD
+
 POD="${PYLON_TEST_POD:-pylon-test}"
 NET="${PYLON_TEST_NET:-pylon-test-net}"
 VOL="${PYLON_TEST_VOL:-pylon-test-data}"
@@ -81,13 +86,14 @@ up() {
     # The built app, served over the pod's shared loopback and published to the host.
     # It must also forward /api, /auth and the websocket to the dashboard: a bare static
     # server leaves the app dialling its own origin and failing, so nothing can assert a
-    # connected socket. See dist_proxy.py.
+    # connected socket. See tools/dev-server/serve.py.
     podman run -d --pod "$POD" --name "${POD}-dist" \
         -e DIST_ROOT=/srv \
         -e PYLON_PROXY_TARGET=http://127.0.0.1:9119 \
+        -e BIND=0.0.0.0 \
         -v "$DIST:/srv:ro,Z" \
-        -v "$HERE/dist_proxy.py:/opt/dist_proxy.py:ro,Z" \
-        "$IMAGE" python3 /opt/dist_proxy.py >/dev/null
+        -v "$HERE/../../tools/dev-server/serve.py:/opt/serve.py:ro,Z" \
+        "$IMAGE" python3 /opt/serve.py >/dev/null
 
     wait_for "http://127.0.0.1:${PREVIEW_PORT}/" "dist server"
     # 19119 belongs to the dashboard, which starts after auth is configured, so wait here
@@ -122,7 +128,10 @@ configure() {
     # Live finding: the dashboard refuses a 0.0.0.0 bind with no auth provider registered.
     # The fixture password hashes via the gateway's own helper, so nothing is guessed.
     local HASH
-    HASH=$(podman exec "${POD}-gateway" python3 -c "from plugins.dashboard_auth.basic import hash_password; print(hash_password('test-password'))" 2>/dev/null)
+    # The password arrives on stdin, never on the command line: `ps` would expose it
+    # and so would shell history. It is generated per run, so nothing here is a secret.
+    HASH=$(printf '%s' "$PYLON_TEST_PASSWORD" | podman exec -i "${POD}-gateway" python3 -c \
+        "import sys; from plugins.dashboard_auth.basic import hash_password; print(hash_password(sys.stdin.read()))" 2>/dev/null)
     [ -n "$HASH" ] || { say "could not hash the fixture password"; return 1; }
     cfg dashboard.basic_auth.username seed
     cfg "dashboard.basic_auth.password_hash" "$HASH"

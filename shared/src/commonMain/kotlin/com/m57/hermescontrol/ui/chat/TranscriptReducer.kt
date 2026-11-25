@@ -58,6 +58,14 @@ sealed interface TranscriptIntent {
     data object OlderLoadStarted : TranscriptIntent
 
     /**
+     * The older page did not join onto what is on screen, so it was not spliced.
+     *
+     * Paging stops rather than showing two unrelated ranges side by side. What is already on screen is kept:
+     * a broken seam means rows were skipped, and offering "load older" again would only re-slice the gap.
+     */
+    data object OlderSeamBroken : TranscriptIntent
+
+    /**
      * An older page arrived and passed every fence: prepend it, drop ids that are already on screen.
      *
      * @param older the page, oldest-first as the server returned it
@@ -105,6 +113,9 @@ object TranscriptReducer {
 
             TranscriptIntent.OlderLoadStarted ->
                 state.copy(isLoadingOlder = true)
+
+            TranscriptIntent.OlderSeamBroken ->
+                state.copy(isLoadingOlder = false, hasOlderMessages = false)
 
             is TranscriptIntent.OlderLoaded -> reduceOlderLoaded(state, intent)
 

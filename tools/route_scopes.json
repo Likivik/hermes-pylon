@@ -1,5 +1,66 @@
 {
- "gateway": "/nix/store/fky5w32h62yh44g32rj10908xnw9y890-hermes-agent-0.23.1-patched/hermes_cli",
+ "gateway": "/nix/store/g0wss07vcg0nnhald112w34hng9zrx9a-hermes-agent-env/lib/python3.14/site-packages/hermes_cli",
+ "generated_from": {
+  "web_routers/__init__.py": "95de9836abeb72e9",
+  "web_routers/_common.py": "622381c124caa2cc",
+  "web_routers/actions.py": "dc779f3720b5729b",
+  "web_routers/analytics.py": "eff0cf9b44f68f09",
+  "web_routers/audio.py": "83673723d6414a16",
+  "web_routers/chat_workspaces.py": "e499a84811bd2cc2",
+  "web_routers/chat_ws.py": "bb4088a77632a82c",
+  "web_routers/chat_ws_errors.py": "4be07279ae6f28e9",
+  "web_routers/config_env.py": "64d5dd44ccd5ecb1",
+  "web_routers/cron.py": "f3199df3210e6822",
+  "web_routers/dashboard_ui.py": "b926e8996ad8056f",
+  "web_routers/delegation.py": "dc13e9a6a37f598d",
+  "web_routers/desktop_plugins.py": "baef2e3ca3874088",
+  "web_routers/display.py": "c3a0915a680ae2f1",
+  "web_routers/files.py": "10fa649f5c796e37",
+  "web_routers/gateway_connections.py": "76ce0eaed90224c4",
+  "web_routers/gateway_connections_reach.py": "d6493fa0313b3a92",
+  "web_routers/git.py": "363e486bc06e9e6b",
+  "web_routers/local_models.py": "57e0ef11d3626fb0",
+  "web_routers/mcp.py": "5659e7b853601232",
+  "web_routers/memory_providers.py": "71853b17515352e2",
+  "web_routers/messaging.py": "125ffcee77865693",
+  "web_routers/messaging_relay.py": "5a23d0dade44d20a",
+  "web_routers/models.py": "1900b0ecec85ee58",
+  "web_routers/oauth.py": "c6e390f802b84d1a",
+  "web_routers/ops.py": "dd3a0bb0fdd6c0dd",
+  "web_routers/peer.py": "9fe25b5717f0de72",
+  "web_routers/profiles.py": "3d6648550bc34bac",
+  "web_routers/sessions.py": "0756a4c9daca5f7e",
+  "web_routers/shared_metrics.py": "d4eca516fdb4aa3e",
+  "web_routers/skills.py": "ff45ba161e438b8c",
+  "web_routers/status.py": "f6b17ba28355d80f",
+  "web_routers/status_public.py": "207b0f3f77137adc",
+  "web_routers/tools.py": "913cb33fc71ff8a7",
+  "web_routers/transfer.py": "62f06fb49042a39b",
+  "web_routers/ui_preferences.py": "f49b0c391f411173",
+  "web_routers/uploads.py": "e2f894c536ee96f8",
+  "web_routers/webapp.py": "22d0e7c1d010683c",
+  "web_routers/webapp_access.py": "f0c64c022ccb1649",
+  "web_routers/webapp_relay_proxy.py": "0b01f9fb52b9de08",
+  "dashboard_auth/__init__.py": "533c0dc638f74d2e",
+  "dashboard_auth/audit.py": "e39ea4b61fb18321",
+  "dashboard_auth/base.py": "71cb7f0fa589cf00",
+  "dashboard_auth/body_limit.py": "17d015467d8b608e",
+  "dashboard_auth/cookies.py": "74aa7def6c8a86a3",
+  "dashboard_auth/listener_client.py": "c2d4fba976625284",
+  "dashboard_auth/login_page.py": "9787f218a95c686f",
+  "dashboard_auth/middleware.py": "e8dc60f2e3b6d746",
+  "dashboard_auth/native_flow.py": "7b281b1def4aa02b",
+  "dashboard_auth/native_http.py": "608abee247b8e1c6",
+  "dashboard_auth/peer_pass.py": "d32526a021b614f9",
+  "dashboard_auth/prefix.py": "6ed340182de284bf",
+  "dashboard_auth/public_paths.py": "534bbb0bbef3f68c",
+  "dashboard_auth/refresh_singleflight.py": "795785645f0a3ef3",
+  "dashboard_auth/registry.py": "bdc657b049497103",
+  "dashboard_auth/request_utils.py": "df4a9d89b272ad64",
+  "dashboard_auth/routes.py": "43a29f99194cb1e2",
+  "dashboard_auth/token_auth.py": "01ce9e62dc8cb180",
+  "dashboard_auth/ws_tickets.py": "c0a1a63623df7c72"
+ },
  "routes": [
   {
    "method": "GET",
@@ -32,6 +93,12 @@
    "file": "audio.py"
   },
   {
+   "method": "WEBSOCKET",
+   "path": "/api/audio/speak-stream",
+   "scope": "body",
+   "file": "audio.py"
+  },
+  {
    "method": "POST",
    "path": "/api/audio/stt-lease",
    "scope": "query",
@@ -41,6 +108,12 @@
    "method": "POST",
    "path": "/api/audio/transcribe",
    "scope": "query",
+   "file": "audio.py"
+  },
+  {
+   "method": "WEBSOCKET",
+   "path": "/api/audio/transcribe-stream",
+   "scope": "body",
    "file": "audio.py"
   },
   {
@@ -68,6 +141,24 @@
    "file": "audio.py"
   },
   {
+   "method": "GET",
+   "path": "/api/auth/me",
+   "scope": "none",
+   "file": "routes.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/auth/providers",
+   "scope": "none",
+   "file": "routes.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/ws-ticket",
+   "scope": "none",
+   "file": "routes.py"
+  },
+  {
    "method": "POST",
    "path": "/api/chat/file-upload",
    "scope": "query",
@@ -84,6 +175,12 @@
    "path": "/api/chat/workspaces",
    "scope": "query",
    "file": "chat_workspaces.py"
+  },
+  {
+   "method": "GET",
+   "path": "/api/cloud/agents",
+   "scope": "query",
+   "file": "status.py"
   },
   {
    "method": "GET",
@@ -120,6 +217,12 @@
    "path": "/api/config/schema",
    "scope": "query",
    "file": "config_env.py"
+  },
+  {
+   "method": "WEBSOCKET",
+   "path": "/api/console",
+   "scope": "body",
+   "file": "chat_ws.py"
   },
   {
    "method": "GET",
@@ -404,6 +507,12 @@
    "file": "desktop_plugins.py"
   },
   {
+   "method": "WEBSOCKET",
+   "path": "/api/display/ws",
+   "scope": "none",
+   "file": "display.py"
+  },
+  {
    "method": "GET",
    "path": "/api/egress/status",
    "scope": "query",
@@ -432,6 +541,12 @@
    "path": "/api/env/reveal",
    "scope": "query",
    "file": "config_env.py"
+  },
+  {
+   "method": "WEBSOCKET",
+   "path": "/api/events",
+   "scope": "none",
+   "file": "chat_ws.py"
   },
   {
    "method": "DELETE",
@@ -467,6 +582,12 @@
    "method": "GET",
    "path": "/api/files/stream",
    "scope": "query",
+   "file": "files.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/files/ticket",
+   "scope": "body",
    "file": "files.py"
   },
   {
@@ -804,6 +925,12 @@
    "path": "/api/hermes/update/receipt",
    "scope": "none",
    "file": "actions.py"
+  },
+  {
+   "method": "WEBSOCKET",
+   "path": "/api/host-terminal",
+   "scope": "none",
+   "file": "webapp.py"
   },
   {
    "method": "GET",
@@ -1209,6 +1336,12 @@
   },
   {
    "method": "GET",
+   "path": "/api/ops/backup/chunk",
+   "scope": "query",
+   "file": "transfer.py"
+  },
+  {
+   "method": "GET",
    "path": "/api/ops/backup/download",
    "scope": "query",
    "file": "ops.py"
@@ -1290,6 +1423,18 @@
    "path": "/api/ops/security-audit",
    "scope": "query",
    "file": "ops.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/ops/transfer/chunk",
+   "scope": "query",
+   "file": "transfer.py"
+  },
+  {
+   "method": "POST",
+   "path": "/api/ops/transfer/restore",
+   "scope": "query",
+   "file": "transfer.py"
   },
   {
    "method": "GET",
@@ -1597,6 +1742,18 @@
    "file": "config_env.py"
   },
   {
+   "method": "WEBSOCKET",
+   "path": "/api/pty",
+   "scope": "body",
+   "file": "chat_ws.py"
+  },
+  {
+   "method": "WEBSOCKET",
+   "path": "/api/pub",
+   "scope": "none",
+   "file": "chat_ws.py"
+  },
+  {
    "method": "GET",
    "path": "/api/sessions",
    "scope": "query",
@@ -1789,6 +1946,12 @@
    "file": "skills.py"
   },
   {
+   "method": "GET",
+   "path": "/api/skills/hub/updates",
+   "scope": "query",
+   "file": "skills.py"
+  },
+  {
    "method": "PUT",
    "path": "/api/skills/lock",
    "scope": "query",
@@ -1969,6 +2132,54 @@
    "file": "ops.py"
   },
   {
+   "method": "WEBSOCKET",
+   "path": "/api/ws",
+   "scope": "none",
+   "file": "chat_ws.py"
+  },
+  {
+   "method": "GET",
+   "path": "/auth/callback",
+   "scope": "none",
+   "file": "routes.py"
+  },
+  {
+   "method": "GET",
+   "path": "/auth/login",
+   "scope": "none",
+   "file": "routes.py"
+  },
+  {
+   "method": "POST",
+   "path": "/auth/logout",
+   "scope": "none",
+   "file": "routes.py"
+  },
+  {
+   "method": "GET",
+   "path": "/auth/native/authorize",
+   "scope": "none",
+   "file": "routes.py"
+  },
+  {
+   "method": "POST",
+   "path": "/auth/native/refresh",
+   "scope": "none",
+   "file": "routes.py"
+  },
+  {
+   "method": "POST",
+   "path": "/auth/native/token",
+   "scope": "none",
+   "file": "routes.py"
+  },
+  {
+   "method": "POST",
+   "path": "/auth/password-login",
+   "scope": "none",
+   "file": "routes.py"
+  },
+  {
    "method": "GET",
    "path": "/dashboard-plugins/@{profile}/{plugin_name}/{file_path:path}",
    "scope": "query",
@@ -1979,6 +2190,12 @@
    "path": "/dashboard-plugins/{plugin_name}/{file_path:path}",
    "scope": "query",
    "file": "dashboard_ui.py"
+  },
+  {
+   "method": "GET",
+   "path": "/login",
+   "scope": "none",
+   "file": "routes.py"
   },
   {
    "method": "GET",

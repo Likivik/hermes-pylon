@@ -47,6 +47,9 @@ internal sealed interface ChatHistoryUpdate {
         val baselineIds: Set<String>,
     ) : ChatHistoryUpdate
 
+    /** The older page did not join onto what is shown, so it was not spliced. Paging stops. */
+    data object OlderSeamBroken : ChatHistoryUpdate
+
     data class LoadFailed(val reason: String) : ChatHistoryUpdate
 
     data object LoadFinished : ChatHistoryUpdate
@@ -84,6 +87,11 @@ internal class ChatHistory(
         stillCurrent: () -> Boolean,
     ) -> Boolean,
     private val captureFence: (sessionId: String) -> HistoryLoadFence?,
+    /**
+     * The transcript as it stands, so an older page can be checked against the seam it should join to.
+     * Empty means "nothing on screen", which has no seam to verify.
+     */
+    private val readMessages: () -> List<ChatMessage> = { emptyList() },
     private val write: (ChatHistoryUpdate) -> Unit,
 ) {
     private var olderCounter = 0L
@@ -108,6 +116,8 @@ internal class ChatHistory(
         latestPaging: Boolean,
         loadedOffset: Int,
         pageSize: Int,
+        seamOverlap: Int = OLDER_PAGE_OVERLAP,
+        seamRetries: Int = 0,
     ) {
         val request =
             planOlderLoad(
@@ -116,6 +126,7 @@ internal class ChatHistory(
                 latestPaging = latestPaging,
                 loadedOffset = loadedOffset,
                 pageSize = pageSize,
+                overlap = seamOverlap,
             ) ?: return
         val fence = captureFence(sessionId) ?: return
 
@@ -126,32 +137,62 @@ internal class ChatHistory(
         olderJob =
             launch {
                 try {
-                    val result =
-                        fetchPage(
-                            sessionId,
-                            request.offset,
-                            request.limit,
-                            if (request.useLatestPaging) "latest" else null,
-                        )
-                    if (result !is NetworkResult.Success || !isOlderCurrent(owner, fence)) return@launch
-                    val effectiveOffset = result.data.pagination?.offset ?: request.offset
-                    val older =
-                        mapMessages(
-                            sessionId,
-                            result.data.messages.orEmpty(),
-                            effectiveOffset,
-                            request.useLatestPaging,
-                        )
+                    // Re-anchor instead of giving up. A seam that does not join means rows moved above the
+                    // window, so refetch with a wider view of the seam and try again. Only a window that still
+                    // will not join at the cap is reported as broken.
+                    var overlap = request.overlap
+                    var attemptsLeft = seamRetries
+                    var stitched: List<ChatMessage>? = null
+                    var effectiveOffset = request.offset
+                    var returned = request.limit
+                    while (stitched == null) {
+                        val result =
+                            fetchPage(
+                                sessionId,
+                                request.fetchOffset - (overlap - request.overlap).coerceAtLeast(0),
+                                request.limit + overlap,
+                                if (request.useLatestPaging) "latest" else null,
+                            )
+                        if (result !is NetworkResult.Success || !isOlderCurrent(owner, fence)) return@launch
+                        // The page's offset. The gateway echoes the request offset, and the fetch window only
+                        // reaches past it when a seam retry widens — which is bounded, so this stays on the page.
+                        effectiveOffset = result.data.pagination?.offset ?: request.offset
+                        val older =
+                            mapMessages(
+                                sessionId,
+                                result.data.messages.orEmpty(),
+                                effectiveOffset,
+                                request.useLatestPaging,
+                            )
+
+                        // Both numbers describe the PAGE, not the fetch window: the seam rows we asked for on
+                        // top are not part of the page, and page-fullness (`returned >= limit`) is what says
+                        // whether more history exists. Counting them would make every short page look full.
+                        returned = (result.data.pagination?.returned ?: older.size) - overlap
+
+                        // Verify the seam before a row is written: a page that does not join is not spliced.
+                        when (val join = stitchOlderPage(sessionId, readMessages(), older, overlap)) {
+                            is OlderPageStitch.Joined -> stitched = join.older
+                            OlderPageStitch.SeamBroken -> {
+                                if (attemptsLeft == 0) {
+                                    write(ChatHistoryUpdate.OlderSeamBroken)
+                                    return@launch
+                                }
+                                attemptsLeft--
+                                overlap = (overlap * 4).coerceAtMost(OLDER_PAGE_OVERLAP_MAX)
+                            }
+                        }
+                    }
                     val persisted =
                         withContext(io) {
-                            persist(older, sessionId, fence.transcriptRevision) { isOlderCurrent(owner, fence) }
+                            persist(stitched, sessionId, fence.transcriptRevision) { isOlderCurrent(owner, fence) }
                         }
                     if (!persisted || !isOlderCurrent(owner, fence)) return@launch
                     write(
                         ChatHistoryUpdate.OlderLoaded(
-                            older = older,
+                            older = stitched,
                             useLatestPaging = request.useLatestPaging,
-                            returned = result.data.pagination?.returned ?: older.size,
+                            returned = returned,
                             effectiveOffset = effectiveOffset,
                             limit = request.limit,
                         ),
