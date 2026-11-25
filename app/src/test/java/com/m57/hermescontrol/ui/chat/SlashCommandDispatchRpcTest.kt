@@ -71,13 +71,6 @@ class SlashCommandDispatchRpcTest {
         Dispatchers.setMain(testDispatcher)
         val testMainDispatcher = Dispatchers.Main
 
-        mockkStatic(android.util.Log::class)
-        every { android.util.Log.d(any(), any()) } returns 0
-        every { android.util.Log.i(any(), any()) } returns 0
-        every { android.util.Log.w(any(), any<String>()) } returns 0
-        every { android.util.Log.e(any(), any()) } returns 0
-        every { android.util.Log.e(any(), any(), any()) } returns 0
-
         mockkStatic(Dispatchers::class)
         every { Dispatchers.IO } returns testDispatcher
         every { Dispatchers.Main } returns testMainDispatcher

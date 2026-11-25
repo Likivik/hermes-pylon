@@ -9,7 +9,6 @@ import com.m57.hermescontrol.data.config.resolvedBaseUrl
 import com.m57.hermescontrol.data.security.SecretStore
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.mockkStatic
 import io.mockk.unmockkAll
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -54,13 +53,6 @@ class Issue647ProfileUrlTest {
         every { mockEditor.putInt(any(), any()) } returns mockEditor
         every { mockEditor.putBoolean(any(), any()) } returns mockEditor
         every { mockPrefs.getBoolean("migrated_to_datastore", any()) } returns true
-
-        mockkStatic(android.util.Log::class)
-        every { android.util.Log.d(any(), any()) } returns 0
-        every { android.util.Log.e(any(), any()) } returns 0
-        every { android.util.Log.e(any(), any(), any()) } returns 0
-        every { android.util.Log.w(any(), any<String>()) } returns 0
-        every { android.util.Log.i(any(), any()) } returns 0
 
         val tempDir = java.io.File(System.getProperty("java.io.tmpdir") ?: "/tmp")
         testContext = ReproContext(tempDir, mockContext)
