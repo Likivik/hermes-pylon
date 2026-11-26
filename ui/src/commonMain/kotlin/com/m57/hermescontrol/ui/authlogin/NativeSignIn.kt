@@ -2,6 +2,30 @@ package com.m57.hermescontrol.ui.authlogin
 
 import com.m57.hermescontrol.data.local.NativeTokenStore
 
+/**
+ * Why a sign-in did not complete.
+ *
+ * Typed rather than a message: this layer has no string resources and no locale, so any text it
+ * produced would be untranslatable and would bypass the resolver every other message on the login
+ * screen goes through. [NativeSignInResult.Failed.detail] carries the untranslated diagnostic.
+ */
+enum class NativeSignInFailure {
+    /** Our own pre-check rejected the redirect URL; the flow never started. */
+    RefusedRedirect,
+
+    /** The token endpoint returned `400`: the code was already used, or the verifier did not match. */
+    CodeRejected,
+
+    /** `401 session_expired` from the token endpoint. */
+    SignInExpired,
+
+    /** The provider redirected with `error=` instead of a code. */
+    ProviderRefused,
+
+    /** `503` or a transport failure. Worth retrying. */
+    Network,
+}
+
 sealed interface NativeSignInResult {
     data class Success(
         val token: NativeToken,
@@ -11,7 +35,8 @@ sealed interface NativeSignInResult {
     data object Cancelled : NativeSignInResult
 
     data class Failed(
-        val reason: String,
+        val failure: NativeSignInFailure,
+        val detail: String = "",
     ) : NativeSignInResult
 
     /** This platform cannot run the flow at all. The web build is the expected caller. */
@@ -53,7 +78,7 @@ class NativeSignIn(
             val redirect = NativeAuthorize.loopbackRedirect(listener.port)
 
             NativeAuthorize.redirectRejection(redirect)?.let {
-                return NativeSignInResult.Failed("refusing to start: $it")
+                return NativeSignInResult.Failed(NativeSignInFailure.RefusedRedirect, it)
             }
 
             openBrowser(
@@ -68,7 +93,11 @@ class NativeSignIn(
 
             return when (val outcome = listener.awaitCallback(state)) {
                 is LoopbackOutcome.TimedOut -> NativeSignInResult.Cancelled
-                is LoopbackOutcome.Rejected -> NativeSignInResult.Failed(outcome.reason)
+                is LoopbackOutcome.Rejected ->
+                    NativeSignInResult.Failed(
+                        NativeSignInFailure.ProviderRefused,
+                        outcome.reason,
+                    )
                 is LoopbackOutcome.Received -> redeem(gatewayBaseUrl, outcome.callback.code, verifier)
             }
         } finally {
@@ -86,9 +115,9 @@ class NativeSignIn(
                 store.save(result.token)
                 NativeSignInResult.Success(result.token)
             }
-            is TokenResult.InvalidCode -> NativeSignInResult.Failed("the sign-in code was rejected; try again")
-            is TokenResult.SessionExpired -> NativeSignInResult.Failed("the sign-in expired; try again")
-            is TokenResult.Retryable -> NativeSignInResult.Failed(result.reason)
+            is TokenResult.InvalidCode -> NativeSignInResult.Failed(NativeSignInFailure.CodeRejected)
+            is TokenResult.SessionExpired -> NativeSignInResult.Failed(NativeSignInFailure.SignInExpired)
+            is TokenResult.Retryable -> NativeSignInResult.Failed(NativeSignInFailure.Network, result.reason)
         }
 
     companion object {

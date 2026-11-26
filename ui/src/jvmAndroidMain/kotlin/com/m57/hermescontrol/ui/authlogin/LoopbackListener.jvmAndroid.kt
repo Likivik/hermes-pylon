@@ -129,3 +129,6 @@ private class JvmLoopbackListener(
 }
 
 actual fun openLoopbackListener(timeoutMillis: Long): LoopbackListener = JvmLoopbackListener(timeoutMillis)
+
+/** A JVM or Android process can bind a socket on the loopback interface. */
+actual val loopbackIsAvailable: Boolean = true

@@ -129,7 +129,9 @@ class NativeSignInTest {
         runBlocking {
             val result = signIn().signIn(base, openBrowser = browser(code = null, error = "access_denied"))
 
-            assertEquals("access_denied", assertIs<NativeSignInResult.Failed>(result).reason)
+            val failed = assertIs<NativeSignInResult.Failed>(result)
+            assertEquals(NativeSignInFailure.ProviderRefused, failed.failure)
+            assertEquals("access_denied", failed.detail, "the provider's reason survives as a diagnostic")
         }
 
     /**

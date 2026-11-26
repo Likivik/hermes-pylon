@@ -71,6 +71,8 @@ data class AuthLoginUiState(
     val authMode: DashboardAuthMode? = null,
     val connectionSuccess: Boolean = false,
     val errorMessage: String? = null,
+    /** A Nous sign-in problem, resolved to text by the screen. Null means no Nous error. */
+    val nousError: NousLoginError? = null,
     val loggedInProfiles: List<GatewayInstance> = emptyList(),
 )
 
@@ -392,7 +394,7 @@ class AuthLoginViewModel(
         val endpoint = runCatching { ServerEndpoint.parseForBuild(_uiState.value.baseUrl) }.getOrNull()
         if (store == null || endpoint == null) {
             _uiState.update {
-                it.copy(isLoading = false, errorMessage = "Sign-in is unavailable until the app has finished starting.")
+                it.copy(isLoading = false, nousError = NousLoginError(NousLoginErrorKind.Unavailable))
             }
             return
         }
@@ -417,16 +419,23 @@ class AuthLoginViewModel(
                     }
                 }
                 is NativeSignInResult.Cancelled -> {
-                    _uiState.update { it.copy(isLoading = false, errorMessage = null) }
+                    _uiState.update { it.copy(isLoading = false, errorMessage = null, nousError = null) }
                 }
                 is NativeSignInResult.Failed -> {
-                    _uiState.update { it.copy(isLoading = false, errorMessage = result.reason) }
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = null,
+                            nousError = NousLoginError.of(result.failure, result.detail),
+                        )
+                    }
                 }
                 is NativeSignInResult.Unsupported -> {
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            errorMessage = "Nous sign-in is not available on this platform.",
+                            errorMessage = null,
+                            nousError = NousLoginError(NousLoginErrorKind.Unsupported),
                         )
                     }
                 }

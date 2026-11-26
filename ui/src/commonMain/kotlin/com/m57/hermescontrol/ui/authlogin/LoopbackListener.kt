@@ -56,5 +56,14 @@ interface LoopbackListener {
  */
 expect fun openLoopbackListener(timeoutMillis: Long = DEFAULT_LOOPBACK_TIMEOUT_MILLIS): LoopbackListener
 
+/**
+ * Whether this platform can accept a loopback redirect at all.
+ *
+ * A browser cannot listen on `127.0.0.1` — that address is the machine the *server* runs on, not
+ * the one the user sits at. The sign-in screen asks this before offering the button, so the web
+ * build never shows an action that cannot work.
+ */
+expect val loopbackIsAvailable: Boolean
+
 /** Long enough for a provider login with a 2FA prompt, short enough to release the port. */
 const val DEFAULT_LOOPBACK_TIMEOUT_MILLIS: Long = 60_000

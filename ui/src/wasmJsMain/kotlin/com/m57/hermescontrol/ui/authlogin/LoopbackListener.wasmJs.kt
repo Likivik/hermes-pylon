@@ -9,3 +9,6 @@ package com.m57.hermescontrol.ui.authlogin
  */
 actual fun openLoopbackListener(timeoutMillis: Long): LoopbackListener =
     throw UnsupportedOperationException("a browser cannot listen on loopback")
+
+/** The web build has no loopback of its own, so the sign-in button is never offered. */
+actual val loopbackIsAvailable: Boolean = false

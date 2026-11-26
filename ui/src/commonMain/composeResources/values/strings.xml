@@ -981,6 +981,13 @@
     <string name="auth_login_existing_profiles_title">Use existing logged-in profile:</string>
     <string name="auth_login_use_profile">Enter as %1$s</string>
     <string name="auth_login_action_nous">Continue with Nous</string>
+    <string name="auth_login_error_nous_unavailable">Sign-in is unavailable until the app has finished starting.</string>
+    <string name="auth_login_error_nous_unsupported">Nous sign-in is not available on this platform. Use the password instead.</string>
+    <string name="auth_login_error_nous_rejected">The sign-in code was rejected. Try again.</string>
+    <string name="auth_login_error_nous_expired">The sign-in expired. Try again.</string>
+    <string name="auth_login_error_nous_refused">The sign-in could not start: %1$s</string>
+    <string name="auth_login_error_nous_provider">The sign-in provider refused the request: %1$s</string>
+    <string name="auth_login_error_nous_network">Could not reach the gateway to finish signing in. Try again.</string>
 
     <!-- Landing Screen -->
     <string name="landing_title">Pylon for Hermes</string>

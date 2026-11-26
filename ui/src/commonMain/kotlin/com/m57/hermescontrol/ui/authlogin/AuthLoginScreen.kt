@@ -53,6 +53,13 @@ import com.m57.hermescontrol.generated.resources.auth_login_action_connect
 import com.m57.hermescontrol.generated.resources.auth_login_action_nous
 import com.m57.hermescontrol.generated.resources.auth_login_base_url_label
 import com.m57.hermescontrol.generated.resources.auth_login_desc
+import com.m57.hermescontrol.generated.resources.auth_login_error_nous_expired
+import com.m57.hermescontrol.generated.resources.auth_login_error_nous_network
+import com.m57.hermescontrol.generated.resources.auth_login_error_nous_provider
+import com.m57.hermescontrol.generated.resources.auth_login_error_nous_refused
+import com.m57.hermescontrol.generated.resources.auth_login_error_nous_rejected
+import com.m57.hermescontrol.generated.resources.auth_login_error_nous_unavailable
+import com.m57.hermescontrol.generated.resources.auth_login_error_nous_unsupported
 import com.m57.hermescontrol.generated.resources.auth_login_existing_profiles_title
 import com.m57.hermescontrol.generated.resources.auth_login_password_label
 import com.m57.hermescontrol.generated.resources.auth_login_probing_dashboard
@@ -300,13 +307,28 @@ fun AuthLoginScreen(
                 )
             }
 
-            // Error message
+            // Error message. A Nous failure is turned into text here, not in the view model,
+            // which has no locale and no string resources.
+            val nousMessage =
+                state.nousError?.let { err ->
+                    when (err.kind) {
+                        NousLoginErrorKind.Unavailable -> stringResource(Res.string.auth_login_error_nous_unavailable)
+                        NousLoginErrorKind.Unsupported -> stringResource(Res.string.auth_login_error_nous_unsupported)
+                        NousLoginErrorKind.RefusedRedirect ->
+                            stringResource(Res.string.auth_login_error_nous_refused, err.detail)
+                        NousLoginErrorKind.CodeRejected -> stringResource(Res.string.auth_login_error_nous_rejected)
+                        NousLoginErrorKind.SignInExpired -> stringResource(Res.string.auth_login_error_nous_expired)
+                        NousLoginErrorKind.ProviderRefused ->
+                            stringResource(Res.string.auth_login_error_nous_provider, err.detail)
+                        NousLoginErrorKind.Network -> stringResource(Res.string.auth_login_error_nous_network)
+                    }
+                }
             AnimatedVisibility(
-                visible = state.errorMessage != null,
+                visible = state.errorMessage != null || nousMessage != null,
                 enter = fadeIn(),
                 exit = fadeOut(),
             ) {
-                state.errorMessage?.let { msg ->
+                (state.errorMessage ?: nousMessage)?.let { msg ->
                     Text(
                         text = msg,
                         style =
@@ -322,18 +344,23 @@ fun AuthLoginScreen(
             // Continue with Nous. The gateway's native flow opens the provider in a
             // Custom Tab and returns on the device's own loopback port, so the code
             // never passes through this app's server or through a URL scheme.
-            Spacer(Modifier.height(8.dp))
-            Button(
-                onClick = {
-                    viewModel.signInWithNous { url ->
-                        launcher.openExternalUrl(url)
-                        Unit
-                    }
-                },
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                enabled = !state.isLoading && !state.probing,
-            ) {
-                Text(text = stringResource(Res.string.auth_login_action_nous))
+            // Offered only where a loopback socket is possible: on the web that address
+            // belongs to the server, so the button would fail after the user had already
+            // signed in at the provider.
+            if (loopbackIsAvailable) {
+                Spacer(Modifier.height(8.dp))
+                Button(
+                    onClick = {
+                        viewModel.signInWithNous { url ->
+                            launcher.openExternalUrl(url)
+                            Unit
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    enabled = !state.isLoading && !state.probing,
+                ) {
+                    Text(text = stringResource(Res.string.auth_login_action_nous))
+                }
             }
 
             // Connect / Probe button
