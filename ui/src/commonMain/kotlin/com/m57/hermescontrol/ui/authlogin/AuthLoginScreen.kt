@@ -361,6 +361,18 @@ fun AuthLoginScreen(
                 ) {
                     Text(text = stringResource(Res.string.auth_login_action_nous))
                 }
+            } else if (WebSignIn.offersBrowserSignIn(state.providers)) {
+                // Web: the gateway's browser flow. Gated on the provider list the gateway
+                // advertises, so a deployment with no interactive provider never offers a
+                // button that would 404 after the user had been sent to the provider.
+                Spacer(Modifier.height(8.dp))
+                Button(
+                    onClick = { viewModel.signInWithNousInBrowser(::navigateTopLevel) },
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    enabled = !state.isLoading && !state.probing,
+                ) {
+                    Text(text = stringResource(Res.string.auth_login_action_nous))
+                }
             }
 
             // Connect / Probe button
