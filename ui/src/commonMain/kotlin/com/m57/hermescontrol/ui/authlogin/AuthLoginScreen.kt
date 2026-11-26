@@ -361,6 +361,18 @@ fun AuthLoginScreen(
                 ) {
                     Text(text = stringResource(Res.string.auth_login_action_nous))
                 }
+            } else if (state.authMode != null) {
+                // Web: the gateway's browser flow. Offered only once the gateway has answered,
+                // because a build with no interactive provider would 404 after the user had
+                // already been sent to the provider.
+                Spacer(Modifier.height(8.dp))
+                Button(
+                    onClick = { viewModel.signInWithNousInBrowser { launcher.openExternalUrl(it) } },
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    enabled = !state.isLoading && !state.probing,
+                ) {
+                    Text(text = stringResource(Res.string.auth_login_action_nous))
+                }
             }
 
             // Connect / Probe button

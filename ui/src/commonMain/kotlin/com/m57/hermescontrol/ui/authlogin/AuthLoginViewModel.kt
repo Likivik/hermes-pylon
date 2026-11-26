@@ -444,6 +444,24 @@ class AuthLoginViewModel(
     }
 
     /**
+     * Starts the browser flow instead of the native one.
+     *
+     * Whole-page navigation, not a fetch: the gateway has to set its cookie on its own origin, and
+     * only a top-level navigation does that. Nothing is stored by Pylon — the cookie is the
+     * credential, and it never becomes visible to this app.
+     */
+    fun signInWithNousInBrowser(navigate: (String) -> Unit) {
+        val endpoint = runCatching { ServerEndpoint.parseForBuild(_uiState.value.baseUrl) }.getOrNull()
+        if (endpoint == null) {
+            _uiState.update { it.copy(nousError = NousLoginError(NousLoginErrorKind.Unavailable)) }
+            return
+        }
+
+        _uiState.update { it.copy(errorMessage = null, nousError = null) }
+        navigate(WebSignIn.authorizeUrl(endpoint.baseUrl.toString()))
+    }
+
+    /**
      * Step 2: Connect using the detected auth mode.
      */
     fun connect() {
