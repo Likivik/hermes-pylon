@@ -73,6 +73,11 @@ data class AuthLoginUiState(
     val errorMessage: String? = null,
     /** A Nous sign-in problem, resolved to text by the screen. Null means no Nous error. */
     val nousError: NousLoginError? = null,
+    /**
+     * Interactive sign-in providers the gateway advertises, by name. Fetched during the probe so
+     * the browser button appears only where the gateway can actually start that sign-in.
+     */
+    val providers: List<String> = emptyList(),
     val loggedInProfiles: List<GatewayInstance> = emptyList(),
 )
 
@@ -289,6 +294,7 @@ class AuthLoginViewModel(
 
         viewModelScope.launch {
             val result = withContext(ioDispatcher) { probeDashboardInternal(endpoint) }
+            val providers = withContext(ioDispatcher) { fetchProviders(endpoint) }
             val unreachableMsg =
                 if (result == null) {
                     resolver.get(Res.string.auth_login_error_unreachable)
@@ -300,11 +306,33 @@ class AuthLoginViewModel(
                     probing = false,
                     authMode = result?.authMode,
                     token = result?.extractedToken ?: it.token,
+                    providers = providers,
                     errorMessage = unreachableMsg,
                 )
             }
         }
     }
+
+    /**
+     * The interactive providers the gateway advertises, by name.
+     *
+     * `/api/auth/providers` answers `503` when the deployment has no interactive provider at all.
+     * That is a correct answer, not an outage, and an empty list is the safe reading: no browser
+     * sign-in is offered. Failing closed matters here because the alternative is sending the user
+     * to a provider round trip that 404s on arrival.
+     */
+    private suspend fun fetchProviders(endpoint: ServerEndpoint): List<String> =
+        try {
+            val response = probeClient.get(endpoint.baseUrl.resolve("api/auth/providers").toString())
+            if (response.status.value !in 200..299) {
+                emptyList()
+            } else {
+                WebSignIn.providerNames(response.bodyAsText())
+            }
+        } catch (e: Exception) {
+            HermesLog.w(TAG, "Provider list fetch failed (${e::class.simpleName})")
+            emptyList()
+        }
 
     /**
      * Result of probing the dashboard.

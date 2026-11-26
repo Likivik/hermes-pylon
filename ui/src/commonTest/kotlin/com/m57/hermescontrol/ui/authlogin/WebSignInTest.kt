@@ -75,4 +75,25 @@ class WebSignInTest {
         assertNull(WebSignIn.nextRejection("/"))
         assertNull(WebSignIn.nextRejection("/chat/42?tab=media"))
     }
+
+    @Test
+    fun theProviderListIsReadByName() {
+        assertEquals(
+            listOf("nous", "github"),
+            WebSignIn.providerNames("""{"providers":[{"name":"nous","display_name":"Nous"},{"name":"github"}]}"""),
+        )
+    }
+
+    /** A deployment with no interactive provider answers 503 with a `detail`, not a list. */
+    @Test
+    fun anErrorBodyMeansNoProviders() {
+        assertEquals(emptyList(), WebSignIn.providerNames("""{"detail":"no auth providers registered"}"""))
+    }
+
+    @Test
+    fun unreadableBodiesMeanNoProviders() {
+        assertEquals(emptyList(), WebSignIn.providerNames(""))
+        assertEquals(emptyList(), WebSignIn.providerNames("<html>502</html>"))
+        assertEquals(emptyList(), WebSignIn.providerNames("""{"providers":"nous"}"""))
+    }
 }

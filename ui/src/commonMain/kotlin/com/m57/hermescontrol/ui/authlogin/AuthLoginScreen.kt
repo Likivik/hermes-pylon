@@ -361,10 +361,10 @@ fun AuthLoginScreen(
                 ) {
                     Text(text = stringResource(Res.string.auth_login_action_nous))
                 }
-            } else if (state.authMode != null) {
-                // Web: the gateway's browser flow. Offered only once the gateway has answered,
-                // because a build with no interactive provider would 404 after the user had
-                // already been sent to the provider.
+            } else if (WebSignIn.DEFAULT_PROVIDER in state.providers) {
+                // Web: the gateway's browser flow. Gated on the provider list the gateway
+                // advertises, so a deployment with no interactive provider never offers a
+                // button that would 404 after the user had been sent to the provider.
                 Spacer(Modifier.height(8.dp))
                 Button(
                     onClick = { viewModel.signInWithNousInBrowser { launcher.openExternalUrl(it) } },

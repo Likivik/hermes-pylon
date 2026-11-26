@@ -1,5 +1,11 @@
 package com.m57.hermescontrol.ui.authlogin
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+
 /**
  * The browser half of Nous sign-in.
  *
@@ -45,6 +51,23 @@ object WebSignIn {
         val base = gatewayBaseUrl.trimEnd('/')
         return "$base/auth/login?provider=${encodeQuery(provider)}&next=${encodeQuery(next)}"
     }
+
+    /**
+     * The provider names in a `/api/auth/providers` body.
+     *
+     * Anything unreadable — a `503` body, an error page, a shape change — yields an empty list.
+     * The caller reads empty as "offer no browser sign-in", which is the safe direction: a missing
+     * button costs nothing, a wrong button costs a provider round trip that ends on a 404.
+     */
+    fun providerNames(body: String): List<String> =
+        runCatching {
+            Json
+                .parseToJsonElement(body)
+                .jsonObject["providers"]
+                ?.jsonArray
+                ?.mapNotNull { it.jsonObject["name"]?.jsonPrimitive?.contentOrNull }
+                .orEmpty()
+        }.getOrDefault(emptyList())
 
     /** Percent-encode everything that is not unreserved, which is what the gateway expects. */
     private fun encodeQuery(value: String): String =
