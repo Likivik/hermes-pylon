@@ -129,6 +129,19 @@ class NativeTokenExchangeTest {
         }
 
     @Test
+    fun aZeroExpiryIsASentinelNotADate() =
+        runTest {
+            // The gateway sends 0 for a session with no expiry of its own. Taken literally it
+            // means "expired in 1970", which would refresh — and rotate the token — on every call.
+            val body = """{"access_token":"a","refresh_token":"r","expires_at":0}"""
+
+            val token = assertIs<TokenResult.Success>(exchange(engine(body = body)).redeem(base, "c", "v")).token
+
+            assertNull(token.expiresAtEpochSeconds)
+            assertFalse(token.needsRefresh(nowEpochSeconds = 1_893_456_000L))
+        }
+
+    @Test
     fun aFourHundredMeansTheCodeWasRejected() =
         runTest {
             val result =

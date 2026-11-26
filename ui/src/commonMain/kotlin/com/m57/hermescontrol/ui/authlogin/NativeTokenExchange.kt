@@ -123,10 +123,15 @@ class NativeTokenExchange(
      * `expires_at` is read as a number when it looks like one, and as a number written in a string
      * otherwise. Anything else is unknown, which [NativeToken.needsRefresh] treats as "do not
      * pre-emptively refresh" rather than as "expired".
+     *
+     * A non-positive value is a sentinel, not a date: the gateway sends `0` for a session that has
+     * no expiry of its own. Reading that literally would mean "expired long ago" — a refresh on
+     * every call, and a token rotation each time.
      */
     private fun JsonObject.epochSecondsOrNull(key: String): Long? {
         val primitive = this[key] as? JsonPrimitive ?: return null
-        return primitive.longOrNull ?: primitive.takeIf { it.isString }?.content?.toLongOrNull()
+        val seconds = primitive.longOrNull ?: primitive.takeIf { it.isString }?.content?.toLongOrNull()
+        return seconds?.takeIf { it > 0 }
     }
 
     private fun endpointUrl(
