@@ -367,7 +367,7 @@ fun AuthLoginScreen(
                 // button that would 404 after the user had been sent to the provider.
                 Spacer(Modifier.height(8.dp))
                 Button(
-                    onClick = { viewModel.signInWithNousInBrowser(::navigateTopLevel) },
+                    onClick = { viewModel.signInWithNousInBrowser { launcher.openExternalUrl(it) } },
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                     enabled = !state.isLoading && !state.probing,
                 ) {
