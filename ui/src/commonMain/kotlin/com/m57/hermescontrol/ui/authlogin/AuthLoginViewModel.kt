@@ -71,6 +71,8 @@ data class AuthLoginUiState(
     val authMode: DashboardAuthMode? = null,
     val connectionSuccess: Boolean = false,
     val errorMessage: String? = null,
+    /** A Nous sign-in problem, resolved to text by the screen. Null means no Nous error. */
+    val nousError: NousLoginError? = null,
     val loggedInProfiles: List<GatewayInstance> = emptyList(),
 )
 
@@ -97,6 +99,40 @@ class AuthLoginViewModel(
 
     init {
         loadLoggedInProfiles()
+        restoreNativeSession()
+    }
+
+    /**
+     * Adopts a stored native token at launch, so a Nous sign-in survives the process ending.
+     *
+     * Runs silently: a stale or rejected token clears itself and leaves the login screen as the
+     * user left it. A network call is made only when something is actually stored, so password
+     * users pay nothing for this.
+     */
+    private fun restoreNativeSession() {
+        val store = com.m57.hermescontrol.data.local.AuthManager.secretStoreOrNull() ?: return
+        val endpoint = runCatching { ServerEndpoint.parseForBuild(_uiState.value.baseUrl) }.getOrNull() ?: return
+        val session =
+            com.m57.hermescontrol.data.local.NativeSession(
+                exchange = NativeTokenExchange(com.m57.hermescontrol.data.remote.createHermesHttpClient()),
+                store = com.m57.hermescontrol.data.local.NativeTokenStore(store),
+            )
+        if (session.stored() == null) return
+
+        viewModelScope.launch {
+            val token = session.current(endpoint.baseUrl.toString())
+            if (token == null) return@launch
+
+            val validated = connectTokenOnly(endpoint, token.accessToken)
+            if (validated != null) {
+                completeSignIn(endpoint, DashboardAuthMode.TOKEN_ONLY, validated)
+            } else {
+                // The stored token is dead. Clear it and drop the error it raised so the screen
+                // still looks like a normal first launch.
+                session.forget()
+                _uiState.update { it.copy(isLoading = false, errorMessage = null) }
+            }
+        }
     }
 
     fun loadLoggedInProfiles() {
@@ -347,6 +383,67 @@ class AuthLoginViewModel(
     )
 
     /**
+     * Continue with Nous: run the gateway's native flow, then adopt the bearer token.
+     *
+     * The token goes into the same encrypted store as the session token, so a later launch finds
+     * exactly one credential. A cancelled tab is not an error — the user closed it, and an error
+     * banner would be a lie about what happened.
+     */
+    fun signInWithNous(openBrowser: (String) -> Unit) {
+        val store = com.m57.hermescontrol.data.local.AuthManager.secretStoreOrNull()
+        val endpoint = runCatching { ServerEndpoint.parseForBuild(_uiState.value.baseUrl) }.getOrNull()
+        if (store == null || endpoint == null) {
+            _uiState.update {
+                it.copy(isLoading = false, nousError = NousLoginError(NousLoginErrorKind.Unavailable))
+            }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            val signIn =
+                NativeSignIn(
+                    exchange = NativeTokenExchange(com.m57.hermescontrol.data.remote.createHermesHttpClient()),
+                    store = com.m57.hermescontrol.data.local.NativeTokenStore(store),
+                )
+
+            when (val result = signIn.signIn(endpoint.baseUrl.toString(), openBrowser = openBrowser)) {
+                is NativeSignInResult.Success -> {
+                    // connectTokenOnly returns the token when the gateway accepts it, and null
+                    // after setting errorMessage when it does not. Reading its return as an error
+                    // string inverts both outcomes: the token becomes a visible error and success
+                    // never advances the screen.
+                    val validated = connectTokenOnly(endpoint, result.token.accessToken)
+                    if (validated != null) {
+                        completeSignIn(endpoint, DashboardAuthMode.TOKEN_ONLY, validated)
+                    }
+                }
+                is NativeSignInResult.Cancelled -> {
+                    _uiState.update { it.copy(isLoading = false, errorMessage = null, nousError = null) }
+                }
+                is NativeSignInResult.Failed -> {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = null,
+                            nousError = NousLoginError.of(result.failure, result.detail),
+                        )
+                    }
+                }
+                is NativeSignInResult.Unsupported -> {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = null,
+                            nousError = NousLoginError(NousLoginErrorKind.Unsupported),
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    /**
      * Step 2: Connect using the detected auth mode.
      */
     fun connect() {
@@ -417,32 +514,47 @@ class AuthLoginViewModel(
                 }
 
             if (result != null) {
-                // The validated login may replace another profile or endpoint.
-                // Stop the old transport before mutating application auth state.
-                HermesWsClient.disconnect(clearPendingMessages = true)
-                AuthSessionState.markAuthenticated()
-                authStore.setBaseUrl(endpoint.baseUrl.toString())
-                if (state.authMode == DashboardAuthMode.TOKEN_ONLY) {
-                    authStore.setToken(result.loopbackToken)
-                    // Loopback mode — no session cookie; ensure any stale one
-                    // is cleared so the jar only sends the Bearer token.
-                    authStore.setSessionCookie(null)
-                    authStore.setWsAuthParam("token")
-                } else {
-                    // Gated (BASIC_AUTH / ALL): the session cookie was captured
-                    // automatically by the shared CookieJar during the login
-                    // call (issue #470), so we keep it and switch the WS auth
-                    // param to a fresh, handshake-local ticket.
-                    authStore.setToken(null)
-                    authStore.setWsAuthParam("ticket")
-                }
-                GatewayConnection.rebuild()
-                // A previous failed session may have left the singleton in
-                // AUTH_EXPIRED, which connect() intentionally refuses to clear.
-                HermesWsClient.connect()
-                _uiState.update { it.copy(isLoading = false, connectionSuccess = true) }
+                completeSignIn(endpoint, state.authMode, result.loopbackToken)
             }
         }
+    }
+
+    /**
+     * Everything that must happen once a credential has been validated.
+     *
+     * Extracted from [connect] rather than copied: two sign-in paths each carrying their own copy
+     * of this sequence is how one of them ends up without `markAuthenticated()` or without a
+     * rebuilt transport, and the symptom is a login that "works" but never leaves the screen.
+     */
+    private fun completeSignIn(
+        endpoint: ServerEndpoint,
+        authMode: DashboardAuthMode?,
+        loopbackToken: String?,
+    ) {
+        // The validated login may replace another profile or endpoint.
+        // Stop the old transport before mutating application auth state.
+        HermesWsClient.disconnect(clearPendingMessages = true)
+        AuthSessionState.markAuthenticated()
+        authStore.setBaseUrl(endpoint.baseUrl.toString())
+        if (authMode == DashboardAuthMode.TOKEN_ONLY) {
+            authStore.setToken(loopbackToken)
+            // Loopback mode — no session cookie; ensure any stale one
+            // is cleared so the jar only sends the Bearer token.
+            authStore.setSessionCookie(null)
+            authStore.setWsAuthParam("token")
+        } else {
+            // Gated (BASIC_AUTH / ALL): the session cookie was captured
+            // automatically by the shared CookieJar during the login
+            // call (issue #470), so we keep it and switch the WS auth
+            // param to a fresh, handshake-local ticket.
+            authStore.setToken(null)
+            authStore.setWsAuthParam("ticket")
+        }
+        GatewayConnection.rebuild()
+        // A previous failed session may have left the singleton in
+        // AUTH_EXPIRED, which connect() intentionally refuses to clear.
+        HermesWsClient.connect()
+        _uiState.update { it.copy(isLoading = false, errorMessage = null, connectionSuccess = true) }
     }
 
     /**

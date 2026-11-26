@@ -87,7 +87,13 @@ private const val H5 = -1694144372
 private const val H6 = 528734635
 private const val H7 = 1541459225
 
-fun sha256Hex(input: ByteArray): String {
+/**
+ * SHA-256 of [input] as its 32 raw bytes.
+ *
+ * PKCE needs the digest itself: the S256 challenge is the base64url of these bytes, not
+ * their hex spelling. [sha256Hex] is this function rendered as text.
+ */
+fun sha256Bytes(input: ByteArray): ByteArray {
     val bitLength = input.size.toLong() * 8
     val padded =
         input.copyOf(((input.size + 9 + 63) / 64) * 64).also { buf ->
@@ -162,9 +168,14 @@ fun sha256Hex(input: ByteArray): String {
         chunk += 64
     }
 
-    return listOf(h0, h1, h2, h3, h4, h5, h6, h7).joinToString("") { word ->
-        word.toUInt().toString(16).padStart(8, '0')
-    }
+    val digest = intArrayOf(h0, h1, h2, h3, h4, h5, h6, h7)
+    return ByteArray(32) { index -> (digest[index / 4] ushr (24 - (index % 4) * 8)).toByte() }
 }
+
+/** SHA-256 of [input] as lowercase hex. */
+fun sha256Hex(input: ByteArray): String =
+    sha256Bytes(input).joinToString("") { byte ->
+        (byte.toInt() and 0xFF).toString(16).padStart(2, '0')
+    }
 
 private fun Int.rotateRight(bits: Int): Int = (this ushr bits) or (this shl (32 - bits))

@@ -287,6 +287,9 @@ kotlin {
                 // Skiko headless, Android needs the androidx driver; this
                 // artifact is the common entry point.
                 implementation(libs.compose.ui.test)
+                // Asserts the exact request the gateway will receive (URL, method, body,
+                // headers) without a network or a live gateway.
+                implementation(libs.ktor.client.mock)
             }
         }
         // The native Skiko binary is platform-specific. linux-x64 is the
