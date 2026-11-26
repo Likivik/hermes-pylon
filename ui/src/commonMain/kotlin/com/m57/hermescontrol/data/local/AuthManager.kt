@@ -68,6 +68,14 @@ object AuthManager : WsAuthConfig {
     @Volatile
     var secretStoreFactory: (() -> SecretStore)? = null
 
+    /**
+     * The encrypted store in use, or null before [init].
+     *
+     * Exposed for features that persist their own credential (the native sign-in token) and must
+     * use the same Keystore-backed store rather than inventing a second one.
+     */
+    fun secretStoreOrNull(): SecretStore? = secretStoreFactory?.invoke() ?: secureStorage
+
     @Volatile
     private var _serverStore: ServerStore? = null
 
