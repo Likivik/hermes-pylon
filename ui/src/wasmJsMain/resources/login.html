@@ -274,10 +274,41 @@
                 a.className = 'provider';
                 a.href = 'auth/login?provider=' + encodeURIComponent(p.name) +
                     '&next=' + encodeURIComponent(NEXT);
+                // A new tab, not this one: the journey ends on the gateway's own pages,
+                // and following it here would throw away the tab the user was on.
+                a.target = '_blank';
+                a.rel = 'noopener';
                 a.textContent = 'Continue with ' + (p.display_name || p.name);
+                a.addEventListener('click', watchForSession);
                 providersEl.appendChild(a);
             });
             providersEl.hidden = false;
+        }
+
+        // The tab is signed in the moment the provider sends it back: the cookie belongs
+        // to this origin, so every tab here has it. This tab only lacks the knowledge, so
+        // it asks until the answer changes and then goes on, instead of stranding the
+        // user on a login page that they are already past.
+        var watching = false;
+
+        function watchForSession() {
+            if (watching) return;
+            watching = true;
+            var tries = 0;
+            var timer = setInterval(function () {
+                tries += 1;
+                fetch('api/auth/me', { cache: 'no-store' })
+                    .then(function (res) {
+                        if (!res.ok) return;
+                        clearInterval(timer);
+                        location.href = NEXT;
+                    })
+                    .catch(function () {});
+                if (tries >= 75) {
+                    clearInterval(timer);
+                    watching = false;
+                }
+            }, 2000);
         }
 
         function applyPasswordPolicy(list) {
