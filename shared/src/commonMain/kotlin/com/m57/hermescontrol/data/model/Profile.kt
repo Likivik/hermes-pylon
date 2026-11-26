@@ -1,9 +1,12 @@
 package com.m57.hermescontrol.data.model
 
+import com.m57.hermescontrol.util.HermesLog
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.decodeFromJsonElement
+
+private const val TAG = "ProfileInfo"
 
 @Serializable
 data class ProfilesResponse(
@@ -31,7 +34,9 @@ data class ProfileInfo(
 ) {
     fun botMeta(json: Json = BOT_METADATA_JSON): BotRosterMeta? {
         val element = ui_meta?.get(BOT_METADATA_NAMESPACE) ?: return null
-        return runCatching { json.decodeFromJsonElement<BotRosterMeta>(element) }.getOrNull()
+        return runCatching { json.decodeFromJsonElement<BotRosterMeta>(element) }
+            .onFailure { HermesLog.d(TAG, "bot metadata is not a roster meta (${it::class.simpleName})") }
+            .getOrNull()
     }
 
     val effectiveTitle: String

@@ -1,4 +1,5 @@
 package com.m57.hermescontrol.data.model
+import com.m57.hermescontrol.util.HermesLog
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.nullable
@@ -8,6 +9,8 @@ import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.decodeFromJsonElement
+
+private const val TAG = "StatusResponse"
 
 @Serializable
 data class StatusResponse(
@@ -78,6 +81,7 @@ object NullableMemoryPressureStatusSerializer : KSerializer<MemoryPressureStatus
         return runCatching {
             decoder.json.decodeFromJsonElement(MemoryPressureStatus.serializer(), element)
         }.map { value -> value.copy(pressure = normalizePressureValue(value.pressure)) }
+            .onFailure { HermesLog.w(TAG, "memory pressure is unreadable (${it::class.simpleName}); reporting unknown") }
             .getOrElse { MemoryPressureStatus(pressure = "unknown") }
     }
 
@@ -98,6 +102,7 @@ object NullableDiskPressureStatusSerializer : KSerializer<DiskPressureStatus?> {
         return runCatching {
             decoder.json.decodeFromJsonElement(DiskPressureStatus.serializer(), element)
         }.map { value -> value.copy(pressure = normalizePressureValue(value.pressure)) }
+            .onFailure { HermesLog.w(TAG, "disk pressure is unreadable (${it::class.simpleName}); reporting unknown") }
             .getOrElse { DiskPressureStatus(pressure = "unknown") }
     }
 
