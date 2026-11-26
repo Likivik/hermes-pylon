@@ -3,7 +3,9 @@ package com.m57.hermescontrol.ui.authlogin
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * The browser flow's only local logic is the URL, and the part that can cost a completed sign-in
@@ -95,5 +97,16 @@ class WebSignInTest {
         assertEquals(emptyList(), WebSignIn.providerNames(""))
         assertEquals(emptyList(), WebSignIn.providerNames("<html>502</html>"))
         assertEquals(emptyList(), WebSignIn.providerNames("""{"providers":"nous"}"""))
+    }
+
+    /** The screen's only branch decision: offer the browser button, or do not. */
+    @Test
+    fun theBrowserButtonIsOfferedOnlyForOurProvider() {
+        assertTrue(WebSignIn.offersBrowserSignIn(listOf("nous")))
+        assertTrue(WebSignIn.offersBrowserSignIn(listOf("github", "nous")))
+
+        assertFalse(WebSignIn.offersBrowserSignIn(emptyList()), "a deployment with no provider offers nothing")
+        assertFalse(WebSignIn.offersBrowserSignIn(listOf("github")))
+        assertFalse(WebSignIn.offersBrowserSignIn(listOf("Nous")), "the provider's own name is lowercase")
     }
 }

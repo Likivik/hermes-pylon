@@ -23,6 +23,16 @@ object WebSignIn {
     const val DEFAULT_PROVIDER = "nous"
     const val DEFAULT_NEXT = "/"
 
+    /**
+     * Whether to offer the browser button at all.
+     *
+     * The gateway is the only thing that knows if it has an interactive provider, so this asks for
+     * the provider by name. Anything else — an empty list, a deployment whose providers are
+     * password-only — means no button, because the alternative is a provider round trip that ends
+     * on a 404.
+     */
+    fun offersBrowserSignIn(providers: List<String>): Boolean = DEFAULT_PROVIDER in providers
+
     /** A path on the gateway's own origin. Absolute URLs, `//host` and control characters are out. */
     fun nextRejection(next: String): String? =
         when {

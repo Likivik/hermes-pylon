@@ -294,7 +294,14 @@ class AuthLoginViewModel(
 
         viewModelScope.launch {
             val result = withContext(ioDispatcher) { probeDashboardInternal(endpoint) }
-            val providers = withContext(ioDispatcher) { fetchProviders(endpoint) }
+            // Only the browser build reads this, so asking on a phone probe would be a second
+            // round trip that nothing looks at.
+            val providers =
+                if (loopbackIsAvailable) {
+                    emptyList()
+                } else {
+                    withContext(ioDispatcher) { fetchProviders(endpoint) }
+                }
             val unreachableMsg =
                 if (result == null) {
                     resolver.get(Res.string.auth_login_error_unreachable)
