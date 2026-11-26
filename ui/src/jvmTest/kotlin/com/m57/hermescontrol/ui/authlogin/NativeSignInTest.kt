@@ -53,7 +53,10 @@ class NativeSignInTest {
                 respond(body, status, headersOf(HttpHeaders.ContentType, "application/json"))
             }
         return NativeSignIn(
-            exchange = NativeTokenExchange(createHermesHttpClient(engine, HermesHttpConfig.Default.copy(maxRetries = 0))),
+            exchange =
+                NativeTokenExchange(
+                    createHermesHttpClient(engine, HermesHttpConfig.Default.copy(maxRetries = 0)),
+                ),
             store = store,
             timeoutMillis = timeoutMillis,
         )
@@ -137,8 +140,9 @@ class NativeSignInTest {
     @Test
     fun aRejectedCodePersistsNoToken() =
         runBlocking {
-            val result = signIn(status = HttpStatusCode.BadRequest, body = """{"detail":"invalid"}""")
-                .signIn(base, openBrowser = browser())
+            val result =
+                signIn(status = HttpStatusCode.BadRequest, body = """{"detail":"invalid"}""")
+                    .signIn(base, openBrowser = browser())
 
             assertIs<NativeSignInResult.Failed>(result)
             assertNull(store.load())

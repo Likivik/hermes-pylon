@@ -132,6 +132,5 @@ class NativeTokenExchange(
     private fun endpointUrl(
         baseUrl: String,
         vararg segments: String,
-    ): String =
-        URLBuilder(Url(baseUrl)).apply { appendPathSegments(*segments) }.buildString()
+    ): String = URLBuilder(Url(baseUrl)).apply { appendPathSegments(*segments) }.buildString()
 }

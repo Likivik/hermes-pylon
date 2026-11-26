@@ -142,7 +142,8 @@ class NativeTokenExchangeTest {
     @Test
     fun aFourOhOneMeansTheRefreshTokenIsDead() =
         runTest {
-            val body = """{"error":"session_expired","detail":"Refresh token expired or invalid; start a new sign-in."}"""
+            // The gateway's body carries a longer detail; only the status drives the mapping.
+            val body = """{"error":"session_expired","detail":"expired"}"""
 
             val result = exchange(engine(HttpStatusCode.Unauthorized, body)).refresh(base, "rt-1", "nous")
 
@@ -152,8 +153,9 @@ class NativeTokenExchangeTest {
     @Test
     fun aFiveOhThreeIsRetryableNotFatal() =
         runTest {
-            val result = exchange(engine(HttpStatusCode.ServiceUnavailable, """{"detail":"unreachable"}"""))
-                .refresh(base, "rt-1", "nous")
+            val service = engine(HttpStatusCode.ServiceUnavailable, """{"detail":"unreachable"}""")
+
+            val result = exchange(service).refresh(base, "rt-1", "nous")
 
             assertIs<TokenResult.Retryable>(result)
         }

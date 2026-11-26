@@ -1,7 +1,7 @@
 package com.m57.hermescontrol.data.local
 
-import com.m57.hermescontrol.data.security.SecretStore
 import com.m57.hermescontrol.data.security.AUTH_SECRET_PREFIX
+import com.m57.hermescontrol.data.security.SecretStore
 import com.m57.hermescontrol.ui.authlogin.NativeToken
 import kotlin.test.Test
 import kotlin.test.assertEquals
