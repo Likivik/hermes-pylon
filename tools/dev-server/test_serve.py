@@ -28,6 +28,7 @@ PROXY = os.path.join(HERE, "serve.py")
 
 WASM_NAME = "41203548298c4f07bacb.wasm"
 GATEWAY_MARKER = "GATEWAY-ANSWERED"
+REDIRECT_TARGET = "https://provider.example/oauth/authorize?state=abc&code_challenge=xyz"
 
 
 class FakeGateway(http.server.BaseHTTPRequestHandler):
@@ -39,6 +40,15 @@ class FakeGateway(http.server.BaseHTTPRequestHandler):
     def _reply(self):
         length = int(self.headers.get("Content-Length") or 0)
         received = self.rfile.read(length) if length else b""
+        # OAuth: the gateway answers /auth/login with a 302 to the provider. The proxy must hand
+        # that 3xx to the client, never follow it -- following it walked the proxy into the
+        # provider's own sign-in flow and returned an unrelated host's page to the browser.
+        if self.path.startswith("/auth/oauth-login"):
+            self.send_response(302)
+            self.send_header("Location", REDIRECT_TARGET)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
         # Echo what arrived, so a test can prove the body crossed the proxy and not just that the
         # gateway answered at all.
         body = GATEWAY_MARKER.encode() + b"|" + received
@@ -114,12 +124,24 @@ class DevServerTest(unittest.TestCase):
         cls.gateway.shutdown()
         shutil.rmtree(cls.dist, ignore_errors=True)
 
-    def fetch(self, path, method="GET", data=None):
+    # A test client that follows redirects cannot tell "the proxy passed a 3xx through" from
+    # "the proxy chased it". This opener stops at the first response, the way a browser told
+    # to show one hop would. Only the redirect test needs it; ordinary fetches keep the default.
+    @staticmethod
+    def _no_redirect_opener():
+        class _Stop(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001
+                return None
+
+        return urllib.request.build_opener(_Stop)
+
+    def fetch(self, path, method="GET", data=None, follow_redirects=True):
         req = urllib.request.Request(
             f"http://127.0.0.1:{self.port}{path}", data=data, method=method
         )
+        opener = urllib.request.urlopen if follow_redirects else self._no_redirect_opener().open
         try:
-            with urllib.request.urlopen(req, timeout=15) as resp:
+            with opener(req, timeout=15) as resp:
                 # Keep the Message object: its .get() is case-insensitive. dict() would make
                 # Content-Type look absent when the server spells it Content-type.
                 return resp.status, resp.headers, resp.read()
@@ -165,6 +187,19 @@ class DevServerTest(unittest.TestCase):
             status, _h, body = self.fetch(path)
             self.assertEqual(200, status, path)
             self.assertIn(GATEWAY_MARKER.encode(), body, path)
+
+    def test_a_proxied_redirect_reaches_the_client_unfollowed(self):
+        """A 3xx must cross the proxy, not be chased by it.
+
+        Shipped bug: urllib follows redirects by default, so /auth/login?provider=nous
+        answered 308 to an unrelated host instead of 302 to the provider, and the OAuth
+        state and PKCE challenge never reached the provider.
+        """
+        status, headers, _body = self.fetch("/auth/oauth-login?provider=nous",
+                                             follow_redirects=False)
+        self.assertEqual(302, status, "the upstream 3xx must not be replaced by a followed response")
+        self.assertEqual(REDIRECT_TARGET, headers.get("Location"),
+                         "the Location must survive byte for byte")
 
     def test_a_post_body_reaches_the_gateway_intact(self):
         """This is the login path."""

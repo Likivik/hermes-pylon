@@ -50,6 +50,25 @@ _LOG_LOCK = threading.Lock()
 # `302 -> /login?next=...`, which put the gateway's own sign-in page on this origin.
 PROXY_PREFIXES = ("/api", "/auth", "/ws", "/webhook")
 
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Return the 3xx to the caller instead of chasing it.
+
+    urllib follows redirects by default. That is wrong for a reverse proxy: the
+    client, not the proxy, must follow them. OAuth login made this visible -- the
+    gateway answers /auth/login with `302 -> https://portal.nousresearch.com/oauth/authorize`,
+    and following it walked the proxy through the portal's own sign-in flow and
+    returned whatever that eventually landed on (a 308 to an unrelated host). The
+    browser then rendered a stranger's page. Passing the 302 through lets the
+    browser perform the redirect the OAuth flow requires.
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001
+        return None
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect)
+
 HOP_BY_HOP = {
     "connection",
     "keep-alive",
@@ -175,7 +194,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         length = int(self.headers.get("Content-Length") or 0)
         body = self.rfile.read(length) if length else None
         try:
-            with urllib.request.urlopen(self._upstream_request(body), timeout=30) as upstream:
+            with _OPENER.open(self._upstream_request(body), timeout=30) as upstream:
                 payload = upstream.read()
                 self.send_response(upstream.status)
                 for name, value in upstream.headers.items():
