@@ -347,6 +347,61 @@ class AuthLoginViewModel(
     )
 
     /**
+     * Continue with Nous: run the gateway's native flow, then adopt the bearer token.
+     *
+     * The token goes into the same encrypted store as the session token, so a later launch finds
+     * exactly one credential. A cancelled tab is not an error — the user closed it, and an error
+     * banner would be a lie about what happened.
+     */
+    fun signInWithNous(openBrowser: (String) -> Unit) {
+        val store = com.m57.hermescontrol.data.local.AuthManager.secretStoreOrNull()
+        val endpoint = runCatching { ServerEndpoint.parseForBuild(_uiState.value.baseUrl) }.getOrNull()
+        if (store == null || endpoint == null) {
+            _uiState.update {
+                it.copy(isLoading = false, errorMessage = "Sign-in is unavailable until the app has finished starting.")
+            }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            val signIn =
+                NativeSignIn(
+                    exchange = NativeTokenExchange(com.m57.hermescontrol.data.remote.createHermesHttpClient()),
+                    store = com.m57.hermescontrol.data.local.NativeTokenStore(store),
+                )
+
+            when (val result = signIn.signIn(endpoint.baseUrl.toString(), openBrowser = openBrowser)) {
+                is NativeSignInResult.Success -> {
+                    com.m57.hermescontrol.data.local.AuthManager.setToken(result.token.accessToken)
+                    val error = connectTokenOnly(endpoint, result.token.accessToken)
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = error,
+                            connectionSuccess = error == null,
+                        )
+                    }
+                }
+                is NativeSignInResult.Cancelled -> {
+                    _uiState.update { it.copy(isLoading = false, errorMessage = null) }
+                }
+                is NativeSignInResult.Failed -> {
+                    _uiState.update { it.copy(isLoading = false, errorMessage = result.reason) }
+                }
+                is NativeSignInResult.Unsupported -> {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = "Nous sign-in is not available on this platform.",
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    /**
      * Step 2: Connect using the detected auth mode.
      */
     fun connect() {

@@ -50,6 +50,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.m57.hermescontrol.generated.resources.Res
 import com.m57.hermescontrol.generated.resources.auth_login_action_connect
+import com.m57.hermescontrol.generated.resources.auth_login_action_nous
 import com.m57.hermescontrol.generated.resources.auth_login_base_url_label
 import com.m57.hermescontrol.generated.resources.auth_login_desc
 import com.m57.hermescontrol.generated.resources.auth_login_existing_profiles_title
@@ -64,6 +65,7 @@ import com.m57.hermescontrol.ui.common.ComposeResourcesStringResolver
 import com.m57.hermescontrol.ui.icons.HermesIcon
 import com.m57.hermescontrol.ui.icons.HermesSymbol
 import com.m57.hermescontrol.ui.landing.HermesIcons
+import com.m57.hermescontrol.ui.mcp.rememberExternalUrlLauncher
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -101,6 +103,7 @@ fun AuthLoginScreen(
     }
 
     var passwordVisible by remember { mutableStateOf(false) }
+    val launcher = rememberExternalUrlLauncher()
 
     Box(
         modifier =
@@ -315,6 +318,23 @@ fun AuthLoginScreen(
             }
 
             Spacer(modifier = Modifier.height(8.dp))
+
+            // Continue with Nous. The gateway's native flow opens the provider in a
+            // Custom Tab and returns on the device's own loopback port, so the code
+            // never passes through this app's server or through a URL scheme.
+            Spacer(Modifier.height(8.dp))
+            Button(
+                onClick = {
+                    viewModel.signInWithNous { url ->
+                        launcher.openExternalUrl(url)
+                        Unit
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                enabled = !state.isLoading && !state.probing,
+            ) {
+                Text(text = stringResource(Res.string.auth_login_action_nous))
+            }
 
             // Connect / Probe button
             Button(
