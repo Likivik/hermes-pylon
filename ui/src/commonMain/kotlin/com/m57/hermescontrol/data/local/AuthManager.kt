@@ -76,6 +76,27 @@ object AuthManager : WsAuthConfig {
      */
     fun secretStoreOrNull(): SecretStore? = secretStoreFactory?.invoke() ?: secureStorage
 
+    /**
+     * Renews the native token in place, so the next attempt reads a fresh one.
+     *
+     * Returns false when there is nothing renewable stored: a password or cookie session has no
+     * refresh token, and the caller should fall back to its normal expiry handling.
+     */
+    private suspend fun renewNativeToken(storage: SecretStore): Boolean {
+        val endpoint = runCatching { endpointForBuild() }.getOrNull() ?: return false
+        val session =
+            NativeSession(
+                exchange =
+                    com.m57.hermescontrol.ui.authlogin.NativeTokenExchange(
+                        com.m57.hermescontrol.data.remote.createHermesHttpClient(),
+                    ),
+                store = NativeTokenStore(storage),
+            )
+        val token = session.renewAfterRejection(endpoint.baseUrl.toString()) ?: return false
+        setToken(token.accessToken)
+        return true
+    }
+
     @Volatile
     private var _serverStore: ServerStore? = null
 
@@ -130,6 +151,10 @@ object AuthManager : WsAuthConfig {
             secureStorage = storage
             migrateLegacyDefaultIfNeeded(storage)
             publishTokenLocked(getTokenInternal(storage))
+
+            // A renewable credential lets safeApiCall recover from a 401 instead of signing the
+            // user out. Installed here rather than at the login screen so every caller benefits.
+            com.m57.hermescontrol.data.remote.AuthRenewal.renew = { renewNativeToken(storage) }
 
             // Initialize the encrypted cookie store. Its initial scope loads on IO.
             val initialProfileId =

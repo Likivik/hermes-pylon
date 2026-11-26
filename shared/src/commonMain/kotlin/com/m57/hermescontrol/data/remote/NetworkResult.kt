@@ -108,6 +108,9 @@ suspend inline fun <reified T> safeApiCall(
     crossinline call: suspend () -> GatewayResponse<T>,
 ): NetworkResult<T> {
     var lastException: IOException? = null
+    // One renewal per call, not one per attempt: each renewal rotates the credential, so a loop
+    // that renews on every 401 could rotate it repeatedly while the gateway keeps refusing.
+    var renewed = false
     for (attempt in 0..retries) {
         try {
             val response = call()
@@ -135,6 +138,13 @@ suspend inline fun <reified T> safeApiCall(
                 }
                 val error = mapHttpError(code, errorBody)
                 if (reportAuthExpiry && error is NetworkError.AuthExpired) {
+                    // A renewable credential gets one more attempt before the session is
+                    // declared over. Without this, a rotated or expired bearer token signs the
+                    // user out even though a refresh would have recovered it.
+                    if (!renewed && attempt < retries && AuthRenewal.renew?.invoke() == true) {
+                        renewed = true
+                        continue
+                    }
                     AuthSessionState.requireSignIn()
                 }
                 return NetworkResult.Failure(error)
