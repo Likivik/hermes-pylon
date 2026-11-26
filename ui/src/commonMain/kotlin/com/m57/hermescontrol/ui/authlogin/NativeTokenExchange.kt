@@ -28,7 +28,7 @@ import kotlinx.serialization.json.put
  * Status mapping follows the gateway exactly — `400` invalid code, `401 session_expired` from the
  * refresh path, `503` provider unreachable — and everything else is retryable, never fatal.
  */
-internal class NativeTokenExchange(
+class NativeTokenExchange(
     private val client: HttpClient,
 ) {
     /** Exchange a loopback code plus the PKCE verifier for tokens. The code is single-use. */
