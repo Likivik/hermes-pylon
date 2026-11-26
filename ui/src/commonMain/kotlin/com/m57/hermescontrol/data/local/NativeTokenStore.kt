@@ -3,12 +3,12 @@ package com.m57.hermescontrol.data.local
 import com.m57.hermescontrol.data.security.SecretStore
 import com.m57.hermescontrol.data.security.authSecretKey
 import com.m57.hermescontrol.ui.authlogin.NativeToken
+import com.m57.hermescontrol.ui.authlogin.epochSecondsOrNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 
 /**
@@ -72,11 +72,6 @@ class NativeTokenStore(
 
     private fun JsonObject.stringOrNull(key: String): String? =
         (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
-
-    private fun JsonObject.epochSecondsOrNull(key: String): Long? {
-        val primitive = this[key] as? JsonPrimitive ?: return null
-        return primitive.longOrNull ?: primitive.takeIf { it.isString }?.content?.toLongOrNull()
-    }
 
     private companion object {
         val KEY = authSecretKey("native/token")
