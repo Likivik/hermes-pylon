@@ -97,6 +97,40 @@ class AuthLoginViewModel(
 
     init {
         loadLoggedInProfiles()
+        restoreNativeSession()
+    }
+
+    /**
+     * Adopts a stored native token at launch, so a Nous sign-in survives the process ending.
+     *
+     * Runs silently: a stale or rejected token clears itself and leaves the login screen as the
+     * user left it. A network call is made only when something is actually stored, so password
+     * users pay nothing for this.
+     */
+    private fun restoreNativeSession() {
+        val store = com.m57.hermescontrol.data.local.AuthManager.secretStoreOrNull() ?: return
+        val endpoint = runCatching { ServerEndpoint.parseForBuild(_uiState.value.baseUrl) }.getOrNull() ?: return
+        val session =
+            com.m57.hermescontrol.data.local.NativeSession(
+                exchange = NativeTokenExchange(com.m57.hermescontrol.data.remote.createHermesHttpClient()),
+                store = com.m57.hermescontrol.data.local.NativeTokenStore(store),
+            )
+        if (session.stored() == null) return
+
+        viewModelScope.launch {
+            val token = session.current(endpoint.baseUrl.toString())
+            if (token == null) return@launch
+
+            val validated = connectTokenOnly(endpoint, token.accessToken)
+            if (validated != null) {
+                completeSignIn(endpoint, DashboardAuthMode.TOKEN_ONLY, validated)
+            } else {
+                // The stored token is dead. Clear it and drop the error it raised so the screen
+                // still looks like a normal first launch.
+                session.forget()
+                _uiState.update { it.copy(isLoading = false, errorMessage = null) }
+            }
+        }
     }
 
     fun loadLoggedInProfiles() {
