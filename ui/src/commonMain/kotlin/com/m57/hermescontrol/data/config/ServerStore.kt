@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import okio.BufferedSink
 import okio.BufferedSource
+import com.m57.hermescontrol.util.HermesLog
 
 /**
  * The persisted server/profile/window state, over any DataStore.
@@ -39,7 +40,9 @@ class ServerStore(
         _stateFlow = MutableStateFlow(firstBlocking(dataStore.data, ServerStoreSerializer.defaultValue).selfHealed())
         stateFlow = _stateFlow.asStateFlow()
         scope.launch(ioDispatcher) {
-            runCatching { dataStore.data.first() }.onSuccess { loaded ->
+            runCatching { dataStore.data.first() }
+                        .onFailure { HermesLog.w("ServerStore", "the stored servers could not be read (${it::class.simpleName}); keeping the defaults") }
+                        .onSuccess { loaded ->
                 _stateFlow.update { current ->
                     if (current == ServerStoreSerializer.defaultValue) loaded.selfHealed() else current
                 }

@@ -196,6 +196,7 @@ object GatewayFileClient {
     fun parseFilename(header: String): String? {
         val match = FILENAME_RE.find(header) ?: return null
         val raw = match.groupValues[1].takeIf(String::isNotBlank) ?: return null
+        // inventory: handled — a name that will not decode is shown raw
         return runCatching { URLDecoder.decode(raw, StandardCharsets.UTF_8.name()) }.getOrDefault(raw)
     }
 

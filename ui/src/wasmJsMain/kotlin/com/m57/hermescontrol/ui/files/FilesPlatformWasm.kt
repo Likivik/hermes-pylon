@@ -112,6 +112,7 @@ private fun openPicker(
     jsOpenFilePicker(
         accept = accept,
         onData = { name, mime, base64 ->
+            // inventory: handled — the caller's onError receives it
             runCatching { onPicked(PickedFile(name = name, mimeType = mime, bytes = decode(base64))) }
                 .onFailure { onError(it.message ?: "Could not decode that file") }
         },

@@ -118,7 +118,7 @@ private class JvmLoopbackListener(
                 write(response.encodeToByteArray())
                 flush()
             }
-        }}.onFailure { HermesLog.w(TAG, "the loopback callback could not be answered (${it::class.simpleName})") // the browser shows a dead page, which is the visible half of this failure
+        }.onFailure { HermesLog.w(TAG, "the loopback callback could not be answered (${it::class.simpleName})") }
     }
 
     override fun close() {
