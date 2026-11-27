@@ -41,6 +41,7 @@ fun ChatMessageRow.toUiModel(): ChatMessage =
     )
 
 private fun decodeAttachments(value: String): List<Attachment> =
+    // inventory: intentional-ignore — a field the mapper cannot read is skipped
     runCatching {
         HermesJson.instance.decodeFromString<List<Attachment>>(value)
     }.getOrDefault(emptyList())

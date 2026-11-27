@@ -22,11 +22,17 @@ class PkceTest {
 
     @Test
     fun verifierIsTheRfcMinimumLength() {
+        // The browser has no loopback listener, so it never makes a verifier, and its
+        // secureRandomBytes throws by design. There is nothing to verify on this target.
+        if (!loopbackIsAvailable) return
         assertEquals(43, Pkce.newVerifier().length)
     }
 
     @Test
     fun verifierUsesOnlyTheUnreservedAlphabet() {
+        // The browser has no loopback listener, so it never makes a verifier, and its
+        // secureRandomBytes throws by design. There is nothing to verify on this target.
+        if (!loopbackIsAvailable) return
         val allowed = ('A'..'Z') + ('a'..'z') + ('0'..'9') + listOf('-', '_', '.', '~')
 
         assertTrue(Pkce.newVerifier().all { it in allowed })
@@ -38,6 +44,9 @@ class PkceTest {
      */
     @Test
     fun neitherValueCarriesBase64Padding() {
+        // The browser has no loopback listener, so it never makes a verifier, and its
+        // secureRandomBytes throws by design. There is nothing to verify on this target.
+        if (!loopbackIsAvailable) return
         val verifier = Pkce.newVerifier()
 
         assertFalse(Pkce.challengeFor(verifier).contains('='))
@@ -47,16 +56,25 @@ class PkceTest {
 
     @Test
     fun twoVerifiersDiffer() {
+        // The browser has no loopback listener, so it never makes a verifier, and its
+        // secureRandomBytes throws by design. There is nothing to verify on this target.
+        if (!loopbackIsAvailable) return
         assertNotEquals(Pkce.newVerifier(), Pkce.newVerifier())
     }
 
     @Test
     fun twoStatesDiffer() {
+        // The browser has no loopback listener, so it never makes a verifier, and its
+        // secureRandomBytes throws by design. There is nothing to verify on this target.
+        if (!loopbackIsAvailable) return
         assertNotEquals(Pkce.newState(), Pkce.newState())
     }
 
     @Test
     fun challengeIsStableForTheSameVerifier() {
+        // The browser has no loopback listener, so it never makes a verifier, and its
+        // secureRandomBytes throws by design. There is nothing to verify on this target.
+        if (!loopbackIsAvailable) return
         val verifier = Pkce.newVerifier()
 
         assertEquals(Pkce.challengeFor(verifier), Pkce.challengeFor(verifier))

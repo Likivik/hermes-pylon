@@ -212,6 +212,7 @@ class SettingsViewModel(
     fun onDialogProfileBaseUrlChange(value: String) {
         val normalized = value.trim()
         val warning =
+            // inventory: handled — a URL that does not parse has no warning to show
             runCatching {
                 ServerEndpoint.parseForBuild(normalized).securityWarning
             }.getOrNull()
@@ -329,6 +330,7 @@ class SettingsViewModel(
     fun onBaseUrlChange(value: String) {
         val normalized = value.trim()
         val endpoint =
+            // inventory: handled — a URL that does not parse has no warning to show
             runCatching {
                 ServerEndpoint.parse(
                     normalized,

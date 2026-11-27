@@ -13,6 +13,7 @@ actual fun rememberExternalUrlLauncher(): ExternalUrlLauncher {
     return remember(context) {
         object : ExternalUrlLauncher {
             override fun openExternalUrl(url: String): Boolean =
+                // inventory: intentional-ignore — the launcher returns false and the caller reads it
                 runCatching {
                     CustomTabsIntent
                         .Builder()

@@ -105,6 +105,7 @@ class SeekableGatewayMediaSession(
         if (!isCurrent()) return GatewayMediaRangeResult.Stale
 
         val end =
+            // inventory: handled — the failure is the returned result
             runCatching { Math.addExact(position, byteCount.toLong() - 1L) }
                 .getOrElse {
                     return GatewayMediaRangeResult.Failure(

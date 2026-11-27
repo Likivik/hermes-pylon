@@ -59,6 +59,7 @@ object ImageBytesResolver {
         gatewayPath: String? = null,
     ): Result =
         withContext(ioDispatcher) {
+            // inventory: intentional-ignore — decoding is best effort: the caller renders the error state
             runCatching {
                 when {
                     gatewayPath != null -> fetchGatewayPath(context, gatewayPath, fallbackMime)
@@ -119,6 +120,7 @@ object ImageBytesResolver {
             return Result.Error("Only base64 data URLs are supported")
         }
         val bytes =
+            // inventory: intentional-ignore — decoding is best effort: the caller renders the error state
             runCatching { Base64.getDecoder().decode(data) }
                 .getOrElse { return Result.Error("Could not decode image data") }
         if (bytes.size.toLong() > maxBytes) {
@@ -134,6 +136,7 @@ object ImageBytesResolver {
     ): Result {
         val uri = Uri.parse(model)
         val bytes =
+            // inventory: intentional-ignore — decoding is best effort: the caller renders the error state
             runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytesLimited() } }
                 .getOrNull()
                 ?: return Result.Error("Could not open local image")
@@ -146,6 +149,7 @@ object ImageBytesResolver {
         fallbackMime: String,
         client: HttpClient = publicMediaClient,
     ): Result =
+        // inventory: intentional-ignore — decoding is best effort: the caller renders the error state
         runCatching {
             val response = client.get(model)
             if (!response.status.isSuccess()) {

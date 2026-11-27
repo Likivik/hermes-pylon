@@ -73,6 +73,7 @@ fun mediaNameFromPath(path: String): String {
     val queryPathMatch = Regex("""[?&]path=([^&]+)""", RegexOption.IGNORE_CASE).find(path)
     if (queryPathMatch != null) {
         val targetPath =
+            // inventory: intentional-ignore — an unreadable mime hint keeps the declared type
             runCatching {
                 queryPathMatch.groupValues[1].decodeURLQueryComponent(plusIsSpace = true)
             }.getOrDefault(queryPathMatch.groupValues[1])

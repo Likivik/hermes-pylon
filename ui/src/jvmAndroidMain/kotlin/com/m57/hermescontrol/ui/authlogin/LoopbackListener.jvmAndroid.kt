@@ -1,5 +1,6 @@
 package com.m57.hermescontrol.ui.authlogin
 
+import com.m57.hermescontrol.util.HermesLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
@@ -8,6 +9,8 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.net.SocketTimeoutException
 import java.net.URLDecoder
+
+private const val TAG = "LoopbackListener"
 
 /**
  * Loopback listener for the JVM and Android.
@@ -115,11 +118,12 @@ private class JvmLoopbackListener(
                 write(response.encodeToByteArray())
                 flush()
             }
-        }
+        }.onFailure { HermesLog.w(TAG, "the loopback callback could not be answered (${it::class.simpleName})") }
     }
 
     override fun close() {
         runCatching { server.close() }
+            .onFailure { HermesLog.d(TAG, "closing the loopback server failed (${it::class.simpleName})") }
     }
 
     private companion object {

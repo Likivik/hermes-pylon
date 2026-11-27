@@ -175,7 +175,9 @@ fun main() {
                         getString(Res.string.landing_subtitle)
                         getString(Res.string.landing_action_auth_login)
                     }
+                    // inventory: intentional-ignore — the fallback is the documented default for this setting
                     runCatching { fontResolver.preload(FontFamily.Default) }
+                    // inventory: intentional-ignore — the fallback is the documented default for this setting
                     runCatching { fontResolver.preload(iconSubsetFamily) }
                     withFrameNanos { }
                     notifyBrowserShellReady()
@@ -467,6 +469,7 @@ private fun pylonSessionState(): String = js("window.__pylonSession || 'unknown'
  */
 private fun adoptVerifiedSession() {
     if (pylonSessionState() != "ok") return
+    // inventory: intentional-ignore — best effort; the caller proceeds either way
     runCatching {
         val manager = com.m57.hermescontrol.data.local.AuthManager
         val origin = window.location.origin

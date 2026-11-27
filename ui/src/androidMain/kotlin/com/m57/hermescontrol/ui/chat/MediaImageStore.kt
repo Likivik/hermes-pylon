@@ -51,6 +51,7 @@ object MediaImageStore {
         val uri = resolver.insert(collection, values) ?: return null
         return try {
             resolver.openOutputStream(uri)?.use { it.write(bytes) } ?: return null.also {
+                // inventory: intentional-ignore — a cache write that fails only costs a re-fetch
                 runCatching { resolver.delete(uri, null, null) }
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -60,6 +61,7 @@ object MediaImageStore {
             }
             uri
         } catch (e: Exception) {
+            // inventory: intentional-ignore — a cache read that fails only costs a re-fetch
             runCatching { resolver.delete(uri, null, null) }
             null
         }

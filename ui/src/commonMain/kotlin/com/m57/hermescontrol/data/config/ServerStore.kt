@@ -5,6 +5,7 @@ package com.m57.hermescontrol.data.config
 import androidx.datastore.core.DataStore
 import androidx.datastore.core.okio.OkioSerializer
 import com.m57.hermescontrol.data.remote.ServerEndpoint
+import com.m57.hermescontrol.util.HermesLog
 import com.m57.hermescontrol.util.ioDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -39,11 +40,18 @@ class ServerStore(
         _stateFlow = MutableStateFlow(firstBlocking(dataStore.data, ServerStoreSerializer.defaultValue).selfHealed())
         stateFlow = _stateFlow.asStateFlow()
         scope.launch(ioDispatcher) {
-            runCatching { dataStore.data.first() }.onSuccess { loaded ->
-                _stateFlow.update { current ->
-                    if (current == ServerStoreSerializer.defaultValue) loaded.selfHealed() else current
+            runCatching { dataStore.data.first() }
+                .onFailure {
+                    HermesLog.w(
+                        "ServerStore",
+                        "the stored servers could not be read (${it::class.simpleName}); keeping the defaults",
+                    )
                 }
-            }
+                .onSuccess { loaded ->
+                    _stateFlow.update { current ->
+                        if (current == ServerStoreSerializer.defaultValue) loaded.selfHealed() else current
+                    }
+                }
         }
     }
 

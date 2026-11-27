@@ -22,6 +22,7 @@ actual val mediaStore: MediaStore =
             path: String,
             cacheDir: String,
         ): MediaResult =
+            // inventory: handled — the result carries the failure
             runCatching {
                 val response = createHermesHttpClient().get(path)
                 if (response.status.value !in 200..299) {

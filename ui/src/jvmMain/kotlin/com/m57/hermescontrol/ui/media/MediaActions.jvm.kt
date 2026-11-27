@@ -16,6 +16,7 @@ actual fun rememberMediaActions(): MediaActions =
                 gatewayPath: String?,
             ): ResolvedImage {
                 if (gatewayPath != null) return ResolvedImage.Error(GATEWAY_UNSUPPORTED)
+                // inventory: handled — the caller renders the error value
                 return runCatching {
                     when {
                         model.startsWith("data:") -> decodeDataUrl(model, fallbackMime)
@@ -80,6 +81,7 @@ private fun decodeDataUrl(
             .substringBefore(';')
             .ifBlank { fallbackMime.ifBlank { "image/png" } }
     val decoded =
+        // inventory: handled — the error value says Malformed data URL
         runCatching { base64Decode(model.substring(comma + 1)) }.getOrNull()
             ?: return ResolvedImage.Error("Malformed data URL")
     return ResolvedImage.Bytes(decoded, mime, extensionForMime(mime))

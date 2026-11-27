@@ -13,5 +13,6 @@ private external fun jsClipboardAvailable(): Boolean
 @Composable
 actual fun rememberLogSharer(): (String) -> Boolean =
     remember {
+        // inventory: handled — the caller reads the false and falls back
         { text -> jsClipboardAvailable() && runCatching { jsWriteClipboard(text) }.getOrDefault(false) }
     }

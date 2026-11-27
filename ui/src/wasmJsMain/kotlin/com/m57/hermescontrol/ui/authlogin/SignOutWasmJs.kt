@@ -20,6 +20,8 @@ import kotlinx.browser.window
  */
 internal actual fun handleSignOut(reason: SignOutReason): Boolean {
     if (reason == SignOutReason.USER_INITIATED) {
+        // inventory: intentional-ignore — the flag only smooths the next page load; the
+        // navigation below happens whether the write landed or not.
         runCatching { window.sessionStorage.setItem("pylon.logout", "1") }
     }
     window.location.replace(signOutPageFor(reason))

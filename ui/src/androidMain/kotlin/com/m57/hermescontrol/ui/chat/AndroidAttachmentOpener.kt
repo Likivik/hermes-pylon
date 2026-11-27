@@ -77,11 +77,13 @@ class AndroidAttachmentOpener(
 
     private suspend fun openLocal(attachment: Attachment): AttachmentOpenOutcome {
         val parsed = Uri.parse(attachment.uri)
+        // inventory: intentional-ignore — the intent result is what the caller acts on
         val viewAttempt = runCatching { openWithView(parsed, attachment.mimeType) }
         if (viewAttempt.isSuccess) return AttachmentOpenOutcome.Handled
         // Local cache-copy fallback: some providers refuse to grant a read to a
         // foreign viewer, so copy the bytes into our own cache and share that.
         val cached =
+            // inventory: intentional-ignore — the intent result is what the caller acts on
             runCatching {
                 val bytes =
                     appContext.contentResolver.openInputStream(parsed)?.use { it.readBytes() }

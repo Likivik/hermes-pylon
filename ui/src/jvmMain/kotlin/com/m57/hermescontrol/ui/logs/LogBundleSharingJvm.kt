@@ -10,6 +10,7 @@ import java.awt.datatransfer.StringSelection
 actual fun rememberLogSharer(): (String) -> Boolean =
     remember {
         { text ->
+            // inventory: handled — the clipboard may be unavailable; the caller also shows the text
             runCatching {
                 Toolkit
                     .getDefaultToolkit()

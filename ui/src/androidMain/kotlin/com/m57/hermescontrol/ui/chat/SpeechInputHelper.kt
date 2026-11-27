@@ -21,6 +21,7 @@ object SpeechInputHelper {
     ): Boolean {
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
         val activities: List<ResolveInfo?> =
+            // inventory: intentional-ignore — speech input is optional; typing remains
             runCatching {
                 if (sdkInt >= Build.VERSION_CODES.TIRAMISU) {
                     queryModern(context.packageManager, intent)

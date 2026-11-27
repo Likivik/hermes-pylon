@@ -2,6 +2,7 @@ package com.m57.hermescontrol.ui.files
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import com.m57.hermescontrol.util.HermesLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.awt.Desktop
@@ -30,6 +31,7 @@ actual fun rememberFilesPlatform(): FilesPlatform =
                     return
                 }
                 val file = chooser.selectedFile
+                // inventory: handled — the caller's onError receives it
                 runCatching { PickedFile(file.name, mimeType.ifBlank { "application/octet-stream" }, file.readBytes()) }
                     .onSuccess(onPicked)
                     .onFailure { onError(it.message) }
@@ -50,6 +52,12 @@ actual fun rememberFilesPlatform(): FilesPlatform =
                         check(canOpenDownloads) { "desktop integration unavailable" }
                         Desktop.getDesktop().open(File(cachePath))
                     }
+                        .onFailure {
+                            HermesLog.w(
+                                "FilesPlatform",
+                                "the file could not be opened (${it::class.simpleName})",
+                            )
+                        }
                 }
 
             override fun formatSize(bytes: Long): String = humanSize(bytes)

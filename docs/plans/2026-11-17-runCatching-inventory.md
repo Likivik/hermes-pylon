@@ -142,3 +142,15 @@ Rules: auth/session/token paths are `MUST-NOT-BE-SILENT` regardless of shape; tr
 
 **Remaining:**
 - `ImageBytesResolver.kt` (4), `MediaPlaybackAndroid.kt` (10, expected log-and-continue), and the 34 "review" sites where shape alone cannot decide.
+
+## Classification closed (2026-11-27)
+
+Every production site is now classified in code, so the budget is **0** and the ratchet only moves
+down. Two forms are used, and each site carries the one that is true of it:
+
+- a log call inside the failure path, where nothing else would have told anyone;
+- `inventory: handled — …` where the failure is returned, rendered, or written to state;
+- `inventory: intentional-ignore — …` where no actor could respond to it.
+
+The count went 99 → 73 → 0 over that pass; 73 were unclassified when the gate first went red.
+

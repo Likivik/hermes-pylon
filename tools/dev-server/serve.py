@@ -50,6 +50,23 @@ _LOG_LOCK = threading.Lock()
 # `302 -> /login?next=...`, which put the gateway's own sign-in page on this origin.
 PROXY_PREFIXES = ("/api", "/auth", "/ws", "/webhook")
 
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Relay a redirect instead of following it.
+
+    `/auth/login` answers 302 to the provider, and the browser has to make that hop itself: it is
+    the one that holds the provider's session and comes back with the code. Following the redirect
+    here would make this server the client of the round trip and hand the browser only the final
+    hop — which is how a sign-in button ends up navigating to whatever the provider's edge answers.
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001 - stdlib signature
+        return None
+
+
+# An opener that stops at the first 3xx. `urlopen` follows, and that is the wrong shape for a proxy.
+_OPENER = urllib.request.build_opener(_NoRedirect)
+
 HOP_BY_HOP = {
     "connection",
     "keep-alive",
@@ -175,7 +192,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         length = int(self.headers.get("Content-Length") or 0)
         body = self.rfile.read(length) if length else None
         try:
-            with urllib.request.urlopen(self._upstream_request(body), timeout=30) as upstream:
+            with _OPENER.open(self._upstream_request(body), timeout=30) as upstream:
                 payload = upstream.read()
                 self.send_response(upstream.status)
                 for name, value in upstream.headers.items():

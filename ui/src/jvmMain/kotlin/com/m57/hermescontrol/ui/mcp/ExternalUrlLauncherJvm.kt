@@ -17,6 +17,7 @@ actual fun rememberExternalUrlLauncher(): ExternalUrlLauncher =
     remember {
         object : ExternalUrlLauncher {
             override fun openExternalUrl(url: String): Boolean =
+                // inventory: intentional-ignore — the launcher returns false and the caller reads it
                 runCatching {
                     val desktop = Desktop.getDesktop()
                     if (!desktop.isSupported(Desktop.Action.BROWSE)) return@runCatching false

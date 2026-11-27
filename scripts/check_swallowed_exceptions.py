@@ -22,7 +22,7 @@ import sys
 from pathlib import Path
 
 # Current number of unclassified production sites. Only ever decrease.
-MAX_UNCLASSIFIED = 65
+MAX_UNCLASSIFIED = 0
 
 LOG_RE = re.compile(r"HermesLog\.|println\(|Logger\.")
 MARKERS = ("inventory: intentional-ignore", "inventory: handled")

@@ -70,6 +70,8 @@ object WebSignIn {
      * button costs nothing, a wrong button costs a provider round trip that ends on a 404.
      */
     fun providerNames(body: String): List<String> =
+        // inventory: intentional-ignore — an unreadable provider list means no button, and a
+        // button that 404s after the user has signed in is the worse outcome.
         runCatching {
             Json
                 .parseToJsonElement(body)

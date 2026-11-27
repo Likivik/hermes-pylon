@@ -116,7 +116,15 @@ class AuthLoginViewModel(
      */
     private fun restoreNativeSession() {
         val store = com.m57.hermescontrol.data.local.AuthManager.secretStoreOrNull() ?: return
-        val endpoint = runCatching { ServerEndpoint.parseForBuild(_uiState.value.baseUrl) }.getOrNull() ?: return
+        val endpoint =
+            runCatching { ServerEndpoint.parseForBuild(_uiState.value.baseUrl) }
+                .onFailure {
+                    HermesLog.w(
+                        TAG,
+                        "the stored base URL no longer parses (${it::class.simpleName})",
+                    )
+                }
+                .getOrNull() ?: return
         val session =
             com.m57.hermescontrol.data.local.NativeSession(
                 exchange = NativeTokenExchange(com.m57.hermescontrol.data.remote.createHermesHttpClient()),
@@ -173,6 +181,16 @@ class AuthLoginViewModel(
 
         /** Login POSTs, including basic-auth validation, get longer than a probe. */
         private const val CONNECT_TIMEOUT_MILLIS = 25_000L
+
+        /**
+         * How long to wait for the sign-in tab.
+         *
+         * Two and a half minutes at two seconds: long enough for a password, a second factor and a
+         * slow phone network, short enough that a forgotten tab does not leave a coroutine polling
+         * for the rest of the session.
+         */
+        private const val BROWSER_SIGN_IN_POLL_MILLIS = 2_000L
+        private const val BROWSER_SIGN_IN_POLLS = 75
     }
 
     private val probeClient: HttpClient = dashboardProbeClient
@@ -194,7 +212,8 @@ class AuthLoginViewModel(
                 parsed.protocol == expected.protocol &&
                     parsed.host == expected.host &&
                     parsed.port == expected.port
-            }.getOrDefault(false)
+            }.onFailure { HermesLog.w(TAG, "the cross-origin check failed (${it::class.simpleName})") }
+                .getOrDefault(false)
         return if (sameOrigin) null else resolver.get(Res.string.auth_login_error_cross_origin, defaultServerBaseUrl)
     }
 
@@ -210,7 +229,13 @@ class AuthLoginViewModel(
         val warning =
             runCatching {
                 ServerEndpoint.parseForBuild(value).securityWarning
-            }.getOrNull()
+            }.onFailure {
+                HermesLog.d(
+                    TAG,
+                    "no security warning: the URL does not parse yet (${it::class.simpleName})",
+                )
+            }
+                .getOrNull()
         _uiState.update {
             it.copy(
                 baseUrl = value.trim(),
@@ -426,7 +451,15 @@ class AuthLoginViewModel(
      */
     fun signInWithNous(openBrowser: (String) -> Unit) {
         val store = com.m57.hermescontrol.data.local.AuthManager.secretStoreOrNull()
-        val endpoint = runCatching { ServerEndpoint.parseForBuild(_uiState.value.baseUrl) }.getOrNull()
+        val endpoint =
+            runCatching { ServerEndpoint.parseForBuild(_uiState.value.baseUrl) }
+                .onFailure {
+                    HermesLog.w(
+                        TAG,
+                        "native sign-in has no usable endpoint (${it::class.simpleName})",
+                    )
+                }
+                .getOrNull()
         if (store == null || endpoint == null) {
             _uiState.update {
                 it.copy(isLoading = false, nousError = NousLoginError(NousLoginErrorKind.Unavailable))
@@ -479,22 +512,66 @@ class AuthLoginViewModel(
     }
 
     /**
-     * Starts the browser flow instead of the native one.
+     * Starts the browser flow in a new tab instead of the native one.
      *
-     * Whole-page navigation, not a fetch: the gateway has to set its cookie on its own origin, and
-     * only a top-level navigation does that. Nothing is stored by Pylon — the cookie is the
-     * credential, and it never becomes visible to this app.
+     * A tab, not a fetch, and not a page navigation: the gateway sets its cookie on its own origin,
+     * so any tab on that origin is signed in — including this one. The user keeps their screen; the
+     * only thing missing is that this tab does not know yet, which is what the watch is for.
+     *
+     * [open] must be called synchronously from the click: a popup opened after a suspension point
+     * is a popup opened without a user gesture, and browsers refuse those.
      */
-    fun signInWithNousInBrowser(navigate: (String) -> Unit) {
-        val endpoint = runCatching { ServerEndpoint.parseForBuild(_uiState.value.baseUrl) }.getOrNull()
+    fun signInWithNousInBrowser(open: (String) -> Unit) {
+        val endpoint =
+            runCatching { ServerEndpoint.parseForBuild(_uiState.value.baseUrl) }
+                .onFailure {
+                    HermesLog.w(
+                        TAG,
+                        "browser sign-in has no usable endpoint (${it::class.simpleName})",
+                    )
+                }
+                .getOrNull()
         if (endpoint == null) {
             _uiState.update { it.copy(nousError = NousLoginError(NousLoginErrorKind.Unavailable)) }
             return
         }
 
         _uiState.update { it.copy(errorMessage = null, nousError = null) }
-        navigate(WebSignIn.authorizeUrl(endpoint.baseUrl.toString()))
+        open(WebSignIn.authorizeUrl(endpoint.baseUrl.toString()))
+        watchForBrowserSignIn(endpoint)
     }
+
+    /**
+     * Waits for the tab to finish at the provider, then completes the same way a password sign-in
+     * does.
+     *
+     * The signal is `/api/auth/me`: it is answered only for a live session, and the cookie flow
+     * leaves exactly that. The probe is not used as the signal because it infers the mode from the
+     * SPA's HTML, which says nothing about whether this browser holds a session.
+     */
+    private fun watchForBrowserSignIn(endpoint: ServerEndpoint) {
+        viewModelScope.launch {
+            repeat(BROWSER_SIGN_IN_POLLS) {
+                delay(BROWSER_SIGN_IN_POLL_MILLIS)
+                if (!hasCookieSession(endpoint)) return@repeat
+
+                val result = withContext(ioDispatcher) { probeDashboardInternal(endpoint) } ?: return@repeat
+                completeSignIn(endpoint, result.authMode, result.extractedToken)
+                return@launch
+            }
+        }
+    }
+
+    private suspend fun hasCookieSession(endpoint: ServerEndpoint): Boolean =
+        withContext(ioDispatcher) {
+            try {
+                probeClient.get(endpoint.baseUrl.resolve("api/auth/me").toString()).status.isSuccess()
+            } catch (e: Exception) {
+                // A tab still at the provider is not an error: keep waiting.
+                HermesLog.d(TAG, "Browser sign-in poll failed (${e::class.simpleName})")
+                false
+            }
+        }
 
     /**
      * Step 2: Connect using the detected auth mode.
