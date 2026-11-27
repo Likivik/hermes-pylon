@@ -116,7 +116,10 @@ class AuthLoginViewModel(
      */
     private fun restoreNativeSession() {
         val store = com.m57.hermescontrol.data.local.AuthManager.secretStoreOrNull() ?: return
-        val endpoint = runCatching { ServerEndpoint.parseForBuild(_uiState.value.baseUrl) }.getOrNull() ?: return
+        val endpoint =
+                        runCatching { ServerEndpoint.parseForBuild(_uiState.value.baseUrl) }
+                            .onFailure { HermesLog.w(TAG, "the stored base URL no longer parses (${it::class.simpleName})") }
+                            .getOrNull() ?: return
         val session =
             com.m57.hermescontrol.data.local.NativeSession(
                 exchange = NativeTokenExchange(com.m57.hermescontrol.data.remote.createHermesHttpClient()),
@@ -204,7 +207,8 @@ class AuthLoginViewModel(
                 parsed.protocol == expected.protocol &&
                     parsed.host == expected.host &&
                     parsed.port == expected.port
-            }.getOrDefault(false)
+            }.onFailure { HermesLog.w(TAG, "the cross-origin check failed (${it::class.simpleName})") }
+                .getOrDefault(false)
         return if (sameOrigin) null else resolver.get(Res.string.auth_login_error_cross_origin, defaultServerBaseUrl)
     }
 
@@ -220,7 +224,8 @@ class AuthLoginViewModel(
         val warning =
             runCatching {
                 ServerEndpoint.parseForBuild(value).securityWarning
-            }.getOrNull()
+            }.onFailure { HermesLog.d(TAG, "no security warning: the URL does not parse yet (${it::class.simpleName})") }
+                .getOrNull()
         _uiState.update {
             it.copy(
                 baseUrl = value.trim(),
@@ -436,8 +441,11 @@ class AuthLoginViewModel(
      */
     fun signInWithNous(openBrowser: (String) -> Unit) {
         val store = com.m57.hermescontrol.data.local.AuthManager.secretStoreOrNull()
-        val endpoint = runCatching { ServerEndpoint.parseForBuild(_uiState.value.baseUrl) }.getOrNull()
-        if (store == null || endpoint == null) {
+        val endpoint =
+                        runCatching { ServerEndpoint.parseForBuild(_uiState.value.baseUrl) }
+                            .onFailure { HermesLog.w(TAG, "native sign-in has no usable endpoint (${it::class.simpleName})") }
+                            .getOrNull()
+                    if (store == null || endpoint == null) {
             _uiState.update {
                 it.copy(isLoading = false, nousError = NousLoginError(NousLoginErrorKind.Unavailable))
             }
@@ -499,8 +507,11 @@ class AuthLoginViewModel(
      * is a popup opened without a user gesture, and browsers refuse those.
      */
     fun signInWithNousInBrowser(open: (String) -> Unit) {
-        val endpoint = runCatching { ServerEndpoint.parseForBuild(_uiState.value.baseUrl) }.getOrNull()
-        if (endpoint == null) {
+        val endpoint =
+                        runCatching { ServerEndpoint.parseForBuild(_uiState.value.baseUrl) }
+                            .onFailure { HermesLog.w(TAG, "browser sign-in has no usable endpoint (${it::class.simpleName})") }
+                            .getOrNull()
+                    if (endpoint == null) {
             _uiState.update { it.copy(nousError = NousLoginError(NousLoginErrorKind.Unavailable)) }
             return
         }

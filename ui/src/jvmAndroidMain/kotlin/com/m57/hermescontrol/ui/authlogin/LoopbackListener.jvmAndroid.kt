@@ -8,6 +8,9 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.net.SocketTimeoutException
 import java.net.URLDecoder
+import com.m57.hermescontrol.util.HermesLog
+
+private const val TAG = "LoopbackListener"
 
 /**
  * Loopback listener for the JVM and Android.
@@ -115,11 +118,12 @@ private class JvmLoopbackListener(
                 write(response.encodeToByteArray())
                 flush()
             }
-        }
+        }}.onFailure { HermesLog.w(TAG, "the loopback callback could not be answered (${it::class.simpleName})") // the browser shows a dead page, which is the visible half of this failure
     }
 
     override fun close() {
         runCatching { server.close() }
+                        .onFailure { HermesLog.d(TAG, "closing the loopback server failed (${it::class.simpleName})") }
     }
 
     private companion object {

@@ -16,6 +16,7 @@ actual fun HermesImageBytes(
     modifier: Modifier,
     contentScale: ContentScale,
 ) {
+    // inventory: intentional-ignore — decoding is best effort: the caller renders the error state
     val bitmap = remember(data) { runCatching { SkiaImage.makeFromEncoded(data).toComposeImageBitmap() }.getOrNull() }
     bitmap?.let {
         Image(

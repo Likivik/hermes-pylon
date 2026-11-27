@@ -52,6 +52,7 @@ class ServerStoreMigration(
 
         val themePrefString = prefs.getString("theme_preference", ThemePreference.SYSTEM.name)
         val themePreference =
+            // inventory: intentional-ignore — an unknown enum string falls back to SYSTEM
             runCatching { ThemePreference.valueOf(themePrefString!!) }
                 .getOrDefault(ThemePreference.SYSTEM)
 
@@ -59,6 +60,7 @@ class ServerStoreMigration(
 
         val themePresetString = prefs.getString("theme_preset", ThemePreset.DEFAULT.name)
         val themePreset =
+            // inventory: intentional-ignore — an unknown enum string falls back to SYSTEM
             runCatching { ThemePreset.valueOf(themePresetString!!) }
                 .getOrDefault(ThemePreset.DEFAULT)
 

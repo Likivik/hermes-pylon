@@ -38,6 +38,7 @@ private object JvmPreferencesStore : PreferencesStore {
     }
 
     override fun allStrings(): Map<String, String> =
+        // inventory: intentional-ignore — a missing preference is the default, not an error
         runCatching {
             node.keys().associateWith { key -> node.get(key, "") ?: "" }
         }.getOrDefault(emptyMap())

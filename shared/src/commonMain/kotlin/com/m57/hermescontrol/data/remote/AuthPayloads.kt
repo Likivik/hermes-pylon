@@ -3,6 +3,9 @@ package com.m57.hermescontrol.data.remote
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
+import com.m57.hermescontrol.util.HermesLog
+
+private const val TAG = "AuthPayloads"
 
 @Serializable
 private data class PasswordLoginPayload(
@@ -37,5 +40,6 @@ object AuthPayloads {
             HermesJson.instance.decodeFromString<WebSocketTicketPayload>(body)
                 .ticket
                 .takeIf { it.isNotBlank() }
-        }.getOrNull()
+        }.onFailure { HermesLog.w(TAG, "the websocket ticket did not parse (${it::class.simpleName})") }
+            .getOrNull()
 }

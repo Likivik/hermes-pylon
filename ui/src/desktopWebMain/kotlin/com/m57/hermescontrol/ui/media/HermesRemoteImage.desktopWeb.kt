@@ -28,6 +28,7 @@ actual fun HermesRemoteImage(
 ) {
     val bitmap: ImageBitmap? by produceState<ImageBitmap?>(initialValue = null, url) {
         value =
+            // inventory: intentional-ignore — decoding is best effort: the caller renders the error state
             runCatching {
                 val bytes = createHermesHttpClient().get(url).bodyAsBytes()
                 SkiaImage.makeFromEncoded(bytes).toComposeImageBitmap()

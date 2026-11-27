@@ -67,6 +67,7 @@ private object LocalStoragePreferencesStore : PreferencesStore {
     }
 
     override fun allStrings(): Map<String, String> =
+        // inventory: intentional-ignore — a missing preference is the default, not an error
         runCatching {
             Json
                 .parseToJsonElement(jsAllPrefixed())

@@ -107,6 +107,7 @@ fun resolveAvatarColor(
     fallback: Color,
 ): Color {
     if (color == null || !color.matches(Regex("^#[0-9A-Fa-f]{6}$"))) return fallback
+    // inventory: intentional-ignore — an avatar that fails to decode renders the initial
     return runCatching { Color(0xFF000000L or color.drop(1).toLong(16)) }.getOrDefault(fallback)
 }
 

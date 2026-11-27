@@ -199,6 +199,7 @@ fun parseStructuredJson(
     schemaType: String,
 ): JsonElement? {
     if (text.isBlank()) return null
+    // inventory: intentional-ignore — an unparseable value keeps what the field holds
     val parsed = runCatching { kotlinx.serialization.json.Json.parseToJsonElement(text) }.getOrNull()
     return when (schemaType) {
         "object" -> parsed as? JsonObject

@@ -78,7 +78,7 @@ internal class TabSecretStore : SecretStore {
                 val value = jsSessionGet(key) ?: continue
                 values[key.removePrefix(PREFIX)] = value
             }
-        }
+        }.onFailure { storeWarn("secret restore") }
     }
 
     override fun getString(logicalKey: String): String? {
@@ -109,7 +109,7 @@ internal class TabSecretStore : SecretStore {
                 val key = jsSessionKey(i) ?: continue
                 if (key.startsWith(PREFIX + prefix) && !jsSessionRemove(key)) storeWarn("secret delete-prefix")
             }
-        }
+        }.onFailure { storeWarn("secret delete-prefix") }
     }
 
     private companion object {

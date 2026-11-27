@@ -56,6 +56,7 @@ internal object NativeAuthorize {
         if (!redirectUri.all { it.code < 0x80 }) return "must be ASCII"
         if (redirectUri.contains('#')) return "must not contain a fragment"
 
+        // inventory: handled — an unparseable redirect URI is what the returned message is for
         val parsed =
             runCatching { Url(redirectUri) }.getOrNull()
                 ?: return "must be a valid URL"

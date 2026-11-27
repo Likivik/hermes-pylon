@@ -35,6 +35,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.concurrent.Volatile
 import kotlin.io.encoding.Base64
+import com.m57.hermescontrol.util.HermesLog
+
+private const val TAG = "AuthManager"
 
 /**
  * Singleton that manages encrypted storage of the Hermes dashboard token
@@ -83,7 +86,10 @@ object AuthManager : WsAuthConfig {
      * refresh token, and the caller should fall back to its normal expiry handling.
      */
     private suspend fun renewNativeToken(storage: SecretStore): Boolean {
-        val endpoint = runCatching { endpointForBuild() }.getOrNull() ?: return false
+        val endpoint =
+                        runCatching { endpointForBuild() }
+                            .onFailure { HermesLog.w(TAG, "no endpoint for this build; the token cannot be renewed (${it::class.simpleName})") }
+                            .getOrNull() ?: return false
         val session =
             NativeSession(
                 exchange =
@@ -171,9 +177,11 @@ object AuthManager : WsAuthConfig {
                 // is owned by the profile-transition path, which publishes under the
                 // monitor and has its own ordering guarantees.
                 runCatching { store.stateFlow.first() }
+                                    .onFailure { HermesLog.w(TAG, "waiting on the secret store failed (${it::class.simpleName})") }
                 synchronized(monitor) {
                     if (_tokenFlow.value == null) {
                         runCatching { publishTokenLocked(getTokenInternal(storage)) }
+                                                .onFailure { HermesLog.w(TAG, "republishing the stored token failed (${it::class.simpleName})") }
                     }
                 }
             }
