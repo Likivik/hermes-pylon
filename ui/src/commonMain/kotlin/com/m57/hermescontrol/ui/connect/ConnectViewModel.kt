@@ -148,6 +148,7 @@ class ConnectViewModel(
         statusGeneration += 1
         val trimmed = value.trim()
         val warning =
+            // inventory: handled — a URL that does not parse has no warning to show
             runCatching {
                 ServerEndpoint.parse(trimmed, CleartextPolicy.ALLOW_WITH_WARNING).securityWarning
             }.getOrNull()
@@ -212,6 +213,7 @@ class ConnectViewModel(
             return
         }
         val endpoint =
+            // inventory: handled — the invalid-URL message is set right below
             runCatching { ServerEndpoint.parseForBuild(state.baseUrl) }.getOrNull()
         if (endpoint == null) {
             viewModelScope.launch {

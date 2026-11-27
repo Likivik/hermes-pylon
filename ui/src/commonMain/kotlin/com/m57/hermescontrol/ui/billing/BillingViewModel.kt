@@ -111,6 +111,7 @@ class BillingViewModel : ViewModel() {
     fun preview(subscriptionTypeId: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isActionInFlight = true, errorMessage = null, actionMessage = null) }
+            // inventory: handled — errorMessage carries the failure and the spinner is cleared
             runCatching { BillingRepository.previewSubscription(subscriptionTypeId) }
                 .onSuccess { preview ->
                     if (preview == null) {
@@ -143,6 +144,7 @@ class BillingViewModel : ViewModel() {
     fun upgrade(subscriptionTypeId: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isActionInFlight = true, errorMessage = null, actionMessage = null) }
+            // inventory: handled — errorMessage carries the failure and the spinner is cleared
             runCatching { BillingRepository.upgradeSubscription(subscriptionTypeId) }
                 .onSuccess { resp ->
                     if (resp == null) {
@@ -187,6 +189,7 @@ class BillingViewModel : ViewModel() {
     ) {
         viewModelScope.launch {
             _uiState.update { it.copy(isActionInFlight = true, errorMessage = null, actionMessage = null) }
+            // inventory: handled — errorMessage carries the failure and the spinner is cleared
             runCatching { BillingRepository.changeSubscription(SubscriptionChangeRequest(subscriptionTypeId, cancel)) }
                 .onSuccess { resp ->
                     if (resp == null) {
@@ -226,6 +229,7 @@ class BillingViewModel : ViewModel() {
     fun resume() {
         viewModelScope.launch {
             _uiState.update { it.copy(isActionInFlight = true, errorMessage = null, actionMessage = null) }
+            // inventory: handled — errorMessage carries the failure and the spinner is cleared
             runCatching { BillingRepository.resumeSubscription() }
                 .onSuccess { resp ->
                     if (resp == null) {

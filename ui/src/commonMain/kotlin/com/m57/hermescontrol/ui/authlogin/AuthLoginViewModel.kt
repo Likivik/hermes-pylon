@@ -117,9 +117,14 @@ class AuthLoginViewModel(
     private fun restoreNativeSession() {
         val store = com.m57.hermescontrol.data.local.AuthManager.secretStoreOrNull() ?: return
         val endpoint =
-                        runCatching { ServerEndpoint.parseForBuild(_uiState.value.baseUrl) }
-                            .onFailure { HermesLog.w(TAG, "the stored base URL no longer parses (${it::class.simpleName})") }
-                            .getOrNull() ?: return
+            runCatching { ServerEndpoint.parseForBuild(_uiState.value.baseUrl) }
+                .onFailure {
+                    HermesLog.w(
+                        TAG,
+                        "the stored base URL no longer parses (${it::class.simpleName})",
+                    )
+                }
+                .getOrNull() ?: return
         val session =
             com.m57.hermescontrol.data.local.NativeSession(
                 exchange = NativeTokenExchange(com.m57.hermescontrol.data.remote.createHermesHttpClient()),
@@ -224,7 +229,12 @@ class AuthLoginViewModel(
         val warning =
             runCatching {
                 ServerEndpoint.parseForBuild(value).securityWarning
-            }.onFailure { HermesLog.d(TAG, "no security warning: the URL does not parse yet (${it::class.simpleName})") }
+            }.onFailure {
+                HermesLog.d(
+                    TAG,
+                    "no security warning: the URL does not parse yet (${it::class.simpleName})",
+                )
+            }
                 .getOrNull()
         _uiState.update {
             it.copy(
@@ -442,10 +452,15 @@ class AuthLoginViewModel(
     fun signInWithNous(openBrowser: (String) -> Unit) {
         val store = com.m57.hermescontrol.data.local.AuthManager.secretStoreOrNull()
         val endpoint =
-                        runCatching { ServerEndpoint.parseForBuild(_uiState.value.baseUrl) }
-                            .onFailure { HermesLog.w(TAG, "native sign-in has no usable endpoint (${it::class.simpleName})") }
-                            .getOrNull()
-                    if (store == null || endpoint == null) {
+            runCatching { ServerEndpoint.parseForBuild(_uiState.value.baseUrl) }
+                .onFailure {
+                    HermesLog.w(
+                        TAG,
+                        "native sign-in has no usable endpoint (${it::class.simpleName})",
+                    )
+                }
+                .getOrNull()
+        if (store == null || endpoint == null) {
             _uiState.update {
                 it.copy(isLoading = false, nousError = NousLoginError(NousLoginErrorKind.Unavailable))
             }
@@ -508,10 +523,15 @@ class AuthLoginViewModel(
      */
     fun signInWithNousInBrowser(open: (String) -> Unit) {
         val endpoint =
-                        runCatching { ServerEndpoint.parseForBuild(_uiState.value.baseUrl) }
-                            .onFailure { HermesLog.w(TAG, "browser sign-in has no usable endpoint (${it::class.simpleName})") }
-                            .getOrNull()
-                    if (endpoint == null) {
+            runCatching { ServerEndpoint.parseForBuild(_uiState.value.baseUrl) }
+                .onFailure {
+                    HermesLog.w(
+                        TAG,
+                        "browser sign-in has no usable endpoint (${it::class.simpleName})",
+                    )
+                }
+                .getOrNull()
+        if (endpoint == null) {
             _uiState.update { it.copy(nousError = NousLoginError(NousLoginErrorKind.Unavailable)) }
             return
         }

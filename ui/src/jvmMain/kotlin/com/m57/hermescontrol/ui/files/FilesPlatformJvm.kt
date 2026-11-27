@@ -2,6 +2,7 @@ package com.m57.hermescontrol.ui.files
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import com.m57.hermescontrol.util.HermesLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.awt.Desktop
@@ -10,7 +11,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import javax.swing.JFileChooser
-import com.m57.hermescontrol.util.HermesLog
 
 /** Desktop: a file chooser for picking, `Desktop.open` for opening downloads. */
 @Composable
@@ -52,7 +52,12 @@ actual fun rememberFilesPlatform(): FilesPlatform =
                         check(canOpenDownloads) { "desktop integration unavailable" }
                         Desktop.getDesktop().open(File(cachePath))
                     }
-                    .onFailure { HermesLog.w("FilesPlatform", "the file could not be opened (${it::class.simpleName})") }
+                        .onFailure {
+                            HermesLog.w(
+                                "FilesPlatform",
+                                "the file could not be opened (${it::class.simpleName})",
+                            )
+                        }
                 }
 
             override fun formatSize(bytes: Long): String = humanSize(bytes)

@@ -1,9 +1,9 @@
 package com.m57.hermescontrol.data.remote
 
+import com.m57.hermescontrol.util.HermesLog
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
-import com.m57.hermescontrol.util.HermesLog
 
 private const val TAG = "AuthPayloads"
 

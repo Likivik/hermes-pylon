@@ -78,7 +78,9 @@ internal class TabSecretStore : SecretStore {
                 val value = jsSessionGet(key) ?: continue
                 values[key.removePrefix(PREFIX)] = value
             }
-        }.onFailure { HermesLog.w("TabSecretStore", "the tab store could not be read (${it::class.simpleName}); starting empty") }
+        }.onFailure {
+            HermesLog.w("TabSecretStore", "the tab store could not be read (${it::class.simpleName}); starting empty")
+        }
     }
 
     override fun getString(logicalKey: String): String? {
@@ -109,7 +111,12 @@ internal class TabSecretStore : SecretStore {
                 val key = jsSessionKey(i) ?: continue
                 if (key.startsWith(PREFIX + prefix) && !jsSessionRemove(key)) storeWarn("secret delete-prefix")
             }
-        }.onFailure { HermesLog.w("TabSecretStore", "the tab store could not be enumerated (${it::class.simpleName}); some keys may remain") }
+        }.onFailure {
+            HermesLog.w(
+                "TabSecretStore",
+                "the tab store could not be enumerated (${it::class.simpleName}); some keys may remain",
+            )
+        }
     }
 
     private companion object {

@@ -1,10 +1,10 @@
 package com.m57.hermescontrol.data.remote
 
+import com.m57.hermescontrol.util.HermesLog
 import com.m57.hermescontrol.util.nowMillis
 import io.ktor.http.HttpHeaders
 import io.ktor.http.Url
 import io.ktor.http.parseServerSetCookieHeader
-import com.m57.hermescontrol.util.HermesLog
 
 /**
  * The in-memory and on-disk cookie model.
@@ -91,9 +91,14 @@ fun parseSetCookie(
     header: String,
 ): CookieHolder? {
     val parsed =
-            runCatching { parseServerSetCookieHeader(header) }
-                .onFailure { HermesLog.w("CookieSerialization", "a Set-Cookie header did not parse (${it::class.simpleName}); the cookie is dropped") }
-                .getOrNull() ?: return null
+        runCatching { parseServerSetCookieHeader(header) }
+            .onFailure {
+                HermesLog.w(
+                    "CookieSerialization",
+                    "a Set-Cookie header did not parse (${it::class.simpleName}); the cookie is dropped",
+                )
+            }
+            .getOrNull() ?: return null
     if (parsed.name.isEmpty()) return null
     val now = nowMillis()
     val maxAge = parsed.maxAge

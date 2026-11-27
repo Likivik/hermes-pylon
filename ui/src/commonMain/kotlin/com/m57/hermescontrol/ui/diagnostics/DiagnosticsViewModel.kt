@@ -107,6 +107,7 @@ class DiagnosticsViewModel {
         _state.update { it.copy(running = true, checks = emptyList()) }
         scope.launch {
             refreshFacts()
+            // inventory: handled — optional detail: its absence is a shorter report
             val endpoint = runCatching { GatewayPlatform.endpoint() }.getOrNull()
             if (endpoint == null) {
                 _state.update { current ->

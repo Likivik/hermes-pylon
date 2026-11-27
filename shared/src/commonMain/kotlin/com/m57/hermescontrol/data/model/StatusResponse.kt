@@ -81,7 +81,12 @@ object NullableMemoryPressureStatusSerializer : KSerializer<MemoryPressureStatus
         return runCatching {
             decoder.json.decodeFromJsonElement(MemoryPressureStatus.serializer(), element)
         }.map { value -> value.copy(pressure = normalizePressureValue(value.pressure)) }
-            .onFailure { HermesLog.w(TAG, "memory pressure is unreadable (${it::class.simpleName}); reporting unknown") }
+            .onFailure {
+                HermesLog.w(
+                    TAG,
+                    "memory pressure is unreadable (${it::class.simpleName}); reporting unknown",
+                )
+            }
             .getOrElse { MemoryPressureStatus(pressure = "unknown") }
     }
 

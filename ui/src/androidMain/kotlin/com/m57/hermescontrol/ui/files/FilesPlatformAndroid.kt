@@ -10,10 +10,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.FileProvider
+import com.m57.hermescontrol.util.HermesLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
-import com.m57.hermescontrol.util.HermesLog
 
 /**
  * Storage Access Framework for picking, a FileProvider for opening — exactly
@@ -67,6 +67,7 @@ actual fun rememberFilesPlatform(): FilesPlatform {
                 mimeType: String,
             ): Result<Unit> =
                 withContext(Dispatchers.IO) {
+                    // inventory: handled — the Result carries the failure to the caller
                     runCatching {
                         val uri: Uri =
                             FileProvider.getUriForFile(
@@ -81,7 +82,12 @@ actual fun rememberFilesPlatform(): FilesPlatform {
                             }
                         context.startActivity(intent)
                     }
-                    .onFailure { HermesLog.w("FilesPlatform", "the file could not be opened (${it::class.simpleName})") }
+                        .onFailure {
+                            HermesLog.w(
+                                "FilesPlatform",
+                                "the file could not be opened (${it::class.simpleName})",
+                            )
+                        }
                 }
 
             override fun formatSize(bytes: Long): String = Formatter.formatShortFileSize(context, bytes)

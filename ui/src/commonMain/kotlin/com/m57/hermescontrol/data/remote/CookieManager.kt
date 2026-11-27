@@ -1,5 +1,6 @@
 package com.m57.hermescontrol.data.remote
 
+import com.m57.hermescontrol.util.HermesLog
 import com.m57.hermescontrol.util.ioDispatcher
 import com.m57.hermescontrol.util.nowMillis
 import com.m57.hermescontrol.util.synchronizedOn
@@ -8,7 +9,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlin.concurrent.Volatile
-import com.m57.hermescontrol.util.HermesLog
 
 /**
  * Coordinator for the issue #470 cookie stack.
@@ -48,9 +48,14 @@ object CookieManager {
     fun cookieHeaderFor(url: String): String {
         val current = jar ?: return ""
         val target =
-                    runCatching { Url(url) }
-                        .onFailure { HermesLog.w("CookieManager", "the request URL did not parse (${it::class.simpleName}); no cookies attached") }
-                        .getOrNull() ?: return ""
+            runCatching { Url(url) }
+                .onFailure {
+                    HermesLog.w(
+                        "CookieManager",
+                        "the request URL did not parse (${it::class.simpleName}); no cookies attached",
+                    )
+                }
+                .getOrNull() ?: return ""
         return current.loadForRequest(target).joinToString("; ") { "${it.name}=${it.value}" }
     }
 

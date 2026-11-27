@@ -269,6 +269,7 @@ private val searchSnippetJson = Json { isLenient = true }
 fun cleanSearchSnippet(snippet: String): String {
     val withoutHighlightMarkers = snippet.replace(">>>", "").replace("<<<", "").trim()
     val parsedSnippet =
+        // inventory: handled — an unparseable snippet is shown as its raw text
         runCatching { searchSnippetJson.parseToJsonElement(withoutHighlightMarkers) }.getOrNull()
     val displayText = parsedSnippet?.searchText() ?: withoutHighlightMarkers
     return displayText

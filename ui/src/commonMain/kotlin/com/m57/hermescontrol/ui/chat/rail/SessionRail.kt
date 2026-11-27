@@ -414,6 +414,7 @@ private fun ReorderableCollectionItemScope.RailItem(
             // Animate once on appear (iterations=1) — no looping noise.
             val kodeinEmoji =
                 remember(iconText) {
+                    // inventory: handled — no emoji found means the text placeholder is used
                     runCatching { emojiFromChar(iconText) }.getOrNull()
                 }
             if (kodeinEmoji != null) {
